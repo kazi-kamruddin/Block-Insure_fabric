@@ -1,10 +1,15 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { demoAccounts, type DemoAccount } from "@/lib/auth/accounts";
+import {
+  demoAccounts,
+  workspaceForAccount,
+  type DemoAccount,
+} from "@/lib/auth/accounts";
+import type { RoleDashboard } from "@/lib/dashboard/build-dashboard";
 
-type AssetType = "package" | "policy" | "claim" | "evidence" | "settlement" | "claim-history";
+type AssetType = "package" | "policy" | "claim" | "evidence" | "settlement" | "access" | "claim-history";
 
 const hash = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 
@@ -36,7 +41,13 @@ async function responseJson(response: Response) {
   return body;
 }
 
-export function WorkspaceClient({ initialAccount }: { initialAccount: DemoAccount | null }) {
+export function WorkspaceClient({
+  initialAccount,
+  initialDashboard,
+}: {
+  initialAccount: DemoAccount | null;
+  initialDashboard: RoleDashboard | null;
+}) {
   const router = useRouter();
   const [account, setAccount] = useState(initialAccount);
   const [command, setCommand] = useState("");
@@ -49,7 +60,22 @@ export function WorkspaceClient({ initialAccount }: { initialAccount: DemoAccoun
   const [ciphertext, setCiphertext] = useState<File | null>(null);
   const [output, setOutput] = useState("Ready.");
   const [busy, setBusy] = useState(false);
+  const [dashboard, setDashboard] = useState<RoleDashboard | null>(initialDashboard);
+  const [dashboardLoading, setDashboardLoading] = useState(Boolean(initialAccount && !initialDashboard));
   const templates = useMemo(() => account ? commandTemplates[account.role] : [], [account]);
+
+  const refreshDashboard = useCallback(async () => {
+    setDashboardLoading(true);
+    try {
+      const body = await responseJson(await fetch("/api/dashboard", { cache: "no-store" }));
+      setDashboard(body.dashboard);
+    } catch (error) {
+      setDashboard(null);
+      setOutput(error instanceof Error ? error.message : "Dashboard failed to load");
+    } finally {
+      setDashboardLoading(false);
+    }
+  }, []);
 
   async function login(accountId: string) {
     setBusy(true);
@@ -59,9 +85,10 @@ export function WorkspaceClient({ initialAccount }: { initialAccount: DemoAccoun
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ accountId }),
       }));
-      setAccount(body.account);
+      const signedInAccount = body.account as DemoAccount;
+      setAccount(signedInAccount);
       setOutput(`Signed in as ${body.account.displayName}.`);
-      router.refresh();
+      router.push(`/workspace/${workspaceForAccount(signedInAccount)}`);
     } catch (error) {
       setOutput(error instanceof Error ? error.message : "Sign-in failed");
     } finally {
@@ -72,8 +99,10 @@ export function WorkspaceClient({ initialAccount }: { initialAccount: DemoAccoun
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST" });
     setAccount(null);
+    setDashboard(null);
     setCommand("");
     setOutput("Signed out.");
+    router.push("/workspace");
     router.refresh();
   }
 
@@ -87,6 +116,7 @@ export function WorkspaceClient({ initialAccount }: { initialAccount: DemoAccoun
         body: JSON.stringify(payload),
       }));
       setOutput(JSON.stringify(body.result, null, 2));
+      await refreshDashboard();
     } catch (error) {
       setOutput(error instanceof Error ? error.message : "Command failed");
     } finally {
@@ -134,6 +164,7 @@ export function WorkspaceClient({ initialAccount }: { initialAccount: DemoAccoun
       form.set("ciphertext", ciphertext);
       const body = await responseJson(await fetch("/api/evidence", { method: "POST", body: form }));
       setOutput(JSON.stringify(body, null, 2));
+      await refreshDashboard();
     } catch (error) {
       setOutput(error instanceof Error ? error.message : "Evidence upload failed");
     } finally {
@@ -171,7 +202,73 @@ export function WorkspaceClient({ initialAccount }: { initialAccount: DemoAccoun
         <button className="secondary button" onClick={logout}>Sign out</button>
       </header>
 
-      <div className="workGrid">
+      <section className="roleDashboard" aria-busy={dashboardLoading}>
+        <div className="dashboardIntro">
+          <div>
+            <span className="kicker">Organization-scoped overview</span>
+            <h2>{dashboard?.title ?? "Loading ledger overview…"}</h2>
+          </div>
+          <p>{dashboard?.description ?? "Evaluating current world state through Fabric Gateway."}</p>
+        </div>
+
+        {dashboard && (
+          <>
+            <div className="metricGrid">
+              {dashboard.metrics.map((metric) => (
+                <article className="metricCard" key={metric.label}>
+                  <span>{metric.label}</span>
+                  <strong>{metric.value}</strong>
+                  <small>{metric.hint}</small>
+                </article>
+              ))}
+            </div>
+
+            <div className="dashboardGrid">
+              <article className="queuePanel">
+                <div className="panelHeading">
+                  <div><span className="kicker">Actionable now</span><h3>{dashboard.queueTitle}</h3></div>
+                  <button className="textButton" disabled={dashboardLoading} onClick={refreshDashboard}>Refresh</button>
+                </div>
+                {dashboard.queue.length === 0 ? (
+                  <p className="emptyState">No ledger records currently require this role.</p>
+                ) : (
+                  <div className="queueList">
+                    {dashboard.queue.map((item) => (
+                      <div className="queueItem" key={item.id}>
+                        <div>
+                          <div className="queueTitle"><strong>{item.title}</strong><span className={`status status-${item.status.toLowerCase()}`}>{item.status.replaceAll("_", " ")}</span></div>
+                          <p>{item.detail}</p>
+                        </div>
+                        {item.command && <button onClick={() => {
+                          setCommand(JSON.stringify(item.command, null, 2));
+                          document.getElementById("transaction-console")?.scrollIntoView({ behavior: "smooth" });
+                        }}>{item.commandLabel}</button>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </article>
+
+              <article className="recentPanel">
+                <span className="kicker">Ledger activity</span>
+                <h3>Recently updated claims</h3>
+                {dashboard.recentClaims.length === 0 ? <p className="emptyState">No visible claims yet.</p> : (
+                  <div className="recentList">
+                    {dashboard.recentClaims.map((claim) => (
+                      <button key={claim.id} onClick={() => { setAssetType("claim"); setAssetId(claim.id); }}>
+                        <span><strong>{claim.id}</strong><small>{claim.policyId}</small></span>
+                        <i className={`status status-${claim.status.toLowerCase()}`}>{claim.status.replaceAll("_", " ")}</i>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </article>
+            </div>
+          </>
+        )}
+      </section>
+
+      <div className="workGrid" id="transaction-console">
         <article className="workCard">
           <span className="kicker">Submit transaction</span>
           <h2>Role commands</h2>
@@ -192,11 +289,12 @@ export function WorkspaceClient({ initialAccount }: { initialAccount: DemoAccoun
               <option value="package">Policy package</option><option value="policy">Policy</option>
               <option value="claim">Claim</option><option value="evidence">Evidence reference</option>
               <option value="settlement">Settlement</option><option value="claim-history">Claim history</option>
+              {(account.role === "insurerAdmin" || account.role === "auditor") && <option value="access">Evidence access log</option>}
             </select>
           </label>
           <label>Asset ID<input value={assetId} onChange={(event) => setAssetId(event.target.value)} placeholder="claim-1" /></label>
           <div className="queryActions">
-            <button className="primary button" disabled={busy} onClick={queryAsset}>Find by ID</button>
+            <button className="primary button" disabled={busy || assetType === "access"} onClick={queryAsset}>Find by ID</button>
             <button className="secondary button" disabled={busy || assetType === "claim-history"} onClick={listAssets}>List all allowed</button>
           </div>
         </article>

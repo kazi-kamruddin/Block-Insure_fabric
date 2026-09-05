@@ -3,7 +3,7 @@ import { z } from "zod";
 import { currentSession } from "@/lib/auth/current-session";
 import { ledger } from "@/lib/fabric/ledger";
 
-const assetTypeSchema = z.enum(["package", "policy", "claim", "evidence", "settlement"]);
+const assetTypeSchema = z.enum(["package", "policy", "claim", "evidence", "settlement", "access"]);
 type RouteContext = { params: Promise<{ assetType: string }> };
 
 export const runtime = "nodejs";
@@ -56,6 +56,12 @@ export async function GET(_request: Request, context: RouteContext) {
         result = settlements.filter((settlement) => ownedClaimIds.has(settlement.claimId));
         break;
       }
+      case "access":
+        if (session.role !== "insurerAdmin" && session.role !== "auditor") {
+          return NextResponse.json({ message: "This account cannot inspect evidence access logs" }, { status: 403 });
+        }
+        result = await ledger.listEvidenceAccessRecords();
+        break;
     }
     return NextResponse.json({ result });
   } catch (error) {

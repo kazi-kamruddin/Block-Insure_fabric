@@ -59,6 +59,7 @@ func (c *Contract) RecordAuditorDecision(ctx contractapi.TransactionContextInter
 	} else {
 		claim.Status = "REJECTED"
 	}
+	claim.AuditorDecisionID = decisionID
 	claim.UpdatedAt = now
 	if err := overwriteAsset(ctx, "claim", claimID, claim); err != nil {
 		return nil, err
@@ -147,6 +148,10 @@ func (c *Contract) ReadClaim(ctx contractapi.TransactionContextInterface, id str
 
 func (c *Contract) ReadEvidenceReference(ctx contractapi.TransactionContextInterface, id string) (*EvidenceReference, error) {
 	return getState[EvidenceReference](ctx, "evidenceReference", id)
+}
+
+func (c *Contract) ReadHospitalVerification(ctx contractapi.TransactionContextInterface, id string) (*HospitalVerification, error) {
+	return getState[HospitalVerification](ctx, "hospitalVerification", id)
 }
 
 func (c *Contract) ReadSettlement(ctx contractapi.TransactionContextInterface, id string) (*Settlement, error) {

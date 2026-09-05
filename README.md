@@ -53,3 +53,16 @@ demo sessions, role-gated workflow commands, ledger queries, and ciphertext-only
 evidence storage with on-ledger integrity references. Demo authentication and
 local filesystem storage are development adapters, not production identity or
 object-storage implementations.
+
+## Complete verification
+
+With Docker Desktop and the Fabric network running, execute every code, network,
+security, browser, and live-workflow check from Windows PowerShell:
+
+```powershell
+.\scripts\verify-all.ps1
+```
+
+The command writes an ignored machine-readable summary to
+`verification-results/latest.json`. Its browser phase creates uniquely named
+local ledger records and proves role isolation plus the full settlement path.

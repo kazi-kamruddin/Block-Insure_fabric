@@ -146,6 +146,7 @@ func (c *Contract) VerifyClaim(ctx contractapi.TransactionContextInterface, clai
 	} else {
 		claim.Status = "REJECTED"
 	}
+	claim.HospitalVerificationID = verificationID
 	claim.UpdatedAt = now
 	if err := overwriteAsset(ctx, "claim", claimID, claim); err != nil {
 		return nil, err

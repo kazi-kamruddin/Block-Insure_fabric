@@ -1,6 +1,6 @@
 package insurance
 
-const SchemaVersion = 1
+const SchemaVersion = 2
 
 type PolicyPackage struct {
 	AssetType          string `json:"assetType"`
@@ -35,18 +35,33 @@ type Policy struct {
 }
 
 type Claim struct {
-	AssetType       string   `json:"assetType"`
-	SchemaVersion   int      `json:"schemaVersion"`
-	ID              string   `json:"id"`
-	PolicyID        string   `json:"policyId"`
-	ClaimantID      string   `json:"claimantId"`
-	AmountMinor     int64    `json:"amountMinor"`
-	IncidentDate    string   `json:"incidentDate"`
-	DescriptionHash string   `json:"descriptionHash"`
-	EvidenceIDs     []string `json:"evidenceIds"`
-	Status          string   `json:"status"`
-	CreatedAt       string   `json:"createdAt"`
-	UpdatedAt       string   `json:"updatedAt"`
+	AssetType              string   `json:"assetType"`
+	SchemaVersion          int      `json:"schemaVersion"`
+	ID                     string   `json:"id"`
+	PolicyID               string   `json:"policyId"`
+	ClaimantID             string   `json:"claimantId"`
+	AmountMinor            int64    `json:"amountMinor"`
+	IncidentDate           string   `json:"incidentDate"`
+	DescriptionHash        string   `json:"descriptionHash"`
+	EvidenceIDs            []string `json:"evidenceIds"`
+	HospitalVerificationID string   `json:"hospitalVerificationId"`
+	AuditorDecisionID      string   `json:"auditorDecisionId"`
+	Status                 string   `json:"status"`
+	CreatedAt              string   `json:"createdAt"`
+	UpdatedAt              string   `json:"updatedAt"`
+}
+
+type EvidenceAccessRecord struct {
+	AssetType        string `json:"assetType"`
+	SchemaVersion    int    `json:"schemaVersion"`
+	ID               string `json:"id"`
+	EvidenceID       string `json:"evidenceId"`
+	ClaimID          string `json:"claimId"`
+	AccessorMSP      string `json:"accessorMsp"`
+	AccessorRole     string `json:"accessorRole"`
+	AccessorIdentity string `json:"accessorIdentity"`
+	Purpose          string `json:"purpose"`
+	CreatedAt        string `json:"createdAt"`
 }
 
 type EvidenceReference struct {

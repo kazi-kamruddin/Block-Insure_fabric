@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit --incremental false",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@grpc/grpc-js": "1.14.4",
@@ -23,6 +24,7 @@
     "@types/node": "26.4.1",
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.7",
+    "@playwright/test": "1.63.0",
     "eslint": "^9.0.0",
     "eslint-config-next": "16.3.4",
     "typescript": "^5.9.0",

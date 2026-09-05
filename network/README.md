@@ -54,7 +54,8 @@ bash network/scripts/network.sh reset
   without replacing its ledger state.
 - `status` lists containers and each peer's joined channels.
 - `verify` checks all 14 containers, five CAs, four CouchDB instances, the
-  orderer channel, and each peer ledger.
+  orderer channel, and each peer ledger. When chaincode is committed, it also
+  checks version `0.3.0` on all four peers and evaluates schema version `2`.
 - `down` stops and removes containers while retaining identities, channel
   artifacts, and Docker ledger volumes.
 - `reset` is destructive: it removes this network's containers, ledger

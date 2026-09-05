@@ -5,12 +5,21 @@ script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 contract_root="$(cd -- "${script_dir}/.." && pwd -P)"
 docker_command=""
 
-if command -v docker >/dev/null && docker info >/dev/null 2>&1; then
-  docker_command="docker"
-elif command -v docker.exe >/dev/null && docker.exe info >/dev/null 2>&1; then
-  docker_command="docker.exe"
-else
-  echo "Docker Desktop is not reachable from this shell." >&2
+for attempt in {1..10}; do
+  if command -v docker >/dev/null && docker info >/dev/null 2>&1; then
+    docker_command="docker"
+    break
+  elif command -v docker.exe >/dev/null && docker.exe info >/dev/null 2>&1; then
+    docker_command="docker.exe"
+    break
+  fi
+  if [ "${attempt}" -lt 10 ]; then
+    echo "Docker is not ready (attempt ${attempt}/10); retrying in 2 seconds..." >&2
+    sleep 2
+  fi
+done
+if [ -z "${docker_command}" ]; then
+  echo "Docker Desktop is not reachable after 10 attempts." >&2
   exit 1
 fi
 

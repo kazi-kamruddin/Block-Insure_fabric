@@ -47,3 +47,15 @@ export const demoAccounts = {
 export function findDemoAccount(id: string): DemoAccount | undefined {
   return demoAccounts[id as DemoAccountId] as DemoAccount | undefined;
 }
+
+export const workspaceByRole: Record<FabricRole, string> = {
+  insurerAdmin: "insurer",
+  policyholder: "policyholder",
+  hospitalOfficer: "hospital",
+  auditor: "auditor",
+  bankOfficer: "bank",
+};
+
+export function workspaceForAccount(account: DemoAccount) {
+  return workspaceByRole[account.role];
+}

@@ -5,6 +5,9 @@ script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 network_root="$(cd -- "${script_dir}/.." && pwd -P)"
 samples_root="${network_root}/.fabric/fabric-samples"
 channel_name="insurance-channel"
+chaincode_name="${CHAINCODE_NAME:-insurance-contract}"
+expected_chaincode_version="${EXPECTED_CHAINCODE_VERSION:-0.3.0}"
+expected_schema_version="${EXPECTED_SCHEMA_VERSION:-2}"
 compose_ca="${network_root}/compose/compose-ca.yaml"
 compose_network="${network_root}/compose/compose-network.yaml"
 organizations="${network_root}/organizations"
@@ -16,14 +19,22 @@ require_tool() { command -v "$1" >/dev/null || { echo "Missing required tool: $1
 docker_command=""
 
 select_docker() {
-  if command -v docker >/dev/null && docker info >/dev/null 2>&1; then
-    docker_command="docker"
-  elif command -v docker.exe >/dev/null && docker.exe info >/dev/null 2>&1; then
-    docker_command="docker.exe"
-  else
-    echo "Docker Desktop is not reachable from this shell." >&2
-    exit 1
-  fi
+  local attempt
+  for attempt in {1..10}; do
+    if command -v docker >/dev/null && docker info >/dev/null 2>&1; then
+      docker_command="docker"
+      return
+    elif command -v docker.exe >/dev/null && docker.exe info >/dev/null 2>&1; then
+      docker_command="docker.exe"
+      return
+    fi
+    if [ "${attempt}" -lt 10 ]; then
+      echo "Docker is not ready (attempt ${attempt}/10); retrying in 2 seconds..." >&2
+      sleep 2
+    fi
+  done
+  echo "Docker Desktop is not reachable after 10 attempts." >&2
+  exit 1
 }
 
 docker_cli() { "${docker_command}" "$@"; }
@@ -159,7 +170,7 @@ verify() {
     peer0.insurer.blockinsure.test peer0.hospital.blockinsure.test
     peer0.auditor.blockinsure.test peer0.bank.blockinsure.test
   )
-  local container port org ca_name
+  local container port org ca_name definition schema chaincode_verified=false
   require_tool curl
   require_tool fabric-ca-client
   require_tool osnadmin
@@ -204,7 +215,40 @@ auditor AuditorMSP 9051
 bank BankMSP 12051
 EOF
 
-  echo "Verified: 14 services healthy, 5 CAs reachable, 4 CouchDBs ready, and all 4 peers joined ${channel_name}."
+  set_peer_context insurer InsurerMSP 7051
+  definition="$(peer lifecycle chaincode querycommitted \
+    --channelID "${channel_name}" --name "${chaincode_name}" 2>/dev/null || true)"
+  if [[ -n "${definition}" ]]; then
+    while read -r org msp port; do
+      set_peer_context "${org}" "${msp}" "${port}"
+      definition="$(peer lifecycle chaincode querycommitted \
+        --channelID "${channel_name}" --name "${chaincode_name}")"
+      if ! grep -q "Version: ${expected_chaincode_version}," <<<"${definition}"; then
+        echo "Verification failed: ${org} peer does not report ${chaincode_name} ${expected_chaincode_version}." >&2
+        exit 1
+      fi
+    done <<'EOF'
+insurer InsurerMSP 7051
+hospital HospitalMSP 8051
+auditor AuditorMSP 9051
+bank BankMSP 12051
+EOF
+
+    set_peer_context insurer InsurerMSP 7051
+    schema="$(peer chaincode query -C "${channel_name}" -n "${chaincode_name}" \
+      -c '{"function":"GetSchemaVersion","Args":[]}')"
+    if [[ "${schema}" != "${expected_schema_version}" ]]; then
+      echo "Verification failed: expected chaincode schema ${expected_schema_version}, received ${schema}." >&2
+      exit 1
+    fi
+    chaincode_verified=true
+  fi
+
+  if [[ "${chaincode_verified}" == true ]]; then
+    echo "Verified: 14 services healthy, 5 CAs reachable, 4 CouchDBs ready, all 4 peers joined ${channel_name}, and ${chaincode_name} ${expected_chaincode_version} exposes schema ${expected_schema_version}."
+  else
+    echo "Verified: 14 services healthy, 5 CAs reachable, 4 CouchDBs ready, and all 4 peers joined ${channel_name}; no committed ${chaincode_name} was found."
+  fi
 }
 
 select_docker

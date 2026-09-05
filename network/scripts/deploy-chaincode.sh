@@ -11,7 +11,7 @@ chaincode_root="${project_root}/chaincode/insurance-contract"
 
 channel_name="${CHANNEL_NAME:-insurance-channel}"
 chaincode_name="${CHAINCODE_NAME:-insurance-contract}"
-chaincode_version="${CHAINCODE_VERSION:-0.2.0}"
+chaincode_version="${CHAINCODE_VERSION:-0.3.0}"
 chaincode_sequence="${CHAINCODE_SEQUENCE:-}"
 chaincode_label="${chaincode_name}_${chaincode_version}"
 package_file="${artifacts}/${chaincode_label}.tar.gz"
@@ -29,16 +29,26 @@ package_chaincode() {
 
   local docker_command="" chaincode_mount="${chaincode_root}" artifacts_mount="${artifacts}"
   local bin_mount="${samples_root}/bin" config_mount="${samples_root}/config"
-  if command -v docker >/dev/null && docker info >/dev/null 2>&1; then
-    docker_command="docker"
-  elif command -v docker.exe >/dev/null && docker.exe info >/dev/null 2>&1; then
-    docker_command="docker.exe"
-    chaincode_mount="$(wslpath -w "${chaincode_root}")"
-    artifacts_mount="$(wslpath -w "${artifacts}")"
-    bin_mount="$(wslpath -w "${samples_root}/bin")"
-    config_mount="$(wslpath -w "${samples_root}/config")"
-  else
-    echo "Go is unavailable and Docker Desktop cannot provide the isolated Go packager." >&2
+  local attempt
+  for attempt in {1..10}; do
+    if command -v docker >/dev/null && docker info >/dev/null 2>&1; then
+      docker_command="docker"
+      break
+    elif command -v docker.exe >/dev/null && docker.exe info >/dev/null 2>&1; then
+      docker_command="docker.exe"
+      chaincode_mount="$(wslpath -w "${chaincode_root}")"
+      artifacts_mount="$(wslpath -w "${artifacts}")"
+      bin_mount="$(wslpath -w "${samples_root}/bin")"
+      config_mount="$(wslpath -w "${samples_root}/config")"
+      break
+    fi
+    if [ "${attempt}" -lt 10 ]; then
+      echo "Docker is not ready (attempt ${attempt}/10); retrying in 2 seconds..." >&2
+      sleep 2
+    fi
+  done
+  if [ -z "${docker_command}" ]; then
+    echo "Go is unavailable and Docker Desktop cannot provide the isolated Go packager after 10 attempts." >&2
     exit 1
   fi
 

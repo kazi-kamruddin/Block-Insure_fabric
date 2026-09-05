@@ -198,6 +198,9 @@ func TestPolicyToSettlementWorkflow(t *testing.T) {
 	if claim.Status != "SETTLED" {
 		t.Fatalf("expected SETTLED claim, got %s", claim.Status)
 	}
+	if claim.HospitalVerificationID != "verification-001" || claim.AuditorDecisionID != "decision-001" {
+		t.Fatalf("claim did not retain verification and decision links: %+v", claim)
+	}
 }
 
 func TestAuthorizationAndInvalidTransitions(t *testing.T) {
@@ -249,5 +252,40 @@ func TestListQueriesUseDeterministicCompositeKeyOrder(t *testing.T) {
 	requireNoError(t, err)
 	if len(packages) != 2 || packages[0].ID != "package-a" || packages[1].ID != "package-z" {
 		t.Fatalf("unexpected package list order: %+v", packages)
+	}
+}
+
+func TestEvidenceAccessAuthorizationAndAuditRecord(t *testing.T) {
+	contract := &Contract{}
+	ctx := &testContext{stub: newMemoryStub()}
+	hash := strings.Repeat("a", 64)
+
+	setIdentity(ctx, "insurer-admin", "InsurerMSP", "insurerAdmin", nil)
+	_, err := contract.CreatePolicyPackage(ctx, "package-access", "Access", "", 100, 1_000, hash)
+	requireNoError(t, err)
+	_, err = contract.PublishPolicyPackage(ctx, "package-access")
+	requireNoError(t, err)
+	_, err = contract.IssuePolicy(ctx, "policy-access", "package-access", "policyholder1", "2026-01-01", "2026-12-31")
+	requireNoError(t, err)
+
+	setIdentity(ctx, "policyholder-cert", "InsurerMSP", "policyholder", map[string]string{"subjectId": "policyholder1"})
+	_, err = contract.SubmitClaim(ctx, "claim-access", "policy-access", 500, "2026-06-01", hash)
+	requireNoError(t, err)
+	_, err = contract.AddEvidenceReference(ctx, "claim-access", "evidence-access", "INVOICE", hash, hash)
+	requireNoError(t, err)
+	record, err := contract.RecordEvidenceAccess(ctx, "access-owner", "evidence-access", "DOWNLOAD")
+	requireNoError(t, err)
+	if record.AccessorRole != "policyholder" || record.ClaimID != "claim-access" {
+		t.Fatalf("unexpected evidence access record: %+v", record)
+	}
+
+	setIdentity(ctx, "bank-officer", "BankMSP", "bankOfficer", nil)
+	_, err = contract.RecordEvidenceAccess(ctx, "access-bank", "evidence-access", "DOWNLOAD")
+	requireError(t, err, "cannot retrieve evidence")
+
+	records, err := contract.ListEvidenceAccessRecords(ctx)
+	requireNoError(t, err)
+	if len(records) != 1 || records[0].ID != "access-owner" {
+		t.Fatalf("unexpected evidence access records: %+v", records)
 	}
 }

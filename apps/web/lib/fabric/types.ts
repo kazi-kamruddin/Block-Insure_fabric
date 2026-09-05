@@ -51,9 +51,24 @@ export type Claim = {
   incidentDate: string;
   descriptionHash: string;
   evidenceIds: string[];
+  hospitalVerificationId: string;
+  auditorDecisionId: string;
   status: ClaimStatus;
   createdAt: LedgerTimestamp;
   updatedAt: LedgerTimestamp;
+};
+
+export type EvidenceAccessRecord = {
+  assetType: "evidenceAccess";
+  schemaVersion: number;
+  id: string;
+  evidenceId: string;
+  claimId: string;
+  accessorMsp: string;
+  accessorRole: string;
+  accessorIdentity: string;
+  purpose: "DOWNLOAD" | "VERIFY" | "AUDIT";
+  createdAt: LedgerTimestamp;
 };
 
 export type EvidenceReference = {

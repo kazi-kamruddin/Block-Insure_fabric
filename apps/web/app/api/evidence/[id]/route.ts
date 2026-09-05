@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { currentSession } from "@/lib/auth/current-session";
 import {
@@ -24,15 +25,27 @@ export async function GET(_request: Request, context: RouteContext) {
   try {
     const evidence = await ledger.readEvidenceReference(id.data);
     const claim = await ledger.readClaim(evidence.claimId);
-    if (session.role === "policyholder" && claim.claimantId !== session.subjectId) {
-      return NextResponse.json({ message: "Evidence is not owned by this account" }, { status: 403 });
-    }
+    const authorized =
+      session.role === "insurerAdmin" ||
+      (session.role === "policyholder" && claim.claimantId === session.subjectId) ||
+      (session.role === "hospitalOfficer" && (claim.status === "SUBMITTED" || Boolean(claim.hospitalVerificationId))) ||
+      (session.role === "auditor" && !["SUBMITTED", "HOSPITAL_VERIFIED"].includes(claim.status));
+    if (!authorized) return NextResponse.json({ message: "This account cannot retrieve that evidence" }, { status: 403 });
+
     const reference = evidenceStorageReference(evidence.submittedBy, evidence.id);
     if (hashValue(reference) !== evidence.storageReferenceHash) {
       return NextResponse.json({ message: "Evidence storage reference failed integrity validation" }, { status: 409 });
     }
 
     const ciphertext = await readCiphertext(evidenceStorageRoot(), evidence.submittedBy, evidence.id);
+    const purpose = session.role === "hospitalOfficer"
+      ? "VERIFY"
+      : session.role === "auditor" ? "AUDIT" : "DOWNLOAD";
+    await ledger.recordEvidenceAccess(session.role, {
+      id: `access-${randomUUID()}`,
+      evidenceId: evidence.id,
+      purpose,
+    });
     return new NextResponse(ciphertext, {
       headers: {
         "content-type": "application/octet-stream",

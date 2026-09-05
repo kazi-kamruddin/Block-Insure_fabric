@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 const capabilities = [
   ["Insurer", "Issue policies, govern packages, and authorize settlements"],
   ["Policyholder", "Submit claims and register tamper-evident evidence references"],
@@ -25,7 +27,7 @@ export default function Home() {
           every organization acts through an issued identity and every transition is verifiable.
         </p>
         <div className="actions">
-          <a className="primary" href="/workspace">Open role workspace</a>
+          <Link className="primary" href="/workspace">Open role workspace</Link>
           <a className="secondary" href="/api/fabric/health">Check ledger connection</a>
         </div>
       </section>

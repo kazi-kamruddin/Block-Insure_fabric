@@ -28,6 +28,13 @@ Deterministic composite-key list queries are available for packages, policies,
 claims, evidence references, and settlements; the application applies its
 policyholder ownership filter before returning collections.
 
+Successful evidence retrievals are separately committed as
+`EvidenceAccessRecord` assets. The contract permits the owning policyholder,
+the insurer administrator, a hospital officer in the claim verification path,
+and an auditor after review starts. Bank identities cannot retrieve clinical
+evidence. Claims link their hospital-verification and auditor-decision records
+for audit navigation.
+
 ## Test
 
 Go does not need to be installed on the host:

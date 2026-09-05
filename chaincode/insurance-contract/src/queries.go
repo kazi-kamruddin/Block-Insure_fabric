@@ -18,6 +18,18 @@ func (c *Contract) ListEvidenceReferences(ctx contractapi.TransactionContextInte
 	return listState[EvidenceReference](ctx, "evidenceReference")
 }
 
+func (c *Contract) ListHospitalVerifications(ctx contractapi.TransactionContextInterface) ([]HospitalVerification, error) {
+	return listState[HospitalVerification](ctx, "hospitalVerification")
+}
+
+func (c *Contract) ListAuditorDecisions(ctx contractapi.TransactionContextInterface) ([]AuditorDecision, error) {
+	return listState[AuditorDecision](ctx, "auditorDecision")
+}
+
+func (c *Contract) ListEvidenceAccessRecords(ctx contractapi.TransactionContextInterface) ([]EvidenceAccessRecord, error) {
+	return listState[EvidenceAccessRecord](ctx, "evidenceAccess")
+}
+
 func (c *Contract) ListSettlements(ctx contractapi.TransactionContextInterface) ([]Settlement, error) {
 	return listState[Settlement](ctx, "settlement")
 }

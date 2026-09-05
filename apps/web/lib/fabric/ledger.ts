@@ -8,6 +8,7 @@ import type {
   Claim,
   ClaimHistoryRecord,
   EvidenceReference,
+  EvidenceAccessRecord,
   HospitalVerification,
   Policy,
   PolicyPackage,
@@ -80,6 +81,10 @@ export const ledger = {
 
   listEvidenceReferences() {
     return evaluate<EvidenceReference[]>("insurerAdmin", "ListEvidenceReferences");
+  },
+
+  listEvidenceAccessRecords() {
+    return evaluate<EvidenceAccessRecord[]>("insurerAdmin", "ListEvidenceAccessRecords");
   },
 
   readSettlement(id: string) {
@@ -169,6 +174,19 @@ export const ledger = {
       input.documentType,
       input.contentHash,
       input.storageReferenceHash,
+    );
+  },
+
+  recordEvidenceAccess(
+    role: FabricRole,
+    input: { id: string; evidenceId: string; purpose: "DOWNLOAD" | "VERIFY" | "AUDIT" },
+  ) {
+    return submit<EvidenceAccessRecord>(
+      role,
+      "RecordEvidenceAccess",
+      input.id,
+      input.evidenceId,
+      input.purpose,
     );
   },
 

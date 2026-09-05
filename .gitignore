@@ -4,6 +4,9 @@ node_modules/
 dist/
 coverage/
 /data/evidence/
+/apps/web/test-results/
+/apps/web/playwright-report/
+/verification-results/*.json
 
 # Local configuration and credentials
 .env

@@ -8,10 +8,14 @@ import {
   sessionTtlSeconds,
 } from "@/lib/auth/current-session";
 import { createSessionToken } from "@/lib/auth/session-token";
+import { checkMutationOrigin } from "@/lib/security/request-origin";
 
 const requestSchema = z.object({ accountId: z.string().trim().min(1) });
 
 export async function POST(request: Request) {
+  const trust = checkMutationOrigin(request);
+  if (!trust.trusted) return NextResponse.json({ message: trust.reason }, { status: 403 });
+
   if (process.env.ENABLE_DEMO_AUTH !== "true") {
     return NextResponse.json({ message: "Demo authentication is disabled" }, { status: 404 });
   }
