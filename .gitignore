@@ -1,7 +1,35 @@
-# Private AI context
-/.project-context/
+# Dependencies and build output
+node_modules/
+.next/
+dist/
+coverage/
 
-# Local reference implementation
+# Local configuration and credentials
+.env
+.env.local
+.env.*.local
+!.env.example
+wallet/
+*.pem
+*.key
+
+# Hyperledger Fabric local-network artifacts
+network/organizations/
+network/channel-artifacts/
+network/system-genesis-block/
+network/peerOrganizations/
+network/ordererOrganizations/
+network/vars/
+
+# Logs and temporary files
+logs/
+*.log
+.DS_Store
+Thumbs.db
+
+# Private local context
+/.project-context/
 /.local-reference/
 
+# Permanent local-only Ethereum reference implementation
 /reference/
