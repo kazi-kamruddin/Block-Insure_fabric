@@ -1,0 +1,7 @@
+# Private AI context
+/.project-context/
+
+# Local reference implementation
+/.local-reference/
+
+/reference/
