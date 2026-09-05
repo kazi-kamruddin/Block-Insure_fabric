@@ -1,0 +1,6 @@
+# Fabric and Docker scripts are executed inside Ubuntu/WSL.
+*.sh text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.env text eol=lf
+

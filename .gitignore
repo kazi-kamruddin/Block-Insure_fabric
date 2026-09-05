@@ -3,6 +3,7 @@ node_modules/
 .next/
 dist/
 coverage/
+/data/evidence/
 
 # Local configuration and credentials
 .env
@@ -14,6 +15,7 @@ wallet/
 *.key
 
 # Hyperledger Fabric local-network artifacts
+/network/.fabric/
 network/organizations/
 network/channel-artifacts/
 network/system-genesis-block/
