@@ -26,6 +26,8 @@ material exists under `../../network/organizations`. Check application health at
 - `/api/auth/*` creates and clears HMAC-signed, HTTP-only demo sessions.
 - `/api/workflows` validates and role-gates ledger mutation commands.
 - `/api/ledger/[assetType]/[id]` reads ledger assets and enforces policyholder ownership.
+- `/api/audit/claims/[id]` lets insurer/auditor sessions export a consolidated
+  ledger-backed claim history, evidence/access, verification, decision, and settlement dossier.
 - `/api/evidence` stores an uploaded `.enc` ciphertext exactly once and commits
   its integrity/reference hashes; an origin-checked `POST` to `/api/evidence/[id]`
   records authorized access and returns ciphertext.

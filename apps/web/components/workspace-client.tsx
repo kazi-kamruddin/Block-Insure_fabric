@@ -70,6 +70,7 @@ export function WorkspaceClient({
   const [retrievalPassphrase, setRetrievalPassphrase] = useState("");
   const [retrieving, setRetrieving] = useState(false);
   const [decryptedEvidence, setDecryptedEvidence] = useState<{ url: string; name: string } | null>(null);
+  const [auditClaimId, setAuditClaimId] = useState("");
   const [output, setOutput] = useState("Ready.");
   const [busy, setBusy] = useState(false);
   const [dashboard, setDashboard] = useState<RoleDashboard | null>(initialDashboard);
@@ -442,6 +443,23 @@ export function WorkspaceClient({
             <div className="evidenceActions">
               <button className="primary button" disabled={busy || retrieving} onClick={retrieveEvidence}>{retrieving ? "Retrieving…" : "Retrieve and decrypt"}</button>
               {decryptedEvidence && <a className="secondary button" download={decryptedEvidence.name} href={decryptedEvidence.url}>Download verified plaintext</a>}
+            </div>
+          </article>
+        )}
+
+        {(account.role === "insurerAdmin" || account.role === "auditor") && (
+          <article className="workCard evidenceCard">
+            <span className="kicker">Portable audit artifact</span>
+            <h2>Export claim dossier</h2>
+            <p className="cardNote">Download the ledger-backed claim, full state history, evidence anchors and access events, hospital verification, auditor decision, and settlement as one JSON record.</p>
+            <div className="auditExport">
+              <label>Claim ID<input value={auditClaimId} onChange={(event) => setAuditClaimId(event.target.value)} placeholder="claim-1" /></label>
+              <a
+                aria-disabled={!auditClaimId.trim()}
+                className={`primary button${auditClaimId.trim() ? "" : " disabledLink"}`}
+                download
+                href={auditClaimId.trim() ? `/api/audit/claims/${encodeURIComponent(auditClaimId.trim())}` : undefined}
+              >Download audit JSON</a>
             </div>
           </article>
         )}

@@ -50,3 +50,16 @@ The local network uses one Raft orderer for simplicity. This provides Fabric
 ordering semantics but not orderer fault tolerance. A multi-orderer Raft
 cluster is a future production concern, not a prerequisite for the thesis
 development network.
+
+## Endorsement governance
+
+The channel application policy uses `MAJORITY Endorsement`. With four business
+organizations, a valid chaincode transaction therefore needs endorsements from
+three organization peers. The chaincode definition lifecycle similarly uses
+`MAJORITY LifecycleEndorsement`, while the deployment script deliberately obtains
+definition approvals from all four organizations before commit.
+
+Endorsement is not the actor authorization rule. Every mutating transaction also
+checks the proposal creator's MSP and CA-issued `role` attribute inside chaincode.
+This combination provides cross-organization validation of deterministic state
+transitions without treating any browser or Next.js role claim as authoritative.

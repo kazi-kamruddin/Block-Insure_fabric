@@ -134,6 +134,24 @@ test("five organization sessions complete a Fabric insurance workflow", async ({
       status: "SETTLED",
     });
 
+    const dossierResponse = await insurer.get(`/api/audit/claims/${ids.claim}`);
+    expect(dossierResponse.ok(), await dossierResponse.text()).toBe(true);
+    expect(dossierResponse.headers()["content-disposition"]).toContain(`${ids.claim}-audit.json`);
+    const dossier = await dossierResponse.json();
+    expect(dossier).toMatchObject({
+      schemaVersion: 1,
+      claim: { id: ids.claim, status: "SETTLED" },
+      hospitalVerification: { id: ids.verification, outcome: "VERIFIED" },
+      auditorDecision: { id: ids.decision, outcome: "APPROVE" },
+      settlement: { id: ids.settlement, status: "CONFIRMED" },
+    });
+    expect(dossier.history.length).toBeGreaterThanOrEqual(6);
+    expect(dossier.evidence.some((item: { id: string }) => item.id === ids.evidence)).toBe(true);
+    expect(dossier.evidenceAccess.some((item: { evidenceId: string }) => item.evidenceId === ids.evidence)).toBe(true);
+
+    const forbiddenDossier = await bank.get(`/api/audit/claims/${ids.claim}`);
+    expect(forbiddenDossier.status()).toBe(403);
+
     const forbidden = await bank.post("/api/workflows", {
       data: { operation: "startClaimReview", claimId: ids.claim },
     });

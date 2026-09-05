@@ -6,6 +6,19 @@ the Ethereum prototype—policies, claims, hospital verification, auditor
 review, banking, and evidence auditability—while using organization-issued
 identities and Fabric ledger controls.
 
+## Project status
+
+The five planned implementation areas are complete for a local thesis and
+supervisor-demonstration release: the four-organization Fabric network, Go
+insurance contract, Next.js Gateway boundary, role-specific workflows/evidence,
+and hardening/test/documentation suite all run end to end. The consolidated
+verifier is green against `insurance-contract` 0.3.0, schema 2.
+
+This is not a production deployment claim. Institutional authentication,
+durable encrypted object storage and key recovery, multi-node/orderer high
+availability, production monitoring, backup/restore operations, and deployment
+governance remain environment-specific work outside the local release.
+
 ## Workspace layout
 
 - `network/` — local Fabric topology, channel configuration, and lifecycle scripts.

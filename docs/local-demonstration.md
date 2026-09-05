@@ -63,7 +63,8 @@ inside the browser and convert BDT values to exact integer poisha.
    reference; only its browser-generated hash is written to the ledger.
 8. **Policyholder One** — read the claim and confirm its final state is `SETTLED`.
 9. **Insurer Administrator or Independent Auditor** — list evidence access records
-   and show the immutable role/purpose trail created by retrievals.
+   and show the immutable role/purpose trail created by retrievals. Enter the
+   claim ID in **Export claim dossier** to download the consolidated JSON artifact.
 
 Each account is redirected to its canonical role workspace and cannot navigate
 into another role's route. Chaincode independently rechecks MSP and certificate
