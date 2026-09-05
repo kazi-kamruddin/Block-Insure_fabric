@@ -17,7 +17,7 @@ business organizations:
 | Auditor | `AuditorMSP` | Manual-review decisions |
 | Bank | `BankMSP` | Settlement/EFT status confirmation |
 
-Each business organization will start with one peer, one Fabric CA, and one
+Each business organization starts with one peer, one Fabric CA, and one
 CouchDB state database. The shared application channel is
 `insurance-channel`.
 
@@ -37,15 +37,54 @@ workspace link at:
 The link points to this repository; it does not copy or move project files. It
 avoids path-space handling defects in some official Fabric sample scripts.
 
-## Lifecycle safety
+## Lifecycle commands
 
-The future `network/scripts/` commands will distinguish between:
+Run the lifecycle script from the repository's WSL workspace link:
 
-- `up` — start a stopped network without deleting data;
-- `down` — stop containers while retaining generated local state where safe;
-- `reset` — explicitly destructive removal of generated identities, ledgers,
-  channel artifacts, and local database data; and
-- `status` — read-only health and channel inspection.
+```bash
+cd -L /home/vengeance/workspaces/block-insure-fabric
+bash network/scripts/network.sh up
+bash network/scripts/network.sh status
+bash network/scripts/network.sh verify
+bash network/scripts/network.sh down
+bash network/scripts/network.sh reset
+```
+
+- `up` bootstraps a missing network or restarts an existing stopped network
+  without replacing its ledger state.
+- `status` lists containers and each peer's joined channels.
+- `verify` checks all 14 containers, five CAs, four CouchDB instances, the
+  orderer channel, and each peer ledger.
+- `down` stops and removes containers while retaining identities, channel
+  artifacts, and Docker ledger volumes.
+- `reset` is destructive: it removes this network's containers, ledger
+  volumes, generated identities, and generated channel artifacts.
+
+The launcher uses the Linux Docker CLI when its WSL socket is available and
+falls back to Docker Desktop's `docker.exe` integration when necessary.
+
+Host ports are `7051`, `8051`, `9051`, and `12051` for the four peers;
+`7054`, `8054`, `9054`, `12054`, and `11054` for the CAs; and `5984`, `6984`,
+`7984`, and `8984` for CouchDB. Credentials embedded in Compose are strictly
+local development defaults and must not be reused outside this disposable
+network.
 
 Never commit local certificates, private keys, wallets, generated channel
 artifacts, or database state.
+
+## Chaincode lifecycle and smoke verification
+
+With the network running, deploy the Go contract and exercise its live workflow:
+
+```bash
+bash network/scripts/deploy-chaincode.sh
+bash network/scripts/smoke-workflow.sh
+```
+
+The deployment script installs and approves the package for all four business
+organizations before committing the definition. The smoke script uses each
+role identity in turn and asserts a final `SETTLED` claim and `CONFIRMED`
+settlement. Bump `CHAINCODE_VERSION` whenever source changes. The script uses
+sequence 1 on a clean channel, detects an already-committed version, and chooses
+the next sequence for a new version; `CHAINCODE_SEQUENCE` remains an explicit
+override for controlled recovery.

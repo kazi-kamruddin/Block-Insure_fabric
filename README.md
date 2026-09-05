@@ -1,7 +1,7 @@
 # Block-Insure Fabric
 
 Block-Insure Fabric is the permissioned Hyperledger Fabric evolution of the
-Block-Insure insurance platform. It will retain the insurance workflows from
+Block-Insure insurance platform. It retains the insurance workflows from
 the Ethereum prototype—policies, claims, hospital verification, auditor
 review, banking, and evidence auditability—while using organization-issued
 identities and Fabric ledger controls.
@@ -21,16 +21,35 @@ identities and Fabric ledger controls.
 It is deliberately ignored by Git and must not be modified or committed as part
 of this Fabric project.
 
-## Planned network model
+## Implemented architecture
 
-The first Fabric network will model separate organizations for the insurer,
-hospital network, bank, and auditors. Application users will be represented by
-certificate identities and attributes rather than browser wallets. The Next.js
-server will access Fabric through Gateway; browsers will never hold Fabric
-private keys.
+The local network models separate organizations for the insurer, hospital,
+bank, and auditor, backed by Fabric CAs and CouchDB. Its Go chaincode enforces
+MSP membership, certificate role attributes, asset ownership, and the complete
+policy-to-settlement state machine. The Next.js server accesses the ledger
+through Fabric Gateway; browsers never hold Fabric private keys.
 
 ## Getting started
 
-This repository currently contains the initial workspace structure. The next
-implementation milestone is to add the local Fabric network and the TypeScript
-insurance chaincode contract.
+The local Fabric network is implemented under `network/`. From Ubuntu WSL:
+
+```bash
+bash network/scripts/network.sh up
+bash network/scripts/deploy-chaincode.sh
+bash network/scripts/network.sh verify
+bash network/scripts/smoke-workflow.sh
+```
+
+The web application lives under `apps/web`. Copy `.env.example` to the ignored
+`.env.local`, generate an `AUTH_SECRET` of at least 32 characters, and run:
+
+```powershell
+npm install
+npm run dev
+```
+
+The application provides process and live-ledger health routes, signed local
+demo sessions, role-gated workflow commands, ledger queries, and ciphertext-only
+evidence storage with on-ledger integrity references. Demo authentication and
+local filesystem storage are development adapters, not production identity or
+object-storage implementations.

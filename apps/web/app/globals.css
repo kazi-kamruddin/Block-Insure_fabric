@@ -1,0 +1,94 @@
+:root {
+  --ink: #102a2e;
+  --muted: #5c6f70;
+  --paper: #f4f1e9;
+  --card: #fbfaf6;
+  --line: #d6d4ca;
+  --mint: #8de3bd;
+  --deep: #123e3c;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  color: var(--ink);
+  background:
+    radial-gradient(circle at 78% 3%, rgba(141, 227, 189, .35), transparent 28rem),
+    var(--paper);
+  font-family: Arial, Helvetica, sans-serif;
+}
+a { color: inherit; text-decoration: none; }
+.shell { width: min(1160px, calc(100% - 40px)); margin-inline: auto; }
+.nav { height: 86px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--line); }
+.brand { display: flex; gap: 12px; align-items: center; font-size: 16px; font-weight: 750; letter-spacing: -.02em; }
+.brandMark { display: grid; place-items: center; width: 37px; height: 37px; background: var(--ink); color: var(--paper); border-radius: 50%; font-size: 12px; letter-spacing: .08em; }
+.networkPill { display: inline-flex; gap: 9px; align-items: center; border: 1px solid var(--line); border-radius: 999px; padding: 9px 13px; font: 12px monospace; background: rgba(251, 250, 246, .55); }
+.networkPill i { width: 7px; height: 7px; border-radius: 50%; background: #1f9d67; box-shadow: 0 0 0 4px rgba(31, 157, 103, .12); }
+.hero { min-height: 610px; padding: 110px 0 90px; }
+.eyebrow, .kicker { color: #31645d; font-size: 12px; font-weight: 800; letter-spacing: .15em; text-transform: uppercase; }
+h1 { max-width: 900px; margin: 22px 0 26px; font-family: Georgia, serif; font-size: clamp(56px, 8.2vw, 104px); line-height: .91; letter-spacing: -.065em; font-weight: 500; }
+.lede { max-width: 690px; color: var(--muted); font-size: 20px; line-height: 1.6; }
+.actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 36px; }
+.primary, .secondary { border-radius: 4px; padding: 15px 20px; font-size: 14px; font-weight: 750; transition: transform .18s ease, background .18s ease; }
+.primary { background: var(--deep); color: white; }
+.secondary { border: 1px solid var(--ink); }
+.primary:hover, .secondary:hover { transform: translateY(-2px); }
+.secondary:hover { background: var(--card); }
+.network { border-top: 1px solid var(--line); padding: 80px 0 110px; }
+.sectionHeading { display: grid; grid-template-columns: 1fr 1fr; align-items: end; gap: 60px; margin-bottom: 42px; }
+h2 { margin: 12px 0 0; max-width: 560px; font-family: Georgia, serif; font-size: clamp(38px, 5vw, 62px); font-weight: 500; line-height: 1; letter-spacing: -.045em; }
+.sectionHeading > p { max-width: 480px; margin: 0; color: var(--muted); line-height: 1.65; }
+.capabilityGrid { display: grid; grid-template-columns: repeat(5, 1fr); border-top: 1px solid var(--line); border-left: 1px solid var(--line); }
+.capability { min-height: 245px; padding: 22px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); background: rgba(251, 250, 246, .45); }
+.capability .index { color: #78908c; font: 12px monospace; }
+.capability h3 { margin: 65px 0 12px; font-size: 18px; }
+.capability p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.55; }
+.footer { display: flex; justify-content: space-between; border-top: 1px solid var(--line); padding: 28px 0 40px; color: var(--muted); font-size: 12px; }
+.button, button { font: inherit; cursor: pointer; }
+.button:disabled, button:disabled { cursor: wait; opacity: .55; }
+.workspacePage { min-height: 100vh; }
+.signInPanel, .workspace { padding: 74px 0 100px; }
+.workspaceTitle { max-width: 780px; margin: 15px 0 22px; font-size: clamp(44px, 6vw, 76px); }
+.accountGrid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin: 42px 0 24px; }
+.accountGrid button { min-height: 150px; padding: 20px; text-align: left; color: var(--ink); background: var(--card); border: 1px solid var(--line); border-radius: 4px; transition: transform .18s ease, border-color .18s ease; }
+.accountGrid button:hover { transform: translateY(-3px); border-color: var(--deep); }
+.accountGrid strong, .accountGrid span { display: block; }
+.accountGrid strong { margin-bottom: 35px; font-size: 15px; }
+.accountGrid span { color: var(--muted); font: 11px monospace; }
+.workspaceHeader { display: flex; align-items: end; justify-content: space-between; gap: 30px; margin-bottom: 50px; }
+.workspaceHeader p { color: var(--muted); }
+.workGrid { display: grid; grid-template-columns: 1.35fr .65fr; gap: 18px; }
+.workCard { padding: 28px; background: var(--card); border: 1px solid var(--line); border-radius: 5px; }
+.workCard h2 { margin: 12px 0 28px; font-size: 34px; }
+.templateButtons { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+.templateButtons button { padding: 8px 11px; color: var(--deep); background: #e8f2eb; border: 0; border-radius: 3px; font-size: 12px; font-weight: 700; }
+.workCard textarea { width: 100%; min-height: 270px; resize: vertical; padding: 16px; margin-bottom: 12px; color: #d5f5e6; background: #102a2e; border: 0; border-radius: 4px; font: 12px/1.6 monospace; }
+.workCard label { display: grid; gap: 8px; margin-bottom: 18px; color: var(--muted); font-size: 12px; font-weight: 700; }
+.evidenceCard { grid-column: 1 / -1; }
+.cardNote { max-width: 760px; margin: -14px 0 26px; color: var(--muted); line-height: 1.6; }
+.evidenceFields { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0 16px; }
+.workCard input, .workCard select { width: 100%; padding: 13px; color: var(--ink); background: var(--paper); border: 1px solid var(--line); border-radius: 3px; font: 14px Arial, sans-serif; }
+.resultHeading { display: flex; justify-content: space-between; margin: 32px 0 10px; color: var(--muted); font-size: 12px; }
+.queryActions { display: flex; flex-wrap: wrap; gap: 9px; }
+.console { min-height: 220px; overflow: auto; padding: 22px; margin: 0; color: #d5f5e6; background: #102a2e; border-radius: 4px; font: 12px/1.6 monospace; white-space: pre-wrap; }
+.console.compact { min-height: 64px; }
+
+@media (max-width: 850px) {
+  .sectionHeading { grid-template-columns: 1fr; gap: 25px; }
+  .capabilityGrid { grid-template-columns: repeat(2, 1fr); }
+  .accountGrid { grid-template-columns: repeat(2, 1fr); }
+  .workGrid { grid-template-columns: 1fr; }
+  .evidenceFields { grid-template-columns: 1fr; }
+  .hero { min-height: auto; padding: 80px 0; }
+}
+@media (max-width: 520px) {
+  .shell { width: min(100% - 24px, 1160px); }
+  .networkPill { display: none; }
+  .capabilityGrid { grid-template-columns: 1fr; }
+  .accountGrid { grid-template-columns: 1fr; }
+  .workspaceHeader { align-items: start; flex-direction: column; }
+  .capability { min-height: 190px; }
+  .capability h3 { margin-top: 38px; }
+  .footer { flex-direction: column; gap: 8px; }
+}
