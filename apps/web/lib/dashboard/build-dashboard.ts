@@ -93,7 +93,7 @@ export function buildRoleDashboard(
           operation: "submitClaim",
           id: `claim-${Date.now()}`,
           policyId: policy.id,
-          amountMinor: "250000",
+          amountMinor: 250000,
           incidentDate: new Date().toISOString().slice(0, 10),
           descriptionHash: "a".repeat(64),
         },

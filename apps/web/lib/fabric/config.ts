@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import path from "node:path";
 import { z } from "zod";
 
@@ -12,7 +13,7 @@ export const fabricRoles = [
 export type FabricRole = (typeof fabricRoles)[number];
 
 const environmentSchema = z.object({
-  FABRIC_NETWORK_ROOT: z.string().trim().min(1).default("../../network"),
+  FABRIC_NETWORK_ROOT: z.string().trim().min(1).optional(),
   FABRIC_CHANNEL_NAME: z.string().trim().min(1).default("insurance-channel"),
   FABRIC_CHAINCODE_NAME: z.string().trim().min(1).default("insurance-contract"),
   FABRIC_EVALUATE_DEADLINE_SECONDS: z.coerce.number().positive().default(5),
@@ -22,6 +23,18 @@ const environmentSchema = z.object({
 });
 
 export type FabricConfig = ReturnType<typeof loadFabricConfig>;
+
+function discoverNetworkRoot(start: string) {
+  let current = path.resolve(start);
+  for (let depth = 0; depth < 8; depth += 1) {
+    const candidate = path.join(current, "network");
+    if (existsSync(path.join(candidate, "config", "configtx.yaml"))) return candidate;
+    const parent = path.dirname(current);
+    if (parent === current) break;
+    current = parent;
+  }
+  return path.resolve(start, "../../network");
+}
 
 type RoleDefinition = {
   mspId: string;
@@ -65,10 +78,9 @@ const roleDefinitions: Record<FabricRole, RoleDefinition> = {
 
 export function loadFabricConfig(environment: NodeJS.ProcessEnv = process.env) {
   const values = environmentSchema.parse(environment);
-  const networkRoot = path.resolve(
-    /* turbopackIgnore: true */ process.cwd(),
-    values.FABRIC_NETWORK_ROOT,
-  );
+  const networkRoot = values.FABRIC_NETWORK_ROOT
+    ? path.resolve(/* turbopackIgnore: true */ process.cwd(), values.FABRIC_NETWORK_ROOT)
+    : discoverNetworkRoot(/* turbopackIgnore: true */ process.cwd());
 
   return {
     networkRoot,

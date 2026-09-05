@@ -1,4 +1,5 @@
 import { expect, request, test, type APIRequestContext } from "@playwright/test";
+import { decryptEvidenceBytes, encryptEvidenceBytes } from "../lib/evidence/browser-crypto";
 
 const hashA = "a".repeat(64);
 const hashB = "b".repeat(64);
@@ -49,30 +50,45 @@ test("five organization sessions complete a Fabric insurance workflow", async ({
       operation: "issuePolicy", id: ids.policy, packageId: ids.package,
       policyholderId: "policyholder1", startDate: "2026-01-01", endDate: "2026-12-31",
     });
+    await command(insurer, { operation: "retirePolicyPackage", id: ids.package });
     await command(policyholder, {
       operation: "submitClaim", id: ids.claim, policyId: ids.policy, amountMinor: 250_000,
       incidentDate: "2026-06-15", descriptionHash: hashB,
+    });
+    const evidencePlaintext = new TextEncoder().encode(`private-e2e-evidence-${suffix}`);
+    const evidencePassphrase = "browser regression evidence passphrase";
+    const encryptedEvidence = await encryptEvidenceBytes(evidencePlaintext, evidencePassphrase, {
+      claimId: ids.claim,
+      evidenceId: ids.evidence,
     });
     const evidenceUpload = await policyholder.post("/api/evidence", {
       multipart: {
         claimId: ids.claim,
         evidenceId: ids.evidence,
         documentType: "DISCHARGE_SUMMARY",
-        contentHash: hashC,
+        contentHash: encryptedEvidence.contentHash,
         ciphertext: {
           name: `${ids.evidence}.enc`,
           mimeType: "application/octet-stream",
-          buffer: Buffer.from(`encrypted-e2e-payload-${suffix}`),
+          buffer: Buffer.from(encryptedEvidence.envelope),
         },
       },
     });
     expect(evidenceUpload.ok(), await evidenceUpload.text()).toBe(true);
 
-    const bankEvidence = await bank.get(`/api/evidence/${ids.evidence}`);
+    const bankEvidence = await bank.post(`/api/evidence/${ids.evidence}`);
     expect(bankEvidence.status()).toBe(403);
-    const ownerEvidence = await policyholder.get(`/api/evidence/${ids.evidence}`);
+    const ownerEvidence = await policyholder.post(`/api/evidence/${ids.evidence}`);
     expect(ownerEvidence.ok(), await ownerEvidence.text()).toBe(true);
     expect(ownerEvidence.headers()["x-ciphertext-sha256"]).toMatch(/^[a-f0-9]{64}$/);
+    expect(ownerEvidence.headers()["x-content-sha256"]).toBe(encryptedEvidence.contentHash);
+    expect(ownerEvidence.headers()["x-evidence-claim-id"]).toBe(ids.claim);
+    const downloadedPlaintext = await decryptEvidenceBytes(
+      new Uint8Array(await ownerEvidence.body()),
+      evidencePassphrase,
+      { claimId: ids.claim, evidenceId: ids.evidence },
+    );
+    expect(new TextDecoder().decode(downloadedPlaintext)).toBe(`private-e2e-evidence-${suffix}`);
 
     const accessLog = await insurer.get("/api/ledger/access");
     expect(accessLog.ok(), await accessLog.text()).toBe(true);
@@ -86,6 +102,9 @@ test("five organization sessions complete a Fabric insurance workflow", async ({
       operation: "verifyClaim", claimId: ids.claim, verificationId: ids.verification,
       outcome: "VERIFIED", clinicalReferenceHash: hashC,
     });
+    const verification = await policyholder.get(`/api/ledger/verification/${ids.verification}`);
+    expect(verification.ok(), await verification.text()).toBe(true);
+    expect((await verification.json()).result).toMatchObject({ id: ids.verification, claimId: ids.claim, outcome: "VERIFIED" });
     await command(insurer, { operation: "startClaimReview", claimId: ids.claim });
 
     const auditorBefore = await auditor.get("/api/dashboard");
@@ -94,6 +113,9 @@ test("five organization sessions complete a Fabric insurance workflow", async ({
       operation: "recordAuditorDecision", claimId: ids.claim, decisionId: ids.decision,
       outcome: "APPROVE", reasonHash: hashA,
     });
+    const decision = await policyholder.get(`/api/ledger/decision/${ids.decision}`);
+    expect(decision.ok(), await decision.text()).toBe(true);
+    expect((await decision.json()).result).toMatchObject({ id: ids.decision, claimId: ids.claim, outcome: "APPROVE" });
     await command(insurer, {
       operation: "authorizeSettlement", settlementId: ids.settlement, claimId: ids.claim,
     });

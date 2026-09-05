@@ -4,7 +4,7 @@ import { currentSession } from "@/lib/auth/current-session";
 import { ledger } from "@/lib/fabric/ledger";
 
 const routeSchema = z.object({
-  assetType: z.enum(["package", "policy", "claim", "evidence", "settlement", "claim-history"]),
+  assetType: z.enum(["package", "policy", "claim", "evidence", "verification", "decision", "settlement", "claim-history"]),
   id: z.string().trim().min(1).max(100).regex(/^[a-zA-Z0-9._:-]+$/),
 });
 
@@ -47,6 +47,28 @@ export async function GET(_request: Request, context: RouteContext) {
         result = evidence;
         if (session.role === "policyholder") {
           const claim = await ledger.readClaim(evidence.claimId);
+          if (claim.claimantId !== session.subjectId) {
+            return NextResponse.json({ message: "Asset is not owned by this account" }, { status: 403 });
+          }
+        }
+        break;
+      }
+      case "verification": {
+        const verification = await ledger.readHospitalVerification(id);
+        result = verification;
+        if (session.role === "policyholder") {
+          const claim = await ledger.readClaim(verification.claimId);
+          if (claim.claimantId !== session.subjectId) {
+            return NextResponse.json({ message: "Asset is not owned by this account" }, { status: 403 });
+          }
+        }
+        break;
+      }
+      case "decision": {
+        const decision = await ledger.readAuditorDecision(id);
+        result = decision;
+        if (session.role === "policyholder") {
+          const claim = await ledger.readClaim(decision.claimId);
           if (claim.claimantId !== session.subjectId) {
             return NextResponse.json({ message: "Asset is not owned by this account" }, { status: 403 });
           }

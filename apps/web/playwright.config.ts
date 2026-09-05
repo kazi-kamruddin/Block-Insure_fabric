@@ -17,7 +17,7 @@ export default defineConfig({
     screenshot: "only-on-failure",
   },
   webServer: {
-    command: `npm run start -- --hostname 127.0.0.1 --port ${port}`,
+    command: "npm run start",
     url: `${baseURL}/api/health`,
     reuseExistingServer: false,
     timeout: 30_000,
@@ -26,6 +26,8 @@ export default defineConfig({
       AUTH_SECRET: "browser-test-only-secret-with-at-least-32-characters",
       SESSION_COOKIE_SECURE: "false",
       APP_ORIGIN: baseURL,
+      HOSTNAME: "127.0.0.1",
+      PORT: String(port),
     },
   },
 });

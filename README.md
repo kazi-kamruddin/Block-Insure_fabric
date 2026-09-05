@@ -49,10 +49,14 @@ npm run dev
 ```
 
 The application provides process and live-ledger health routes, signed local
-demo sessions, role-gated workflow commands, ledger queries, and ciphertext-only
-evidence storage with on-ledger integrity references. Demo authentication and
+demo sessions, role-specific dashboards and guided transactions, ledger queries,
+and browser-encrypted evidence storage with on-ledger integrity/access records. Demo authentication and
 local filesystem storage are development adapters, not production identity or
 object-storage implementations.
+
+See [the local demonstration runbook](docs/local-demonstration.md) for the
+five-organization journey and [the evidence security boundary](docs/evidence-security.md)
+for the AES-GCM envelope, authorization path, and production limitations.
 
 ## Complete verification
 
@@ -66,3 +70,8 @@ security, browser, and live-workflow check from Windows PowerShell:
 The command writes an ignored machine-readable summary to
 `verification-results/latest.json`. Its browser phase creates uniquely named
 local ledger records and proves role isolation plus the full settlement path.
+
+GitHub Actions also runs locked Next.js lint/type/unit/audit/build checks and
+native Go format/vet/tests on pushes and pull requests. The live Fabric/browser
+gate remains local because it depends on this repository's four-organization
+Docker network and enrolled development identities.

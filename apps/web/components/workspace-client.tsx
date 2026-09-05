@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   demoAccounts,
@@ -8,8 +8,11 @@ import {
   type DemoAccount,
 } from "@/lib/auth/accounts";
 import type { RoleDashboard } from "@/lib/dashboard/build-dashboard";
+import { GuidedWorkflowForm, type PreparedWorkflow } from "@/components/guided-workflow-form";
+import type { WorkflowCommand } from "@/lib/workflows/commands";
+import { decryptEvidenceBytes, encryptEvidenceBytes, sha256Hex } from "@/lib/evidence/browser-crypto";
 
-type AssetType = "package" | "policy" | "claim" | "evidence" | "settlement" | "access" | "claim-history";
+type AssetType = "package" | "policy" | "claim" | "evidence" | "verification" | "decision" | "settlement" | "access" | "claim-history";
 
 const hash = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 
@@ -17,6 +20,7 @@ const commandTemplates = {
   insurerAdmin: [
     ["Create package", { operation: "createPolicyPackage", id: "package-1", name: "Essential Health", description: "Core inpatient coverage", premiumMinor: 10000, coverageLimitMinor: 1000000, termsHash: hash }],
     ["Publish package", { operation: "publishPolicyPackage", id: "package-1" }],
+    ["Retire package", { operation: "retirePolicyPackage", id: "package-1" }],
     ["Issue policy", { operation: "issuePolicy", id: "policy-1", packageId: "package-1", policyholderId: "policyholder1", startDate: "2026-01-01", endDate: "2026-12-31" }],
     ["Start review", { operation: "startClaimReview", claimId: "claim-1" }],
     ["Authorize settlement", { operation: "authorizeSettlement", settlementId: "settlement-1", claimId: "claim-1" }],
@@ -58,11 +62,24 @@ export function WorkspaceClient({
   const [documentType, setDocumentType] = useState("DISCHARGE_SUMMARY");
   const [contentHash, setContentHash] = useState("");
   const [ciphertext, setCiphertext] = useState<File | null>(null);
+  const [plaintextEvidence, setPlaintextEvidence] = useState<File | null>(null);
+  const [evidencePassphrase, setEvidencePassphrase] = useState("");
+  const [evidencePassphraseConfirmation, setEvidencePassphraseConfirmation] = useState("");
+  const [encrypting, setEncrypting] = useState(false);
+  const [retrievalEvidenceId, setRetrievalEvidenceId] = useState("");
+  const [retrievalPassphrase, setRetrievalPassphrase] = useState("");
+  const [retrieving, setRetrieving] = useState(false);
+  const [decryptedEvidence, setDecryptedEvidence] = useState<{ url: string; name: string } | null>(null);
   const [output, setOutput] = useState("Ready.");
   const [busy, setBusy] = useState(false);
   const [dashboard, setDashboard] = useState<RoleDashboard | null>(initialDashboard);
   const [dashboardLoading, setDashboardLoading] = useState(Boolean(initialAccount && !initialDashboard));
+  const [preparedWorkflow, setPreparedWorkflow] = useState<PreparedWorkflow | null>(null);
   const templates = useMemo(() => account ? commandTemplates[account.role] : [], [account]);
+
+  useEffect(() => () => {
+    if (decryptedEvidence) URL.revokeObjectURL(decryptedEvidence.url);
+  }, [decryptedEvidence]);
 
   const refreshDashboard = useCallback(async () => {
     setDashboardLoading(true);
@@ -106,10 +123,9 @@ export function WorkspaceClient({
     router.refresh();
   }
 
-  async function submitCommand() {
+  async function submitWorkflow(payload: WorkflowCommand) {
     setBusy(true);
     try {
-      const payload = JSON.parse(command);
       const body = await responseJson(await fetch("/api/workflows", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -121,6 +137,14 @@ export function WorkspaceClient({
       setOutput(error instanceof Error ? error.message : "Command failed");
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function submitCommand() {
+    try {
+      await submitWorkflow(JSON.parse(command) as WorkflowCommand);
+    } catch (error) {
+      setOutput(error instanceof Error ? error.message : "Command JSON is invalid");
     }
   }
 
@@ -169,6 +193,73 @@ export function WorkspaceClient({
       setOutput(error instanceof Error ? error.message : "Evidence upload failed");
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function encryptEvidence() {
+    setEncrypting(true);
+    try {
+      if (!plaintextEvidence) throw new Error("Choose the original evidence file.");
+      if (evidencePassphrase !== evidencePassphraseConfirmation) throw new Error("Evidence passphrases do not match.");
+      const encrypted = await encryptEvidenceBytes(
+        new Uint8Array(await plaintextEvidence.arrayBuffer()),
+        evidencePassphrase,
+        { claimId: evidenceClaimId.trim(), evidenceId: evidenceId.trim() },
+      );
+      const safeName = plaintextEvidence.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+      const envelopeBuffer = new ArrayBuffer(encrypted.envelope.byteLength);
+      new Uint8Array(envelopeBuffer).set(encrypted.envelope);
+      const file = new File(
+        [envelopeBuffer],
+        `${safeName}.enc`,
+        { type: "application/octet-stream" },
+      );
+      setCiphertext(file);
+      setContentHash(encrypted.contentHash);
+      setEvidencePassphrase("");
+      setEvidencePassphraseConfirmation("");
+      setOutput(`Encrypted ${plaintextEvidence.name} locally. Keep the passphrase safe; it cannot be recovered by Block-Insure.`);
+    } catch (error) {
+      setCiphertext(null);
+      setContentHash("");
+      setOutput(error instanceof Error ? error.message : "Evidence encryption failed");
+    } finally {
+      setEncrypting(false);
+    }
+  }
+
+  async function retrieveEvidence() {
+    setRetrieving(true);
+    try {
+      const id = retrievalEvidenceId.trim();
+      if (!id) throw new Error("Enter an evidence ID to retrieve.");
+      if (retrievalPassphrase.length < 12) throw new Error("Enter the evidence passphrase.");
+      const response = await fetch(`/api/evidence/${encodeURIComponent(id)}`, { method: "POST", cache: "no-store" });
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ message: `Evidence retrieval failed (${response.status})` }));
+        throw new Error(error.message);
+      }
+      const claimId = response.headers.get("x-evidence-claim-id");
+      const expectedHash = response.headers.get("x-content-sha256");
+      if (!claimId || !expectedHash) throw new Error("Evidence integrity metadata is missing.");
+      const plaintext = await decryptEvidenceBytes(
+        new Uint8Array(await response.arrayBuffer()),
+        retrievalPassphrase,
+        { claimId, evidenceId: id },
+      );
+      if (await sha256Hex(plaintext) !== expectedHash) throw new Error("Decrypted evidence failed its ledger integrity check.");
+      const plaintextBuffer = new ArrayBuffer(plaintext.byteLength);
+      new Uint8Array(plaintextBuffer).set(plaintext);
+      const next = { url: URL.createObjectURL(new Blob([plaintextBuffer])), name: `${id}.decrypted` };
+      setDecryptedEvidence(next);
+      setRetrievalPassphrase("");
+      setOutput(`Evidence ${id} decrypted locally and matched its Fabric content hash.`);
+      await refreshDashboard();
+    } catch (error) {
+      setDecryptedEvidence(null);
+      setOutput(error instanceof Error ? error.message : "Evidence retrieval failed");
+    } finally {
+      setRetrieving(false);
     }
   }
 
@@ -240,8 +331,9 @@ export function WorkspaceClient({
                           <p>{item.detail}</p>
                         </div>
                         {item.command && <button onClick={() => {
-                          setCommand(JSON.stringify(item.command, null, 2));
-                          document.getElementById("transaction-console")?.scrollIntoView({ behavior: "smooth" });
+                          if (!item.command) return;
+                          setPreparedWorkflow({ command: item.command, revision: Date.now() });
+                          document.getElementById("guided-workflow")?.scrollIntoView({ behavior: "smooth" });
                         }}>{item.commandLabel}</button>}
                       </div>
                     ))}
@@ -269,17 +361,13 @@ export function WorkspaceClient({
       </section>
 
       <div className="workGrid" id="transaction-console">
-        <article className="workCard">
-          <span className="kicker">Submit transaction</span>
-          <h2>Role commands</h2>
-          <div className="templateButtons">
-            {templates.map(([label, template]) => (
-              <button key={label} onClick={() => setCommand(JSON.stringify(template, null, 2))}>{label}</button>
-            ))}
-          </div>
-          <textarea value={command} onChange={(event) => setCommand(event.target.value)} placeholder="Select a command template" spellCheck={false} />
-          <button className="primary button" disabled={busy || !command} onClick={submitCommand}>Submit to ledger</button>
-        </article>
+        <GuidedWorkflowForm
+          key={`${account.role}-${preparedWorkflow?.revision ?? 0}`}
+          role={account.role}
+          busy={busy}
+          prepared={preparedWorkflow}
+          onSubmit={submitWorkflow}
+        />
 
         <article className="workCard">
           <span className="kicker">Evaluate transaction</span>
@@ -288,6 +376,7 @@ export function WorkspaceClient({
             <select value={assetType} onChange={(event) => setAssetType(event.target.value as AssetType)}>
               <option value="package">Policy package</option><option value="policy">Policy</option>
               <option value="claim">Claim</option><option value="evidence">Evidence reference</option>
+              <option value="verification">Hospital verification</option><option value="decision">Auditor decision</option>
               <option value="settlement">Settlement</option><option value="claim-history">Claim history</option>
               {(account.role === "insurerAdmin" || account.role === "auditor") && <option value="access">Evidence access log</option>}
             </select>
@@ -299,19 +388,61 @@ export function WorkspaceClient({
           </div>
         </article>
 
+        <article className="workCard advancedCard">
+          <span className="kicker">Advanced diagnostics</span>
+          <h2>JSON command console</h2>
+          <p className="cardNote">Use the guided form for normal work. This console remains available for development and contract diagnostics.</p>
+          <details>
+            <summary>Open advanced console</summary>
+            <div className="templateButtons">
+              {templates.map(([label, template]) => (
+                <button type="button" key={label} onClick={() => setCommand(JSON.stringify(template, null, 2))}>{label}</button>
+              ))}
+            </div>
+            <textarea value={command} onChange={(event) => setCommand(event.target.value)} placeholder="Select a command template" spellCheck={false} />
+            <button className="primary button" disabled={busy || !command} onClick={submitCommand}>Submit raw command</button>
+          </details>
+        </article>
+
         {account.role === "policyholder" && (
           <article className="workCard evidenceCard">
             <span className="kicker">Ciphertext evidence</span>
-            <h2>Store and anchor evidence</h2>
-            <p className="cardNote">Encrypt the file before choosing it. This service stores only the <code>.enc</code> ciphertext; the ledger receives integrity hashes, never document bytes or encryption keys.</p>
+            <h2>Encrypt, store, and anchor evidence</h2>
+            <p className="cardNote">Encryption happens in this browser with AES-256-GCM. The passphrase and plaintext never reach the server; only the generated <code>.enc</code> envelope is stored, and Fabric receives integrity hashes.</p>
             <div className="evidenceFields">
               <label>Claim ID<input value={evidenceClaimId} onChange={(event) => setEvidenceClaimId(event.target.value)} placeholder="claim-1" /></label>
               <label>Evidence ID<input value={evidenceId} onChange={(event) => setEvidenceId(event.target.value)} placeholder="evidence-1" /></label>
               <label>Document type<input value={documentType} onChange={(event) => setDocumentType(event.target.value)} /></label>
-              <label>Original content SHA-256<input value={contentHash} onChange={(event) => setContentHash(event.target.value)} placeholder="64 hexadecimal characters" /></label>
-              <label>Encrypted file<input type="file" accept=".enc,application/octet-stream" onChange={(event) => setCiphertext(event.target.files?.[0] ?? null)} /></label>
+              <label>Original file<input type="file" onChange={(event) => { setPlaintextEvidence(event.target.files?.[0] ?? null); setCiphertext(null); setContentHash(""); }} /></label>
+              <label>Evidence passphrase<input type="password" autoComplete="new-password" value={evidencePassphrase} onChange={(event) => setEvidencePassphrase(event.target.value)} placeholder="At least 12 characters" /></label>
+              <label>Confirm passphrase<input type="password" autoComplete="new-password" value={evidencePassphraseConfirmation} onChange={(event) => setEvidencePassphraseConfirmation(event.target.value)} /></label>
+              <label>Original content SHA-256<input value={contentHash} readOnly placeholder="Calculated after encryption" /></label>
+              <div className="encryptionStatus">
+                <strong>{ciphertext ? "Ciphertext ready" : "Not encrypted yet"}</strong>
+                <span>{ciphertext ? `${ciphertext.name} · ${ciphertext.size} bytes` : "Choose a file and protect it with a passphrase."}</span>
+              </div>
             </div>
-            <button className="primary button" disabled={busy} onClick={uploadEvidence}>Store ciphertext and record reference</button>
+            <div className="evidenceActions">
+              <button className="secondary button" disabled={busy || encrypting} onClick={encryptEvidence}>{encrypting ? "Encrypting…" : "Encrypt in browser"}</button>
+              <button className="primary button" disabled={busy || encrypting || !ciphertext} onClick={uploadEvidence}>Store ciphertext and record reference</button>
+            </div>
+            <p className="evidenceWarning">Block-Insure never receives or stores the passphrase. Losing it makes the downloaded ciphertext unrecoverable.</p>
+          </article>
+        )}
+
+        {account.role !== "bankOfficer" && (
+          <article className="workCard evidenceCard">
+            <span className="kicker">Authorized evidence access</span>
+            <h2>Retrieve and decrypt evidence</h2>
+            <p className="cardNote">The server validates your organization and the claim state, records this access on Fabric, and returns ciphertext. Decryption and integrity verification happen only in this browser.</p>
+            <div className="evidenceFields">
+              <label>Evidence ID<input value={retrievalEvidenceId} onChange={(event) => { setRetrievalEvidenceId(event.target.value); setDecryptedEvidence(null); }} placeholder="evidence-1" /></label>
+              <label>Evidence passphrase<input type="password" autoComplete="current-password" value={retrievalPassphrase} onChange={(event) => setRetrievalPassphrase(event.target.value)} /></label>
+            </div>
+            <div className="evidenceActions">
+              <button className="primary button" disabled={busy || retrieving} onClick={retrieveEvidence}>{retrieving ? "Retrieving…" : "Retrieve and decrypt"}</button>
+              {decryptedEvidence && <a className="secondary button" download={decryptedEvidence.name} href={decryptedEvidence.url}>Download verified plaintext</a>}
+            </div>
           </article>
         )}
       </div>

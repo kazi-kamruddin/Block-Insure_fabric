@@ -87,6 +87,25 @@ export const ledger = {
     return evaluate<EvidenceAccessRecord[]>("insurerAdmin", "ListEvidenceAccessRecords");
   },
 
+  readHospitalVerification(id: string) {
+    return evaluate<HospitalVerification>("insurerAdmin", "ReadHospitalVerification", id);
+  },
+
+  listHospitalVerifications() {
+    return evaluate<HospitalVerification[]>("insurerAdmin", "ListHospitalVerifications");
+  },
+
+  async readAuditorDecision(id: string) {
+    const decisions = await evaluate<AuditorDecision[]>("insurerAdmin", "ListAuditorDecisions");
+    const decision = decisions.find((item) => item.id === id);
+    if (!decision) throw new Error(`auditor decision ${id} does not exist`);
+    return decision;
+  },
+
+  listAuditorDecisions() {
+    return evaluate<AuditorDecision[]>("insurerAdmin", "ListAuditorDecisions");
+  },
+
   readSettlement(id: string) {
     return evaluate<Settlement>("insurerAdmin", "ReadSettlement", id);
   },
@@ -121,6 +140,10 @@ export const ledger = {
 
   publishPolicyPackage(id: string) {
     return submit<PolicyPackage>("insurerAdmin", "PublishPolicyPackage", id);
+  },
+
+  retirePolicyPackage(id: string) {
+    return submit<PolicyPackage>("insurerAdmin", "RetirePolicyPackage", id);
   },
 
   issuePolicy(input: {

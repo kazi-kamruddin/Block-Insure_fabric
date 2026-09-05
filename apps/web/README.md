@@ -27,8 +27,10 @@ material exists under `../../network/organizations`. Check application health at
 - `/api/workflows` validates and role-gates ledger mutation commands.
 - `/api/ledger/[assetType]/[id]` reads ledger assets and enforces policyholder ownership.
 - `/api/evidence` stores an uploaded `.enc` ciphertext exactly once and commits
-  its integrity/reference hashes; `/api/evidence/[id]` retrieves authorized ciphertext.
-- `/workspace` provides a role-aware local demonstration console.
+  its integrity/reference hashes; an origin-checked `POST` to `/api/evidence/[id]`
+  records authorized access and returns ciphertext.
+- `/workspace/<role>` provides canonical organization dashboards, guided
+  transactions, browser evidence encryption/decryption, and an advanced JSON console.
 
 ## Security boundary
 
@@ -37,7 +39,11 @@ not production authentication. Do not accept a Fabric role or identity label
 directly from a browser request. Replace demo account selection with an
 institutional identity provider before deployment.
 
-The evidence API accepts only files named `.enc`; callers are responsible for
-client-side encryption and key distribution. The application never stores those
-encryption keys. Replace local filesystem storage with durable encrypted object
-storage before production use.
+The policyholder UI creates versioned AES-256-GCM `.enc` envelopes in the browser,
+and authorized non-bank roles decrypt retrieved ciphertext in the browser after
+the server records access on Fabric. Passphrases and plaintext never reach the
+server. The application never stores encryption keys; key sharing/recovery remains
+the users' responsibility in this demonstration. Replace local filesystem storage
+with durable encrypted object storage and institutional key management before
+production use. The complete format and limitations are documented in
+`../../docs/evidence-security.md`.

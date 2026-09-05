@@ -93,9 +93,26 @@ h2 { margin: 12px 0 0; max-width: 560px; font-family: Georgia, serif; font-size:
 .templateButtons button { padding: 8px 11px; color: var(--deep); background: #e8f2eb; border: 0; border-radius: 3px; font-size: 12px; font-weight: 700; }
 .workCard textarea { width: 100%; min-height: 270px; resize: vertical; padding: 16px; margin-bottom: 12px; color: #d5f5e6; background: #102a2e; border: 0; border-radius: 4px; font: 12px/1.6 monospace; }
 .workCard label { display: grid; gap: 8px; margin-bottom: 18px; color: var(--muted); font-size: 12px; font-weight: 700; }
+.guidedCard { grid-column: 1 / -1; }
+.guidedCard h2 { max-width: 720px; }
+.guidedForm { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 16px; }
+.guidedForm .wideField, .guidedSubmit, .formError { grid-column: 1 / -1; }
+.guidedForm textarea { min-height: 105px; margin: 0; color: var(--ink); background: var(--paper); border: 1px solid var(--line); font: 14px/1.5 Arial, sans-serif; }
+.guidedForm small { color: var(--muted); font-size: 10px; font-weight: 500; line-height: 1.45; }
+.workflowDescription { margin-top: 0; }
+.guidedSubmit { justify-self: start; border: 0; }
+.formError { padding: 11px 13px; margin: 0 0 16px; color: #7c312d; background: #f1dcd8; border-left: 3px solid #a5443d; font-size: 13px; }
+.advancedCard details summary { margin-bottom: 18px; color: #31645d; cursor: pointer; font-size: 13px; font-weight: 750; }
+.advancedCard details[open] summary { margin-bottom: 22px; }
 .evidenceCard { grid-column: 1 / -1; }
 .cardNote { max-width: 760px; margin: -14px 0 26px; color: var(--muted); line-height: 1.6; }
 .evidenceFields { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0 16px; }
+.encryptionStatus { display: grid; align-content: center; gap: 5px; min-height: 65px; padding: 12px 14px; margin-bottom: 18px; background: var(--paper); border: 1px dashed var(--line); border-radius: 3px; }
+.encryptionStatus strong { font-size: 12px; }
+.encryptionStatus span, .evidenceWarning { color: var(--muted); font-size: 11px; line-height: 1.5; }
+.evidenceActions { display: flex; flex-wrap: wrap; gap: 9px; }
+.evidenceActions button { border-width: 1px; }
+.evidenceWarning { margin: 14px 0 0; }
 .workCard input, .workCard select { width: 100%; padding: 13px; color: var(--ink); background: var(--paper); border: 1px solid var(--line); border-radius: 3px; font: 14px Arial, sans-serif; }
 .resultHeading { display: flex; justify-content: space-between; margin: 32px 0 10px; color: var(--muted); font-size: 12px; }
 .queryActions { display: flex; flex-wrap: wrap; gap: 9px; }
@@ -111,6 +128,8 @@ h2 { margin: 12px 0 0; max-width: 560px; font-family: Georgia, serif; font-size:
   .metricGrid { grid-template-columns: repeat(2, 1fr); }
   .dashboardGrid { grid-template-columns: 1fr; }
   .evidenceFields { grid-template-columns: 1fr; }
+  .guidedForm { grid-template-columns: 1fr; }
+  .guidedForm .wideField, .guidedSubmit, .formError { grid-column: auto; }
   .hero { min-height: auto; padding: 80px 0; }
 }
 @media (max-width: 520px) {

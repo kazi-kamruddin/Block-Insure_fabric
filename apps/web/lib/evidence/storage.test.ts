@@ -4,6 +4,7 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   evidenceStorageReference,
+  evidenceStorageRoot,
   hashValue,
   readCiphertext,
   storeCiphertext,
@@ -16,6 +17,10 @@ afterEach(async () => {
 });
 
 describe("ciphertext evidence storage", () => {
+  it("discovers the repository storage root when no deployment override is set", () => {
+    expect(evidenceStorageRoot({} as NodeJS.ProcessEnv)).toBe(path.resolve(process.cwd(), "../../data/evidence"));
+  });
+
   it("stores a ciphertext once with deterministic integrity metadata", async () => {
     const root = await fs.mkdtemp(path.join(os.tmpdir(), "block-insure-evidence-"));
     roots.push(root);

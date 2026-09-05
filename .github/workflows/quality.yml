@@ -1,0 +1,63 @@
+name: Quality
+
+on:
+  push:
+    branches: [main, developement]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: quality-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  web:
+    name: Next.js quality and build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: Type check
+        run: npm run typecheck
+      - name: Unit and cryptographic tests
+        run: npm test
+      - name: Audit production dependency tree
+        run: npm audit --audit-level=high
+      - name: Build standalone application
+        run: npm run build
+
+  chaincode:
+    name: Go chaincode quality
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: chaincode/insurance-contract
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+      - name: Set up Go from go.mod
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: chaincode/insurance-contract/go.mod
+          cache-dependency-path: chaincode/insurance-contract/go.sum
+      - name: Check formatting
+        run: test -z "$(gofmt -l .)"
+      - name: Vet chaincode
+        run: go vet ./...
+      - name: Test chaincode
+        run: go test ./...

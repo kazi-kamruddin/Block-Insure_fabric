@@ -9,13 +9,16 @@ import {
   readCiphertext,
 } from "@/lib/evidence/storage";
 import { ledger } from "@/lib/fabric/ledger";
+import { checkMutationOrigin } from "@/lib/security/request-origin";
 
 const idSchema = z.string().trim().min(1).max(100).regex(/^[a-zA-Z0-9._:-]+$/);
 type RouteContext = { params: Promise<{ id: string }> };
 
 export const runtime = "nodejs";
 
-export async function GET(_request: Request, context: RouteContext) {
+export async function POST(request: Request, context: RouteContext) {
+  const trust = checkMutationOrigin(request);
+  if (!trust.trusted) return NextResponse.json({ message: trust.reason }, { status: 403 });
   const session = await currentSession().catch(() => null);
   if (!session) return NextResponse.json({ message: "Authentication required" }, { status: 401 });
 
@@ -53,6 +56,8 @@ export async function GET(_request: Request, context: RouteContext) {
         "x-content-type-options": "nosniff",
         "cache-control": "private, no-store",
         "x-ciphertext-sha256": hashValue(ciphertext),
+        "x-content-sha256": evidence.contentHash,
+        "x-evidence-claim-id": evidence.claimId,
       },
     });
   } catch (error) {

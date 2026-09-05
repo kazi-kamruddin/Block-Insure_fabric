@@ -9,6 +9,8 @@ export function executeWorkflowCommand(command: WorkflowCommand) {
       return ledger.createPolicyPackage(command);
     case "publishPolicyPackage":
       return ledger.publishPolicyPackage(command.id);
+    case "retirePolicyPackage":
+      return ledger.retirePolicyPackage(command.id);
     case "issuePolicy":
       return ledger.issuePolicy(command);
     case "submitClaim":

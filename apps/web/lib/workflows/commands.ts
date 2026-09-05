@@ -17,6 +17,7 @@ export const workflowCommandSchema = z.discriminatedUnion("operation", [
     termsHash: hash,
   }),
   z.object({ operation: z.literal("publishPolicyPackage"), id }),
+  z.object({ operation: z.literal("retirePolicyPackage"), id }),
   z.object({
     operation: z.literal("issuePolicy"),
     id,
@@ -58,6 +59,7 @@ export type WorkflowOperation = WorkflowCommand["operation"];
 export const requiredRoleByOperation = {
   createPolicyPackage: "insurerAdmin",
   publishPolicyPackage: "insurerAdmin",
+  retirePolicyPackage: "insurerAdmin",
   issuePolicy: "insurerAdmin",
   submitClaim: "policyholder",
   verifyClaim: "hospitalOfficer",

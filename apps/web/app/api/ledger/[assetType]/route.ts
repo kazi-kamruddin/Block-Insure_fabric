@@ -3,7 +3,7 @@ import { z } from "zod";
 import { currentSession } from "@/lib/auth/current-session";
 import { ledger } from "@/lib/fabric/ledger";
 
-const assetTypeSchema = z.enum(["package", "policy", "claim", "evidence", "settlement", "access"]);
+const assetTypeSchema = z.enum(["package", "policy", "claim", "evidence", "verification", "decision", "settlement", "access"]);
 type RouteContext = { params: Promise<{ assetType: string }> };
 
 export const runtime = "nodejs";
@@ -40,6 +40,34 @@ export async function GET(_request: Request, context: RouteContext) {
         result = session.role === "policyholder"
           ? evidence.filter((item) => item.submittedBy === session.subjectId)
           : evidence;
+        break;
+      }
+      case "verification": {
+        const verifications = await ledger.listHospitalVerifications();
+        if (session.role !== "policyholder") {
+          result = verifications;
+          break;
+        }
+        const ownedClaimIds = new Set(
+          (await ledger.listClaims())
+            .filter((claim) => claim.claimantId === session.subjectId)
+            .map((claim) => claim.id),
+        );
+        result = verifications.filter((item) => ownedClaimIds.has(item.claimId));
+        break;
+      }
+      case "decision": {
+        const decisions = await ledger.listAuditorDecisions();
+        if (session.role !== "policyholder") {
+          result = decisions;
+          break;
+        }
+        const ownedClaimIds = new Set(
+          (await ledger.listClaims())
+            .filter((claim) => claim.claimantId === session.subjectId)
+            .map((claim) => claim.id),
+        );
+        result = decisions.filter((item) => ownedClaimIds.has(item.claimId));
         break;
       }
       case "settlement": {

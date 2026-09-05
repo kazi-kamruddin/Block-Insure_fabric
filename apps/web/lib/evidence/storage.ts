@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { promises as fs } from "node:fs";
+import { existsSync, promises as fs } from "node:fs";
 import path from "node:path";
 
 const safeSegment = /^[a-zA-Z0-9._:-]+$/;
@@ -11,10 +11,19 @@ function assertSafeSegment(name: string, value: string) {
 }
 
 export function evidenceStorageRoot(environment: NodeJS.ProcessEnv = process.env) {
-  return path.resolve(
-    /* turbopackIgnore: true */ process.cwd(),
-    environment.EVIDENCE_STORAGE_ROOT ?? "../../data/evidence",
-  );
+  if (environment.EVIDENCE_STORAGE_ROOT?.trim()) {
+    return path.resolve(/* turbopackIgnore: true */ process.cwd(), environment.EVIDENCE_STORAGE_ROOT);
+  }
+  let current = path.resolve(/* turbopackIgnore: true */ process.cwd());
+  for (let depth = 0; depth < 8; depth += 1) {
+    if (existsSync(path.join(current, "network", "config", "configtx.yaml"))) {
+      return path.join(current, "data", "evidence");
+    }
+    const parent = path.dirname(current);
+    if (parent === current) break;
+    current = parent;
+  }
+  return path.resolve(process.cwd(), "../../data/evidence");
 }
 
 export function evidenceStorageReference(subjectId: string, evidenceId: string) {

@@ -23,4 +23,9 @@ describe("Fabric configuration", () => {
     expect(bank.mspId).toBe("BankMSP");
     expect(bank.peerEndpoint).toBe("localhost:12051");
   });
+
+  it("honors an explicit network root for packaged deployments", () => {
+    const config = loadFabricConfig({ FABRIC_NETWORK_ROOT: "X:/fabric-network" } as unknown as NodeJS.ProcessEnv);
+    expect(config.networkRoot).toBe(path.resolve(process.cwd(), "X:/fabric-network"));
+  });
 });
