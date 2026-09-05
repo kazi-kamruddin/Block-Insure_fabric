@@ -46,6 +46,14 @@ enroll_peer_org() {
   cp "${base}/peers/peer0.${domain}/tls/keystore/"* "${base}/peers/peer0.${domain}/tls/server.key"
   fabric-ca-client enroll -u "https://orgadmin:orgadminpw@localhost:${port}" --caname "${ca_name}" -M "${base}/users/Admin@${domain}/msp" --tls.certfiles "${ca_cert}"
   cp "${base}/msp/config.yaml" "${base}/users/Admin@${domain}/msp/config.yaml"
+  fabric-ca-client enroll -u "https://${role}:${role}pw@localhost:${port}" --caname "${ca_name}" -M "${base}/users/${role}@${domain}/msp" --tls.certfiles "${ca_cert}"
+  cp "${base}/msp/config.yaml" "${base}/users/${role}@${domain}/msp/config.yaml"
+
+  if [ "${org}" = "insurer" ]; then
+    fabric-ca-client register --caname "${ca_name}" --id.name policyholder1 --id.secret policyholder1pw --id.type client --id.attrs "role=policyholder:ecert,subjectId=policyholder1:ecert" --tls.certfiles "${ca_cert}"
+    fabric-ca-client enroll -u "https://policyholder1:policyholder1pw@localhost:${port}" --caname "${ca_name}" -M "${base}/users/policyholder1@${domain}/msp" --tls.certfiles "${ca_cert}"
+    cp "${base}/msp/config.yaml" "${base}/users/policyholder1@${domain}/msp/config.yaml"
+  fi
 }
 
 enroll_peer_org insurer InsurerMSP 7054 insurerAdmin
