@@ -18,6 +18,9 @@ Organizations:
       Writers: { Type: Signature, Rule: "OR('InsurerMSP.admin', 'InsurerMSP.client')" }
       Admins: { Type: Signature, Rule: "OR('InsurerMSP.admin')" }
       Endorsement: { Type: Signature, Rule: "OR('InsurerMSP.peer')" }
+    AnchorPeers:
+      - Host: peer0.insurer.blockinsure.test
+        Port: 7051
   - &HospitalOrg
     Name: HospitalMSP
     ID: HospitalMSP
@@ -27,6 +30,9 @@ Organizations:
       Writers: { Type: Signature, Rule: "OR('HospitalMSP.admin', 'HospitalMSP.client')" }
       Admins: { Type: Signature, Rule: "OR('HospitalMSP.admin')" }
       Endorsement: { Type: Signature, Rule: "OR('HospitalMSP.peer')" }
+    AnchorPeers:
+      - Host: peer0.hospital.blockinsure.test
+        Port: 7051
   - &AuditorOrg
     Name: AuditorMSP
     ID: AuditorMSP
@@ -36,6 +42,9 @@ Organizations:
       Writers: { Type: Signature, Rule: "OR('AuditorMSP.admin', 'AuditorMSP.client')" }
       Admins: { Type: Signature, Rule: "OR('AuditorMSP.admin')" }
       Endorsement: { Type: Signature, Rule: "OR('AuditorMSP.peer')" }
+    AnchorPeers:
+      - Host: peer0.auditor.blockinsure.test
+        Port: 7051
   - &BankOrg
     Name: BankMSP
     ID: BankMSP
@@ -45,6 +54,9 @@ Organizations:
       Writers: { Type: Signature, Rule: "OR('BankMSP.admin', 'BankMSP.client')" }
       Admins: { Type: Signature, Rule: "OR('BankMSP.admin')" }
       Endorsement: { Type: Signature, Rule: "OR('BankMSP.peer')" }
+    AnchorPeers:
+      - Host: peer0.bank.blockinsure.test
+        Port: 7051
 
 Capabilities:
   Channel: &ChannelCapabilities
