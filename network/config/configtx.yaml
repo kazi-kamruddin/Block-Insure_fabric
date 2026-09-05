@@ -1,0 +1,107 @@
+---
+Organizations:
+  - &OrdererOrg
+    Name: OrdererMSP
+    ID: OrdererMSP
+    MSPDir: ../organizations/ordererOrganizations/blockinsure.test/msp
+    Policies:
+      Readers: { Type: Signature, Rule: "OR('OrdererMSP.member')" }
+      Writers: { Type: Signature, Rule: "OR('OrdererMSP.member')" }
+      Admins: { Type: Signature, Rule: "OR('OrdererMSP.admin')" }
+    OrdererEndpoints: [orderer.blockinsure.test:7050]
+  - &InsurerOrg
+    Name: InsurerMSP
+    ID: InsurerMSP
+    MSPDir: ../organizations/peerOrganizations/insurer.blockinsure.test/msp
+    Policies:
+      Readers: { Type: Signature, Rule: "OR('InsurerMSP.admin', 'InsurerMSP.peer', 'InsurerMSP.client')" }
+      Writers: { Type: Signature, Rule: "OR('InsurerMSP.admin', 'InsurerMSP.client')" }
+      Admins: { Type: Signature, Rule: "OR('InsurerMSP.admin')" }
+      Endorsement: { Type: Signature, Rule: "OR('InsurerMSP.peer')" }
+  - &HospitalOrg
+    Name: HospitalMSP
+    ID: HospitalMSP
+    MSPDir: ../organizations/peerOrganizations/hospital.blockinsure.test/msp
+    Policies:
+      Readers: { Type: Signature, Rule: "OR('HospitalMSP.admin', 'HospitalMSP.peer', 'HospitalMSP.client')" }
+      Writers: { Type: Signature, Rule: "OR('HospitalMSP.admin', 'HospitalMSP.client')" }
+      Admins: { Type: Signature, Rule: "OR('HospitalMSP.admin')" }
+      Endorsement: { Type: Signature, Rule: "OR('HospitalMSP.peer')" }
+  - &AuditorOrg
+    Name: AuditorMSP
+    ID: AuditorMSP
+    MSPDir: ../organizations/peerOrganizations/auditor.blockinsure.test/msp
+    Policies:
+      Readers: { Type: Signature, Rule: "OR('AuditorMSP.admin', 'AuditorMSP.peer', 'AuditorMSP.client')" }
+      Writers: { Type: Signature, Rule: "OR('AuditorMSP.admin', 'AuditorMSP.client')" }
+      Admins: { Type: Signature, Rule: "OR('AuditorMSP.admin')" }
+      Endorsement: { Type: Signature, Rule: "OR('AuditorMSP.peer')" }
+  - &BankOrg
+    Name: BankMSP
+    ID: BankMSP
+    MSPDir: ../organizations/peerOrganizations/bank.blockinsure.test/msp
+    Policies:
+      Readers: { Type: Signature, Rule: "OR('BankMSP.admin', 'BankMSP.peer', 'BankMSP.client')" }
+      Writers: { Type: Signature, Rule: "OR('BankMSP.admin', 'BankMSP.client')" }
+      Admins: { Type: Signature, Rule: "OR('BankMSP.admin')" }
+      Endorsement: { Type: Signature, Rule: "OR('BankMSP.peer')" }
+
+Capabilities:
+  Channel: &ChannelCapabilities
+    V2_0: true
+  Orderer: &OrdererCapabilities
+    V2_0: true
+  Application: &ApplicationCapabilities
+    V2_5: true
+
+Application: &ApplicationDefaults
+  Organizations:
+  Policies:
+    Readers: { Type: ImplicitMeta, Rule: "ANY Readers" }
+    Writers: { Type: ImplicitMeta, Rule: "ANY Writers" }
+    Admins: { Type: ImplicitMeta, Rule: "MAJORITY Admins" }
+    LifecycleEndorsement: { Type: ImplicitMeta, Rule: "MAJORITY Endorsement" }
+    Endorsement: { Type: ImplicitMeta, Rule: "MAJORITY Endorsement" }
+  Capabilities:
+    <<: *ApplicationCapabilities
+
+Orderer: &OrdererDefaults
+  OrdererType: etcdraft
+  Addresses: [orderer.blockinsure.test:7050]
+  BatchTimeout: 2s
+  BatchSize:
+    MaxMessageCount: 10
+    AbsoluteMaxBytes: 99 MB
+    PreferredMaxBytes: 512 KB
+  Organizations:
+  Policies:
+    Readers: { Type: ImplicitMeta, Rule: "ANY Readers" }
+    Writers: { Type: ImplicitMeta, Rule: "ANY Writers" }
+    Admins: { Type: ImplicitMeta, Rule: "MAJORITY Admins" }
+    BlockValidation: { Type: ImplicitMeta, Rule: "ANY Writers" }
+
+Channel: &ChannelDefaults
+  Policies:
+    Readers: { Type: ImplicitMeta, Rule: "ANY Readers" }
+    Writers: { Type: ImplicitMeta, Rule: "ANY Writers" }
+    Admins: { Type: ImplicitMeta, Rule: "MAJORITY Admins" }
+  Capabilities:
+    <<: *ChannelCapabilities
+
+Profiles:
+  InsuranceChannel:
+    <<: *ChannelDefaults
+    Orderer:
+      <<: *OrdererDefaults
+      EtcdRaft:
+        Consenters:
+          - Host: orderer.blockinsure.test
+            Port: 7050
+            ClientTLSCert: ../organizations/ordererOrganizations/blockinsure.test/orderers/orderer.blockinsure.test/tls/server.crt
+            ServerTLSCert: ../organizations/ordererOrganizations/blockinsure.test/orderers/orderer.blockinsure.test/tls/server.crt
+      Organizations: [*OrdererOrg]
+      Capabilities: *OrdererCapabilities
+    Application:
+      <<: *ApplicationDefaults
+      Organizations: [*InsurerOrg, *HospitalOrg, *AuditorOrg, *BankOrg]
+      Capabilities: *ApplicationCapabilities

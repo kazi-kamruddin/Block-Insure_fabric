@@ -1,0 +1,67 @@
+name: block-insure-ca
+
+networks:
+  block-insure:
+    name: block-insure
+
+x-ca-defaults: &ca-defaults
+  image: hyperledger/fabric-ca:1.5.17
+  labels:
+    service: hyperledger-fabric
+  environment:
+    FABRIC_CA_HOME: /etc/hyperledger/fabric-ca-server
+    FABRIC_CA_SERVER_TLS_ENABLED: "true"
+  command: sh -c 'fabric-ca-server start -b admin:adminpw -d'
+  networks: [block-insure]
+
+services:
+  ca-insurer:
+    <<: *ca-defaults
+    container_name: ca.insurer.blockinsure.test
+    environment:
+      FABRIC_CA_HOME: /etc/hyperledger/fabric-ca-server
+      FABRIC_CA_SERVER_CA_NAME: ca-insurer
+      FABRIC_CA_SERVER_TLS_ENABLED: "true"
+      FABRIC_CA_SERVER_PORT: 7054
+    ports: ["7054:7054"]
+    volumes: ["../organizations/fabric-ca/insurer:/etc/hyperledger/fabric-ca-server"]
+  ca-hospital:
+    <<: *ca-defaults
+    container_name: ca.hospital.blockinsure.test
+    environment:
+      FABRIC_CA_HOME: /etc/hyperledger/fabric-ca-server
+      FABRIC_CA_SERVER_CA_NAME: ca-hospital
+      FABRIC_CA_SERVER_TLS_ENABLED: "true"
+      FABRIC_CA_SERVER_PORT: 8054
+    ports: ["8054:8054"]
+    volumes: ["../organizations/fabric-ca/hospital:/etc/hyperledger/fabric-ca-server"]
+  ca-auditor:
+    <<: *ca-defaults
+    container_name: ca.auditor.blockinsure.test
+    environment:
+      FABRIC_CA_HOME: /etc/hyperledger/fabric-ca-server
+      FABRIC_CA_SERVER_CA_NAME: ca-auditor
+      FABRIC_CA_SERVER_TLS_ENABLED: "true"
+      FABRIC_CA_SERVER_PORT: 9054
+    ports: ["9054:9054"]
+    volumes: ["../organizations/fabric-ca/auditor:/etc/hyperledger/fabric-ca-server"]
+  ca-bank:
+    <<: *ca-defaults
+    container_name: ca.bank.blockinsure.test
+    environment:
+      FABRIC_CA_HOME: /etc/hyperledger/fabric-ca-server
+      FABRIC_CA_SERVER_CA_NAME: ca-bank
+      FABRIC_CA_SERVER_TLS_ENABLED: "true"
+      FABRIC_CA_SERVER_PORT: 10054
+    ports: ["10054:10054"]
+    volumes: ["../organizations/fabric-ca/bank:/etc/hyperledger/fabric-ca-server"]
+  ca-orderer:
+    <<: *ca-defaults
+    container_name: ca.orderer.blockinsure.test
+    environment:
+      FABRIC_CA_HOME: /etc/hyperledger/fabric-ca-server
+      FABRIC_CA_SERVER_CA_NAME: ca-orderer
+      FABRIC_CA_SERVER_TLS_ENABLED: "true"
+      FABRIC_CA_SERVER_PORT: 11054
+    ports: ["11054:11054"]
+    volumes: ["../organizations/fabric-ca/orderer:/etc/hyperledger/fabric-ca-server"]
