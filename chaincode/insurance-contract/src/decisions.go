@@ -106,6 +106,10 @@ func (c *Contract) ReadEvidenceReference(ctx contractapi.TransactionContextInter
 	return getState[EvidenceReference](ctx, "evidenceReference", id)
 }
 
+func (c *Contract) ReadEvidenceAccessGrant(ctx contractapi.TransactionContextInterface, id string) (*EvidenceAccessGrant, error) {
+	return getState[EvidenceAccessGrant](ctx, "evidenceGrant", id)
+}
+
 func (c *Contract) ReadHospitalVerification(ctx contractapi.TransactionContextInterface, id string) (*HospitalVerification, error) {
 	return getState[HospitalVerification](ctx, "hospitalVerification", id)
 }

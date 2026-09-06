@@ -16,6 +16,7 @@ import type {
   ClaimHistoryRecord,
   EvidenceReference,
   EvidenceAccessRecord,
+  EvidenceAccessGrant,
   HospitalVerification,
   FraudAssessment,
   Liability,
@@ -184,6 +185,14 @@ export const ledger = {
 
   listEvidenceAccessRecords() {
     return evaluate<EvidenceAccessRecord[]>("insurerAdmin", "ListEvidenceAccessRecords");
+  },
+
+  readEvidenceAccessGrant(id: string) {
+    return evaluate<EvidenceAccessGrant>("insurerAdmin", "ReadEvidenceAccessGrant", id);
+  },
+
+  listEvidenceAccessGrants() {
+    return evaluate<EvidenceAccessGrant[]>("insurerAdmin", "ListEvidenceAccessGrants");
   },
 
   readHospitalVerification(id: string) {
@@ -450,6 +459,32 @@ export const ledger = {
       input.evidenceId,
       input.purpose,
     );
+  },
+
+  recordGrantedEvidenceAccess(
+    role: FabricRole,
+    input: { id: string; evidenceId: string; grantId: string; purpose: "DOWNLOAD" | "VERIFY" | "AUDIT" },
+    auditorUserName?: string,
+  ) {
+    if (role === "auditor") {
+      return submitAsAuditor<EvidenceAccessRecord>(auditorUserName, "RecordGrantedEvidenceAccess", input.id, input.evidenceId, input.grantId, input.purpose);
+    }
+    return submit<EvidenceAccessRecord>(role, "RecordGrantedEvidenceAccess", input.id, input.evidenceId, input.grantId, input.purpose);
+  },
+
+  grantEvidenceAccess(input: {
+    id: string; evidenceId: string; granteeMsp: string; granteeRole: string;
+    granteeSubject: string; purpose: string; expiresAt: string; maxAccesses: number;
+  }) {
+    return submit<EvidenceAccessGrant>(
+      "policyholder", "GrantEvidenceAccess", input.id, input.evidenceId,
+      input.granteeMsp, input.granteeRole, input.granteeSubject, input.purpose,
+      input.expiresAt, input.maxAccesses,
+    );
+  },
+
+  revokeEvidenceAccess(grantId: string) {
+    return submit<EvidenceAccessGrant>("policyholder", "RevokeEvidenceAccess", grantId);
   },
 
   verifyClaim(input: {

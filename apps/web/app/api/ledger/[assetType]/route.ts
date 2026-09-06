@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { currentSession } from "@/lib/auth/current-session";
+import { findDemoAccount } from "@/lib/auth/accounts";
 import { ledger } from "@/lib/fabric/ledger";
 
-const assetTypeSchema = z.enum(["package", "policy", "claim", "evidence", "verification", "decision", "review", "appeal", "fraud-assessment", "settlement", "access", "account", "mandate", "premium-payment", "premium-adjustment", "collection", "benefit-plan", "beneficiaries", "benefit-request", "liability"]);
+const assetTypeSchema = z.enum(["package", "policy", "claim", "evidence", "evidence-grant", "verification", "decision", "review", "appeal", "fraud-assessment", "settlement", "access", "account", "mandate", "premium-payment", "premium-adjustment", "collection", "benefit-plan", "beneficiaries", "benefit-request", "liability"]);
 type RouteContext = { params: Promise<{ assetType: string }> };
 
 export const runtime = "nodejs";
@@ -40,6 +41,15 @@ export async function GET(_request: Request, context: RouteContext) {
         result = session.role === "policyholder"
           ? evidence.filter((item) => item.submittedBy === session.subjectId)
           : evidence;
+        break;
+      }
+      case "evidence-grant": {
+        const grants = await ledger.listEvidenceAccessGrants();
+        const account = findDemoAccount(session.accountId);
+        if (session.role === "insurerAdmin") result = grants;
+        else if (session.role === "policyholder") result = grants.filter((item) => item.ownerId === session.subjectId);
+        else if (!account) result = [];
+        else result = grants.filter((item) => item.granteeMsp === account.organization && item.granteeRole === session.role && (item.granteeSubject === "*" || item.granteeSubject === session.subjectId));
         break;
       }
       case "verification": {

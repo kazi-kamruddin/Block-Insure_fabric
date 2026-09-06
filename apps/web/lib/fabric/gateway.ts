@@ -51,6 +51,7 @@ export async function withFabricContract<T>(
     endorseOptions: () => ({ deadline: deadlineAfter(config.deadlines.endorse)() }),
     submitOptions: () => ({ deadline: deadlineAfter(config.deadlines.submit)() }),
     commitStatusOptions: () => ({ deadline: deadlineAfter(config.deadlines.commitStatus)() }),
+    chaincodeEventsOptions: () => ({ deadline: deadlineAfter(config.deadlines.eventSync)() }),
   });
 
   try {

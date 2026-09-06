@@ -8,6 +8,7 @@ import type {
   ClaimReview,
   ClaimHistoryRecord,
   EvidenceAccessRecord,
+  EvidenceAccessGrant,
   EvidenceReference,
   FraudAssessment,
   HospitalVerification,
@@ -15,12 +16,13 @@ import type {
 } from "@/lib/fabric/types";
 
 export type ClaimAuditDossier = {
-  schemaVersion: 2;
+  schemaVersion: 3;
   exportedAt: string;
   claim: Claim;
   history: ClaimHistoryRecord[];
   evidence: EvidenceReference[];
   evidenceAccess: EvidenceAccessRecord[];
+  evidenceGrants: EvidenceAccessGrant[];
   hospitalVerification: HospitalVerification | null;
   auditorDecisions: AuditorDecision[];
   reviewRounds: ClaimReview[];
@@ -31,10 +33,11 @@ export type ClaimAuditDossier = {
 
 export async function loadClaimAuditDossier(claimId: string): Promise<ClaimAuditDossier> {
   const claim = await ledger.readClaim(claimId);
-  const [history, allEvidence, allAccess, allVerifications, allDecisions, allReviews, allAppeals, allFraudAssessments, allSettlements] = await Promise.all([
+  const [history, allEvidence, allAccess, allGrants, allVerifications, allDecisions, allReviews, allAppeals, allFraudAssessments, allSettlements] = await Promise.all([
     ledger.claimHistory(claimId),
     ledger.listEvidenceReferences(),
     ledger.listEvidenceAccessRecords(),
+    ledger.listEvidenceAccessGrants(),
     ledger.listHospitalVerifications(),
     ledger.listAuditorDecisions(),
     ledger.listClaimReviews(),
@@ -44,12 +47,13 @@ export async function loadClaimAuditDossier(claimId: string): Promise<ClaimAudit
   ]);
 
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
     exportedAt: new Date().toISOString(),
     claim,
     history,
     evidence: allEvidence.filter((item) => item.claimId === claimId),
     evidenceAccess: allAccess.filter((item) => item.claimId === claimId),
+    evidenceGrants: allGrants.filter((item) => item.claimId === claimId),
     hospitalVerification: allVerifications.find((item) => item.id === claim.hospitalVerificationId) ?? null,
     auditorDecisions: allDecisions.filter((item) => item.claimId === claimId),
     reviewRounds: allReviews.filter((item) => item.claimId === claimId),

@@ -20,6 +20,7 @@ const environmentSchema = z.object({
   FABRIC_ENDORSE_DEADLINE_SECONDS: z.coerce.number().positive().default(15),
   FABRIC_SUBMIT_DEADLINE_SECONDS: z.coerce.number().positive().default(5),
   FABRIC_COMMIT_STATUS_DEADLINE_SECONDS: z.coerce.number().positive().default(60),
+  FABRIC_EVENT_SYNC_DEADLINE_SECONDS: z.coerce.number().positive().default(10),
 });
 
 export type FabricConfig = ReturnType<typeof loadFabricConfig>;
@@ -91,6 +92,7 @@ export function loadFabricConfig(environment: NodeJS.ProcessEnv = process.env) {
       endorse: values.FABRIC_ENDORSE_DEADLINE_SECONDS,
       submit: values.FABRIC_SUBMIT_DEADLINE_SECONDS,
       commitStatus: values.FABRIC_COMMIT_STATUS_DEADLINE_SECONDS,
+      eventSync: values.FABRIC_EVENT_SYNC_DEADLINE_SECONDS,
     },
   };
 }

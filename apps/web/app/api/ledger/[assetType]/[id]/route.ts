@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { currentSession } from "@/lib/auth/current-session";
+import { findDemoAccount } from "@/lib/auth/accounts";
 import { ledger } from "@/lib/fabric/ledger";
 
 const routeSchema = z.object({
-  assetType: z.enum(["package", "policy", "claim", "evidence", "verification", "decision", "review", "appeal", "fraud-assessment", "settlement", "claim-history", "account", "mandate", "premium-payment", "premium-adjustment", "collection", "benefit-plan", "beneficiaries", "benefit-request", "liability"]),
+  assetType: z.enum(["package", "policy", "claim", "evidence", "evidence-grant", "verification", "decision", "review", "appeal", "fraud-assessment", "settlement", "claim-history", "account", "mandate", "premium-payment", "premium-adjustment", "collection", "benefit-plan", "beneficiaries", "benefit-request", "liability"]),
   id: z.string().trim().min(1).max(100).regex(/^[a-zA-Z0-9._:-]+$/),
 });
 
@@ -51,6 +52,16 @@ export async function GET(_request: Request, context: RouteContext) {
             return NextResponse.json({ message: "Asset is not owned by this account" }, { status: 403 });
           }
         }
+        break;
+      }
+      case "evidence-grant": {
+        const grant = await ledger.readEvidenceAccessGrant(id);
+        const account = findDemoAccount(session.accountId);
+        const visible = session.role === "insurerAdmin" ||
+          (session.role === "policyholder" && grant.ownerId === session.subjectId) ||
+          Boolean(account && grant.granteeMsp === account.organization && grant.granteeRole === session.role && (grant.granteeSubject === "*" || grant.granteeSubject === session.subjectId));
+        if (!visible) return NextResponse.json({ message: "Grant is not visible to this account" }, { status: 403 });
+        result = grant;
         break;
       }
       case "verification": {

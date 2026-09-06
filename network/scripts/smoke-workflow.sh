@@ -50,6 +50,8 @@ package_id="smoke-package-${suffix}"
 policy_id="smoke-policy-${suffix}"
 claim_id="smoke-claim-${suffix}"
 evidence_id="smoke-evidence-${suffix}"
+evidence_grant_id="smoke-evidence-grant-${suffix}"
+evidence_access_id="smoke-evidence-access-${suffix}"
 verification_id="smoke-verification-${suffix}"
 decision_id="smoke-decision-${suffix}"
 review_id="smoke-review-${suffix}"
@@ -70,6 +72,7 @@ hash_d="dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
 premium_receipt_hash="$(printf '%s' "premium-${suffix}" | sha256sum | cut -d' ' -f1)"
 collection_receipt_hash="$(printf '%s' "collection-${suffix}" | sha256sum | cut -d' ' -f1)"
 review_deadline="$(date -u -d '+3 days' '+%Y-%m-%dT%H:%M:%SZ')"
+grant_deadline="$(date -u -d '+7 days' '+%Y-%m-%dT%H:%M:%SZ')"
 
 set_client_context insurer InsurerMSP 7051 insurerAdmin
 invoke CreatePolicyPackage "${package_id}" "Smoke Health Plan" "Live Fabric workflow verification" 10000 1000000 "${hash_a}"
@@ -109,9 +112,14 @@ invoke ConfirmBenefitPayment "${benefit_request_id}" "${hash_d}"
 set_client_context insurer InsurerMSP 7051 policyholder1
 invoke SubmitClaim "${claim_id}" "${policy_id}" 250000 2026-06-15 "${hash_b}"
 invoke AddEvidenceReference "${claim_id}" "${evidence_id}" DISCHARGE_SUMMARY "${hash_c}" "${hash_d}"
+invoke GrantEvidenceAccess "${evidence_grant_id}" "${evidence_id}" HospitalMSP hospitalOfficer '*' VERIFY "${grant_deadline}" 2
 
 set_client_context hospital HospitalMSP 8051 hospitalOfficer
+invoke RecordGrantedEvidenceAccess "${evidence_access_id}" "${evidence_id}" "${evidence_grant_id}" VERIFY
 invoke VerifyClaim "${claim_id}" "${verification_id}" VERIFIED "${hash_a}"
+
+set_client_context insurer InsurerMSP 7051 policyholder1
+invoke RevokeEvidenceAccess "${evidence_grant_id}"
 
 set_client_context insurer InsurerMSP 7051 insurerAdmin
 invoke RecordFraudAssessment "${fraud_id}" "${claim_id}" transparent-claim-triage 1.0.0 "${hash_a}" "${hash_b}" 4300 MEDIUM '["COVERAGE_RATIO_40_PLUS","SINGLE_EVIDENCE_REFERENCE"]'
@@ -136,6 +144,7 @@ benefit_json="$(peer chaincode query -C "${channel_name}" -n "${chaincode_name}"
 liability_json="$(peer chaincode query -C "${channel_name}" -n "${chaincode_name}" -c "$(payload ReadLiability "liability-benefit-${benefit_request_id}")")"
 review_json="$(peer chaincode query -C "${channel_name}" -n "${chaincode_name}" -c "$(payload ReadClaimReview "${review_id}")")"
 fraud_json="$(peer chaincode query -C "${channel_name}" -n "${chaincode_name}" -c "$(payload ReadFraudAssessment "${fraud_id}")")"
+grant_json="$(peer chaincode query -C "${channel_name}" -n "${chaincode_name}" -c "$(payload ReadEvidenceAccessGrant "${evidence_grant_id}")")"
 
 test "$(jq -r '.status' <<<"${claim_json}")" = "SETTLED"
 test "$(jq -r '.status' <<<"${settlement_json}")" = "CONFIRMED"
@@ -148,5 +157,7 @@ test "$(jq -r '.status' <<<"${liability_json}")" = "PAID"
 test "$(jq -r '.status' <<<"${review_json}")" = "APPROVED"
 test "$(jq -r '.votesCast' <<<"${review_json}")" = "3"
 test "$(jq -r '.advisory' <<<"${fraud_json}")" = "true"
+test "$(jq -r '.status' <<<"${grant_json}")" = "REVOKED"
+test "$(jq -r '.accessCount' <<<"${grant_json}")" = "1"
 
-echo "Verified live workflows: claim ${claim_id} SETTLED by 3-of-4 review quorum; fraud triage remained advisory; policy ${acquired_policy_id} ACTIVE; collection COMPLETED; benefit PAID."
+echo "Verified live workflows: governed evidence grant used and revoked; claim ${claim_id} SETTLED by 3-of-4 review quorum; fraud triage remained advisory; policy ${acquired_policy_id} ACTIVE; collection COMPLETED; benefit PAID."

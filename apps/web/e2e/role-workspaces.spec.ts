@@ -55,6 +55,17 @@ test("anonymous users cannot read ledger dashboards", async ({ request }) => {
   expect(response.status()).toBe(401);
 });
 
+test("research metrics are role-restricted and reproducibly identified", async ({ page }) => {
+  await signIn(page, "policyholder-1");
+  await page.goto("/research");
+  await expect(page).toHaveURL(/\/workspace\/policyholder$/);
+  await page.getByRole("button", { name: "Sign out" }).click();
+  await signIn(page, "insurer-admin");
+  await page.goto("/research");
+  await expect(page.getByRole("heading", { name: "Block-Insure thesis dashboard" })).toBeVisible();
+  await expect(page.getByText(/Hash [a-f0-9]{64}/)).toBeVisible();
+});
+
 test("guided financial forms reject fractional poisha before submission", async ({ page }) => {
   await signIn(page, "insurer-admin");
   await page.getByLabel("Package name").fill("Validation-only package");

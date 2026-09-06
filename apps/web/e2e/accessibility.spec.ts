@@ -33,3 +33,12 @@ for (const account of accounts) {
     await expectWcagAA(page, `${account} workspace`);
   });
 }
+
+test("ledger-derived research dashboard passes automated WCAG 2.1 AA checks", async ({ page }) => {
+  test.setTimeout(60_000);
+  await page.goto("/workspace");
+  await page.getByRole("button", { name: /Insurer Administrator/ }).click();
+  await page.goto("/research");
+  await expect(page.getByRole("heading", { name: "Block-Insure thesis dashboard" })).toBeVisible();
+  await expectWcagAA(page, "research dashboard");
+});

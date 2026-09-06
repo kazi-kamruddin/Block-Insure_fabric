@@ -20,7 +20,7 @@ async function command(context: APIRequestContext, payload: Record<string, unkno
 }
 
 test("five organization sessions complete a Fabric insurance workflow", async ({ baseURL }) => {
-  test.setTimeout(120_000);
+  test.setTimeout(180_000);
   if (!baseURL) throw new Error("Playwright baseURL is required");
 
   const suffix = `${Date.now()}-${Math.floor(Math.random() * 1_000_000)}`;
@@ -29,6 +29,7 @@ test("five organization sessions complete a Fabric insurance workflow", async ({
     policy: `e2e-policy-${suffix}`,
     claim: `e2e-claim-${suffix}`,
     evidence: `e2e-evidence-${suffix}`,
+    grant: `e2e-grant-${suffix}`,
     verification: `e2e-verification-${suffix}`,
     decision: `e2e-decision-${suffix}`,
     review: `e2e-review-${suffix}`,
@@ -80,6 +81,11 @@ test("five organization sessions complete a Fabric insurance workflow", async ({
       },
     });
     expect(evidenceUpload.ok(), await evidenceUpload.text()).toBe(true);
+    await command(policyholder, {
+      operation: "grantEvidenceAccess", id: ids.grant, evidenceId: ids.evidence,
+      granteeMsp: "HospitalMSP", granteeRole: "hospitalOfficer", granteeSubject: "*",
+      purpose: "VERIFY", expiresAt: new Date(Date.now() + 7 * 86_400_000).toISOString(), maxAccesses: 2,
+    });
 
     const bankEvidence = await bank.post(`/api/evidence/${ids.evidence}`);
     expect(bankEvidence.status()).toBe(403);
@@ -94,6 +100,13 @@ test("five organization sessions complete a Fabric insurance workflow", async ({
       { claimId: ids.claim, evidenceId: ids.evidence },
     );
     expect(new TextDecoder().decode(downloadedPlaintext)).toBe(`private-e2e-evidence-${suffix}`);
+
+    const sharedEvidence = await hospital.post(`/api/evidence/${ids.evidence}`, { data: { grantId: ids.grant } });
+    expect(sharedEvidence.ok(), await sharedEvidence.text()).toBe(true);
+    expect(sharedEvidence.headers()["x-content-sha256"]).toBe(encryptedEvidence.contentHash);
+    await command(policyholder, { operation: "revokeEvidenceAccess", grantId: ids.grant });
+    const revokedGrant = await policyholder.get(`/api/ledger/evidence-grant/${ids.grant}`);
+    expect((await revokedGrant.json()).result).toMatchObject({ status: "REVOKED", accessCount: 1 });
 
     const accessLog = await insurer.get("/api/ledger/access");
     expect(accessLog.ok(), await accessLog.text()).toBe(true);
@@ -120,7 +133,7 @@ test("five organization sessions complete a Fabric insurance workflow", async ({
     });
 
     const auditorBefore = await auditor.get("/api/dashboard");
-    expect((await auditorBefore.json()).dashboard.queue.some((item: { id: string }) => item.id === ids.claim)).toBe(true);
+    expect((await auditorBefore.json()).dashboard.queue.some((item: { id: string }) => item.id === ids.review)).toBe(true);
     await command(auditor, {
       operation: "recordAuditorDecision", reviewId: ids.review, decisionId: `${ids.decision}-1`,
       outcome: "APPROVE", reasonHash: hashA,
@@ -155,7 +168,7 @@ test("five organization sessions complete a Fabric insurance workflow", async ({
     expect(dossierResponse.headers()["content-disposition"]).toContain(`${ids.claim}-audit.json`);
     const dossier = await dossierResponse.json();
     expect(dossier).toMatchObject({
-      schemaVersion: 2,
+      schemaVersion: 3,
       claim: { id: ids.claim, status: "SETTLED" },
       hospitalVerification: { id: ids.verification, outcome: "VERIFIED" },
       settlement: { id: ids.settlement, status: "CONFIRMED" },
@@ -166,6 +179,19 @@ test("five organization sessions complete a Fabric insurance workflow", async ({
     expect(dossier.history.length).toBeGreaterThanOrEqual(6);
     expect(dossier.evidence.some((item: { id: string }) => item.id === ids.evidence)).toBe(true);
     expect(dossier.evidenceAccess.some((item: { evidenceId: string }) => item.evidenceId === ids.evidence)).toBe(true);
+    expect(dossier.evidenceGrants).toEqual(expect.arrayContaining([expect.objectContaining({ id: ids.grant, status: "REVOKED", accessCount: 1 })]));
+
+    const eventSync = await insurer.post("/api/internal/events/sync");
+    expect(eventSync.ok(), await eventSync.text()).toBe(true);
+    const research = await insurer.get("/api/research/snapshot");
+    expect(research.ok(), await research.text()).toBe(true);
+    expect(await research.json()).toMatchObject({
+      schemaVersion: 1,
+      provenance: { ledgerSchemaVersion: 5 },
+      fraudDecisionSupport: { advisoryOnly: true },
+    });
+    const auditorNotifications = await auditor.get("/api/operations/notifications");
+    expect((await auditorNotifications.json()).notifications.some((item: { assetId: string }) => item.assetId === ids.review)).toBe(true);
 
     const forbiddenDossier = await bank.get(`/api/audit/claims/${ids.claim}`);
     expect(forbiddenDossier.status()).toBe(403);

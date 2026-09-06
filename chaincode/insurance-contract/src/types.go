@@ -1,6 +1,6 @@
 package insurance
 
-const SchemaVersion = 4
+const SchemaVersion = 5
 
 type PolicyPackage struct {
 	AssetType          string `json:"assetType"`
@@ -211,11 +211,31 @@ type EvidenceAccessRecord struct {
 	ID               string `json:"id"`
 	EvidenceID       string `json:"evidenceId"`
 	ClaimID          string `json:"claimId"`
+	GrantID          string `json:"grantId"`
 	AccessorMSP      string `json:"accessorMsp"`
 	AccessorRole     string `json:"accessorRole"`
 	AccessorIdentity string `json:"accessorIdentity"`
 	Purpose          string `json:"purpose"`
 	CreatedAt        string `json:"createdAt"`
+}
+
+type EvidenceAccessGrant struct {
+	AssetType      string `json:"assetType"`
+	SchemaVersion  int    `json:"schemaVersion"`
+	ID             string `json:"id"`
+	EvidenceID     string `json:"evidenceId"`
+	ClaimID        string `json:"claimId"`
+	OwnerID        string `json:"ownerId"`
+	GranteeMSP     string `json:"granteeMsp"`
+	GranteeRole    string `json:"granteeRole"`
+	GranteeSubject string `json:"granteeSubject"`
+	Purpose        string `json:"purpose"`
+	ExpiresAt      string `json:"expiresAt"`
+	MaxAccesses    int    `json:"maxAccesses"`
+	AccessCount    int    `json:"accessCount"`
+	Status         string `json:"status"`
+	CreatedAt      string `json:"createdAt"`
+	RevokedAt      string `json:"revokedAt"`
 }
 
 type EvidenceReference struct {

@@ -35,11 +35,14 @@ claim ID, evidence ID, and submitting identity are committed to Fabric.
 ## Retrieval path
 
 1. An authenticated non-bank user submits an origin-checked `POST` to
-   `/api/evidence/<evidenceId>`.
+   `/api/evidence/<evidenceId>`, optionally naming a governed grant.
 2. The server reads the evidence reference and claim from Fabric and checks the
    caller's role, organization, ownership, and current workflow state.
-3. The server verifies the storage reference, loads ciphertext, and commits an
-   `EvidenceAccessRecord` through the caller's organization identity.
+3. The server verifies the storage reference and loads ciphertext. Chaincode
+   either enforces the active workflow assignment or an unrevoked, unexpired,
+   use-limited `EvidenceAccessGrant` whose MSP, role, subject, and purpose match.
+   It then commits an `EvidenceAccessRecord` through the caller's organization
+   identity, retaining the grant ID when one was used.
 4. The response returns ciphertext with its ciphertext hash, expected plaintext
    hash, and ledger-derived claim ID in private/no-store headers.
 5. The browser derives the key, authenticates/decrypts the envelope, recomputes
@@ -63,9 +66,10 @@ not permitted to retrieve medical evidence.
   requires durable encrypted object storage, retention/backup policy, malware
   controls, institutional key recovery/escrow policy, and secure identity
   lifecycle management.
-- This design does not copy the Ethereum reference's proxy re-encryption scheme.
-  Adding delegated key grants requires an explicit organizational key-management
-  design; Fabric membership alone cannot distribute a browser-held passphrase.
+- Policyholders can create and revoke ledger grants, but a grant authorizes
+  ciphertext retrieval only. It does not distribute the browser-held passphrase.
+  This deliberately does not copy the Ethereum proxy re-encryption scheme;
+  production still requires explicit organizational key management.
 
 The implementation is in `apps/web/lib/evidence/browser-crypto.ts`, with
 cryptographic round-trip, wrong-passphrase, and claim-rebinding tests.

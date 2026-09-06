@@ -368,6 +368,8 @@ func TestEvidenceAccessAuthorizationAndAuditRecord(t *testing.T) {
 	requireNoError(t, err)
 	_, err = contract.AddEvidenceReference(ctx, "claim-access", "evidence-access", "INVOICE", hash, hash)
 	requireNoError(t, err)
+	_, err = contract.RecordEvidenceAccess(ctx, "access-mislabeled", "evidence-access", "AUDIT")
+	requireError(t, err, "purpose does not match")
 	record, err := contract.RecordEvidenceAccess(ctx, "access-owner", "evidence-access", "DOWNLOAD")
 	requireNoError(t, err)
 	if record.AccessorRole != "policyholder" || record.ClaimID != "claim-access" {
@@ -383,6 +385,93 @@ func TestEvidenceAccessAuthorizationAndAuditRecord(t *testing.T) {
 	if len(records) != 1 || records[0].ID != "access-owner" {
 		t.Fatalf("unexpected evidence access records: %+v", records)
 	}
+}
+
+func TestGovernedEvidenceGrantLifecycle(t *testing.T) {
+	contract := &Contract{}
+	ctx := &testContext{stub: newMemoryStub()}
+	hash := strings.Repeat("a", 64)
+
+	setIdentity(ctx, "insurer-admin", "InsurerMSP", "insurerAdmin", nil)
+	_, err := contract.CreatePolicyPackage(ctx, "package-grant", "Grant", "", 100, 1_000, hash)
+	requireNoError(t, err)
+	_, err = contract.PublishPolicyPackage(ctx, "package-grant")
+	requireNoError(t, err)
+	_, err = contract.IssuePolicy(ctx, "policy-grant", "package-grant", "policyholder1", "2026-01-01", "2026-12-31")
+	requireNoError(t, err)
+
+	setIdentity(ctx, "policyholder-cert", "InsurerMSP", "policyholder", map[string]string{"subjectId": "policyholder1"})
+	_, err = contract.SubmitClaim(ctx, "claim-grant", "policy-grant", 500, "2026-06-01", hash)
+	requireNoError(t, err)
+	_, err = contract.AddEvidenceReference(ctx, "claim-grant", "evidence-grant", "INVOICE", hash, hash)
+	requireNoError(t, err)
+	grant, err := contract.GrantEvidenceAccess(ctx, "grant-hospital", "evidence-grant", "HospitalMSP", "hospitalOfficer", "*", "VERIFY", "2026-09-06T13:00:00Z", 2)
+	requireNoError(t, err)
+	if grant.Status != "ACTIVE" || grant.MaxAccesses != 2 || grant.OwnerID != "policyholder1" {
+		t.Fatalf("unexpected evidence grant: %+v", grant)
+	}
+	_, err = contract.GrantEvidenceAccess(ctx, "grant-invalid", "evidence-grant", "BankMSP", "bankOfficer", "*", "DOWNLOAD", "2026-09-06T13:00:00Z", 1)
+	requireError(t, err, "not an allowed evidence-sharing scope")
+	_, err = contract.GrantEvidenceAccess(ctx, "grant-long-subject", "evidence-grant", "AuditorMSP", "auditor", strings.Repeat("a", 129), "AUDIT", "2026-09-06T13:00:00Z", 1)
+	requireError(t, err, "cannot exceed 128")
+
+	setIdentity(ctx, "hospital-cert", "HospitalMSP", "hospitalOfficer", map[string]string{"subjectId": "hospital1"})
+	first, err := contract.RecordGrantedEvidenceAccess(ctx, "access-granted-1", "evidence-grant", grant.ID, "VERIFY")
+	requireNoError(t, err)
+	if first.GrantID != grant.ID || first.Purpose != "VERIFY" {
+		t.Fatalf("granted access did not retain provenance: %+v", first)
+	}
+	_, err = contract.RecordGrantedEvidenceAccess(ctx, "access-granted-2", "evidence-grant", grant.ID, "VERIFY")
+	requireNoError(t, err)
+	_, err = contract.RecordGrantedEvidenceAccess(ctx, "access-granted-3", "evidence-grant", grant.ID, "VERIFY")
+	requireError(t, err, "access limit is exhausted")
+
+	setIdentity(ctx, "policyholder-cert", "InsurerMSP", "policyholder", map[string]string{"subjectId": "policyholder1"})
+	grant, err = contract.RevokeEvidenceAccess(ctx, grant.ID)
+	requireNoError(t, err)
+	if grant.Status != "REVOKED" || grant.RevokedAt == "" {
+		t.Fatalf("grant was not revoked: %+v", grant)
+	}
+	grant, err = contract.RevokeEvidenceAccess(ctx, grant.ID)
+	requireNoError(t, err)
+
+	grants, err := contract.ListEvidenceAccessGrants(ctx)
+	requireNoError(t, err)
+	if len(grants) != 1 || grants[0].AccessCount != 2 || grants[0].Status != "REVOKED" {
+		t.Fatalf("unexpected grant list: %+v", grants)
+	}
+}
+
+func TestDirectAuditorEvidenceAccessRequiresCurrentAssignment(t *testing.T) {
+	contract := &Contract{}
+	ctx := &testContext{stub: newMemoryStub()}
+	hash := strings.Repeat("b", 64)
+
+	setIdentity(ctx, "insurer-admin", "InsurerMSP", "insurerAdmin", nil)
+	_, err := contract.CreatePolicyPackage(ctx, "package-audit-access", "Audit", "", 100, 1_000, hash)
+	requireNoError(t, err)
+	_, err = contract.PublishPolicyPackage(ctx, "package-audit-access")
+	requireNoError(t, err)
+	_, err = contract.IssuePolicy(ctx, "policy-audit-access", "package-audit-access", "policyholder1", "2026-01-01", "2026-12-31")
+	requireNoError(t, err)
+	setIdentity(ctx, "policyholder-cert", "InsurerMSP", "policyholder", map[string]string{"subjectId": "policyholder1"})
+	_, err = contract.SubmitClaim(ctx, "claim-audit-access", "policy-audit-access", 500, "2026-06-01", hash)
+	requireNoError(t, err)
+	_, err = contract.AddEvidenceReference(ctx, "claim-audit-access", "evidence-audit-access", "INVOICE", hash, hash)
+	requireNoError(t, err)
+	setIdentity(ctx, "hospital", "HospitalMSP", "hospitalOfficer", nil)
+	_, err = contract.VerifyClaim(ctx, "claim-audit-access", "verification-audit-access", "VERIFIED", hash)
+	requireNoError(t, err)
+	setIdentity(ctx, "insurer-admin", "InsurerMSP", "insurerAdmin", nil)
+	_, err = contract.OpenClaimReview(ctx, "claim-audit-access", "review-audit-access", `["auditor1","auditor2","auditor3"]`, 2, 2, "2026-09-08T12:00:00Z")
+	requireNoError(t, err)
+
+	setIdentity(ctx, "auditor9-cert", "AuditorMSP", "auditor", map[string]string{"subjectId": "auditor9"})
+	_, err = contract.RecordEvidenceAccess(ctx, "access-unassigned", "evidence-audit-access", "AUDIT")
+	requireError(t, err, "cannot retrieve evidence")
+	setIdentity(ctx, "auditor1-cert", "AuditorMSP", "auditor", map[string]string{"subjectId": "auditor1"})
+	_, err = contract.RecordEvidenceAccess(ctx, "access-assigned", "evidence-audit-access", "AUDIT")
+	requireNoError(t, err)
 }
 
 func TestPolicyPremiumMandateAndCollectionLifecycle(t *testing.T) {

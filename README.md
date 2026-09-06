@@ -12,8 +12,10 @@ The original five implementation areas and the policy/premium/benefit expansion
 are complete for a local thesis and supervisor-demonstration release. The
 four-organization network, Go contract, Next.js Gateway boundary, role-specific
 workflows/evidence, release verification, policy acquisition, premium collection,
-bank mandates, and governed benefits run end to end against
-`insurance-contract` 0.4.1, schema 3.
+bank mandates, governed benefits, distributed adjudication, appeals, and advisory
+fraud triage, governed evidence grants, durable event projection, and
+ledger-derived research metrics run end to end against `insurance-contract`
+0.6.1, schema 5.
 
 This is not a production deployment claim. Institutional authentication,
 durable encrypted object storage and key recovery, multi-node/orderer high
@@ -72,7 +74,12 @@ See [the lifecycle design](docs/policy-premium-benefit-lifecycles.md) for policy
 OTP, collection-worker, reconciliation, and benefit boundaries;
 [the local demonstration runbook](docs/local-demonstration.md) for the
 five-organization journey and [the evidence security boundary](docs/evidence-security.md)
-for the AES-GCM envelope, authorization path, and production limitations.
+for the AES-GCM envelope, authorization path, and production limitations. The
+[adjudication design](docs/distributed-adjudication.md) documents assignment,
+quorum, timeout, appeal, and fraud decision-support boundaries. See the
+[operations and research design](docs/event-driven-operations-and-research.md)
+for Fabric event checkpointing, notification projection, evidence grants, and
+reproducible thesis metrics.
 
 ## Complete verification
 

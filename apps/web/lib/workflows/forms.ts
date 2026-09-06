@@ -25,7 +25,7 @@ export type HashText = (value: string) => Promise<string>;
 
 export const operationsByRole = {
   insurerAdmin: ["createPolicyPackage", "publishPolicyPackage", "retirePolicyPackage", "createBenefitPlan", "publishBenefitPlan", "retireBenefitPlan", "issuePolicy", "advancePolicyLifecycle", "cancelPolicyAsInsurer", "queuePremiumCollection", "decideBenefitRequest", "markBenefitPaymentReady", "assessClaimFraud", "openClaimReview", "openAppealReview", "finalizeExpiredReview", "authorizeSettlement"],
-  policyholder: ["acquirePolicy", "requestBankMandate", "cancelBankMandate", "setBeneficiaries", "submitBenefitRequest", "renewPolicy", "cancelPolicy", "submitClaim", "submitClaimAppeal"],
+  policyholder: ["acquirePolicy", "requestBankMandate", "cancelBankMandate", "setBeneficiaries", "submitBenefitRequest", "renewPolicy", "cancelPolicy", "submitClaim", "submitClaimAppeal", "grantEvidenceAccess", "revokeEvidenceAccess"],
   hospitalOfficer: ["verifyClaim"],
   auditor: ["recordAuditorDecision"],
   bankOfficer: ["registerBankAccountReference", "reviewBankMandate", "recordPremiumPayment", "recordPremiumAdjustment", "completePremiumCollection", "failPremiumCollection", "expireBankMandate", "confirmBenefitPayment", "confirmSettlement"],
@@ -240,6 +240,25 @@ export const workflowFormDefinitions: Record<WorkflowOperation, WorkflowFormDefi
       { name: "evidenceText", label: "Optional appeal evidence reference", kind: "textarea", help: "If supplied, only its hash is committed." },
     ],
   },
+  grantEvidenceAccess: {
+    label: "Share encrypted evidence",
+    description: "Create a revocable, expiring, use-limited grant scoped to one Fabric organization, role, identity, and purpose.",
+    fields: [
+      { name: "id", label: "Grant ID", placeholder: "grant-1001" },
+      { name: "evidenceId", label: "Evidence ID", placeholder: "evidence-1001" },
+      { name: "granteeMsp", label: "Grantee organization", kind: "select", options: ["HospitalMSP", "AuditorMSP", "InsurerMSP"] },
+      { name: "granteeRole", label: "Grantee role", kind: "select", options: ["hospitalOfficer", "auditor", "insurerAdmin"] },
+      { name: "granteeSubject", label: "Grantee certificate subject", placeholder: "auditor1", help: "Use * only when every identity in the selected organization role should qualify." },
+      { name: "purpose", label: "Permitted purpose", kind: "select", options: ["VERIFY", "AUDIT", "DOWNLOAD"] },
+      { name: "expiresAt", label: "Expiry (RFC3339)", placeholder: "2026-09-09T12:00:00Z" },
+      { name: "maxAccesses", label: "Maximum retrievals", placeholder: "3" },
+    ],
+  },
+  revokeEvidenceAccess: {
+    label: "Revoke evidence grant",
+    description: "Immediately prevent any unused access allowed by an owned grant while preserving its ledger history.",
+    fields: [{ name: "grantId", label: "Grant ID", placeholder: "grant-1001" }],
+  },
   openAppealReview: {
     label: "Open appeal review",
     description: "Create a new immutable review round for a submitted appeal.",
@@ -337,6 +356,8 @@ export function createWorkflowFormValues(
     assessClaimFraud: { assessmentId: generatedId("fraud", idFactory), claimId: "" },
     openClaimReview: { claimId: "", reviewId: generatedId("review", idFactory), assignedAuditorIdsJson: '["auditor1","auditor2","auditor3","auditor4"]', approvalThreshold: "3", rejectionThreshold: "2", deadline: deadlineOffset(3) },
     submitClaimAppeal: { appealId: generatedId("appeal", idFactory), claimId: "", reasonText: "", evidenceText: "" },
+    grantEvidenceAccess: { id: generatedId("grant", idFactory), evidenceId: "", granteeMsp: "AuditorMSP", granteeRole: "auditor", granteeSubject: "auditor1", purpose: "AUDIT", expiresAt: deadlineOffset(7), maxAccesses: "3" },
+    revokeEvidenceAccess: { grantId: "" },
     openAppealReview: { appealId: "", reviewId: generatedId("review-appeal", idFactory), assignedAuditorIdsJson: '["auditor1","auditor2","auditor3","auditor4"]', approvalThreshold: "3", rejectionThreshold: "2", deadline: deadlineOffset(3) },
     finalizeExpiredReview: { reviewId: "" },
     recordAuditorDecision: { reviewId: "", decisionId: generatedId("decision", idFactory), outcome: "APPROVE", reasonText: "" },
@@ -527,6 +548,22 @@ export async function buildWorkflowCommand(
       break;
     case "submitClaimAppeal":
       command = { operation, appealId: required(values, "appealId", "Appeal ID"), claimId: required(values, "claimId", "Claim ID"), reasonHash: await digest("reasonText", "Appeal reason"), evidenceHash: values.evidenceText?.trim() ? await hashText(values.evidenceText.trim()) : "" };
+      break;
+    case "grantEvidenceAccess":
+      command = {
+        operation,
+        id: required(values, "id", "Grant ID"),
+        evidenceId: required(values, "evidenceId", "Evidence ID"),
+        granteeMsp: required(values, "granteeMsp", "Grantee organization"),
+        granteeRole: required(values, "granteeRole", "Grantee role"),
+        granteeSubject: required(values, "granteeSubject", "Grantee certificate subject"),
+        purpose: required(values, "purpose", "Permitted purpose"),
+        expiresAt: required(values, "expiresAt", "Expiry"),
+        maxAccesses: positiveInteger(values, "maxAccesses", "Maximum retrievals"),
+      };
+      break;
+    case "revokeEvidenceAccess":
+      command = { operation, grantId: required(values, "grantId", "Grant ID") };
       break;
     case "openAppealReview":
       command = { operation, appealId: required(values, "appealId", "Appeal ID"), reviewId: required(values, "reviewId", "Review ID"), assignedAuditorIdsJson: required(values, "assignedAuditorIdsJson", "Assigned auditor IDs"), approvalThreshold: positiveInteger(values, "approvalThreshold", "Approval threshold"), rejectionThreshold: positiveInteger(values, "rejectionThreshold", "Rejection threshold"), deadline: required(values, "deadline", "Review deadline") };

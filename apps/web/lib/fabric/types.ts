@@ -216,11 +216,31 @@ export type EvidenceAccessRecord = {
   id: string;
   evidenceId: string;
   claimId: string;
+  grantId: string;
   accessorMsp: string;
   accessorRole: string;
   accessorIdentity: string;
   purpose: "DOWNLOAD" | "VERIFY" | "AUDIT";
   createdAt: LedgerTimestamp;
+};
+
+export type EvidenceAccessGrant = {
+  assetType: "evidenceGrant";
+  schemaVersion: number;
+  id: string;
+  evidenceId: string;
+  claimId: string;
+  ownerId: string;
+  granteeMsp: "InsurerMSP" | "HospitalMSP" | "AuditorMSP";
+  granteeRole: "insurerAdmin" | "hospitalOfficer" | "auditor";
+  granteeSubject: string;
+  purpose: "DOWNLOAD" | "VERIFY" | "AUDIT";
+  expiresAt: LedgerTimestamp;
+  maxAccesses: number;
+  accessCount: number;
+  status: "ACTIVE" | "REVOKED";
+  createdAt: LedgerTimestamp;
+  revokedAt: LedgerTimestamp;
 };
 
 export type EvidenceReference = {

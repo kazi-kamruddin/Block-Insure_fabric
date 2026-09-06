@@ -16,7 +16,7 @@ bash network/scripts/network.sh verify
 
 The verifier should report 14 healthy services, five reachable CAs, four ready
 CouchDB instances, all four peers joined to `insurance-channel`, chaincode
-`insurance-contract` 0.4.1, and schema version 3.
+`insurance-contract` 0.6.1, and schema version 5.
 
 ## 2. Start the application
 
@@ -51,20 +51,30 @@ inside the browser and convert BDT values to exact integer poisha.
 2. **Policyholder One** — submit a claim against that policy. In the evidence
    panel, provide the claim/evidence IDs, choose a small original document, enter
    and safely retain a passphrase, encrypt in the browser, then store the
-   ciphertext reference.
+   ciphertext reference. Create an expiring/use-limited grant for a specific
+   organization, role, certificate subject, and retrieval purpose.
 3. **Hospital Officer** — open the submitted claim from the verification queue,
    optionally retrieve/decrypt evidence with the shared demonstration passphrase,
    then record `VERIFIED` or `INVALID`.
-4. **Insurer Administrator** — move a verified claim into independent review.
-5. **Independent Auditor** — inspect the claim/evidence and record `APPROVE` or
-   `REJECT`.
-6. **Insurer Administrator** — authorize a settlement for an approved claim.
-7. **Bank Officer** — confirm the authorized settlement using an external payment
+4. **Insurer Administrator** — record the transparent advisory fraud assessment,
+   then open an independent review with immutable auditor assignments, quorum
+   thresholds, and a deadline.
+5. **Independent Auditors One through Four** — inspect assigned claim/evidence
+   and cast certificate-bound `APPROVE` or `REJECT` votes. Three approvals or two
+   rejections finalize the default 3-of-4 review; duplicate votes are rejected.
+6. **Policyholder One** — if the initial review rejects the claim, submit the
+   single permitted appeal. The insurer opens a new round and a fresh quorum can
+   overturn or uphold the decision without erasing round-one votes.
+7. **Insurer Administrator** — authorize a settlement for an approved claim.
+8. **Bank Officer** — confirm the authorized settlement using an external payment
    reference; only its browser-generated hash is written to the ledger.
-8. **Policyholder One** — read the claim and confirm its final state is `SETTLED`.
-9. **Insurer Administrator or Independent Auditor** — list evidence access records
+9. **Policyholder One** — read the claim and confirm its final state is `SETTLED`.
+10. **Insurer Administrator or an assigned Independent Auditor** — list evidence access records
    and show the immutable role/purpose trail created by retrievals. Enter the
    claim ID in **Export claim dossier** to download the consolidated JSON artifact.
+11. **Insurer Administrator** — synchronize committed Fabric events. Show the
+    transaction-aware checkpoint and role inbox, then open the thesis dashboard
+    and download its reproducibility-hashed JSON snapshot.
 
 Each account is redirected to its canonical role workspace and cannot navigate
 into another role's route. Chaincode independently rechecks MSP and certificate
@@ -81,7 +91,8 @@ From the repository root in Windows PowerShell:
 This runs lint, TypeScript, unit and cryptographic tests, dependency audit,
 standalone production build, Go chaincode tests, live Fabric topology/schema
 verification, role isolation, WCAG 2.1 AA checks, encrypted evidence
-round-trip/access logging, and the complete five-session settlement workflow.
+round-trip/access logging, multi-auditor appeal adjudication, and the complete
+multi-session settlement workflow.
 The ignored result is written to `verification-results/latest.json`.
 
 The browser workflow creates uniquely named ledger records. Use the local

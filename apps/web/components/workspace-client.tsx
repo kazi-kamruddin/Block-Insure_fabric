@@ -13,7 +13,16 @@ import type { WorkflowCommand } from "@/lib/workflows/commands";
 import { bdtToMinor } from "@/lib/workflows/forms";
 import { decryptEvidenceBytes, encryptEvidenceBytes, sha256Hex } from "@/lib/evidence/browser-crypto";
 
-type AssetType = "package" | "policy" | "claim" | "evidence" | "verification" | "decision" | "review" | "appeal" | "fraud-assessment" | "settlement" | "access" | "claim-history" | "account" | "mandate" | "premium-payment" | "premium-adjustment" | "collection" | "benefit-plan" | "beneficiaries" | "benefit-request" | "liability";
+type AssetType = "package" | "policy" | "claim" | "evidence" | "evidence-grant" | "verification" | "decision" | "review" | "appeal" | "fraud-assessment" | "settlement" | "access" | "claim-history" | "account" | "mandate" | "premium-payment" | "premium-adjustment" | "collection" | "benefit-plan" | "beneficiaries" | "benefit-request" | "liability";
+type NotificationItem = { id: string; title: string; message: string; assetId: string; blockNumber: string };
+type ResearchSnapshotView = {
+  reproducibilityHash: string;
+  provenance: { ledgerSchemaVersion: number; indexedEvents: number; checkpoint: { blockNumber: string } | null };
+  portfolio: { policies: number; claims: number };
+  adjudication: { reviewRounds: number; appeals: number; meanClosureLatencyMs: number | null };
+  fraudDecisionSupport: { assessments: number; advisoryOnly: boolean };
+  evidenceGovernance: { grants: number; accesses: number; grantBackedAccesses: number };
+};
 
 const hash = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 
@@ -69,6 +78,7 @@ export function WorkspaceClient({
   const [evidencePassphraseConfirmation, setEvidencePassphraseConfirmation] = useState("");
   const [encrypting, setEncrypting] = useState(false);
   const [retrievalEvidenceId, setRetrievalEvidenceId] = useState("");
+  const [retrievalGrantId, setRetrievalGrantId] = useState("");
   const [retrievalPassphrase, setRetrievalPassphrase] = useState("");
   const [retrieving, setRetrieving] = useState(false);
   const [decryptedEvidence, setDecryptedEvidence] = useState<{ url: string; name: string } | null>(null);
@@ -80,11 +90,48 @@ export function WorkspaceClient({
   const [dashboard, setDashboard] = useState<RoleDashboard | null>(initialDashboard);
   const [dashboardLoading, setDashboardLoading] = useState(Boolean(initialAccount && !initialDashboard));
   const [preparedWorkflow, setPreparedWorkflow] = useState<PreparedWorkflow | null>(null);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [eventCheckpoint, setEventCheckpoint] = useState<string>("Not synchronized");
+  const [researchSnapshot, setResearchSnapshot] = useState<ResearchSnapshotView | null>(null);
   const templates = useMemo(() => account ? commandTemplates[account.role] : [], [account]);
 
   useEffect(() => () => {
     if (decryptedEvidence) URL.revokeObjectURL(decryptedEvidence.url);
   }, [decryptedEvidence]);
+
+  const refreshNotifications = useCallback(async () => {
+    try {
+      const body = await responseJson(await fetch("/api/operations/notifications", { cache: "no-store" }));
+      setNotifications(body.notifications ?? []);
+      setEventCheckpoint(body.checkpoint ? `Block ${body.checkpoint.blockNumber}` : "Not synchronized");
+    } catch {
+      setNotifications([]);
+    }
+  }, []);
+
+  async function synchronizeEvents() {
+    setBusy(true);
+    try {
+      const body = await responseJson(await fetch("/api/internal/events/sync", { method: "POST" }));
+      setOutput(`Indexed ${body.processed} new Fabric events; projection now contains ${body.totalEvents}.`);
+      await refreshNotifications();
+    } catch (error) {
+      setOutput(error instanceof Error ? error.message : "Event synchronization failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function refreshResearchSnapshot() {
+    setBusy(true);
+    try {
+      setResearchSnapshot(await responseJson(await fetch("/api/research/snapshot", { cache: "no-store" })));
+    } catch (error) {
+      setOutput(error instanceof Error ? error.message : "Research snapshot failed");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   const refreshDashboard = useCallback(async () => {
     setDashboardLoading(true);
@@ -110,6 +157,7 @@ export function WorkspaceClient({
       const signedInAccount = body.account as DemoAccount;
       setAccount(signedInAccount);
       setOutput(`Signed in as ${body.account.displayName}.`);
+      await refreshNotifications();
       router.push(`/workspace/${workspaceForAccount(signedInAccount)}`);
     } catch (error) {
       setOutput(error instanceof Error ? error.message : "Sign-in failed");
@@ -283,7 +331,12 @@ export function WorkspaceClient({
       const id = retrievalEvidenceId.trim();
       if (!id) throw new Error("Enter an evidence ID to retrieve.");
       if (retrievalPassphrase.length < 12) throw new Error("Enter the evidence passphrase.");
-      const response = await fetch(`/api/evidence/${encodeURIComponent(id)}`, { method: "POST", cache: "no-store" });
+      const response = await fetch(`/api/evidence/${encodeURIComponent(id)}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(retrievalGrantId.trim() ? { grantId: retrievalGrantId.trim() } : {}),
+        cache: "no-store",
+      });
       if (!response.ok) {
         const error = await response.json().catch(() => ({ message: `Evidence retrieval failed (${response.status})` }));
         throw new Error(error.message);
@@ -409,6 +462,39 @@ export function WorkspaceClient({
         )}
       </section>
 
+      <div className="workGrid">
+        <article className="workCard">
+          <span className="kicker">Event-driven operations</span>
+          <h2>Fabric activity inbox</h2>
+          <p className="cardNote">Durable, replay-safe projection checkpoint: {eventCheckpoint}. Notifications are derived from committed chaincode events.</p>
+          {account.role === "insurerAdmin" && <button className="secondary button" disabled={busy} onClick={synchronizeEvents}>Synchronize Fabric events</button>}
+          <button className="textButton" disabled={busy} onClick={refreshNotifications}>Refresh inbox</button>
+          {notifications.length === 0 ? <p className="emptyState">No projected events currently require this identity.</p> : (
+            <div className="recentList">{notifications.slice(0, 8).map((item) => (
+              <div className="queueItem" key={item.id}><div><strong>{item.title}</strong><p>{item.assetId || item.message}</p></div><span className="status">Block {item.blockNumber}</span></div>
+            ))}</div>
+          )}
+        </article>
+
+        {(account.role === "insurerAdmin" || account.role === "auditor") && <article className="workCard">
+          <span className="kicker">Research dashboard</span>
+          <h2>Ledger-derived thesis snapshot</h2>
+          <p className="cardNote">Current-world-state metrics carry Fabric provenance and a reproducibility hash. They do not claim clinical or causal validity.</p>
+          <div className="evidenceActions">
+            <button className="primary button" disabled={busy} onClick={refreshResearchSnapshot}>Refresh metrics</button>
+            <a className="secondary button" href="/research">Open full dashboard</a>
+            <a className="secondary button" download href="/api/research/snapshot?download=1">Download snapshot</a>
+          </div>
+          {researchSnapshot && <div className="metricGrid">
+            <div className="metricCard"><span>Policies / claims</span><strong>{researchSnapshot.portfolio.policies} / {researchSnapshot.portfolio.claims}</strong><small>Current ledger assets</small></div>
+            <div className="metricCard"><span>Reviews / appeals</span><strong>{researchSnapshot.adjudication.reviewRounds} / {researchSnapshot.adjudication.appeals}</strong><small>Immutable rounds</small></div>
+            <div className="metricCard"><span>Fraud assessments</span><strong>{researchSnapshot.fraudDecisionSupport.assessments}</strong><small>{researchSnapshot.fraudDecisionSupport.advisoryOnly ? "Advisory only" : "Boundary violation"}</small></div>
+            <div className="metricCard"><span>Evidence grants / access</span><strong>{researchSnapshot.evidenceGovernance.grants} / {researchSnapshot.evidenceGovernance.accesses}</strong><small>{researchSnapshot.evidenceGovernance.grantBackedAccesses} grant-backed</small></div>
+          </div>}
+          {researchSnapshot && <p className="cardNote">Schema {researchSnapshot.provenance.ledgerSchemaVersion}; indexed events {researchSnapshot.provenance.indexedEvents}; hash <code>{researchSnapshot.reproducibilityHash.slice(0, 16)}…</code></p>}
+        </article>}
+      </div>
+
       <div className="workGrid" id="transaction-console">
         <GuidedWorkflowForm
           key={`${account.role}-${preparedWorkflow?.revision ?? 0}`}
@@ -457,7 +543,7 @@ export function WorkspaceClient({
           <label>Asset type
             <select value={assetType} onChange={(event) => setAssetType(event.target.value as AssetType)}>
               <option value="package">Policy package</option><option value="policy">Policy</option>
-              <option value="claim">Claim</option><option value="evidence">Evidence reference</option>
+              <option value="claim">Claim</option><option value="evidence">Evidence reference</option><option value="evidence-grant">Evidence access grant</option>
               <option value="verification">Hospital verification</option><option value="decision">Auditor decision</option>
               <option value="review">Claim review round</option><option value="appeal">Claim appeal</option><option value="fraud-assessment">Fraud assessment</option>
               <option value="settlement">Settlement</option><option value="claim-history">Claim history</option>
@@ -524,6 +610,7 @@ export function WorkspaceClient({
             <p className="cardNote">The server validates your organization and the claim state, records this access on Fabric, and returns ciphertext. Decryption and integrity verification happen only in this browser.</p>
             <div className="evidenceFields">
               <label>Evidence ID<input value={retrievalEvidenceId} onChange={(event) => { setRetrievalEvidenceId(event.target.value); setDecryptedEvidence(null); }} placeholder="evidence-1" /></label>
+              <label>Grant ID (optional)<input value={retrievalGrantId} onChange={(event) => setRetrievalGrantId(event.target.value)} placeholder="grant-1" /></label>
               <label>Evidence passphrase<input type="password" autoComplete="current-password" value={retrievalPassphrase} onChange={(event) => setRetrievalPassphrase(event.target.value)} /></label>
             </div>
             <div className="evidenceActions">

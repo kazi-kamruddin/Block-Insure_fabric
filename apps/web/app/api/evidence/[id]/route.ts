@@ -13,6 +13,7 @@ import { ledger } from "@/lib/fabric/ledger";
 import { checkMutationOrigin } from "@/lib/security/request-origin";
 
 const idSchema = z.string().trim().min(1).max(100).regex(/^[a-zA-Z0-9._:-]+$/);
+const retrievalSchema = z.object({ grantId: idSchema.optional() });
 type RouteContext = { params: Promise<{ id: string }> };
 
 export const runtime = "nodejs";
@@ -25,19 +26,32 @@ export async function POST(request: Request, context: RouteContext) {
 
   const id = idSchema.safeParse((await context.params).id);
   if (!id.success) return NextResponse.json({ message: "Invalid evidence ID" }, { status: 400 });
+  const retrieval = retrievalSchema.safeParse(await request.json().catch(() => ({})));
+  if (!retrieval.success) return NextResponse.json({ message: "Invalid evidence retrieval request" }, { status: 400 });
 
   try {
     const evidence = await ledger.readEvidenceReference(id.data);
     const claim = await ledger.readClaim(evidence.claimId);
+    const account = findDemoAccount(session.accountId);
     const auditorAssigned = session.role === "auditor" && Boolean(claim.currentReviewId)
       ? (await ledger.readClaimReview(claim.currentReviewId)).assignedAuditorIds.includes(session.subjectId ?? "")
       : false;
-    const authorized =
+    const workflowAuthorized =
       session.role === "insurerAdmin" ||
       (session.role === "policyholder" && claim.claimantId === session.subjectId) ||
       (session.role === "hospitalOfficer" && (claim.status === "SUBMITTED" || Boolean(claim.hospitalVerificationId))) ||
       (session.role === "auditor" && auditorAssigned && !["SUBMITTED", "HOSPITAL_VERIFIED"].includes(claim.status));
-    if (!authorized) return NextResponse.json({ message: "This account cannot retrieve that evidence" }, { status: 403 });
+    let grantAuthorized = false;
+    if (retrieval.data.grantId && account) {
+      const grant = await ledger.readEvidenceAccessGrant(retrieval.data.grantId);
+      const expectedPurpose = session.role === "hospitalOfficer" ? "VERIFY" : session.role === "auditor" ? "AUDIT" : "DOWNLOAD";
+      grantAuthorized = grant.evidenceId === evidence.id && grant.claimId === claim.id &&
+        grant.status === "ACTIVE" && Date.parse(grant.expiresAt) > Date.now() &&
+        grant.accessCount < grant.maxAccesses && grant.granteeMsp === account.organization &&
+        grant.granteeRole === session.role && grant.purpose === expectedPurpose &&
+        (grant.granteeSubject === "*" || grant.granteeSubject === session.subjectId);
+    }
+    if (!workflowAuthorized && !grantAuthorized) return NextResponse.json({ message: "This account cannot retrieve that evidence" }, { status: 403 });
 
     const reference = evidenceStorageReference(evidence.submittedBy, evidence.id);
     if (hashValue(reference) !== evidence.storageReferenceHash) {
@@ -48,11 +62,16 @@ export async function POST(request: Request, context: RouteContext) {
     const purpose = session.role === "hospitalOfficer"
       ? "VERIFY"
       : session.role === "auditor" ? "AUDIT" : "DOWNLOAD";
-    await ledger.recordEvidenceAccess(session.role, {
+    const accessInput = {
       id: `access-${randomUUID()}`,
       evidenceId: evidence.id,
       purpose,
-    }, findDemoAccount(session.accountId)?.fabricUserName);
+    } as const;
+    if (retrieval.data.grantId) {
+      await ledger.recordGrantedEvidenceAccess(session.role, { ...accessInput, grantId: retrieval.data.grantId }, account?.fabricUserName);
+    } else {
+      await ledger.recordEvidenceAccess(session.role, accessInput, account?.fabricUserName);
+    }
     return new NextResponse(ciphertext, {
       headers: {
         "content-type": "application/octet-stream",

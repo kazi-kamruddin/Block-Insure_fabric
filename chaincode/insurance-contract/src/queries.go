@@ -42,6 +42,10 @@ func (c *Contract) ListEvidenceAccessRecords(ctx contractapi.TransactionContextI
 	return listState[EvidenceAccessRecord](ctx, "evidenceAccess")
 }
 
+func (c *Contract) ListEvidenceAccessGrants(ctx contractapi.TransactionContextInterface) ([]EvidenceAccessGrant, error) {
+	return listState[EvidenceAccessGrant](ctx, "evidenceGrant")
+}
+
 func (c *Contract) ListSettlements(ctx contractapi.TransactionContextInterface) ([]Settlement, error) {
 	return listState[Settlement](ctx, "settlement")
 }

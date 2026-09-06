@@ -55,7 +55,7 @@ bash network/scripts/network.sh reset
 - `status` lists containers and each peer's joined channels.
 - `verify` checks all 14 containers, five CAs, four CouchDB instances, the
   orderer channel, and each peer ledger. When chaincode is committed, it also
-  checks version `0.4.1` on all four peers and evaluates schema version `3`.
+  checks version `0.6.1` on all four peers and evaluates schema version `5`.
 - `down` stops and removes containers while retaining identities, channel
   artifacts, and Docker ledger volumes.
 - `reset` is destructive: it removes this network's containers, ledger
@@ -83,9 +83,11 @@ bash network/scripts/smoke-workflow.sh
 ```
 
 The deployment script installs and approves the package for all four business
-organizations before committing the definition. The smoke script uses each
-role identity in turn and asserts a final `SETTLED` claim, active premium-funded
-policy, completed collection, and paid benefit liability. Bump `CHAINCODE_VERSION` whenever source changes. The script uses
+organizations before committing the definition. Four separately enrolled auditor
+identities exercise a 3-of-4 approval quorum. The smoke script asserts a final
+`SETTLED` claim, an advisory fraud assessment that cannot decide the claim,
+an active premium-funded policy, a completed collection, and a paid benefit
+liability. Bump `CHAINCODE_VERSION` whenever source changes. The script uses
 sequence 1 on a clean channel, detects an already-committed version, and chooses
 the next sequence for a new version; `CHAINCODE_SEQUENCE` remains an explicit
 override for controlled recovery.

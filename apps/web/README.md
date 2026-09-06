@@ -27,10 +27,19 @@ material exists under `../../network/organizations`. Check application health at
 - `/api/workflows` validates and role-gates ledger mutation commands.
 - `/api/ledger/[assetType]/[id]` reads ledger assets and enforces policyholder ownership.
 - `/api/audit/claims/[id]` lets insurer/auditor sessions export a consolidated
-  ledger-backed claim history, evidence/access, verification, decision, and settlement dossier.
+  ledger-backed claim history, evidence/access, verification, every review round
+  and vote, appeal, advisory fraud assessment, and settlement dossier.
 - `/api/evidence` stores an uploaded `.enc` ciphertext exactly once and commits
   its integrity/reference hashes; an origin-checked `POST` to `/api/evidence/[id]`
   records authorized access and returns ciphertext.
+- `/api/internal/events/sync` replays committed chaincode events from a durable
+  block/transaction checkpoint into an idempotent local operational projection.
+  The repository-root checkpoint survives standalone rebuilds; its response
+  reports `limitReached` if a scheduler should immediately request another batch.
+- `/api/operations/notifications` and `/api/operations/events` expose role-filtered
+  inbox records and auditable indexed events.
+- `/research` and `/api/research/snapshot` provide a role-restricted,
+  ledger-derived thesis dashboard and reproducibility-hashed JSON artifact.
 - `/api/banking/otp` and `/api/banking/premium-payment` provide policy-bound,
   single-use manual premium authorization for policyholders.
 - `/api/internal/banking/collections` is the bearer-protected durable collection
@@ -39,6 +48,15 @@ material exists under `../../network/organizations`. Check application health at
   mandate, claim, benefit, and liability statement.
 - `/workspace/<role>` provides canonical organization dashboards, guided
   transactions, browser evidence encryption/decryption, and an advanced JSON console.
+
+The local identity registry includes four separately enrolled auditor accounts.
+Review assignments are certificate-subject based; a default four-person panel
+finalizes at three approvals or two rejections, and the policyholder may submit
+one appeal after rejection.
+
+Policyholders can create revocable evidence grants scoped by organization, role,
+certificate subject, purpose, expiry, and access count. These grants authorize
+ciphertext retrieval; passphrase/key distribution remains out of scope.
 
 ## Security boundary
 
