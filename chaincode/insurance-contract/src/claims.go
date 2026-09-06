@@ -19,8 +19,8 @@ func (c *Contract) SubmitClaim(ctx contractapi.TransactionContextInterface, id, 
 	if err != nil {
 		return nil, err
 	}
-	if policy.Status != "ACTIVE" {
-		return nil, fmt.Errorf("policy %s is not active", policyID)
+	if policy.Status != "ACTIVE" && policy.Status != "GRACE" && policy.Status != "EXPIRED" {
+		return nil, fmt.Errorf("policy %s was not eligible for claims in its coverage period", policyID)
 	}
 	if policy.PolicyholderID != claimantID {
 		return nil, fmt.Errorf("access denied: policy %s belongs to another policyholder", policyID)

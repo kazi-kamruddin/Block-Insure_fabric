@@ -16,7 +16,7 @@ bash network/scripts/network.sh verify
 
 The verifier should report 14 healthy services, five reachable CAs, four ready
 CouchDB instances, all four peers joined to `insurance-channel`, chaincode
-`insurance-contract` 0.3.0, and schema version 2.
+`insurance-contract` 0.4.1, and schema version 3.
 
 ## 2. Start the application
 

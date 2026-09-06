@@ -3,7 +3,7 @@ import { z } from "zod";
 import { currentSession } from "@/lib/auth/current-session";
 import { ledger } from "@/lib/fabric/ledger";
 
-const assetTypeSchema = z.enum(["package", "policy", "claim", "evidence", "verification", "decision", "settlement", "access"]);
+const assetTypeSchema = z.enum(["package", "policy", "claim", "evidence", "verification", "decision", "settlement", "access", "account", "mandate", "premium-payment", "premium-adjustment", "collection", "benefit-plan", "beneficiaries", "benefit-request", "liability"]);
 type RouteContext = { params: Promise<{ assetType: string }> };
 
 export const runtime = "nodejs";
@@ -90,6 +90,57 @@ export async function GET(_request: Request, context: RouteContext) {
         }
         result = await ledger.listEvidenceAccessRecords();
         break;
+      case "account": {
+        const accounts = await ledger.listBankAccountReferences();
+        result = session.role === "policyholder" ? accounts.filter((item) => item.ownerId === session.subjectId) : accounts;
+        break;
+      }
+      case "mandate": {
+        const mandates = await ledger.listBankMandates();
+        result = session.role === "policyholder" ? mandates.filter((item) => item.ownerId === session.subjectId) : mandates;
+        break;
+      }
+      case "premium-payment": {
+        const payments = await ledger.listPremiumPayments();
+        if (session.role !== "policyholder") { result = payments; break; }
+        const ownedPolicyIds = new Set((await ledger.listPolicies()).filter((item) => item.policyholderId === session.subjectId).map((item) => item.id));
+        result = payments.filter((item) => ownedPolicyIds.has(item.policyId));
+        break;
+      }
+      case "premium-adjustment": {
+        const adjustments = await ledger.listPremiumAdjustments();
+        if (session.role !== "policyholder") { result = adjustments; break; }
+        const ownedPolicyIds = new Set((await ledger.listPolicies()).filter((item) => item.policyholderId === session.subjectId).map((item) => item.id));
+        result = adjustments.filter((item) => ownedPolicyIds.has(item.policyId));
+        break;
+      }
+      case "collection": {
+        const collections = await ledger.listPremiumCollections();
+        if (session.role !== "policyholder") { result = collections; break; }
+        const ownedPolicyIds = new Set((await ledger.listPolicies()).filter((item) => item.policyholderId === session.subjectId).map((item) => item.id));
+        result = collections.filter((item) => ownedPolicyIds.has(item.policyId));
+        break;
+      }
+      case "benefit-plan":
+        result = await ledger.listBenefitPlans();
+        break;
+      case "beneficiaries": {
+        const designations = await ledger.listBeneficiaryDesignations();
+        result = session.role === "policyholder" ? designations.filter((item) => item.ownerId === session.subjectId) : designations;
+        break;
+      }
+      case "benefit-request": {
+        const benefits = await ledger.listBenefitRequests();
+        result = session.role === "policyholder" ? benefits.filter((item) => item.requesterId === session.subjectId) : benefits;
+        break;
+      }
+      case "liability": {
+        const liabilities = await ledger.listLiabilities();
+        if (session.role !== "policyholder") { result = liabilities; break; }
+        const ownedPolicyIds = new Set((await ledger.listPolicies()).filter((item) => item.policyholderId === session.subjectId).map((item) => item.id));
+        result = liabilities.filter((item) => ownedPolicyIds.has(item.policyId));
+        break;
+      }
     }
     return NextResponse.json({ result });
   } catch (error) {

@@ -92,6 +92,14 @@ func (c *Contract) AuthorizeSettlement(ctx contractapi.TransactionContextInterfa
 	if err := putState(ctx, "settlement", settlementID, settlement); err != nil {
 		return nil, err
 	}
+	liability := &Liability{
+		AssetType: "liability", SchemaVersion: SchemaVersion, ID: "liability-claim-" + claimID,
+		SourceType: "CLAIM", SourceID: claimID, PolicyID: claim.PolicyID,
+		AmountMinor: claim.AmountMinor, Status: "PAYMENT_READY", CreatedAt: now, UpdatedAt: now,
+	}
+	if err := putState(ctx, "liability", liability.ID, liability); err != nil {
+		return nil, err
+	}
 	claim.Status = "SETTLEMENT_AUTHORIZED"
 	claim.UpdatedAt = now
 	if err := overwriteAsset(ctx, "claim", claimID, claim); err != nil {
@@ -134,6 +142,16 @@ func (c *Contract) ConfirmSettlement(ctx contractapi.TransactionContextInterface
 	claim.Status = "SETTLED"
 	claim.UpdatedAt = now
 	if err := overwriteAsset(ctx, "claim", claim.ID, claim); err != nil {
+		return nil, err
+	}
+	liability, err := c.ReadLiability(ctx, "liability-claim-"+claim.ID)
+	if err != nil {
+		return nil, err
+	}
+	liability.Status = "PAID"
+	liability.BankReferenceHash = settlement.BankReferenceHash
+	liability.UpdatedAt = now
+	if err := overwriteAsset(ctx, "liability", liability.ID, liability); err != nil {
 		return nil, err
 	}
 	if err := emit(ctx, "SettlementConfirmed", settlement); err != nil {

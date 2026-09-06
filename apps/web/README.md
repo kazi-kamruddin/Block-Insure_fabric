@@ -31,6 +31,12 @@ material exists under `../../network/organizations`. Check application health at
 - `/api/evidence` stores an uploaded `.enc` ciphertext exactly once and commits
   its integrity/reference hashes; an origin-checked `POST` to `/api/evidence/[id]`
   records authorized access and returns ciphertext.
+- `/api/banking/otp` and `/api/banking/premium-payment` provide policy-bound,
+  single-use manual premium authorization for policyholders.
+- `/api/internal/banking/collections` is the bearer-protected durable collection
+  worker boundary for due/retry discovery and bank reconciliation.
+- `/api/policies/[id]/statement` exports an ownership-filtered policy, premium,
+  mandate, claim, benefit, and liability statement.
 - `/workspace/<role>` provides canonical organization dashboards, guided
   transactions, browser evidence encryption/decryption, and an advanced JSON console.
 

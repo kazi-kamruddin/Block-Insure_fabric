@@ -3,7 +3,7 @@
 This Go chaincode owns the shared, permissioned insurance ledger for
 `insurance-channel`.
 
-## Current transaction flow
+## Current transaction flows
 
 1. An `InsurerMSP` identity with `role=insurerAdmin` creates and publishes a
    policy package, then issues a policy whose terms are snapshotted.
@@ -18,14 +18,23 @@ This Go chaincode owns the shared, permissioned insurance ledger for
 5. The insurer authorizes settlement and a `BankMSP` identity with
    `role=bankOfficer` confirms the bank reference.
 
+The policyholder can also acquire published coverage in `PENDING_PAYMENT`,
+designate beneficiaries, request a bank mandate, authorize a manual OTP payment,
+and request configured death/surrender/maturity benefits. Bank-confirmed premiums
+activate or reinstate coverage; insurer lifecycle processing applies grace,
+lapse, expiry, cancellation, and renewal rules. Scheduled collections, receipt
+replay markers, append-only reversals, explicit funding gates, and claim/benefit
+liabilities preserve the external-fiat audit trail without putting account
+numbers or real BDT on-chain.
+
 The initial review model deliberately uses one auditor decision per claim. A
 multi-auditor quorum can be introduced later without weakening this state
 machine.
 
 Money is represented as signed 64-bit integer minor units. Dates use
 `YYYY-MM-DD`; ledger timestamps come from the Fabric transaction timestamp.
-Deterministic composite-key list queries are available for packages, policies,
-claims, evidence references, and settlements; the application applies its
+Deterministic composite-key list queries are available for every policy, banking,
+benefit, claim, evidence, and liability asset; the application applies its
 policyholder ownership filter before returning collections.
 
 Successful evidence retrievals are separately committed as

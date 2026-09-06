@@ -27,7 +27,154 @@ export type Policy = {
   premiumMinor: number;
   coverageLimitMinor: number;
   termsHash: string;
-  status: "ACTIVE";
+  status: "PENDING_PAYMENT" | "ACTIVE" | "GRACE" | "LAPSED" | "CANCELLED" | "EXPIRED";
+  premiumIntervalDays?: number;
+  gracePeriodDays?: number;
+  paidThroughDate?: string;
+  nextPremiumDueDate?: string;
+  renewedFromPolicyId?: string;
+  cancellationReasonHash?: string;
+  benefitPlanId?: string;
+  benefitPlanVersion?: number;
+  deathBenefitMinor?: number;
+  surrenderBenefitMinor?: number;
+  maturityBenefitMinor?: number;
+  benefitRulesHash?: string;
+  createdAt: LedgerTimestamp;
+  updatedAt: LedgerTimestamp;
+};
+
+export type BankAccountReference = {
+  assetType: "bankAccountReference";
+  schemaVersion: number;
+  id: string;
+  ownerId: string;
+  accountTokenHash: string;
+  status: "VERIFIED" | "DISABLED";
+  createdAt: LedgerTimestamp;
+  updatedAt: LedgerTimestamp;
+};
+
+export type BankMandate = {
+  assetType: "bankMandate";
+  schemaVersion: number;
+  id: string;
+  policyId: string;
+  accountReferenceId: string;
+  ownerId: string;
+  amountMinor: number;
+  intervalDays: number;
+  nextDebitDate: string;
+  expiryDate: string;
+  status: "PENDING" | "ACTIVE" | "REJECTED" | "CANCELLED" | "EXPIRED";
+  decisionHash: string;
+  createdAt: LedgerTimestamp;
+  updatedAt: LedgerTimestamp;
+};
+
+export type PremiumPayment = {
+  assetType: "premiumPayment";
+  schemaVersion: number;
+  id: string;
+  policyId: string;
+  mandateId: string;
+  periodStartDate: string;
+  periodEndDate: string;
+  amountMinor: number;
+  externalReferenceHash: string;
+  method: "OTP" | "AUTODEBIT";
+  recordedAt: LedgerTimestamp;
+};
+
+export type PremiumAdjustment = {
+  assetType: "premiumAdjustment";
+  schemaVersion: number;
+  id: string;
+  paymentId: string;
+  policyId: string;
+  amountMinor: number;
+  externalReferenceHash: string;
+  reasonHash: string;
+  type: "REVERSAL";
+  recordedAt: LedgerTimestamp;
+};
+
+export type PremiumCollection = {
+  assetType: "premiumCollection";
+  schemaVersion: number;
+  id: string;
+  policyId: string;
+  mandateId: string;
+  dueDate: string;
+  amountMinor: number;
+  status: "DUE" | "RETRY" | "COMPLETED" | "FAILED";
+  paymentId: string;
+  failureHash: string;
+  attemptCount: number;
+  createdAt: LedgerTimestamp;
+  updatedAt: LedgerTimestamp;
+};
+
+export type BeneficiaryAllocation = { beneficiaryId: string; shareBps: number };
+
+export type BenefitPlan = {
+  assetType: "benefitPlan";
+  schemaVersion: number;
+  id: string;
+  packageId: string;
+  version: number;
+  deathBenefitMinor: number;
+  surrenderBenefitMinor: number;
+  maturityBenefitMinor: number;
+  rulesHash: string;
+  status: "DRAFT" | "PUBLISHED" | "RETIRED";
+  createdAt: LedgerTimestamp;
+  updatedAt: LedgerTimestamp;
+};
+
+export type BeneficiaryDesignation = {
+  assetType: "beneficiaryDesignation";
+  schemaVersion: number;
+  policyId: string;
+  ownerId: string;
+  revision: number;
+  allocations: BeneficiaryAllocation[];
+  updatedAt: LedgerTimestamp;
+};
+
+export type BenefitRequest = {
+  assetType: "benefitRequest";
+  schemaVersion: number;
+  id: string;
+  policyId: string;
+  requesterId: string;
+  benefitType: "DEATH" | "SURRENDER" | "MATURITY";
+  benefitPlanId: string;
+  benefitPlanVersion: number;
+  benefitRulesHash: string;
+  eventDate: string;
+  amountMinor: number;
+  evidenceHash: string;
+  decisionHash: string;
+  fundingReferenceHash: string;
+  bankReferenceHash: string;
+  status: "SUBMITTED" | "REJECTED" | "FUNDING_REQUIRED" | "PAYMENT_READY" | "PAID";
+  allocations: BeneficiaryAllocation[];
+  createdAt: LedgerTimestamp;
+  updatedAt: LedgerTimestamp;
+};
+
+export type Liability = {
+  assetType: "liability";
+  schemaVersion: number;
+  id: string;
+  sourceType: "CLAIM" | "BENEFIT";
+  sourceId: string;
+  policyId: string;
+  amountMinor: number;
+  status: "FUNDING_REQUIRED" | "PAYMENT_READY" | "PAID";
+  fundingReferenceHash: string;
+  bankReferenceHash: string;
   createdAt: LedgerTimestamp;
   updatedAt: LedgerTimestamp;
 };

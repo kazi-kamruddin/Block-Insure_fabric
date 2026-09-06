@@ -289,3 +289,144 @@ func TestEvidenceAccessAuthorizationAndAuditRecord(t *testing.T) {
 		t.Fatalf("unexpected evidence access records: %+v", records)
 	}
 }
+
+func TestPolicyPremiumMandateAndCollectionLifecycle(t *testing.T) {
+	contract := &Contract{}
+	ctx := &testContext{stub: newMemoryStub()}
+	hashA := strings.Repeat("a", 64)
+	hashB := strings.Repeat("b", 64)
+	hashC := strings.Repeat("c", 64)
+
+	setIdentity(ctx, "insurer-admin", "InsurerMSP", "insurerAdmin", nil)
+	_, err := contract.CreatePolicyPackage(ctx, "package-lifecycle", "Lifecycle", "", 10_000, 1_000_000, hashA)
+	requireNoError(t, err)
+	_, err = contract.PublishPolicyPackage(ctx, "package-lifecycle")
+	requireNoError(t, err)
+
+	setIdentity(ctx, "bank-officer", "BankMSP", "bankOfficer", nil)
+	_, err = contract.RegisterBankAccountReference(ctx, "account-token-1", "policyholder1", hashA)
+	requireNoError(t, err)
+
+	setIdentity(ctx, "policyholder", "InsurerMSP", "policyholder", map[string]string{"subjectId": "policyholder1"})
+	policy, err := contract.AcquirePolicy(ctx, "policy-lifecycle", "package-lifecycle", "2026-01-01", "2026-12-31")
+	requireNoError(t, err)
+	if policy.Status != "PENDING_PAYMENT" || policy.NextPremiumDueDate != "2026-01-01" {
+		t.Fatalf("unexpected acquired policy: %+v", policy)
+	}
+	mandate, err := contract.RequestBankMandate(ctx, "mandate-1", policy.ID, "account-token-1", "2026-12-31")
+	requireNoError(t, err)
+	if mandate.Status != "PENDING" {
+		t.Fatalf("expected pending mandate, got %s", mandate.Status)
+	}
+
+	setIdentity(ctx, "bank-officer", "BankMSP", "bankOfficer", nil)
+	_, err = contract.ReviewBankMandate(ctx, "mandate-1", "APPROVE", hashB)
+	requireNoError(t, err)
+	payment, err := contract.RecordPremiumPayment(ctx, "payment-1", policy.ID, "mandate-1", "2026-01-01", "2026-01-30", 10_000, hashA, "OTP")
+	requireNoError(t, err)
+	if payment.Method != "OTP" {
+		t.Fatalf("expected OTP payment, got %s", payment.Method)
+	}
+	adjustment, err := contract.RecordPremiumAdjustment(ctx, "adjustment-1", payment.ID, 2_500, hashB, hashC)
+	requireNoError(t, err)
+	if adjustment.Type != "REVERSAL" || adjustment.AmountMinor != 2_500 {
+		t.Fatalf("unexpected premium adjustment: %+v", adjustment)
+	}
+	_, err = contract.RecordPremiumAdjustment(ctx, "adjustment-too-large", payment.ID, 8_000, strings.Repeat("d", 64), hashC)
+	requireError(t, err, "cannot exceed")
+	policy, err = contract.ReadPolicy(ctx, policy.ID)
+	requireNoError(t, err)
+	if policy.Status != "ACTIVE" || policy.PaidThroughDate != "2026-01-30" || policy.NextPremiumDueDate != "2026-01-31" {
+		t.Fatalf("premium did not activate and advance policy: %+v", policy)
+	}
+	_, err = contract.RecordPremiumPayment(ctx, "payment-replay", policy.ID, "mandate-1", "2026-01-31", "2026-03-01", 10_000, hashA, "OTP")
+	requireError(t, err, "external payment reference has already been recorded")
+
+	setIdentity(ctx, "insurer-admin", "InsurerMSP", "insurerAdmin", nil)
+	collection, err := contract.QueuePremiumCollection(ctx, "collection-1", "mandate-1", "2026-01-31")
+	requireNoError(t, err)
+	if collection.Status != "DUE" {
+		t.Fatalf("expected due collection, got %s", collection.Status)
+	}
+
+	setIdentity(ctx, "bank-officer", "BankMSP", "bankOfficer", nil)
+	collection, err = contract.CompletePremiumCollection(ctx, "collection-1", "payment-2", "2026-03-01", hashC)
+	requireNoError(t, err)
+	if collection.Status != "COMPLETED" || collection.PaymentID != "payment-2" {
+		t.Fatalf("unexpected completed collection: %+v", collection)
+	}
+
+	setIdentity(ctx, "insurer-admin", "InsurerMSP", "insurerAdmin", nil)
+	policy, err = contract.AdvancePolicyLifecycle(ctx, policy.ID, "2026-03-03")
+	requireNoError(t, err)
+	if policy.Status != "GRACE" {
+		t.Fatalf("expected GRACE, got %s", policy.Status)
+	}
+	policy, err = contract.AdvancePolicyLifecycle(ctx, policy.ID, "2026-03-20")
+	requireNoError(t, err)
+	if policy.Status != "LAPSED" {
+		t.Fatalf("expected LAPSED, got %s", policy.Status)
+	}
+}
+
+func TestBenefitsBeneficiariesAndLiabilityLifecycle(t *testing.T) {
+	contract := &Contract{}
+	ctx := &testContext{stub: newMemoryStub()}
+	hashA := strings.Repeat("a", 64)
+	hashB := strings.Repeat("b", 64)
+	hashC := strings.Repeat("c", 64)
+	hashD := strings.Repeat("d", 64)
+
+	setIdentity(ctx, "insurer-admin", "InsurerMSP", "insurerAdmin", nil)
+	_, err := contract.CreatePolicyPackage(ctx, "package-benefit", "Benefits", "", 10_000, 1_000_000, hashA)
+	requireNoError(t, err)
+	_, err = contract.CreateBenefitPlan(ctx, "benefit-plan-1", "package-benefit", 500_000, 100_000, 250_000, hashB)
+	requireNoError(t, err)
+	_, err = contract.PublishBenefitPlan(ctx, "benefit-plan-1")
+	requireNoError(t, err)
+	_, err = contract.PublishPolicyPackage(ctx, "package-benefit")
+	requireNoError(t, err)
+	_, err = contract.IssuePolicy(ctx, "policy-benefit", "package-benefit", "policyholder1", "2026-01-01", "2026-12-31")
+	requireNoError(t, err)
+	plan2, err := contract.CreateBenefitPlan(ctx, "benefit-plan-2", "package-benefit", 900_000, 200_000, 400_000, hashC)
+	requireNoError(t, err)
+	if plan2.Version != 2 {
+		t.Fatalf("expected benefit plan version 2, got %d", plan2.Version)
+	}
+	_, err = contract.RetireBenefitPlan(ctx, "benefit-plan-1")
+	requireNoError(t, err)
+	_, err = contract.PublishBenefitPlan(ctx, "benefit-plan-2")
+	requireNoError(t, err)
+
+	setIdentity(ctx, "policyholder", "InsurerMSP", "policyholder", map[string]string{"subjectId": "policyholder1"})
+	_, err = contract.SetBeneficiaries(ctx, "policy-benefit", `[{"beneficiaryId":"beneficiary-a","shareBps":6000},{"beneficiaryId":"beneficiary-b","shareBps":4000}]`)
+	requireNoError(t, err)
+	_, err = contract.SetBeneficiaries(ctx, "policy-benefit", `[{"beneficiaryId":"beneficiary-a","shareBps":5000}]`)
+	requireError(t, err, "total 10000")
+	request, err := contract.SubmitBenefitRequest(ctx, "benefit-request-1", "policy-benefit", "DEATH", "2026-06-15", hashC)
+	requireNoError(t, err)
+	if request.AmountMinor != 500_000 || request.BenefitPlanVersion != 1 || len(request.Allocations) != 2 {
+		t.Fatalf("benefit request did not snapshot rules and allocations: %+v", request)
+	}
+
+	setIdentity(ctx, "insurer-admin", "InsurerMSP", "insurerAdmin", nil)
+	request, err = contract.DecideBenefitRequest(ctx, request.ID, "APPROVE", hashD)
+	requireNoError(t, err)
+	if request.Status != "FUNDING_REQUIRED" {
+		t.Fatalf("expected funding-required benefit, got %s", request.Status)
+	}
+	request, err = contract.MarkBenefitPaymentReady(ctx, request.ID, hashA)
+	requireNoError(t, err)
+	if request.Status != "PAYMENT_READY" {
+		t.Fatalf("expected payment-ready benefit, got %s", request.Status)
+	}
+
+	setIdentity(ctx, "bank-officer", "BankMSP", "bankOfficer", nil)
+	request, err = contract.ConfirmBenefitPayment(ctx, request.ID, hashB)
+	requireNoError(t, err)
+	liability, err := contract.ReadLiability(ctx, "liability-benefit-"+request.ID)
+	requireNoError(t, err)
+	if request.Status != "PAID" || liability.Status != "PAID" || liability.BankReferenceHash != hashB {
+		t.Fatalf("benefit payment did not close its liability: request=%+v liability=%+v", request, liability)
+	}
+}

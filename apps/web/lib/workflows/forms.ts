@@ -24,11 +24,11 @@ export type WorkflowFormValues = Record<string, string>;
 export type HashText = (value: string) => Promise<string>;
 
 export const operationsByRole = {
-  insurerAdmin: ["createPolicyPackage", "publishPolicyPackage", "retirePolicyPackage", "issuePolicy", "startClaimReview", "authorizeSettlement"],
-  policyholder: ["submitClaim"],
+  insurerAdmin: ["createPolicyPackage", "publishPolicyPackage", "retirePolicyPackage", "createBenefitPlan", "publishBenefitPlan", "retireBenefitPlan", "issuePolicy", "advancePolicyLifecycle", "cancelPolicyAsInsurer", "queuePremiumCollection", "decideBenefitRequest", "markBenefitPaymentReady", "startClaimReview", "authorizeSettlement"],
+  policyholder: ["acquirePolicy", "requestBankMandate", "cancelBankMandate", "setBeneficiaries", "submitBenefitRequest", "renewPolicy", "cancelPolicy", "submitClaim"],
   hospitalOfficer: ["verifyClaim"],
   auditor: ["recordAuditorDecision"],
-  bankOfficer: ["confirmSettlement"],
+  bankOfficer: ["registerBankAccountReference", "reviewBankMandate", "recordPremiumPayment", "recordPremiumAdjustment", "completePremiumCollection", "failPremiumCollection", "expireBankMandate", "confirmBenefitPayment", "confirmSettlement"],
 } as const satisfies Record<FabricRole, readonly WorkflowOperation[]>;
 
 export const workflowFormDefinitions: Record<WorkflowOperation, WorkflowFormDefinition> = {
@@ -54,6 +54,28 @@ export const workflowFormDefinitions: Record<WorkflowOperation, WorkflowFormDefi
     description: "Stop future issuance from a published package without altering policies already issued from it.",
     fields: [{ name: "id", label: "Package ID", placeholder: "package-essential" }],
   },
+  createBenefitPlan: {
+    label: "Create benefit plan",
+    description: "Attach versioned death, surrender, and maturity amounts to a policy package.",
+    fields: [
+      { name: "id", label: "Benefit plan ID", placeholder: "benefit-plan-essential" },
+      { name: "packageId", label: "Package ID", placeholder: "package-essential" },
+      { name: "deathBenefitBdt", label: "Death benefit (BDT)", kind: "money" },
+      { name: "surrenderBenefitBdt", label: "Surrender benefit (BDT)", kind: "money" },
+      { name: "maturityBenefitBdt", label: "Maturity benefit (BDT)", kind: "money" },
+      { name: "rulesText", label: "Benefit rules reference", kind: "textarea", help: "Hashed locally; the rules document is not placed on-chain." },
+    ],
+  },
+  publishBenefitPlan: {
+    label: "Publish benefit plan",
+    description: "Freeze a draft benefit configuration for new requests.",
+    fields: [{ name: "id", label: "Benefit plan ID", placeholder: "benefit-plan-essential" }],
+  },
+  retireBenefitPlan: {
+    label: "Retire benefit plan",
+    description: "Retire the current package rules before publishing a new version; existing policies keep their snapshot.",
+    fields: [{ name: "id", label: "Benefit plan ID", placeholder: "benefit-plan-essential" }],
+  },
   issuePolicy: {
     label: "Issue policy",
     description: "Issue a published package to a known policyholder identity.",
@@ -64,6 +86,111 @@ export const workflowFormDefinitions: Record<WorkflowOperation, WorkflowFormDefi
       { name: "startDate", label: "Coverage starts", kind: "date" },
       { name: "endDate", label: "Coverage ends", kind: "date" },
     ],
+  },
+  acquirePolicy: {
+    label: "Acquire policy",
+    description: "Accept the published package snapshot and create coverage pending its first premium.",
+    fields: [
+      { name: "id", label: "Policy ID", placeholder: "policy-1001" },
+      { name: "packageId", label: "Published package ID", placeholder: "package-essential" },
+      { name: "startDate", label: "Coverage starts", kind: "date" },
+      { name: "endDate", label: "Coverage ends", kind: "date" },
+    ],
+  },
+  advancePolicyLifecycle: {
+    label: "Advance policy lifecycle",
+    description: "Apply a due-date transition to grace, lapse, or expiry using an explicit business date.",
+    fields: [{ name: "id", label: "Policy ID" }, { name: "asOfDate", label: "Business date", kind: "date" }],
+  },
+  cancelPolicy: {
+    label: "Cancel my policy",
+    description: "Cancel owned coverage and retain only a hash of the private reason.",
+    fields: [{ name: "id", label: "Policy ID" }, { name: "reasonText", label: "Cancellation reason reference", kind: "textarea" }],
+  },
+  cancelPolicyAsInsurer: {
+    label: "Cancel policy as insurer",
+    description: "Apply a governed insurer cancellation and hash the supporting reason.",
+    fields: [{ name: "id", label: "Policy ID" }, { name: "reasonText", label: "Cancellation reason reference", kind: "textarea" }],
+  },
+  renewPolicy: {
+    label: "Renew policy",
+    description: "Create a renewal from the latest published package terms; payment is still required.",
+    fields: [{ name: "newId", label: "New policy ID" }, { name: "existingId", label: "Existing policy ID" }, { name: "newEndDate", label: "New coverage end", kind: "date" }],
+  },
+  registerBankAccountReference: {
+    label: "Register bank account token",
+    description: "Register a verified, irreversible account token. Never enter an account number here.",
+    fields: [{ name: "id", label: "Account reference ID" }, { name: "ownerId", label: "Policyholder subject ID" }, { name: "accountTokenText", label: "Bank-vault token", help: "Hashed locally before Fabric submission." }],
+  },
+  requestBankMandate: {
+    label: "Request debit mandate",
+    description: "Ask BankMSP to approve recurring premium collection from a verified account token.",
+    fields: [{ name: "id", label: "Mandate ID" }, { name: "policyId", label: "Policy ID" }, { name: "accountReferenceId", label: "Account reference ID" }, { name: "expiryDate", label: "Mandate expiry", kind: "date" }],
+  },
+  reviewBankMandate: {
+    label: "Review debit mandate",
+    description: "Approve or reject a pending mandate using a hashed bank decision reference.",
+    fields: [{ name: "id", label: "Mandate ID" }, { name: "outcome", label: "Outcome", kind: "select", options: ["APPROVE", "REJECT"] }, { name: "decisionText", label: "Decision reference" }],
+  },
+  cancelBankMandate: {
+    label: "Cancel debit mandate",
+    description: "Stop future collections from an owned pending or active mandate.",
+    fields: [{ name: "id", label: "Mandate ID" }],
+  },
+  expireBankMandate: {
+    label: "Expire debit mandate",
+    description: "Close an active mandate after its recorded expiry date.",
+    fields: [{ name: "id", label: "Mandate ID" }, { name: "asOfDate", label: "Business date", kind: "date" }],
+  },
+  recordPremiumPayment: {
+    label: "Record premium receipt",
+    description: "Anchor a bank-confirmed external receipt and activate or reinstate eligible coverage.",
+    fields: [{ name: "id", label: "Payment ID" }, { name: "policyId", label: "Policy ID" }, { name: "mandateId", label: "Mandate ID" }, { name: "periodStartDate", label: "Period starts", kind: "date" }, { name: "periodEndDate", label: "Period ends", kind: "date" }, { name: "amountBdt", label: "Premium (BDT)", kind: "money" }, { name: "externalReferenceText", label: "External receipt reference", help: "Hashed locally for replay protection." }, { name: "method", label: "Collection method", kind: "select", options: ["OTP", "AUTODEBIT"] }],
+  },
+  recordPremiumAdjustment: {
+    label: "Record premium reversal",
+    description: "Append a compensating external reversal without deleting or rewriting the original receipt.",
+    fields: [{ name: "id", label: "Adjustment ID" }, { name: "paymentId", label: "Original payment ID" }, { name: "amountBdt", label: "Reversed amount (BDT)", kind: "money" }, { name: "externalReferenceText", label: "External reversal reference" }, { name: "reasonText", label: "Reversal reason reference" }],
+  },
+  queuePremiumCollection: {
+    label: "Queue scheduled collection",
+    description: "Create a durable on-ledger work item for a due active mandate.",
+    fields: [{ name: "id", label: "Collection ID" }, { name: "mandateId", label: "Mandate ID" }, { name: "dueDate", label: "Due date", kind: "date" }],
+  },
+  completePremiumCollection: {
+    label: "Complete scheduled collection",
+    description: "Reconcile a due collection to its external bank receipt.",
+    fields: [{ name: "collectionId", label: "Collection ID" }, { name: "paymentId", label: "Payment ID" }, { name: "periodEndDate", label: "Period ends", kind: "date" }, { name: "externalReferenceText", label: "External receipt reference" }],
+  },
+  failPremiumCollection: {
+    label: "Record collection failure",
+    description: "Increment the durable retry counter without exposing the bank's raw failure detail.",
+    fields: [{ name: "collectionId", label: "Collection ID" }, { name: "failureText", label: "Failure reference" }],
+  },
+  setBeneficiaries: {
+    label: "Set beneficiaries",
+    description: "Replace the owned policy's designation. Shares are basis points and must total 10000.",
+    fields: [{ name: "policyId", label: "Policy ID" }, { name: "allocationsJson", label: "Allocations JSON", kind: "textarea", placeholder: '[{"beneficiaryId":"person-1","shareBps":10000}]' }],
+  },
+  submitBenefitRequest: {
+    label: "Request policy benefit",
+    description: "Request a configured death, surrender, or maturity benefit and snapshot beneficiary allocations.",
+    fields: [{ name: "id", label: "Benefit request ID" }, { name: "policyId", label: "Policy ID" }, { name: "benefitType", label: "Benefit", kind: "select", options: ["DEATH", "SURRENDER", "MATURITY"] }, { name: "eventDate", label: "Covered event date", kind: "date" }, { name: "evidenceText", label: "Evidence reference", kind: "textarea" }],
+  },
+  decideBenefitRequest: {
+    label: "Decide benefit request",
+    description: "Approve into funding-required state or reject with a hashed decision reference.",
+    fields: [{ name: "id", label: "Benefit request ID" }, { name: "outcome", label: "Outcome", kind: "select", options: ["APPROVE", "REJECT"] }, { name: "decisionText", label: "Decision reference" }],
+  },
+  markBenefitPaymentReady: {
+    label: "Mark benefit funded",
+    description: "Record the external funding authorization that makes an approved benefit payable.",
+    fields: [{ name: "id", label: "Benefit request ID" }, { name: "fundingReferenceText", label: "Funding reference" }],
+  },
+  confirmBenefitPayment: {
+    label: "Confirm benefit payout",
+    description: "Close the benefit liability against a hashed external transfer reference.",
+    fields: [{ name: "id", label: "Benefit request ID" }, { name: "bankReferenceText", label: "Bank transfer reference" }],
   },
   submitClaim: {
     label: "Submit claim",
@@ -138,7 +265,30 @@ export function createWorkflowFormValues(
     createPolicyPackage: { id: generatedId("package", idFactory), name: "", description: "", premiumBdt: "", coverageLimitBdt: "", termsText: "" },
     publishPolicyPackage: { id: "" },
     retirePolicyPackage: { id: "" },
+    createBenefitPlan: { id: generatedId("benefit-plan", idFactory), packageId: "", deathBenefitBdt: "", surrenderBenefitBdt: "", maturityBenefitBdt: "", rulesText: "" },
+    publishBenefitPlan: { id: "" },
+    retireBenefitPlan: { id: "" },
     issuePolicy: { id: generatedId("policy", idFactory), packageId: "", policyholderId: "policyholder1", startDate: today, endDate: dateOffset(1) },
+    acquirePolicy: { id: generatedId("policy", idFactory), packageId: "", startDate: today, endDate: dateOffset(1) },
+    advancePolicyLifecycle: { id: "", asOfDate: today },
+    cancelPolicy: { id: "", reasonText: "" },
+    cancelPolicyAsInsurer: { id: "", reasonText: "" },
+    renewPolicy: { newId: generatedId("policy-renewal", idFactory), existingId: "", newEndDate: dateOffset(2) },
+    registerBankAccountReference: { id: generatedId("account-ref", idFactory), ownerId: "policyholder1", accountTokenText: "" },
+    requestBankMandate: { id: generatedId("mandate", idFactory), policyId: "", accountReferenceId: "", expiryDate: dateOffset(1) },
+    reviewBankMandate: { id: "", outcome: "APPROVE", decisionText: "" },
+    cancelBankMandate: { id: "" },
+    expireBankMandate: { id: "", asOfDate: today },
+    recordPremiumPayment: { id: generatedId("payment", idFactory), policyId: "", mandateId: "", periodStartDate: today, periodEndDate: today, amountBdt: "", externalReferenceText: "", method: "OTP" },
+    recordPremiumAdjustment: { id: generatedId("adjustment", idFactory), paymentId: "", amountBdt: "", externalReferenceText: "", reasonText: "" },
+    queuePremiumCollection: { id: generatedId("collection", idFactory), mandateId: "", dueDate: today },
+    completePremiumCollection: { collectionId: "", paymentId: generatedId("payment", idFactory), periodEndDate: today, externalReferenceText: "" },
+    failPremiumCollection: { collectionId: "", failureText: "" },
+    setBeneficiaries: { policyId: "", allocationsJson: '[{"beneficiaryId":"beneficiary-1","shareBps":10000}]' },
+    submitBenefitRequest: { id: generatedId("benefit-request", idFactory), policyId: "", benefitType: "DEATH", eventDate: today, evidenceText: "" },
+    decideBenefitRequest: { id: "", outcome: "APPROVE", decisionText: "" },
+    markBenefitPaymentReady: { id: "", fundingReferenceText: "" },
+    confirmBenefitPayment: { id: "", bankReferenceText: "" },
     submitClaim: { id: generatedId("claim", idFactory), policyId: "", amountBdt: "", incidentDate: today, descriptionText: "" },
     verifyClaim: { claimId: "", verificationId: generatedId("verification", idFactory), outcome: "VERIFIED", clinicalReferenceText: "" },
     startClaimReview: { claimId: "" },
@@ -212,6 +362,23 @@ export async function buildWorkflowCommand(
     case "retirePolicyPackage":
       command = { operation, id: required(values, "id", "Package ID") };
       break;
+    case "createBenefitPlan":
+      command = {
+        operation,
+        id: required(values, "id", "Benefit plan ID"),
+        packageId: required(values, "packageId", "Package ID"),
+        deathBenefitMinor: bdtToMinor(required(values, "deathBenefitBdt", "Death benefit")),
+        surrenderBenefitMinor: bdtToMinor(required(values, "surrenderBenefitBdt", "Surrender benefit")),
+        maturityBenefitMinor: bdtToMinor(required(values, "maturityBenefitBdt", "Maturity benefit")),
+        rulesHash: await digest("rulesText", "Benefit rules reference"),
+      };
+      break;
+    case "publishBenefitPlan":
+      command = { operation, id: required(values, "id", "Benefit plan ID") };
+      break;
+    case "retireBenefitPlan":
+      command = { operation, id: required(values, "id", "Benefit plan ID") };
+      break;
     case "issuePolicy":
       command = {
         operation,
@@ -221,6 +388,64 @@ export async function buildWorkflowCommand(
         startDate: required(values, "startDate", "Coverage start date"),
         endDate: required(values, "endDate", "Coverage end date"),
       };
+      break;
+    case "acquirePolicy":
+      command = { operation, id: required(values, "id", "Policy ID"), packageId: required(values, "packageId", "Package ID"), startDate: required(values, "startDate", "Coverage start date"), endDate: required(values, "endDate", "Coverage end date") };
+      break;
+    case "advancePolicyLifecycle":
+      command = { operation, id: required(values, "id", "Policy ID"), asOfDate: required(values, "asOfDate", "Business date") };
+      break;
+    case "cancelPolicy":
+    case "cancelPolicyAsInsurer":
+      command = { operation, id: required(values, "id", "Policy ID"), reasonHash: await digest("reasonText", "Cancellation reason") };
+      break;
+    case "renewPolicy":
+      command = { operation, newId: required(values, "newId", "New policy ID"), existingId: required(values, "existingId", "Existing policy ID"), newEndDate: required(values, "newEndDate", "New coverage end") };
+      break;
+    case "registerBankAccountReference":
+      command = { operation, id: required(values, "id", "Account reference ID"), ownerId: required(values, "ownerId", "Policyholder subject ID"), accountTokenHash: await digest("accountTokenText", "Bank-vault token") };
+      break;
+    case "requestBankMandate":
+      command = { operation, id: required(values, "id", "Mandate ID"), policyId: required(values, "policyId", "Policy ID"), accountReferenceId: required(values, "accountReferenceId", "Account reference ID"), expiryDate: required(values, "expiryDate", "Mandate expiry") };
+      break;
+    case "reviewBankMandate":
+      command = { operation, id: required(values, "id", "Mandate ID"), outcome: required(values, "outcome", "Outcome"), decisionHash: await digest("decisionText", "Decision reference") };
+      break;
+    case "cancelBankMandate":
+      command = { operation, id: required(values, "id", "Mandate ID") };
+      break;
+    case "expireBankMandate":
+      command = { operation, id: required(values, "id", "Mandate ID"), asOfDate: required(values, "asOfDate", "Business date") };
+      break;
+    case "recordPremiumPayment":
+      command = { operation, id: required(values, "id", "Payment ID"), policyId: required(values, "policyId", "Policy ID"), mandateId: required(values, "mandateId", "Mandate ID"), periodStartDate: required(values, "periodStartDate", "Period start"), periodEndDate: required(values, "periodEndDate", "Period end"), amountMinor: bdtToMinor(required(values, "amountBdt", "Premium")), externalReferenceHash: await digest("externalReferenceText", "External receipt reference"), method: required(values, "method", "Collection method") };
+      break;
+    case "recordPremiumAdjustment":
+      command = { operation, id: required(values, "id", "Adjustment ID"), paymentId: required(values, "paymentId", "Original payment ID"), amountMinor: bdtToMinor(required(values, "amountBdt", "Reversed amount")), externalReferenceHash: await digest("externalReferenceText", "External reversal reference"), reasonHash: await digest("reasonText", "Reversal reason reference") };
+      break;
+    case "queuePremiumCollection":
+      command = { operation, id: required(values, "id", "Collection ID"), mandateId: required(values, "mandateId", "Mandate ID"), dueDate: required(values, "dueDate", "Due date") };
+      break;
+    case "completePremiumCollection":
+      command = { operation, collectionId: required(values, "collectionId", "Collection ID"), paymentId: required(values, "paymentId", "Payment ID"), periodEndDate: required(values, "periodEndDate", "Period end"), externalReferenceHash: await digest("externalReferenceText", "External receipt reference") };
+      break;
+    case "failPremiumCollection":
+      command = { operation, collectionId: required(values, "collectionId", "Collection ID"), failureHash: await digest("failureText", "Failure reference") };
+      break;
+    case "setBeneficiaries":
+      command = { operation, policyId: required(values, "policyId", "Policy ID"), allocationsJson: required(values, "allocationsJson", "Allocations JSON") };
+      break;
+    case "submitBenefitRequest":
+      command = { operation, id: required(values, "id", "Benefit request ID"), policyId: required(values, "policyId", "Policy ID"), benefitType: required(values, "benefitType", "Benefit type"), eventDate: required(values, "eventDate", "Event date"), evidenceHash: await digest("evidenceText", "Evidence reference") };
+      break;
+    case "decideBenefitRequest":
+      command = { operation, id: required(values, "id", "Benefit request ID"), outcome: required(values, "outcome", "Outcome"), decisionHash: await digest("decisionText", "Decision reference") };
+      break;
+    case "markBenefitPaymentReady":
+      command = { operation, id: required(values, "id", "Benefit request ID"), fundingReferenceHash: await digest("fundingReferenceText", "Funding reference") };
+      break;
+    case "confirmBenefitPayment":
+      command = { operation, id: required(values, "id", "Benefit request ID"), bankReferenceHash: await digest("bankReferenceText", "Bank transfer reference") };
       break;
     case "submitClaim":
       command = {

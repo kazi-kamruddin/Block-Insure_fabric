@@ -5,13 +5,22 @@ import { withFabricContract } from "./gateway";
 import type { FabricRole } from "./config";
 import type {
   AuditorDecision,
+  BankAccountReference,
+  BankMandate,
+  BeneficiaryDesignation,
+  BenefitPlan,
+  BenefitRequest,
   Claim,
   ClaimHistoryRecord,
   EvidenceReference,
   EvidenceAccessRecord,
   HospitalVerification,
+  Liability,
   Policy,
   PolicyPackage,
+  PremiumCollection,
+  PremiumAdjustment,
+  PremiumPayment,
   Settlement,
 } from "./types";
 
@@ -65,6 +74,78 @@ export const ledger = {
 
   listPolicies() {
     return evaluate<Policy[]>("insurerAdmin", "ListPolicies");
+  },
+
+  readBankAccountReference(id: string) {
+    return evaluate<BankAccountReference>("bankOfficer", "ReadBankAccountReference", id);
+  },
+
+  listBankAccountReferences() {
+    return evaluate<BankAccountReference[]>("bankOfficer", "ListBankAccountReferences");
+  },
+
+  readBankMandate(id: string) {
+    return evaluate<BankMandate>("insurerAdmin", "ReadBankMandate", id);
+  },
+
+  listBankMandates() {
+    return evaluate<BankMandate[]>("insurerAdmin", "ListBankMandates");
+  },
+
+  readPremiumPayment(id: string) {
+    return evaluate<PremiumPayment>("insurerAdmin", "ReadPremiumPayment", id);
+  },
+
+  listPremiumPayments() {
+    return evaluate<PremiumPayment[]>("insurerAdmin", "ListPremiumPayments");
+  },
+
+  readPremiumAdjustment(id: string) {
+    return evaluate<PremiumAdjustment>("insurerAdmin", "ReadPremiumAdjustment", id);
+  },
+
+  listPremiumAdjustments() {
+    return evaluate<PremiumAdjustment[]>("insurerAdmin", "ListPremiumAdjustments");
+  },
+
+  readPremiumCollection(id: string) {
+    return evaluate<PremiumCollection>("insurerAdmin", "ReadPremiumCollection", id);
+  },
+
+  listPremiumCollections() {
+    return evaluate<PremiumCollection[]>("insurerAdmin", "ListPremiumCollections");
+  },
+
+  readBenefitPlan(id: string) {
+    return evaluate<BenefitPlan>("insurerAdmin", "ReadBenefitPlan", id);
+  },
+
+  listBenefitPlans() {
+    return evaluate<BenefitPlan[]>("insurerAdmin", "ListBenefitPlans");
+  },
+
+  readBeneficiaryDesignation(policyId: string) {
+    return evaluate<BeneficiaryDesignation>("insurerAdmin", "ReadBeneficiaryDesignation", policyId);
+  },
+
+  listBeneficiaryDesignations() {
+    return evaluate<BeneficiaryDesignation[]>("insurerAdmin", "ListBeneficiaryDesignations");
+  },
+
+  readBenefitRequest(id: string) {
+    return evaluate<BenefitRequest>("insurerAdmin", "ReadBenefitRequest", id);
+  },
+
+  listBenefitRequests() {
+    return evaluate<BenefitRequest[]>("insurerAdmin", "ListBenefitRequests");
+  },
+
+  readLiability(id: string) {
+    return evaluate<Liability>("insurerAdmin", "ReadLiability", id);
+  },
+
+  listLiabilities() {
+    return evaluate<Liability[]>("insurerAdmin", "ListLiabilities");
   },
 
   readClaim(id: string) {
@@ -162,6 +243,118 @@ export const ledger = {
       input.startDate,
       input.endDate,
     );
+  },
+
+  acquirePolicy(input: { id: string; packageId: string; startDate: string; endDate: string }) {
+    return submit<Policy>(
+      "policyholder", "AcquirePolicy", input.id, input.packageId, input.startDate, input.endDate,
+    );
+  },
+
+  advancePolicyLifecycle(id: string, asOfDate: string) {
+    return submit<Policy>("insurerAdmin", "AdvancePolicyLifecycle", id, asOfDate);
+  },
+
+  cancelPolicy(id: string, reasonHash: string, role: "policyholder" | "insurerAdmin") {
+    return submit<Policy>(role, "CancelPolicy", id, reasonHash);
+  },
+
+  renewPolicy(newId: string, existingId: string, newEndDate: string) {
+    return submit<Policy>("policyholder", "RenewPolicy", newId, existingId, newEndDate);
+  },
+
+  registerBankAccountReference(input: { id: string; ownerId: string; accountTokenHash: string }) {
+    return submit<BankAccountReference>(
+      "bankOfficer", "RegisterBankAccountReference", input.id, input.ownerId, input.accountTokenHash,
+    );
+  },
+
+  requestBankMandate(input: { id: string; policyId: string; accountReferenceId: string; expiryDate: string }) {
+    return submit<BankMandate>(
+      "policyholder", "RequestBankMandate", input.id, input.policyId, input.accountReferenceId, input.expiryDate,
+    );
+  },
+
+  reviewBankMandate(id: string, outcome: "APPROVE" | "REJECT", decisionHash: string) {
+    return submit<BankMandate>("bankOfficer", "ReviewBankMandate", id, outcome, decisionHash);
+  },
+
+  cancelBankMandate(id: string) {
+    return submit<BankMandate>("policyholder", "CancelBankMandate", id);
+  },
+
+  expireBankMandate(id: string, asOfDate: string) {
+    return submit<BankMandate>("bankOfficer", "ExpireBankMandate", id, asOfDate);
+  },
+
+  recordPremiumPayment(input: {
+    id: string; policyId: string; mandateId: string; periodStartDate: string;
+    periodEndDate: string; amountMinor: number; externalReferenceHash: string; method: "OTP" | "AUTODEBIT";
+  }) {
+    return submit<PremiumPayment>(
+      "bankOfficer", "RecordPremiumPayment", input.id, input.policyId, input.mandateId,
+      input.periodStartDate, input.periodEndDate, input.amountMinor, input.externalReferenceHash, input.method,
+    );
+  },
+
+  recordPremiumAdjustment(input: { id: string; paymentId: string; amountMinor: number; externalReferenceHash: string; reasonHash: string }) {
+    return submit<PremiumAdjustment>(
+      "bankOfficer", "RecordPremiumAdjustment", input.id, input.paymentId, input.amountMinor, input.externalReferenceHash, input.reasonHash,
+    );
+  },
+
+  queuePremiumCollection(id: string, mandateId: string, dueDate: string) {
+    return submit<PremiumCollection>("insurerAdmin", "QueuePremiumCollection", id, mandateId, dueDate);
+  },
+
+  completePremiumCollection(collectionId: string, paymentId: string, periodEndDate: string, externalReferenceHash: string) {
+    return submit<PremiumCollection>(
+      "bankOfficer", "CompletePremiumCollection", collectionId, paymentId, periodEndDate, externalReferenceHash,
+    );
+  },
+
+  failPremiumCollection(collectionId: string, failureHash: string) {
+    return submit<PremiumCollection>("bankOfficer", "FailPremiumCollection", collectionId, failureHash);
+  },
+
+  createBenefitPlan(input: {
+    id: string; packageId: string; deathBenefitMinor: number;
+    surrenderBenefitMinor: number; maturityBenefitMinor: number; rulesHash: string;
+  }) {
+    return submit<BenefitPlan>(
+      "insurerAdmin", "CreateBenefitPlan", input.id, input.packageId, input.deathBenefitMinor,
+      input.surrenderBenefitMinor, input.maturityBenefitMinor, input.rulesHash,
+    );
+  },
+
+  publishBenefitPlan(id: string) {
+    return submit<BenefitPlan>("insurerAdmin", "PublishBenefitPlan", id);
+  },
+
+  retireBenefitPlan(id: string) {
+    return submit<BenefitPlan>("insurerAdmin", "RetireBenefitPlan", id);
+  },
+
+  setBeneficiaries(policyId: string, allocationsJson: string) {
+    return submit<BeneficiaryDesignation>("policyholder", "SetBeneficiaries", policyId, allocationsJson);
+  },
+
+  submitBenefitRequest(input: { id: string; policyId: string; benefitType: "DEATH" | "SURRENDER" | "MATURITY"; eventDate: string; evidenceHash: string }) {
+    return submit<BenefitRequest>(
+      "policyholder", "SubmitBenefitRequest", input.id, input.policyId, input.benefitType, input.eventDate, input.evidenceHash,
+    );
+  },
+
+  decideBenefitRequest(id: string, outcome: "APPROVE" | "REJECT", decisionHash: string) {
+    return submit<BenefitRequest>("insurerAdmin", "DecideBenefitRequest", id, outcome, decisionHash);
+  },
+
+  markBenefitPaymentReady(id: string, fundingReferenceHash: string) {
+    return submit<BenefitRequest>("insurerAdmin", "MarkBenefitPaymentReady", id, fundingReferenceHash);
+  },
+
+  confirmBenefitPayment(id: string, bankReferenceHash: string) {
+    return submit<BenefitRequest>("bankOfficer", "ConfirmBenefitPayment", id, bankReferenceHash);
   },
 
   submitClaim(input: {

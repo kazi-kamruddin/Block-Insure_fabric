@@ -10,9 +10,10 @@ import {
 import type { RoleDashboard } from "@/lib/dashboard/build-dashboard";
 import { GuidedWorkflowForm, type PreparedWorkflow } from "@/components/guided-workflow-form";
 import type { WorkflowCommand } from "@/lib/workflows/commands";
+import { bdtToMinor } from "@/lib/workflows/forms";
 import { decryptEvidenceBytes, encryptEvidenceBytes, sha256Hex } from "@/lib/evidence/browser-crypto";
 
-type AssetType = "package" | "policy" | "claim" | "evidence" | "verification" | "decision" | "settlement" | "access" | "claim-history";
+type AssetType = "package" | "policy" | "claim" | "evidence" | "verification" | "decision" | "settlement" | "access" | "claim-history" | "account" | "mandate" | "premium-payment" | "premium-adjustment" | "collection" | "benefit-plan" | "beneficiaries" | "benefit-request" | "liability";
 
 const hash = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 
@@ -71,6 +72,8 @@ export function WorkspaceClient({
   const [retrieving, setRetrieving] = useState(false);
   const [decryptedEvidence, setDecryptedEvidence] = useState<{ url: string; name: string } | null>(null);
   const [auditClaimId, setAuditClaimId] = useState("");
+  const [manualPayment, setManualPayment] = useState({ policyId: "", mandateId: "", paymentId: "", periodStartDate: "", periodEndDate: "", amountBdt: "", externalReference: "", challengeId: "", otp: "", demoCode: "" });
+  const [statementPolicyId, setStatementPolicyId] = useState("");
   const [output, setOutput] = useState("Ready.");
   const [busy, setBusy] = useState(false);
   const [dashboard, setDashboard] = useState<RoleDashboard | null>(initialDashboard);
@@ -172,6 +175,50 @@ export function WorkspaceClient({
       setOutput(JSON.stringify(body.result, null, 2));
     } catch (error) {
       setOutput(error instanceof Error ? error.message : "List query failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function updateManualPayment(name: keyof typeof manualPayment, value: string) {
+    setManualPayment((current) => ({ ...current, [name]: value }));
+  }
+
+  async function requestPremiumOtp() {
+    setBusy(true);
+    try {
+      const body = await responseJson(await fetch("/api/banking/otp", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ policyId: manualPayment.policyId, mandateId: manualPayment.mandateId }),
+      }));
+      setManualPayment((current) => ({ ...current, challengeId: body.challengeId, demoCode: body.demoCode ?? "", otp: body.demoCode ?? "" }));
+      setOutput(body.demoCode ? `Demo OTP ${body.demoCode} expires at ${body.expiresAt}.` : `OTP challenge created and delivered by the configured adapter; expires at ${body.expiresAt}.`);
+    } catch (error) {
+      setOutput(error instanceof Error ? error.message : "OTP request failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function submitManualPremium() {
+    setBusy(true);
+    try {
+      if (!manualPayment.challengeId) throw new Error("Request an OTP first.");
+      const externalReferenceHash = await sha256Hex(new TextEncoder().encode(manualPayment.externalReference.trim()));
+      const body = await responseJson(await fetch("/api/banking/premium-payment", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          challengeId: manualPayment.challengeId, otp: manualPayment.otp,
+          id: manualPayment.paymentId, policyId: manualPayment.policyId, mandateId: manualPayment.mandateId,
+          periodStartDate: manualPayment.periodStartDate, periodEndDate: manualPayment.periodEndDate,
+          amountMinor: bdtToMinor(manualPayment.amountBdt), externalReferenceHash,
+        }),
+      }));
+      setOutput(JSON.stringify(body.result, null, 2));
+      setManualPayment((current) => ({ ...current, challengeId: "", otp: "", demoCode: "", externalReference: "" }));
+      await refreshDashboard();
+    } catch (error) {
+      setOutput(error instanceof Error ? error.message : "Premium payment failed");
     } finally {
       setBusy(false);
     }
@@ -370,6 +417,39 @@ export function WorkspaceClient({
           onSubmit={submitWorkflow}
         />
 
+        {account.role === "policyholder" && (
+          <article className="workCard evidenceCard">
+            <span className="kicker">Manual premium</span>
+            <h2>Pay with one-time authorization</h2>
+            <p className="cardNote">The OTP is bound to you, this policy, and this active mandate. Fabric stores the bank-confirmed receipt hash—never the OTP or account number.</p>
+            <div className="evidenceFields">
+              <label>Policy ID<input value={manualPayment.policyId} onChange={(event) => updateManualPayment("policyId", event.target.value)} /></label>
+              <label>Mandate ID<input value={manualPayment.mandateId} onChange={(event) => updateManualPayment("mandateId", event.target.value)} /></label>
+              <label>Payment ID<input value={manualPayment.paymentId} onChange={(event) => updateManualPayment("paymentId", event.target.value)} /></label>
+              <label>Period starts<input type="date" value={manualPayment.periodStartDate} onChange={(event) => updateManualPayment("periodStartDate", event.target.value)} /></label>
+              <label>Period ends<input type="date" value={manualPayment.periodEndDate} onChange={(event) => updateManualPayment("periodEndDate", event.target.value)} /></label>
+              <label>Premium (BDT)<input inputMode="decimal" value={manualPayment.amountBdt} onChange={(event) => updateManualPayment("amountBdt", event.target.value)} /></label>
+              <label>External bank receipt<input value={manualPayment.externalReference} onChange={(event) => updateManualPayment("externalReference", event.target.value)} /></label>
+              <label>Six-digit OTP<input inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={manualPayment.otp} onChange={(event) => updateManualPayment("otp", event.target.value.replace(/\D/g, ""))} /></label>
+            </div>
+            {manualPayment.demoCode && <p className="evidenceWarning">Local demo delivery code: <strong>{manualPayment.demoCode}</strong></p>}
+            <div className="evidenceActions">
+              <button className="secondary button" disabled={busy || !manualPayment.policyId || !manualPayment.mandateId} onClick={requestPremiumOtp}>Request OTP</button>
+              <button className="primary button" disabled={busy || !manualPayment.challengeId || manualPayment.otp.length !== 6} onClick={submitManualPremium}>Authorize premium</button>
+            </div>
+          </article>
+        )}
+
+        {account.role === "policyholder" && (
+          <article className="workCard">
+            <span className="kicker">Policy statement</span>
+            <h2>Export coverage and payment history</h2>
+            <p className="cardNote">Download premiums, reversals, mandates, collections, claims, benefits, and liabilities reconciled to one owned policy.</p>
+            <label>Policy ID<input value={statementPolicyId} onChange={(event) => setStatementPolicyId(event.target.value)} placeholder="policy-1" /></label>
+            <a aria-disabled={!statementPolicyId.trim()} className={`primary button${statementPolicyId.trim() ? "" : " disabledLink"}`} download href={statementPolicyId.trim() ? `/api/policies/${encodeURIComponent(statementPolicyId.trim())}/statement` : undefined}>Download statement JSON</a>
+          </article>
+        )}
+
         <article className="workCard">
           <span className="kicker">Evaluate transaction</span>
           <h2>Find ledger asset</h2>
@@ -379,6 +459,10 @@ export function WorkspaceClient({
               <option value="claim">Claim</option><option value="evidence">Evidence reference</option>
               <option value="verification">Hospital verification</option><option value="decision">Auditor decision</option>
               <option value="settlement">Settlement</option><option value="claim-history">Claim history</option>
+              <option value="account">Bank account token</option><option value="mandate">Debit mandate</option>
+              <option value="premium-payment">Premium payment</option><option value="premium-adjustment">Premium reversal</option><option value="collection">Premium collection</option>
+              <option value="benefit-plan">Benefit plan</option><option value="beneficiaries">Beneficiary designation</option>
+              <option value="benefit-request">Benefit request</option><option value="liability">Liability</option>
               {(account.role === "insurerAdmin" || account.role === "auditor") && <option value="access">Evidence access log</option>}
             </select>
           </label>

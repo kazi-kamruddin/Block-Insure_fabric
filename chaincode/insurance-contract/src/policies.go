@@ -125,7 +125,12 @@ func (c *Contract) IssuePolicy(ctx contractapi.TransactionContextInterface, id, 
 		PackageID: packageID, PackageVersion: policyPackage.Version, PolicyholderID: policyholderID,
 		StartDate: startDate, EndDate: endDate, PremiumMinor: policyPackage.PremiumMinor,
 		CoverageLimitMinor: policyPackage.CoverageLimitMinor, TermsHash: policyPackage.TermsHash,
-		Status: "ACTIVE", CreatedAt: now, UpdatedAt: now,
+		Status: "ACTIVE", PremiumIntervalDays: 30, GracePeriodDays: 15,
+		PaidThroughDate: startDate, NextPremiumDueDate: start.AddDate(0, 0, 30).Format("2006-01-02"),
+		CreatedAt: now, UpdatedAt: now,
+	}
+	if err := c.snapshotBenefitPlan(ctx, policy); err != nil {
+		return nil, err
 	}
 	if err := putState(ctx, "policy", id, policy); err != nil {
 		return nil, err

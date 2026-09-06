@@ -8,11 +8,12 @@ identities and Fabric ledger controls.
 
 ## Project status
 
-The five planned implementation areas are complete for a local thesis and
-supervisor-demonstration release: the four-organization Fabric network, Go
-insurance contract, Next.js Gateway boundary, role-specific workflows/evidence,
-and hardening/test/documentation suite all run end to end. The consolidated
-verifier is green against `insurance-contract` 0.3.0, schema 2.
+The original five implementation areas and the policy/premium/benefit expansion
+are complete for a local thesis and supervisor-demonstration release. The
+four-organization network, Go contract, Next.js Gateway boundary, role-specific
+workflows/evidence, release verification, policy acquisition, premium collection,
+bank mandates, and governed benefits run end to end against
+`insurance-contract` 0.4.1, schema 3.
 
 This is not a production deployment claim. Institutional authentication,
 durable encrypted object storage and key recovery, multi-node/orderer high
@@ -39,7 +40,7 @@ of this Fabric project.
 The local network models separate organizations for the insurer, hospital,
 bank, and auditor, backed by Fabric CAs and CouchDB. Its Go chaincode enforces
 MSP membership, certificate role attributes, asset ownership, and the complete
-policy-to-settlement state machine. The Next.js server accesses the ledger
+policy-to-settlement and policy-to-benefit state machines. The Next.js server accesses the ledger
 through Fabric Gateway; browsers never hold Fabric private keys.
 
 ## Getting started
@@ -67,7 +68,9 @@ and browser-encrypted evidence storage with on-ledger integrity/access records. 
 local filesystem storage are development adapters, not production identity or
 object-storage implementations.
 
-See [the local demonstration runbook](docs/local-demonstration.md) for the
+See [the lifecycle design](docs/policy-premium-benefit-lifecycles.md) for policy,
+OTP, collection-worker, reconciliation, and benefit boundaries;
+[the local demonstration runbook](docs/local-demonstration.md) for the
 five-organization journey and [the evidence security boundary](docs/evidence-security.md)
 for the AES-GCM envelope, authorization path, and production limitations.
 

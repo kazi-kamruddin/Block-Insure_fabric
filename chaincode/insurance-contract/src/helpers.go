@@ -36,6 +36,26 @@ func requireIdentity(ctx contractapi.TransactionContextInterface, mspID, role st
 	return callerID, nil
 }
 
+func identityDetails(ctx contractapi.TransactionContextInterface) (string, string, string, error) {
+	identity := ctx.GetClientIdentity()
+	mspID, err := identity.GetMSPID()
+	if err != nil {
+		return "", "", "", fmt.Errorf("read caller MSP: %w", err)
+	}
+	role, found, err := identity.GetAttributeValue("role")
+	if err != nil {
+		return "", "", "", fmt.Errorf("read caller role: %w", err)
+	}
+	if !found {
+		return "", "", "", fmt.Errorf("access denied: caller role is required")
+	}
+	id, err := identity.GetID()
+	if err != nil {
+		return "", "", "", fmt.Errorf("read caller identity: %w", err)
+	}
+	return id, mspID, role, nil
+}
+
 func callerSubject(ctx contractapi.TransactionContextInterface) (string, error) {
 	if subject, found, err := ctx.GetClientIdentity().GetAttributeValue("subjectId"); err != nil {
 		return "", fmt.Errorf("read subjectId: %w", err)

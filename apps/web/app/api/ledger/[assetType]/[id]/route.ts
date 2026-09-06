@@ -4,7 +4,7 @@ import { currentSession } from "@/lib/auth/current-session";
 import { ledger } from "@/lib/fabric/ledger";
 
 const routeSchema = z.object({
-  assetType: z.enum(["package", "policy", "claim", "evidence", "verification", "decision", "settlement", "claim-history"]),
+  assetType: z.enum(["package", "policy", "claim", "evidence", "verification", "decision", "settlement", "claim-history", "account", "mandate", "premium-payment", "premium-adjustment", "collection", "benefit-plan", "beneficiaries", "benefit-request", "liability"]),
   id: z.string().trim().min(1).max(100).regex(/^[a-zA-Z0-9._:-]+$/),
 });
 
@@ -94,6 +94,57 @@ export async function GET(_request: Request, context: RouteContext) {
           }
         }
         result = await ledger.claimHistory(id);
+        break;
+      }
+      case "account": {
+        const account = await ledger.readBankAccountReference(id);
+        if (session.role === "policyholder" && account.ownerId !== session.subjectId) return NextResponse.json({ message: "Asset is not owned by this account" }, { status: 403 });
+        result = account;
+        break;
+      }
+      case "mandate": {
+        const mandate = await ledger.readBankMandate(id);
+        if (session.role === "policyholder" && mandate.ownerId !== session.subjectId) return NextResponse.json({ message: "Asset is not owned by this account" }, { status: 403 });
+        result = mandate;
+        break;
+      }
+      case "premium-payment": {
+        const payment = await ledger.readPremiumPayment(id);
+        if (session.role === "policyholder" && (await ledger.readPolicy(payment.policyId)).policyholderId !== session.subjectId) return NextResponse.json({ message: "Asset is not owned by this account" }, { status: 403 });
+        result = payment;
+        break;
+      }
+      case "premium-adjustment": {
+        const adjustment = await ledger.readPremiumAdjustment(id);
+        if (session.role === "policyholder" && (await ledger.readPolicy(adjustment.policyId)).policyholderId !== session.subjectId) return NextResponse.json({ message: "Asset is not owned by this account" }, { status: 403 });
+        result = adjustment;
+        break;
+      }
+      case "collection": {
+        const collection = await ledger.readPremiumCollection(id);
+        if (session.role === "policyholder" && (await ledger.readPolicy(collection.policyId)).policyholderId !== session.subjectId) return NextResponse.json({ message: "Asset is not owned by this account" }, { status: 403 });
+        result = collection;
+        break;
+      }
+      case "benefit-plan":
+        result = await ledger.readBenefitPlan(id);
+        break;
+      case "beneficiaries": {
+        const designation = await ledger.readBeneficiaryDesignation(id);
+        if (session.role === "policyholder" && designation.ownerId !== session.subjectId) return NextResponse.json({ message: "Asset is not owned by this account" }, { status: 403 });
+        result = designation;
+        break;
+      }
+      case "benefit-request": {
+        const benefit = await ledger.readBenefitRequest(id);
+        if (session.role === "policyholder" && benefit.requesterId !== session.subjectId) return NextResponse.json({ message: "Asset is not owned by this account" }, { status: 403 });
+        result = benefit;
+        break;
+      }
+      case "liability": {
+        const liability = await ledger.readLiability(id);
+        if (session.role === "policyholder" && (await ledger.readPolicy(liability.policyId)).policyholderId !== session.subjectId) return NextResponse.json({ message: "Asset is not owned by this account" }, { status: 403 });
+        result = liability;
         break;
       }
     }

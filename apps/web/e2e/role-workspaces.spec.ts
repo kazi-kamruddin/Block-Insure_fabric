@@ -2,10 +2,10 @@ import { expect, test, type Page } from "@playwright/test";
 
 const actors = [
   { account: "insurer-admin", workspace: "insurer", heading: "Portfolio oversight", action: "createPolicyPackage" },
-  { account: "policyholder-1", workspace: "policyholder", heading: "Coverage and claims overview", action: "submitClaim" },
+  { account: "policyholder-1", workspace: "policyholder", heading: "Coverage and claims overview", action: "acquirePolicy" },
   { account: "hospital-officer", workspace: "hospital", heading: "Hospital verification desk", action: "verifyClaim" },
   { account: "auditor", workspace: "auditor", heading: "Independent claim audit", action: "recordAuditorDecision" },
-  { account: "bank-officer", workspace: "bank", heading: "Settlement confirmation desk", action: "confirmSettlement" },
+  { account: "bank-officer", workspace: "bank", heading: "Banking operations desk", action: "registerBankAccountReference" },
 ] as const;
 
 async function signIn(page: Page, account: string) {

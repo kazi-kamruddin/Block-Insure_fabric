@@ -1,6 +1,6 @@
 package insurance
 
-const SchemaVersion = 2
+const SchemaVersion = 3
 
 type PolicyPackage struct {
 	AssetType          string `json:"assetType"`
@@ -18,20 +18,170 @@ type PolicyPackage struct {
 }
 
 type Policy struct {
+	AssetType              string `json:"assetType"`
+	SchemaVersion          int    `json:"schemaVersion"`
+	ID                     string `json:"id"`
+	PackageID              string `json:"packageId"`
+	PackageVersion         int    `json:"packageVersion"`
+	PolicyholderID         string `json:"policyholderId"`
+	StartDate              string `json:"startDate"`
+	EndDate                string `json:"endDate"`
+	PremiumMinor           int64  `json:"premiumMinor"`
+	CoverageLimitMinor     int64  `json:"coverageLimitMinor"`
+	TermsHash              string `json:"termsHash"`
+	Status                 string `json:"status"`
+	PremiumIntervalDays    int    `json:"premiumIntervalDays"`
+	GracePeriodDays        int    `json:"gracePeriodDays"`
+	PaidThroughDate        string `json:"paidThroughDate"`
+	NextPremiumDueDate     string `json:"nextPremiumDueDate"`
+	RenewedFromPolicyID    string `json:"renewedFromPolicyId"`
+	CancellationReasonHash string `json:"cancellationReasonHash"`
+	BenefitPlanID          string `json:"benefitPlanId"`
+	BenefitPlanVersion     int    `json:"benefitPlanVersion"`
+	DeathBenefitMinor      int64  `json:"deathBenefitMinor"`
+	SurrenderBenefitMinor  int64  `json:"surrenderBenefitMinor"`
+	MaturityBenefitMinor   int64  `json:"maturityBenefitMinor"`
+	BenefitRulesHash       string `json:"benefitRulesHash"`
+	CreatedAt              string `json:"createdAt"`
+	UpdatedAt              string `json:"updatedAt"`
+}
+
+type BankAccountReference struct {
+	AssetType        string `json:"assetType"`
+	SchemaVersion    int    `json:"schemaVersion"`
+	ID               string `json:"id"`
+	OwnerID          string `json:"ownerId"`
+	AccountTokenHash string `json:"accountTokenHash"`
+	Status           string `json:"status"`
+	CreatedAt        string `json:"createdAt"`
+	UpdatedAt        string `json:"updatedAt"`
+}
+
+type BankMandate struct {
 	AssetType          string `json:"assetType"`
 	SchemaVersion      int    `json:"schemaVersion"`
 	ID                 string `json:"id"`
-	PackageID          string `json:"packageId"`
-	PackageVersion     int    `json:"packageVersion"`
-	PolicyholderID     string `json:"policyholderId"`
-	StartDate          string `json:"startDate"`
-	EndDate            string `json:"endDate"`
-	PremiumMinor       int64  `json:"premiumMinor"`
-	CoverageLimitMinor int64  `json:"coverageLimitMinor"`
-	TermsHash          string `json:"termsHash"`
+	PolicyID           string `json:"policyId"`
+	AccountReferenceID string `json:"accountReferenceId"`
+	OwnerID            string `json:"ownerId"`
+	AmountMinor        int64  `json:"amountMinor"`
+	IntervalDays       int    `json:"intervalDays"`
+	NextDebitDate      string `json:"nextDebitDate"`
+	ExpiryDate         string `json:"expiryDate"`
 	Status             string `json:"status"`
+	DecisionHash       string `json:"decisionHash"`
 	CreatedAt          string `json:"createdAt"`
 	UpdatedAt          string `json:"updatedAt"`
+}
+
+type PremiumPayment struct {
+	AssetType             string `json:"assetType"`
+	SchemaVersion         int    `json:"schemaVersion"`
+	ID                    string `json:"id"`
+	PolicyID              string `json:"policyId"`
+	MandateID             string `json:"mandateId"`
+	PeriodStartDate       string `json:"periodStartDate"`
+	PeriodEndDate         string `json:"periodEndDate"`
+	AmountMinor           int64  `json:"amountMinor"`
+	ExternalReferenceHash string `json:"externalReferenceHash"`
+	Method                string `json:"method"`
+	RecordedAt            string `json:"recordedAt"`
+}
+
+type PremiumAdjustment struct {
+	AssetType             string `json:"assetType"`
+	SchemaVersion         int    `json:"schemaVersion"`
+	ID                    string `json:"id"`
+	PaymentID             string `json:"paymentId"`
+	PolicyID              string `json:"policyId"`
+	AmountMinor           int64  `json:"amountMinor"`
+	ExternalReferenceHash string `json:"externalReferenceHash"`
+	ReasonHash            string `json:"reasonHash"`
+	Type                  string `json:"type"`
+	RecordedAt            string `json:"recordedAt"`
+}
+
+type PremiumCollection struct {
+	AssetType     string `json:"assetType"`
+	SchemaVersion int    `json:"schemaVersion"`
+	ID            string `json:"id"`
+	PolicyID      string `json:"policyId"`
+	MandateID     string `json:"mandateId"`
+	DueDate       string `json:"dueDate"`
+	AmountMinor   int64  `json:"amountMinor"`
+	Status        string `json:"status"`
+	PaymentID     string `json:"paymentId"`
+	FailureHash   string `json:"failureHash"`
+	AttemptCount  int    `json:"attemptCount"`
+	CreatedAt     string `json:"createdAt"`
+	UpdatedAt     string `json:"updatedAt"`
+}
+
+type BeneficiaryAllocation struct {
+	BeneficiaryID string `json:"beneficiaryId"`
+	ShareBps      int    `json:"shareBps"`
+}
+
+type BenefitPlan struct {
+	AssetType             string `json:"assetType"`
+	SchemaVersion         int    `json:"schemaVersion"`
+	ID                    string `json:"id"`
+	PackageID             string `json:"packageId"`
+	Version               int    `json:"version"`
+	DeathBenefitMinor     int64  `json:"deathBenefitMinor"`
+	SurrenderBenefitMinor int64  `json:"surrenderBenefitMinor"`
+	MaturityBenefitMinor  int64  `json:"maturityBenefitMinor"`
+	RulesHash             string `json:"rulesHash"`
+	Status                string `json:"status"`
+	CreatedAt             string `json:"createdAt"`
+	UpdatedAt             string `json:"updatedAt"`
+}
+
+type BeneficiaryDesignation struct {
+	AssetType     string                  `json:"assetType"`
+	SchemaVersion int                     `json:"schemaVersion"`
+	PolicyID      string                  `json:"policyId"`
+	OwnerID       string                  `json:"ownerId"`
+	Revision      int                     `json:"revision"`
+	Allocations   []BeneficiaryAllocation `json:"allocations"`
+	UpdatedAt     string                  `json:"updatedAt"`
+}
+
+type BenefitRequest struct {
+	AssetType            string                  `json:"assetType"`
+	SchemaVersion        int                     `json:"schemaVersion"`
+	ID                   string                  `json:"id"`
+	PolicyID             string                  `json:"policyId"`
+	RequesterID          string                  `json:"requesterId"`
+	BenefitType          string                  `json:"benefitType"`
+	BenefitPlanID        string                  `json:"benefitPlanId"`
+	BenefitPlanVersion   int                     `json:"benefitPlanVersion"`
+	BenefitRulesHash     string                  `json:"benefitRulesHash"`
+	EventDate            string                  `json:"eventDate"`
+	AmountMinor          int64                   `json:"amountMinor"`
+	EvidenceHash         string                  `json:"evidenceHash"`
+	DecisionHash         string                  `json:"decisionHash"`
+	FundingReferenceHash string                  `json:"fundingReferenceHash"`
+	BankReferenceHash    string                  `json:"bankReferenceHash"`
+	Status               string                  `json:"status"`
+	Allocations          []BeneficiaryAllocation `json:"allocations"`
+	CreatedAt            string                  `json:"createdAt"`
+	UpdatedAt            string                  `json:"updatedAt"`
+}
+
+type Liability struct {
+	AssetType            string `json:"assetType"`
+	SchemaVersion        int    `json:"schemaVersion"`
+	ID                   string `json:"id"`
+	SourceType           string `json:"sourceType"`
+	SourceID             string `json:"sourceId"`
+	PolicyID             string `json:"policyId"`
+	AmountMinor          int64  `json:"amountMinor"`
+	Status               string `json:"status"`
+	FundingReferenceHash string `json:"fundingReferenceHash"`
+	BankReferenceHash    string `json:"bankReferenceHash"`
+	CreatedAt            string `json:"createdAt"`
+	UpdatedAt            string `json:"updatedAt"`
 }
 
 type Claim struct {

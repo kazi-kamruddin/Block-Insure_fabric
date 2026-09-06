@@ -48,4 +48,14 @@ describe("guided workflow forms", () => {
     expect(prepared.amountBdt).toBe("2500.00");
     expect(prepared.descriptionText).toBe("");
   });
+
+  it("builds a premium compensation command with locally hashed references", async () => {
+    const hashText = vi.fn().mockResolvedValueOnce("b".repeat(64)).mockResolvedValueOnce("c".repeat(64));
+    const command = await buildWorkflowCommand("recordPremiumAdjustment", {
+      id: "adjustment-1", paymentId: "payment-1", amountBdt: "25.50",
+      externalReferenceText: "bank-reversal-88", reasonText: "duplicate debit",
+    }, hashText);
+    expect(command).toEqual({ operation: "recordPremiumAdjustment", id: "adjustment-1", paymentId: "payment-1", amountMinor: 2_550, externalReferenceHash: "b".repeat(64), reasonHash: "c".repeat(64) });
+    expect(hashText).toHaveBeenCalledTimes(2);
+  });
 });

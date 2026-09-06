@@ -1,10 +1,15 @@
 import type { FabricRole } from "@/lib/fabric/config";
 import type {
+  BankMandate,
+  BenefitRequest,
   Claim,
   EvidenceReference,
   EvidenceAccessRecord,
   Policy,
   PolicyPackage,
+  PremiumCollection,
+  PremiumPayment,
+  Liability,
   Settlement,
 } from "@/lib/fabric/types";
 
@@ -35,6 +40,11 @@ export type DashboardAssets = {
   evidence: EvidenceReference[];
   settlements: Settlement[];
   evidenceAccess: EvidenceAccessRecord[];
+  mandates?: BankMandate[];
+  premiumPayments?: PremiumPayment[];
+  premiumCollections?: PremiumCollection[];
+  benefitRequests?: BenefitRequest[];
+  liabilities?: Liability[];
 };
 
 const terminalClaimStatuses = new Set(["REJECTED", "SETTLED"]);
@@ -58,29 +68,32 @@ export function buildRoleDashboard(
   assets: DashboardAssets,
   subjectId?: string,
 ): RoleDashboard {
+  const mandates = assets.mandates ?? [];
+  const premiumPayments = assets.premiumPayments ?? [];
+  const premiumCollections = assets.premiumCollections ?? [];
+  const benefitRequests = assets.benefitRequests ?? [];
+  const liabilities = assets.liabilities ?? [];
   const ownedPolicies = role === "policyholder"
     ? assets.policies.filter((policy) => policy.policyholderId === subjectId)
     : assets.policies;
   const ownedClaims = role === "policyholder"
     ? assets.claims.filter((claim) => claim.claimantId === subjectId)
     : assets.claims;
-  const ownedClaimIds = new Set(ownedClaims.map((claim) => claim.id));
-  const visibleSettlements = role === "policyholder"
-    ? assets.settlements.filter((settlement) => ownedClaimIds.has(settlement.claimId))
-    : assets.settlements;
-  const visibleEvidence = role === "policyholder"
-    ? assets.evidence.filter((item) => item.submittedBy === subjectId)
-    : assets.evidence;
+  const ownedPolicyIds = new Set(ownedPolicies.map((policy) => policy.id));
+  const visibleMandates = role === "policyholder" ? mandates.filter((item) => item.ownerId === subjectId) : mandates;
+  const visiblePayments = role === "policyholder" ? premiumPayments.filter((item) => ownedPolicyIds.has(item.policyId)) : premiumPayments;
+  const visibleBenefits = role === "policyholder" ? benefitRequests.filter((item) => item.requesterId === subjectId) : benefitRequests;
 
   if (role === "policyholder") {
     return {
       title: "Coverage and claims overview",
-      description: "Your owned policies, active claims, evidence anchors, and confirmed settlements.",
+      description: "Your coverage, premium standing, benefit requests, claims, and confirmed payouts.",
       metrics: [
         { label: "Active policies", value: ownedPolicies.filter((item) => item.status === "ACTIVE").length, hint: "coverage issued to you" },
         { label: "Open claims", value: ownedClaims.filter((item) => !terminalClaimStatuses.has(item.status)).length, hint: "still moving through the network" },
-        { label: "Evidence anchors", value: visibleEvidence.length, hint: "ciphertext references on ledger" },
-        { label: "Settled", value: visibleSettlements.filter((item) => item.status === "CONFIRMED").length, hint: "bank-confirmed claims" },
+        { label: "Premium receipts", value: visiblePayments.length, hint: "reconciled external payments" },
+        { label: "Open benefits", value: visibleBenefits.filter((item) => !["PAID", "REJECTED"].includes(item.status)).length, hint: "governed benefit requests" },
+        { label: "Active mandates", value: visibleMandates.filter((item) => item.status === "ACTIVE").length, hint: "bank-approved collections" },
       ],
       queueTitle: "Your active coverage",
       queue: ownedPolicies.map((policy) => ({
@@ -88,15 +101,11 @@ export function buildRoleDashboard(
         title: policy.id,
         detail: `${money(policy.coverageLimitMinor)} coverage · ends ${policy.endDate}`,
         status: policy.status,
-        commandLabel: "Prepare claim",
-        command: {
-          operation: "submitClaim",
-          id: `claim-${Date.now()}`,
-          policyId: policy.id,
-          amountMinor: 250000,
-          incidentDate: new Date().toISOString().slice(0, 10),
-          descriptionHash: "a".repeat(64),
-        },
+        commandLabel: policy.status === "ACTIVE" ? "Prepare claim" : "Manage coverage",
+        command: policy.status === "ACTIVE" ? {
+          operation: "submitClaim", id: `claim-${Date.now()}`, policyId: policy.id,
+          amountMinor: 250000, incidentDate: new Date().toISOString().slice(0, 10), descriptionHash: "a".repeat(64),
+        } : { operation: "requestBankMandate", policyId: policy.id },
       })),
       recentClaims: newestClaims(ownedClaims),
     };
@@ -161,28 +170,26 @@ export function buildRoleDashboard(
   }
 
   if (role === "bankOfficer") {
-    const queue = assets.settlements.filter((item) => item.status === "AUTHORIZED");
+    const pendingMandates = mandates.filter((item) => item.status === "PENDING");
+    const dueCollections = premiumCollections.filter((item) => ["DUE", "RETRY"].includes(item.status));
+    const readyBenefits = benefitRequests.filter((item) => item.status === "PAYMENT_READY");
+    const readySettlements = assets.settlements.filter((item) => item.status === "AUTHORIZED");
+    const queue: DashboardItem[] = [
+      ...pendingMandates.map((mandate) => ({ id: mandate.id, title: mandate.id, detail: `${money(mandate.amountMinor)} · policy ${mandate.policyId}`, status: mandate.status, commandLabel: "Review mandate", command: { operation: "reviewBankMandate", id: mandate.id, outcome: "APPROVE" } })),
+      ...dueCollections.map((collection) => ({ id: collection.id, title: collection.id, detail: `${money(collection.amountMinor)} · due ${collection.dueDate}`, status: collection.status, commandLabel: "Reconcile collection", command: { operation: "completePremiumCollection", collectionId: collection.id } })),
+      ...readyBenefits.map((benefit) => ({ id: benefit.id, title: benefit.id, detail: `${money(benefit.amountMinor)} · ${benefit.benefitType.toLowerCase()} benefit`, status: benefit.status, commandLabel: "Confirm payout", command: { operation: "confirmBenefitPayment", id: benefit.id } })),
+      ...readySettlements.map((settlement) => ({ id: settlement.id, title: settlement.id, detail: `${money(settlement.amountMinor)} · claim ${settlement.claimId}`, status: settlement.status, commandLabel: "Prepare confirmation", command: { operation: "confirmSettlement", settlementId: settlement.id } })),
+    ];
     return {
-      title: "Settlement confirmation desk",
-      description: "Confirm external EFT references for insurer-authorized settlements.",
+      title: "Banking operations desk",
+      description: "Review debit mandates, reconcile premium collections, and confirm claim and benefit payouts.",
       metrics: [
-        { label: "Awaiting confirmation", value: queue.length, hint: "authorized settlements" },
-        { label: "Confirmed", value: assets.settlements.filter((item) => item.status === "CONFIRMED").length, hint: "bank references committed" },
-        { label: "Total settlements", value: assets.settlements.length, hint: "ledger settlement records" },
+        { label: "Bank action queue", value: queue.length, hint: "mandates, collections, and payouts" },
+        { label: "Premium receipts", value: premiumPayments.length, hint: "replay-protected confirmations" },
+        { label: "Paid liabilities", value: liabilities.filter((item) => item.status === "PAID").length, hint: "external transfers reconciled" },
       ],
-      queueTitle: "Authorized settlements",
-      queue: queue.map((settlement) => ({
-        id: settlement.id,
-        title: settlement.id,
-        detail: `${money(settlement.amountMinor)} · claim ${settlement.claimId}`,
-        status: settlement.status,
-        commandLabel: "Prepare confirmation",
-        command: {
-          operation: "confirmSettlement",
-          settlementId: settlement.id,
-          bankReferenceHash: "a".repeat(64),
-        },
-      })),
+      queueTitle: "Mandates, collections, and payouts",
+      queue,
       recentClaims: newestClaims(assets.claims.filter((claim) =>
         assets.settlements.some((settlement) => settlement.claimId === claim.id),
       )),
@@ -199,10 +206,16 @@ export function buildRoleDashboard(
       { label: "Published packages", value: assets.packages.filter((item) => item.status === "PUBLISHED").length, hint: "available product definitions" },
       { label: "Active policies", value: assets.policies.filter((item) => item.status === "ACTIVE").length, hint: "issued coverage records" },
       { label: "Open claims", value: assets.claims.filter((item) => !terminalClaimStatuses.has(item.status)).length, hint: "portfolio work in progress" },
-      { label: "Needs insurer action", value: reviewQueue.length, hint: "review or settlement step" },
+      { label: "Needs insurer action", value: reviewQueue.length + benefitRequests.filter((item) => ["SUBMITTED", "FUNDING_REQUIRED"].includes(item.status)).length, hint: "claims and benefit liabilities" },
     ],
     queueTitle: "Insurer action queue",
-    queue: reviewQueue.map((claim) => {
+    queue: [
+      ...benefitRequests.filter((item) => ["SUBMITTED", "FUNDING_REQUIRED"].includes(item.status)).map((benefit) => ({
+        id: benefit.id, title: benefit.id, detail: `${money(benefit.amountMinor)} · ${benefit.benefitType.toLowerCase()} benefit`, status: benefit.status,
+        commandLabel: benefit.status === "SUBMITTED" ? "Prepare decision" : "Record funding",
+        command: benefit.status === "SUBMITTED" ? { operation: "decideBenefitRequest", id: benefit.id, outcome: "APPROVE" } : { operation: "markBenefitPaymentReady", id: benefit.id },
+      })),
+      ...reviewQueue.map((claim) => {
       const approved = claim.status === "APPROVED";
       return {
         id: claim.id,
@@ -214,7 +227,8 @@ export function buildRoleDashboard(
           ? { operation: "authorizeSettlement", settlementId: `settlement-${Date.now()}-${claim.id}`, claimId: claim.id }
           : { operation: "startClaimReview", claimId: claim.id },
       };
-    }),
+      }),
+    ],
     recentClaims: newestClaims(assets.claims),
   };
 }
