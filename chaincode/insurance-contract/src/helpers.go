@@ -80,10 +80,6 @@ func stateKey(ctx contractapi.TransactionContextInterface, assetType, id string)
 	return ctx.GetStub().CreateCompositeKey(assetType, []string{id})
 }
 
-func decisionKey(ctx contractapi.TransactionContextInterface, claimID, auditorID string) (string, error) {
-	return ctx.GetStub().CreateCompositeKey("auditorDecision", []string{claimID, auditorID})
-}
-
 func reviewDecisionKey(ctx contractapi.TransactionContextInterface, reviewID, auditorID string) (string, error) {
 	return ctx.GetStub().CreateCompositeKey("reviewVote", []string{reviewID, auditorID})
 }

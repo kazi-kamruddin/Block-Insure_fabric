@@ -16,9 +16,10 @@ const [{ loadOracleConfig }, { connectOracleGateway }, { loadRegistrySnapshot, a
 
 const config = loadOracleConfig();
 const registry = await loadRegistrySnapshot(config.registryPath);
-const runtime = await connectOracleGateway(config);
-const healthState = healthModule.createHealthState(config, registry);
 const healthPath = path.join(config.stateRoot, config.oracleId, "health.json");
+const previousHealth = await healthModule.loadPersistedHealth(healthPath, config.oracleId);
+const runtime = await connectOracleGateway(config);
+const healthState = healthModule.createHealthState(config, registry, previousHealth);
 const cursorPath = path.join(config.stateRoot, config.oracleId, "cursor.json");
 const decoder = new TextDecoder();
 let stopping = false;
@@ -126,9 +127,6 @@ async function processRequest(requestId) {
   let request = await evaluate("ReadOracleRequest", requestId);
   if (!request.assignedOracleIds.includes(config.oracleId)) return;
   if (request.status !== "PENDING" || await evaluateOrNull("ReadOracleResult", `${request.id}:${config.oracleId}`)) return;
-  if (request.modelVersion !== config.modelVersion || request.modelHash !== config.modelHash) {
-    throw new Error(`Request ${request.id} model identity does not match ${config.oracleId} configuration`);
-  }
   const [claim, hospitalVerification] = await Promise.all([
     evaluate("ReadClaim", request.claimId),
     evaluate("ReadHospitalVerification", request.hospitalVerificationId),
@@ -146,7 +144,14 @@ async function processRequest(requestId) {
     await updateHealth({ status: "ONLINE", lastProcessedRequestId: request.id, lastError: `Reveal deadline expired for ${request.id}` });
     return;
   }
-  const assessment = assessRegistryRecord({ snapshot: registry, request, claim, hospitalVerification });
+  const assessment = assessRegistryRecord({
+    snapshot: registry,
+    request,
+    claim,
+    hospitalVerification,
+    configuredModelVersion: config.modelVersion,
+    configuredModelHash: config.modelHash,
+  });
   const resultHash = protocol.buildResultDigest(request, assessment);
   const salt = protocol.buildDeterministicSalt(runtime.privateKey, request.id, config.oracleId);
   const commitmentHash = protocol.buildCommitmentDigest(request, { verified: assessment.verified, resultHash, salt });

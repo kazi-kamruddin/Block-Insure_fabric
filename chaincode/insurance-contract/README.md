@@ -56,10 +56,10 @@ provenance on every use. Bank identities cannot retrieve clinical evidence.
 Claims link verifications, review rounds, decisions, appeals, fraud assessments,
 access records, and settlements for audit navigation.
 
-The Oracle-capable target definition is `insurance-contract` 0.7.0 with schema
-version 6 and an automatically resolved lifecycle sequence. The preserved local
-definition remains 0.6.1 sequence 9/schema 5 until an explicitly approved clean
-Oracle topology bootstrap is performed.
+The current Oracle-capable definition is `insurance-contract` 0.7.1 with schema
+version 6 and an automatically resolved lifecycle sequence. A clean bootstrap
+starts at sequence 1; a non-destructive source upgrade increments the existing
+channel sequence.
 
 ## Test
 

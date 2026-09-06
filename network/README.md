@@ -56,7 +56,7 @@ bash network/scripts/network.sh reset
 - `status` lists containers and each peer's joined channels.
 - `verify` checks all 17 containers, six CAs, five CouchDB instances, the
   orderer channel, and each peer ledger. When chaincode is committed, it also
-  checks version `0.7.0` on all five peers, evaluates schema version `6`, and
+  checks version `0.7.1` on all five peers, evaluates schema version `6`, and
   confirms both Oracle service enrollments.
 - `down` stops and removes containers while retaining identities, channel
   artifacts, and Docker ledger volumes.

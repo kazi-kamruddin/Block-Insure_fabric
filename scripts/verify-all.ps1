@@ -84,6 +84,32 @@ function Get-WebHealth {
     catch { return $null }
 }
 
+function Resolve-WslProjectRoot {
+    for ($attempt = 1; $attempt -le 5; $attempt++) {
+        $resolved = (& wsl.exe -d Ubuntu -- wslpath -a $projectRoot 2>$null).Trim()
+        if ($LASTEXITCODE -eq 0 -and $resolved) { return $resolved }
+        if ($attempt -lt 5) { Start-Sleep -Seconds 2 }
+    }
+    throw "Could not resolve the project path inside Ubuntu WSL after 5 attempts"
+}
+
+function Invoke-WslVerification {
+    param(
+        [Parameter(Mandatory)][string]$ProjectRoot,
+        [Parameter(Mandatory)][string]$Command
+    )
+    for ($attempt = 1; $attempt -le 3; $attempt++) {
+        & wsl.exe -d Ubuntu -- bash -lc "cd '$ProjectRoot' && $Command"
+        $exitCode = $LASTEXITCODE
+        if ($exitCode -eq 0) { return }
+        if ($attempt -lt 3) {
+            Write-Warning "WSL verification command failed with exit code $exitCode (attempt $attempt/3); retrying the read-only/idempotent operation."
+            Start-Sleep -Seconds 2
+        }
+    }
+    throw "WSL verification command failed with exit code $exitCode after 3 attempts"
+}
+
 function Ensure-OracleWorker {
     param(
         [Parameter(Mandatory)][string]$OracleId,
@@ -148,15 +174,12 @@ try {
     Pop-Location
 
     if (-not $SkipNetwork) {
-        $wslProjectRoot = (& wsl.exe -d Ubuntu -- wslpath -a $projectRoot).Trim()
-        if ($LASTEXITCODE -ne 0 -or -not $wslProjectRoot) {
-            throw "Could not resolve the project path inside Ubuntu WSL"
-        }
+        $wslProjectRoot = Resolve-WslProjectRoot
         Invoke-VerificationStep "Go chaincode suite" {
-            wsl.exe -d Ubuntu -- bash -lc "cd '$wslProjectRoot' && bash chaincode/insurance-contract/scripts/test.sh"
+            Invoke-WslVerification $wslProjectRoot "bash chaincode/insurance-contract/scripts/test.sh"
         }
         Invoke-VerificationStep "Fabric network and contract" {
-            wsl.exe -d Ubuntu -- bash -lc "cd '$wslProjectRoot' && bash network/scripts/network.sh verify"
+            Invoke-WslVerification $wslProjectRoot "bash network/scripts/network.sh verify"
         }
         Invoke-VerificationStep "Oracle worker supervision and health" {
             Ensure-OracleWorker "oracle1" 3301 ".env.oracle1.example"

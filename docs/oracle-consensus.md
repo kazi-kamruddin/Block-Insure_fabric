@@ -20,14 +20,19 @@ the hospital record, and computes a deterministic result containing the complete
 verdict, verification code, canonical record hash, and every snapshotted version.
 It first submits a salted commitment. Reveal begins after both commitments arrive
 or the commit deadline passes. Chaincode recomputes both the result hash and the
-commitment before accepting a reveal.
+commitment before accepting a reveal. It accepts only the documented result-code
+set and requires `verified=true` exactly for `VERIFIED`; malformed combinations
+cannot become internally inconsistent ledger evidence. A worker whose configured
+model differs from the request produces the governed `MODEL_VERSION_MISMATCH`
+negative result instead of blocking its event cursor.
 
 Two identical canonical result hashes are required:
 
 - matching valid results set the claim to `APPROVED`;
 - matching invalid results finalize `NEGATIVE_RESULT`;
 - different complete results finalize `CONFLICT`;
-- an incomplete request can finalize `TIMEOUT` after the reveal deadline.
+- an insurer administrator can finalize an incomplete request as `TIMEOUT` after
+  the reveal deadline.
 
 The last three outcomes set the claim to `ORACLE_FAILED`. An insurer can then use
 `RouteOracleFailureToReview` to open the existing certificate-bound four-auditor
@@ -65,7 +70,9 @@ Workers persist identity-bound cursors and secret-free health JSON under ignored
 snapshot/model versions, progress, counts, errors, and last latency. Claim dossier
 schema 4 includes requests, commitments, revealed results, and registry provenance.
 Unrevealed result material is never returned because commitments contain only a
-salted hash.
+salted hash. Counters and progress survive worker restarts, while the web health
+reader verifies each live endpoint and labels a retained checkpoint offline when
+its worker is no longer reachable.
 
 The Go suite covers authorization, certificate-subject separation, duplicate and
 late submissions, reveal matching, exact positive/negative consensus, conflict,

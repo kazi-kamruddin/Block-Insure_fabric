@@ -22,6 +22,12 @@ export type OracleWorkerHealth = {
   lastProcessingLatencyMs: number | null;
 };
 
+type HealthReadOptions = {
+  environment?: NodeJS.ProcessEnv;
+  startDirectory?: string;
+  fetcher?: typeof fetch;
+};
+
 function stateRoot(environment: NodeJS.ProcessEnv = process.env, startDirectory = process.cwd()) {
   if (environment.ORACLE_STATE_ROOT?.trim()) return path.resolve(startDirectory, environment.ORACLE_STATE_ROOT);
   let current = path.resolve(startDirectory);
@@ -34,17 +40,39 @@ function stateRoot(environment: NodeJS.ProcessEnv = process.env, startDirectory 
   return path.resolve(startDirectory, "data", "oracle");
 }
 
-export async function readOracleWorkerHealth(oracleId: "oracle1" | "oracle2") {
+function offlineHealth(oracleId: "oracle1" | "oracle2"): OracleWorkerHealth {
+  return {
+    schemaVersion: 1, oracleId, label: oracleId === "oracle1" ? "Oracle 1" : "Oracle 2",
+    status: "OFFLINE", registrySource: "Unavailable", registrySnapshotId: "", registryVersion: 0,
+    registryRootHash: "", modelVersion: "", startedAt: "", updatedAt: "", lastProcessedBlock: null,
+    lastProcessedRequestId: null, lastError: "No worker health record exists", counts: { requests: 0, commitments: 0, reveals: 0, verified: 0, failed: 0 },
+    lastProcessingLatencyMs: null,
+  };
+}
+
+export async function readOracleWorkerHealth(oracleId: "oracle1" | "oracle2", options: HealthReadOptions = {}) {
+  const environment = options.environment ?? process.env;
+  const endpoint = environment[oracleId === "oracle1" ? "ORACLE1_HEALTH_URL" : "ORACLE2_HEALTH_URL"]
+    ?? `http://127.0.0.1:${oracleId === "oracle1" ? 3301 : 3302}/health`;
   try {
-    return JSON.parse(await fs.readFile(path.join(stateRoot(), oracleId, "health.json"), "utf8")) as OracleWorkerHealth;
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
-    return {
-      schemaVersion: 1, oracleId, label: oracleId === "oracle1" ? "Oracle 1" : "Oracle 2",
-      status: "OFFLINE", registrySource: "Unavailable", registrySnapshotId: "", registryVersion: 0,
-      registryRootHash: "", modelVersion: "", startedAt: "", updatedAt: "", lastProcessedBlock: null,
-      lastProcessedRequestId: null, lastError: "No worker health record exists", counts: { requests: 0, commitments: 0, reveals: 0, verified: 0, failed: 0 },
-      lastProcessingLatencyMs: null,
-    } satisfies OracleWorkerHealth;
+    const response = await (options.fetcher ?? fetch)(endpoint, { cache: "no-store", signal: AbortSignal.timeout(1_500) });
+    if (!response.ok) throw new Error(`health endpoint returned ${response.status}`);
+    const live = await response.json() as OracleWorkerHealth;
+    if (live.oracleId !== oracleId) throw new Error(`health endpoint returned ${live.oracleId}`);
+    return live;
+  } catch {
+    try {
+      const stored = JSON.parse(await fs.readFile(path.join(stateRoot(environment, options.startDirectory), oracleId, "health.json"), "utf8")) as OracleWorkerHealth;
+      return {
+        ...stored,
+        status: stored.status === "STOPPED" ? "STOPPED" : "OFFLINE",
+        lastError: stored.lastError
+          ? `Worker endpoint unavailable. Last worker error: ${stored.lastError}`
+          : "Worker endpoint unavailable; showing the last durable checkpoint",
+      };
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+      return offlineHealth(oracleId);
+    }
   }
 }

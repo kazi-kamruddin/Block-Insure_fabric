@@ -6,8 +6,8 @@ import test from "node:test";
 import { loadOracleConfig } from "../src/config.mjs";
 import { emptyCursor, loadCursor, persistCursor } from "../src/cursor.mjs";
 import { buildCommitmentDigest, buildDeterministicSalt, buildResultDigest, oracleRequestPhase } from "../src/protocol.mjs";
-import { createHealthState, persistHealth } from "../src/health.mjs";
-import { assessRegistryRecord, loadRegistrySnapshot } from "../src/registry.mjs";
+import { createHealthState, loadPersistedHealth, persistHealth } from "../src/health.mjs";
+import { assessRegistryRecord, loadRegistrySnapshot, validateRegistrySnapshot } from "../src/registry.mjs";
 import { withBoundedRetry } from "../src/retry.mjs";
 
 const request = {
@@ -99,6 +99,31 @@ test("matching snapshots independently return the same negative record result", 
   assert.deepEqual(first, second);
 });
 
+test("a request for a different model produces a deterministic negative result", async () => {
+  const root = path.resolve(import.meta.dirname, "..");
+  const snapshot = await loadRegistrySnapshot(path.join(root, "registry", "oracle1-v1.json"));
+  const result = assessRegistryRecord({
+    snapshot,
+    request: { ...request, registrySnapshotId: snapshot.snapshotId, registryVersion: snapshot.version, registryRootHash: snapshot.rootHash, rulesVersion: snapshot.rulesVersion, rulesHash: snapshot.rulesHash },
+    claim: { amountMinor: 50_000, incidentDate: "2026-06-01", descriptionHash: "a".repeat(64) },
+    hospitalVerification: { clinicalReferenceHash: "1".repeat(64) },
+    configuredModelVersion: "model-v2",
+    configuredModelHash: "9".repeat(64),
+  });
+  assert.equal(result.verified, false);
+  assert.equal(result.verificationCode, "MODEL_VERSION_MISMATCH");
+});
+
+test("registry validation rejects impossible dates, reversed ranges, and unknown statuses", () => {
+  const valid = {
+    sourceId: "source-1", snapshotId: "snapshot-1", version: 1, rulesVersion: "rules-v1", rulesHash: "a".repeat(64),
+    records: [{ lookupHash: "1".repeat(64), hospitalId: "hospital-1", treatmentCode: "treatment-1", minimumAmountMinor: 1, maximumAmountMinor: 2, validFrom: "2026-01-01", validThrough: "2026-12-31", descriptionHash: "b".repeat(64), status: "VALID" }],
+  };
+  assert.throws(() => validateRegistrySnapshot({ ...valid, records: [{ ...valid.records[0], validFrom: "2026-02-30" }] }), /valid calendar date/);
+  assert.throws(() => validateRegistrySnapshot({ ...valid, records: [{ ...valid.records[0], validFrom: "2026-12-31", validThrough: "2026-01-01" }] }), /date range/);
+  assert.throws(() => validateRegistrySnapshot({ ...valid, records: [{ ...valid.records[0], status: "UNKNOWN" }] }), /record status/);
+});
+
 test("cursor persistence is identity-bound and restart-idempotent", async () => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), "block-insure-oracle-"));
   const filePath = path.join(directory, "cursor.json");
@@ -138,6 +163,7 @@ test("oracle process configurations select independent identity and health profi
   assert.notEqual(first.oracleId, second.oracleId);
   assert.notEqual(first.healthPort, second.healthPort);
   assert.notEqual(first.fabric.userMspPath, second.fabric.userMspPath);
+  assert.throws(() => loadOracleConfig({ ...common, ORACLE_ID: "oracle1", ORACLE_MODEL_HASH: "not-a-hash" }), /64-character hexadecimal hash/);
 });
 
 test("worker commit/reveal sequencing waits for quorum or the commit deadline", () => {
@@ -164,6 +190,14 @@ test("health reporting persists identity, provenance, progress, and non-secret c
     assert.equal(stored.registrySource, "independent-source");
     assert.equal(stored.lastProcessedBlock, "42");
     assert.equal("privateKey" in stored, false);
+    const restored = createHealthState(
+      { oracleId: "oracle1", label: "Oracle 1", modelVersion: "model-v1" },
+      { sourceId: "independent-source", snapshotId: "registry-demo-v1", version: 1, rootHash: "a".repeat(64) },
+      await loadPersistedHealth(filePath, "oracle1"),
+    ).snapshot();
+    assert.deepEqual(restored.counts, stored.counts);
+    assert.equal(restored.lastProcessedBlock, "42");
+    assert.equal(await loadPersistedHealth(filePath, "oracle2"), null);
   } finally {
     await fs.rm(directory, { recursive: true, force: true });
   }

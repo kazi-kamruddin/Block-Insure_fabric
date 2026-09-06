@@ -1,7 +1,29 @@
 import http from "node:http";
+import { promises as fs } from "node:fs";
 import { persistJsonFile } from "./state-file.mjs";
 
-export function createHealthState(config, registry) {
+const emptyCounts = () => ({ requests: 0, commitments: 0, reveals: 0, verified: 0, failed: 0 });
+
+function restoredCounts(previous) {
+  const result = emptyCounts();
+  for (const key of Object.keys(result)) {
+    const value = previous?.counts?.[key];
+    if (Number.isSafeInteger(value) && value >= 0) result[key] = value;
+  }
+  return result;
+}
+
+export async function loadPersistedHealth(filePath, oracleId) {
+  try {
+    const stored = JSON.parse(await fs.readFile(filePath, "utf8"));
+    return stored?.schemaVersion === 1 && stored?.oracleId === oracleId ? stored : null;
+  } catch (error) {
+    if (error?.code === "ENOENT") return null;
+    throw error;
+  }
+}
+
+export function createHealthState(config, registry, previous = null) {
   let state = {
     schemaVersion: 1,
     oracleId: config.oracleId,
@@ -14,11 +36,11 @@ export function createHealthState(config, registry) {
     modelVersion: config.modelVersion,
     startedAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
-    lastProcessedBlock: null,
-    lastProcessedRequestId: null,
+    lastProcessedBlock: previous?.lastProcessedBlock ?? null,
+    lastProcessedRequestId: previous?.lastProcessedRequestId ?? null,
     lastError: null,
-    counts: { requests: 0, commitments: 0, reveals: 0, verified: 0, failed: 0 },
-    lastProcessingLatencyMs: null,
+    counts: restoredCounts(previous),
+    lastProcessingLatencyMs: previous?.lastProcessingLatencyMs ?? null,
   };
   return {
     snapshot: () => structuredClone(state),

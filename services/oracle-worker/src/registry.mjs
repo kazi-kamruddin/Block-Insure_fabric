@@ -16,6 +16,17 @@ function requireId(name, value) {
   return normalized;
 }
 
+function requireDate(name, value) {
+  const normalized = String(value ?? "");
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(normalized);
+  if (!match) throw new Error(`${name} must use YYYY-MM-DD`);
+  const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])));
+  if (Number.isNaN(date.valueOf()) || date.toISOString().slice(0, 10) !== normalized) {
+    throw new Error(`${name} is not a valid calendar date`);
+  }
+  return normalized;
+}
+
 export function canonicalRecordHash(record) {
   return canonicalProtocolHash(
     `${ORACLE_PROTOCOL_VERSION}:registry-record`,
@@ -62,6 +73,8 @@ export function validateRegistrySnapshot(snapshot) {
       treatmentCode: requireId("record.treatmentCode", record.treatmentCode),
       minimumAmountMinor: Number(record.minimumAmountMinor),
       maximumAmountMinor: Number(record.maximumAmountMinor),
+      validFrom: requireDate("record.validFrom", record.validFrom),
+      validThrough: requireDate("record.validThrough", record.validThrough),
       status: String(record.status).toUpperCase(),
     })),
   };
@@ -75,9 +88,8 @@ export function validateRegistrySnapshot(snapshot) {
     if (!Number.isSafeInteger(record.minimumAmountMinor) || !Number.isSafeInteger(record.maximumAmountMinor) || record.minimumAmountMinor < 0 || record.maximumAmountMinor < record.minimumAmountMinor) {
       throw new Error(`Invalid amount bounds for ${record.lookupHash}`);
     }
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(record.validFrom) || !/^\d{4}-\d{2}-\d{2}$/.test(record.validThrough)) {
-      throw new Error(`Invalid coverage dates for ${record.lookupHash}`);
-    }
+    if (record.validThrough < record.validFrom) throw new Error(`Invalid coverage date range for ${record.lookupHash}`);
+    if (!["VALID", "INVALID"].includes(record.status)) throw new Error(`Invalid record status for ${record.lookupHash}`);
     canonicalRecordHash(record);
   }
   return {
@@ -91,10 +103,11 @@ export async function loadRegistrySnapshot(filePath) {
   return validateRegistrySnapshot(JSON.parse(await fs.readFile(filePath, "utf8")));
 }
 
-export function assessRegistryRecord({ snapshot, request, claim, hospitalVerification }) {
+export function assessRegistryRecord({ snapshot, request, claim, hospitalVerification, configuredModelVersion, configuredModelHash }) {
   const record = snapshot.recordsByLookupHash.get(String(hospitalVerification.clinicalReferenceHash).toLowerCase());
   let verificationCode = "VERIFIED";
-  if (snapshot.snapshotId !== request.registrySnapshotId || snapshot.version !== request.registryVersion) verificationCode = "SNAPSHOT_VERSION_MISMATCH";
+  if (configuredModelVersion !== undefined && (configuredModelVersion !== request.modelVersion || String(configuredModelHash).toLowerCase() !== request.modelHash)) verificationCode = "MODEL_VERSION_MISMATCH";
+  else if (snapshot.snapshotId !== request.registrySnapshotId || snapshot.version !== request.registryVersion) verificationCode = "SNAPSHOT_VERSION_MISMATCH";
   else if (snapshot.rootHash !== request.registryRootHash) verificationCode = "REGISTRY_ROOT_MISMATCH";
   else if (snapshot.rulesVersion !== request.rulesVersion || snapshot.rulesHash !== request.rulesHash) verificationCode = "RULES_VERSION_MISMATCH";
   else if (!record) verificationCode = "RECORD_NOT_FOUND";

@@ -4,6 +4,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { eventProjectionRoot } from "./location";
 import { applyFabricEvent, emptyEventProjection, type EventProjection, type IndexedFabricEvent } from "./projection";
+import { persistJsonFile } from "./state-file";
 
 let writeQueue = Promise.resolve();
 
@@ -25,10 +26,7 @@ export function appendProjectedEvent(event: IndexedFabricEvent) {
     const current = await readEventProjection();
     const next = applyFabricEvent(current, event, new Date().toISOString());
     if (next === current) return current;
-    await fs.mkdir(eventProjectionRoot(/* turbopackIgnore: true */), { recursive: true });
-    const temporary = `${projectionPath()}.${process.pid}.tmp`;
-    await fs.writeFile(temporary, `${JSON.stringify(next, null, 2)}\n`, { encoding: "utf8", mode: 0o600 });
-    await fs.rename(temporary, projectionPath());
+    await persistJsonFile(projectionPath(), next);
     return next;
   });
   writeQueue = operation.then(() => undefined, () => undefined);

@@ -19,16 +19,28 @@ $logRoot = Join-Path $stateRoot "logs"
 $processPath = Join-Path $stateRoot "processes.json"
 
 function Resolve-WslProjectRoot {
-    $resolved = (& wsl.exe -d Ubuntu -- wslpath -a $projectRoot).Trim()
-    if ($LASTEXITCODE -ne 0 -or -not $resolved) { throw "Ubuntu WSL could not resolve the project path." }
-    return $resolved
+    for ($attempt = 1; $attempt -le 5; $attempt++) {
+        $resolved = (& wsl.exe -d Ubuntu -- wslpath -a $projectRoot 2>$null).Trim()
+        if ($LASTEXITCODE -eq 0 -and $resolved) { return $resolved }
+        if ($attempt -lt 5) { Start-Sleep -Seconds 2 }
+    }
+    throw "Ubuntu WSL could not resolve the project path after 5 attempts."
 }
 
 function Invoke-NetworkScript {
     param([Parameter(Mandatory)][string]$Command)
-    $wslRoot = Resolve-WslProjectRoot
-    & wsl.exe -d Ubuntu -- bash -lc "cd '$wslRoot' && bash network/scripts/$Command"
-    if ($LASTEXITCODE -ne 0) { throw "network/scripts/$Command failed with exit code $LASTEXITCODE" }
+    $maximumAttempts = if ($Command -in "network.sh up", "network.sh verify") { 3 } else { 1 }
+    for ($attempt = 1; $attempt -le $maximumAttempts; $attempt++) {
+        $wslRoot = Resolve-WslProjectRoot
+        & wsl.exe -d Ubuntu -- bash -lc "cd '$wslRoot' && bash network/scripts/$Command"
+        $exitCode = $LASTEXITCODE
+        if ($exitCode -eq 0) { return }
+        if ($attempt -lt $maximumAttempts) {
+            Write-Warning "network/scripts/$Command failed with exit code $exitCode (attempt $attempt/$maximumAttempts); retrying the idempotent operation."
+            Start-Sleep -Seconds 2
+        }
+    }
+    throw "network/scripts/$Command failed with exit code $exitCode after $maximumAttempts attempt(s)"
 }
 
 function Test-HttpHealth {
@@ -97,7 +109,6 @@ function Invoke-Preflight {
 function Start-DemoStack {
     Invoke-Preflight
     Invoke-NetworkScript "network.sh up"
-    Invoke-NetworkScript "network.sh verify"
     $existing = Read-ManagedProcesses
     if ($existing.Count -gt 0 -and ($existing | Where-Object { Test-ManagedProcess $_ }).Count -gt 0) {
         throw "Managed demo processes are already running. Use Status or Stop first."
@@ -110,17 +121,32 @@ function Start-DemoStack {
     $oracle2Environment = if ($OracleScenario -eq "Conflict") { ".env.oracle2-conflict.example" } else { ".env.oracle2.example" }
     $records = @(
         Start-ManagedProcess "web" $webRoot $webArguments
-        Start-ManagedProcess "event-worker" $webRoot @("scripts/sync-events.mjs")
-        Start-ManagedProcess "oracle1" $oracleRoot @("src/index.mjs", "--env=.env.oracle1.example")
-        if ($OracleScenario -ne "Oracle2Unavailable") {
-            Start-ManagedProcess "oracle2" $oracleRoot @("src/index.mjs", "--env=$oracle2Environment")
-        }
     )
     $records | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $processPath -Encoding utf8
+
     $deadline = [DateTimeOffset]::UtcNow.AddSeconds(45)
     do {
-        $healthy = (Test-HttpHealth "http://127.0.0.1:3000/api/health") -and
-            (Test-HttpHealth "http://127.0.0.1:3000/api/fabric/health") -and
+        $webHealthy = (Test-ManagedProcess $records[0]) -and
+            (Test-HttpHealth "http://127.0.0.1:3000/api/health") -and
+            (Test-HttpHealth "http://127.0.0.1:3000/api/fabric/health")
+        if (-not $webHealthy) { Start-Sleep -Seconds 1 }
+    } until ($webHealthy -or [DateTimeOffset]::UtcNow -ge $deadline)
+    if (-not $webHealthy) {
+        if (Test-ManagedProcess $records[0]) { Stop-Process -Id ([int]$records[0].id) -ErrorAction SilentlyContinue }
+        if (Test-Path -LiteralPath $processPath) { Remove-Item -LiteralPath $processPath -Force }
+        throw "The web application and Fabric gateway did not become healthy within 45 seconds. The web process was stopped; inspect data/demo-stack/logs."
+    }
+
+    $records += Start-ManagedProcess "event-worker" $webRoot @("scripts/sync-events.mjs")
+    $records += Start-ManagedProcess "oracle1" $oracleRoot @("src/index.mjs", "--env=.env.oracle1.example")
+    if ($OracleScenario -ne "Oracle2Unavailable") {
+        $records += Start-ManagedProcess "oracle2" $oracleRoot @("src/index.mjs", "--env=$oracle2Environment")
+    }
+    $records | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $processPath -Encoding utf8
+
+    $deadline = [DateTimeOffset]::UtcNow.AddSeconds(45)
+    do {
+        $healthy = ($records | Where-Object { Test-ManagedProcess $_ }).Count -eq $records.Count -and
             (Test-HttpHealth "http://127.0.0.1:3301/health") -and
             ($OracleScenario -eq "Oracle2Unavailable" -or (Test-HttpHealth "http://127.0.0.1:3302/health"))
         if (-not $healthy) { Start-Sleep -Seconds 1 }
@@ -130,7 +156,7 @@ function Start-DemoStack {
             if (Test-ManagedProcess $record) { Stop-Process -Id ([int]$record.id) -ErrorAction SilentlyContinue }
         }
         if (Test-Path -LiteralPath $processPath) { Remove-Item -LiteralPath $processPath -Force }
-        throw "The demo services did not become healthy within 45 seconds. Started processes were stopped; inspect data/demo-stack/logs."
+        throw "The workers did not become healthy within 45 seconds. Started processes were stopped; inspect data/demo-stack/logs."
     }
     Write-Host "Demo stack is healthy at http://127.0.0.1:3000 (Oracle scenario: $OracleScenario)." -ForegroundColor Green
 }

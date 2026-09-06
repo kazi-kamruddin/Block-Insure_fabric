@@ -791,6 +791,9 @@ func TestOracleNegativeConflictTimeoutAndFallback(t *testing.T) {
 		contract, ctx, request := setupOracleRequest(t, "timeout")
 		setIdentity(ctx, "policyholder-cert", "InsurerMSP", "policyholder", map[string]string{"subjectId": "policyholder1"})
 		_, err := contract.FinalizeOracleTimeout(ctx, request.ID)
+		requireError(t, err, "insurerAdmin role is required")
+		setIdentity(ctx, "insurer-admin", "InsurerMSP", "insurerAdmin", nil)
+		_, err = contract.FinalizeOracleTimeout(ctx, request.ID)
 		requireError(t, err, "has not timed out")
 		ctx.stub.timestamp = timestamppb.New(time.Date(2026, time.September, 5, 12, 11, 0, 0, time.UTC))
 		finalRequest, err := contract.FinalizeOracleTimeout(ctx, request.ID)
@@ -801,6 +804,34 @@ func TestOracleNegativeConflictTimeoutAndFallback(t *testing.T) {
 			t.Fatalf("Oracle timeout did not fail safely: request=%+v claim=%+v", finalRequest, claim)
 		}
 	})
+}
+
+func TestOracleResultCodesMustMatchTheirVerdict(t *testing.T) {
+	contract, ctx, request := setupOracleRequest(t, "result-code")
+	recordHash := strings.Repeat("d", 64)
+	salt := strings.Repeat("1", 64)
+	setIdentity(ctx, "certificate-oracle1", "OracleMSP", "oracle", map[string]string{"subjectId": "oracle1"})
+
+	resultHash := oracleResultDigest(request, true, "RECORD_INVALID", recordHash)
+	_, err := contract.RevealOracleResult(
+		ctx, request.ID, true, "RECORD_INVALID", recordHash, resultHash,
+		request.ClaimVersion, request.RegistryVersion, request.ModelVersion, request.ModelHash, salt,
+	)
+	requireError(t, err, "verified must be true exactly when verificationCode is VERIFIED")
+
+	resultHash = oracleResultDigest(request, false, "VERIFIED", recordHash)
+	_, err = contract.RevealOracleResult(
+		ctx, request.ID, false, "VERIFIED", recordHash, resultHash,
+		request.ClaimVersion, request.RegistryVersion, request.ModelVersion, request.ModelHash, salt,
+	)
+	requireError(t, err, "verified must be true exactly when verificationCode is VERIFIED")
+
+	resultHash = oracleResultDigest(request, false, "UNRECOGNIZED_RESULT", recordHash)
+	_, err = contract.RevealOracleResult(
+		ctx, request.ID, false, "UNRECOGNIZED_RESULT", recordHash, resultHash,
+		request.ClaimVersion, request.RegistryVersion, request.ModelVersion, request.ModelHash, salt,
+	)
+	requireError(t, err, "is not supported")
 }
 
 func TestOracleDeadlinesStaleVersionsAndAppealIsolation(t *testing.T) {

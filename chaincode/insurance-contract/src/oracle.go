@@ -17,6 +17,19 @@ const (
 	oracleRequiredConfirmations = 2
 )
 
+var oracleVerificationCodes = map[string]bool{
+	"VERIFIED":                  true,
+	"SNAPSHOT_VERSION_MISMATCH": true,
+	"REGISTRY_ROOT_MISMATCH":    true,
+	"RULES_VERSION_MISMATCH":    true,
+	"MODEL_VERSION_MISMATCH":    true,
+	"RECORD_NOT_FOUND":          true,
+	"RECORD_INVALID":            true,
+	"AMOUNT_OUT_OF_RANGE":       true,
+	"INCIDENT_DATE_MISMATCH":    true,
+	"DESCRIPTION_MISMATCH":      true,
+}
+
 func canonicalProtocolHash(domain string, values ...string) string {
 	var canonical strings.Builder
 	canonical.WriteString(domain)
@@ -365,11 +378,22 @@ func (c *Contract) RevealOracleResult(
 		return nil, fmt.Errorf("model version mismatch")
 	}
 	verificationCode = strings.ToUpper(strings.TrimSpace(verificationCode))
-	if !idPattern.MatchString(verificationCode) {
-		return nil, fmt.Errorf("verificationCode is invalid")
+	if !oracleVerificationCodes[verificationCode] {
+		return nil, fmt.Errorf("verificationCode %s is not supported", verificationCode)
 	}
-	for field, value := range map[string]string{"recordHash": recordHash, "resultHash": resultHash, "modelHash": modelHash, "salt": salt} {
-		if err := validateHash(field, value); err != nil {
+	if verified != (verificationCode == "VERIFIED") {
+		return nil, fmt.Errorf("verified must be true exactly when verificationCode is VERIFIED")
+	}
+	for _, field := range []struct {
+		name  string
+		value string
+	}{
+		{name: "recordHash", value: recordHash},
+		{name: "resultHash", value: resultHash},
+		{name: "modelHash", value: modelHash},
+		{name: "salt", value: salt},
+	} {
+		if err := validateHash(field.name, field.value); err != nil {
 			return nil, err
 		}
 	}
@@ -412,16 +436,30 @@ func (c *Contract) RevealOracleResult(
 		return nil, err
 	}
 	request.RevealCount++
-	results, err := c.ListOracleResults(ctx)
-	if err != nil {
-		return nil, err
-	}
 	// Fabric range queries do not guarantee that an asset written earlier in the
-	// same simulation is visible. Count this reveal explicitly and only add
-	// previously committed, distinct results from the world state.
+	// same simulation is visible. Count this reveal explicitly and read only the
+	// other assigned Oracle's deterministic result key from world state.
 	matching := 1
-	for _, revealed := range results {
-		if revealed.ID != result.ID && revealed.RequestID == request.ID && revealed.ResultHash == expectedResultHash {
+	for _, assignedOracleID := range request.AssignedOracleIDs {
+		if assignedOracleID == oracleID {
+			continue
+		}
+		otherKey, keyErr := stateKey(ctx, "oracleResult", oracleSubmissionID(request.ID, assignedOracleID))
+		if keyErr != nil {
+			return nil, keyErr
+		}
+		otherPayload, stateErr := ctx.GetStub().GetState(otherKey)
+		if stateErr != nil {
+			return nil, fmt.Errorf("read Oracle result %s: %w", assignedOracleID, stateErr)
+		}
+		if otherPayload == nil {
+			continue
+		}
+		var otherResult OracleResult
+		if decodeErr := json.Unmarshal(otherPayload, &otherResult); decodeErr != nil {
+			return nil, fmt.Errorf("decode Oracle result %s: %w", assignedOracleID, decodeErr)
+		}
+		if otherResult.RequestID == request.ID && otherResult.ResultHash == expectedResultHash {
 			matching++
 		}
 	}
@@ -495,7 +533,7 @@ func (c *Contract) finalizeOracleRequest(ctx contractapi.TransactionContextInter
 }
 
 func (c *Contract) FinalizeOracleTimeout(ctx contractapi.TransactionContextInterface, requestID string) (*OracleRequest, error) {
-	if _, _, _, err := identityDetails(ctx); err != nil {
+	if _, err := requireIdentity(ctx, "InsurerMSP", "insurerAdmin"); err != nil {
 		return nil, err
 	}
 	request, err := c.ReadOracleRequest(ctx, requestID)

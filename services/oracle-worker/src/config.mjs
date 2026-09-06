@@ -10,6 +10,12 @@ function required(environment, name) {
   return value;
 }
 
+function requiredHash(environment, name) {
+  const value = required(environment, name).toLowerCase();
+  if (!/^[a-f0-9]{64}$/.test(value)) throw new Error(`${name} must be a 64-character hexadecimal hash`);
+  return value;
+}
+
 function boundedInteger(environment, name, fallback, minimum, maximum) {
   const value = Number(environment[name] ?? fallback);
   if (!Number.isInteger(value) || value < minimum || value > maximum) {
@@ -43,7 +49,7 @@ export function loadOracleConfig(environment = process.env) {
       maximumDelayMs: boundedInteger(environment, "ORACLE_RETRY_MAX_MS", 5_000, 0, 300_000),
     },
     modelVersion: required(environment, "ORACLE_MODEL_VERSION"),
-    modelHash: required(environment, "ORACLE_MODEL_HASH").toLowerCase(),
+    modelHash: requiredHash(environment, "ORACLE_MODEL_HASH"),
     fabric: {
       networkRoot,
       channelName: environment.FABRIC_CHANNEL_NAME ?? "insurance-channel",
