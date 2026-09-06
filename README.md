@@ -15,9 +15,9 @@ workflows/evidence, release verification, policy acquisition, premium collection
 bank mandates, governed benefits, distributed adjudication, appeals, and advisory
 fraud triage, governed evidence grants, durable event projection, and
 ledger-derived research metrics, independent Oracle workers, commit/reveal
-consensus, and governed auditor fallback. The target deployment is
-`insurance-contract` 0.7.0, schema 6. A clean topology deployment and final human
-supervisor rehearsal remain required before this revision is declared complete.
+consensus, and governed auditor fallback. The clean local deployment runs
+`insurance-contract` 0.7.0, sequence 1, schema 6 and has passed the complete
+automated and live Oracle gate. Final human presentation sign-off remains.
 
 This is not a production deployment claim. Institutional authentication,
 durable encrypted object storage and key recovery, multi-node/orderer high
@@ -106,12 +106,19 @@ With Docker Desktop and the Fabric network running, execute every code, network,
 security, browser, and live-workflow check from Windows PowerShell:
 
 ```powershell
+.\scripts\demo-stack.ps1 Stop -KeepNetwork
 .\scripts\verify-all.ps1
+.\scripts\demo-stack.ps1 Start
 ```
+
+The verifier needs exclusive access to the Next.js build and Oracle worker ports;
+it fails early with an actionable message if managed application services are
+still running. Fabric ledger volumes remain available throughout this sequence.
 
 The command writes an ignored machine-readable summary to
 `verification-results/latest.json`. Its browser phase creates uniquely named
-local ledger records and proves role isolation plus the full settlement path.
+local ledger records and proves role isolation plus automatic consensus and
+negative, divergent-snapshot, and unavailable-Oracle fallback settlement paths.
 
 GitHub Actions also runs locked Next.js lint/type/unit/audit/build checks, Oracle
 worker protocol/durability tests, and native Go format/vet/tests on pushes and

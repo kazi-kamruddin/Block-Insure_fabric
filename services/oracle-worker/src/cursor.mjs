@@ -1,5 +1,5 @@
 import { promises as fs } from "node:fs";
-import path from "node:path";
+import { persistJsonFile } from "./state-file.mjs";
 
 export function emptyCursor(startBlock = 0) {
   return { nextBlock: Number(startBlock), transactionId: "" };
@@ -20,9 +20,6 @@ export async function loadCursor(filePath, identity, startBlock = 0) {
 }
 
 export async function persistCursor(filePath, identity, cursor) {
-  await fs.mkdir(path.dirname(filePath), { recursive: true });
-  const temporary = `${filePath}.${process.pid}.tmp`;
   const payload = { schemaVersion: 1, identity, ...cursor, updatedAt: new Date().toISOString() };
-  await fs.writeFile(temporary, `${JSON.stringify(payload, null, 2)}\n`, { encoding: "utf8", mode: 0o600 });
-  await fs.rename(temporary, filePath);
+  await persistJsonFile(filePath, payload);
 }

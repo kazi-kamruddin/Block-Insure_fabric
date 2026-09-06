@@ -2,6 +2,25 @@ import { defineConfig, devices } from "@playwright/test";
 
 const port = 3200;
 const baseURL = `http://127.0.0.1:${port}`;
+const oracleScenario = process.env.ORACLE_E2E_SCENARIO ?? "baseline";
+const oracle2Environment = oracleScenario === "conflict"
+  ? "../../services/oracle-worker/.env.oracle2-conflict.example"
+  : "../../services/oracle-worker/.env.oracle2.example";
+
+const oracleServers = [
+  {
+    command: "node ../../services/oracle-worker/src/index.mjs --env=../../services/oracle-worker/.env.oracle1.example",
+    url: "http://127.0.0.1:3301/health",
+    reuseExistingServer: true,
+    timeout: 30_000,
+  },
+  ...(oracleScenario === "timeout" ? [] : [{
+    command: `node ../../services/oracle-worker/src/index.mjs --env=${oracle2Environment}`,
+    url: "http://127.0.0.1:3302/health",
+    reuseExistingServer: true,
+    timeout: 30_000,
+  }]),
+];
 
 export default defineConfig({
   testDir: "./e2e",
@@ -33,17 +52,6 @@ export default defineConfig({
         FABRIC_EVENT_SYNC_DEADLINE_SECONDS: "5",
       },
     },
-    {
-      command: "node ../../services/oracle-worker/src/index.mjs --env=../../services/oracle-worker/.env.oracle1.example",
-      url: "http://127.0.0.1:3301/health",
-      reuseExistingServer: true,
-      timeout: 30_000,
-    },
-    {
-      command: "node ../../services/oracle-worker/src/index.mjs --env=../../services/oracle-worker/.env.oracle2.example",
-      url: "http://127.0.0.1:3302/health",
-      reuseExistingServer: true,
-      timeout: 30_000,
-    },
+    ...oracleServers,
   ],
 });

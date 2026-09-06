@@ -168,3 +168,22 @@ test("health reporting persists identity, provenance, progress, and non-secret c
     await fs.rm(directory, { recursive: true, force: true });
   }
 });
+
+test("health checkpoints tolerate concurrent Windows-style replacements", async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "oracle-health-race-"));
+  const filePath = path.join(directory, "health.json");
+  try {
+    await Promise.all(Array.from({ length: 8 }, (_, index) => persistHealth(filePath, {
+      schemaVersion: 1,
+      oracleId: "oracle1",
+      status: "ONLINE",
+      sequence: index,
+    })));
+    const stored = JSON.parse(await fs.readFile(filePath, "utf8"));
+    assert.equal(stored.oracleId, "oracle1");
+    assert.equal(stored.status, "ONLINE");
+    assert.ok(Number.isInteger(stored.sequence));
+  } finally {
+    await fs.rm(directory, { recursive: true, force: true });
+  }
+});

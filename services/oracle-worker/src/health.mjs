@@ -1,6 +1,5 @@
-import { promises as fs } from "node:fs";
 import http from "node:http";
-import path from "node:path";
+import { persistJsonFile } from "./state-file.mjs";
 
 export function createHealthState(config, registry) {
   let state = {
@@ -36,10 +35,7 @@ export function createHealthState(config, registry) {
 }
 
 export async function persistHealth(filePath, health) {
-  await fs.mkdir(path.dirname(filePath), { recursive: true });
-  const temporary = `${filePath}.${process.pid}.tmp`;
-  await fs.writeFile(temporary, `${JSON.stringify(health, null, 2)}\n`, { encoding: "utf8", mode: 0o600 });
-  await fs.rename(temporary, filePath);
+  await persistJsonFile(filePath, health);
 }
 
 export function startHealthServer(port, state) {

@@ -79,6 +79,11 @@ function Get-OracleHealth {
     catch { return $null }
 }
 
+function Get-WebHealth {
+    try { return Invoke-RestMethod -Uri "http://127.0.0.1:3000/api/health" -TimeoutSec 3 }
+    catch { return $null }
+}
+
 function Ensure-OracleWorker {
     param(
         [Parameter(Mandatory)][string]$OracleId,
@@ -106,9 +111,26 @@ function Stop-StartedOracleWorkers {
     foreach ($process in $startedOracleWorkers) {
         if (-not $process.HasExited) { Stop-Process -Id $process.Id -ErrorAction SilentlyContinue }
     }
+    $startedOracleWorkers.Clear()
+    $deadline = [DateTimeOffset]::UtcNow.AddSeconds(10)
+    while (((Get-OracleHealth 3301) -or (Get-OracleHealth 3302)) -and [DateTimeOffset]::UtcNow -lt $deadline) {
+        Start-Sleep -Milliseconds 250
+    }
+}
+
+function Assert-IsolatedBrowserRuntime {
+    if ($SkipBrowser) { return }
+    $occupied = @()
+    if (Get-WebHealth) { $occupied += "web:3000" }
+    if (Get-OracleHealth 3301) { $occupied += "oracle1:3301" }
+    if (Get-OracleHealth 3302) { $occupied += "oracle2:3302" }
+    if ($occupied.Count -gt 0) {
+        throw "Browser verification requires isolated application ports for baseline/conflict/timeout scenarios. Stop managed services while retaining Fabric first: .\\scripts\\demo-stack.ps1 -Action Stop -KeepNetwork. Occupied: $($occupied -join ', ')"
+    }
 }
 
 try {
+    Assert-IsolatedBrowserRuntime
     Push-Location $webRoot
     Invoke-VerificationStep "Web lint" { npm run lint }
     Invoke-VerificationStep "Web type check" { npm run typecheck }
@@ -144,11 +166,28 @@ try {
                 if (-not $health -or $health.status -notin "ONLINE", "PROCESSING") { throw "Oracle health on port $port is not operational." }
             }
         }
+        if (-not $SkipBrowser) { Stop-StartedOracleWorkers }
     }
 
     if (-not $SkipBrowser) {
         Push-Location $webRoot
         Invoke-VerificationStep "Browser and live workflow suite" { npm run test:e2e }
+        Invoke-VerificationStep "Live Oracle conflict fallback" {
+            $previousScenario = $env:ORACLE_E2E_SCENARIO
+            try {
+                $env:ORACLE_E2E_SCENARIO = "conflict"
+                npx playwright test --grep "@oracle-conflict"
+            }
+            finally { $env:ORACLE_E2E_SCENARIO = $previousScenario }
+        }
+        Invoke-VerificationStep "Live Oracle timeout fallback" {
+            $previousScenario = $env:ORACLE_E2E_SCENARIO
+            try {
+                $env:ORACLE_E2E_SCENARIO = "timeout"
+                npx playwright test --grep "@oracle-timeout"
+            }
+            finally { $env:ORACLE_E2E_SCENARIO = $previousScenario }
+        }
         Pop-Location
     }
 

@@ -139,15 +139,24 @@ attributes even if the application boundary is bypassed.
 From the repository root in Windows PowerShell:
 
 ```powershell
+.\scripts\demo-stack.ps1 Stop -KeepNetwork
 .\scripts\verify-all.ps1
+.\scripts\demo-stack.ps1 Start
 ```
+
+Stop the managed application processes while retaining Fabric before the gate.
+This lets Next.js replace its standalone build on Windows and gives Playwright
+exclusive Oracle ports for the baseline, divergent-snapshot, and unavailable-
+Oracle phases. The verifier fails early with this instruction if those ports are
+occupied; restarting afterward reopens the supervisor-ready Baseline stack.
 
 This runs lint, TypeScript, unit and cryptographic tests, dependency audit,
 event-worker syntax validation, Oracle worker tests and health, standalone production build, Go chaincode tests,
 live Fabric topology/schema
 verification, role isolation, WCAG 2.1 AA checks, encrypted evidence
 round-trip/access logging, multi-auditor appeal adjudication, automatic Oracle
-settlement, negative-result auditor fallback, and the existing multi-session workflows.
+settlement, negative-result auditor fallback, isolated conflict and timeout
+fallbacks, and the existing multi-session workflows.
 The ignored result is written to `verification-results/latest.json`, including
 the commit/branch, dirty-tree flag, selected gates, runtime versions, and timings.
 
