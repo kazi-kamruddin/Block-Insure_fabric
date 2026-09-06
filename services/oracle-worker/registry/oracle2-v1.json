@@ -1,0 +1,42 @@
+{
+  "sourceId": "oracle2-registry-v1",
+  "snapshotId": "registry-demo-v1",
+  "version": 1,
+  "rulesVersion": "rules-v1",
+  "rulesHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "records": [
+    {
+      "lookupHash": "1111111111111111111111111111111111111111111111111111111111111111",
+      "hospitalId": "hospital-demo",
+      "treatmentCode": "hospitalization",
+      "minimumAmountMinor": 1000,
+      "maximumAmountMinor": 500000,
+      "validFrom": "2026-01-01",
+      "validThrough": "2026-12-31",
+      "descriptionHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "status": "VALID"
+    },
+    {
+      "lookupHash": "2222222222222222222222222222222222222222222222222222222222222222",
+      "hospitalId": "hospital-demo",
+      "treatmentCode": "hospitalization",
+      "minimumAmountMinor": 1000,
+      "maximumAmountMinor": 500000,
+      "validFrom": "2026-01-01",
+      "validThrough": "2026-12-31",
+      "descriptionHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "status": "INVALID"
+    },
+    {
+      "lookupHash": "3333333333333333333333333333333333333333333333333333333333333333",
+      "hospitalId": "hospital-demo",
+      "treatmentCode": "hospitalization",
+      "minimumAmountMinor": 1000,
+      "maximumAmountMinor": 500000,
+      "validFrom": "2026-01-01",
+      "validThrough": "2026-12-31",
+      "descriptionHash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "status": "VALID"
+    }
+  ]
+}

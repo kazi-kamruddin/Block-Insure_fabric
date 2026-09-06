@@ -24,6 +24,8 @@ export default async function ResearchPage() {
         <article className="metricCard"><span>Claims</span><strong>{snapshot.portfolio.claims}</strong><small>{formatMinor(snapshot.portfolio.claimAmountMinor)} requested</small></article>
         <article className="metricCard"><span>Review rounds</span><strong>{snapshot.adjudication.reviewRounds}</strong><small>{formatDuration(snapshot.adjudication.meanClosureLatencyMs)} mean closure</small></article>
         <article className="metricCard"><span>Appeals</span><strong>{snapshot.adjudication.appeals}</strong><small>{snapshot.adjudication.voteAlignmentBps === null ? "No finalized votes" : `${(snapshot.adjudication.voteAlignmentBps / 100).toFixed(1)}% final-outcome alignment`}</small></article>
+        <article className="metricCard"><span>Oracle requests</span><strong>{snapshot.oracleConsensus.requests}</strong><small>{formatDuration(snapshot.oracleConsensus.meanFinalizationLatencyMs)} mean finalization</small></article>
+        <article className="metricCard"><span>Oracle agreement</span><strong>{snapshot.oracleConsensus.agreementBps === null ? "—" : `${(snapshot.oracleConsensus.agreementBps / 100).toFixed(1)}%`}</strong><small>{snapshot.oracleConsensus.revealedResults} certificate-bound reveals</small></article>
         <article className="metricCard"><span>Fraud assessments</span><strong>{snapshot.fraudDecisionSupport.assessments}</strong><small>{snapshot.fraudDecisionSupport.advisoryOnly ? "All advisory" : "Authority boundary violation"}</small></article>
         <article className="metricCard"><span>Indexed events</span><strong>{snapshot.provenance.indexedEvents}</strong><small>{snapshot.provenance.checkpoint ? `${snapshot.provenance.retainedEvents} retained; through block ${snapshot.provenance.checkpoint.blockNumber}` : "No checkpoint"}</small></article>
         <article className="metricCard"><span>Evidence grants</span><strong>{snapshot.evidenceGovernance.grants}</strong><small>{snapshot.evidenceGovernance.grantBackedAccesses} grant-backed accesses</small></article>
@@ -34,6 +36,7 @@ export default async function ResearchPage() {
       <Breakdown title="Claim status" values={snapshot.portfolio.claimStatus} />
       <Breakdown title="Review outcomes" values={snapshot.adjudication.reviewStatus} />
       <Breakdown title="Appeal outcomes" values={snapshot.adjudication.appealStatus} />
+      <Breakdown title="Oracle outcomes" values={snapshot.oracleConsensus.outcomes} />
       <Breakdown title="Fraud risk bands" values={snapshot.fraudDecisionSupport.riskLevels} />
       <Breakdown title="Evidence grant state" values={snapshot.evidenceGovernance.grantState} />
       <Breakdown title="Evidence access purposes" values={snapshot.evidenceGovernance.accessPurpose} />

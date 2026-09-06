@@ -42,6 +42,11 @@ function notificationTargets(event: IndexedFabricEvent) {
   switch (event.eventName) {
     case "ClaimSubmitted": return [{ role: "insurerAdmin", subject: "", title: "Claim submitted", asset: text(p, "id") }];
     case "ClaimHospitalVerified": return [{ role: "insurerAdmin", subject: "", title: "Hospital verification recorded", asset: text(p, "claimId") }];
+    case "OracleRegistrySnapshotPublished": return [{ role: "insurerAdmin", subject: "", title: "Oracle registry snapshot published", asset: text(p, "id") }];
+    case "OracleVerificationRequested": return [{ role: "insurerAdmin", subject: "", title: "Oracle verification requested", asset: text(p, "id") }];
+    case "OracleCommitmentSubmitted": return [{ role: "insurerAdmin", subject: "", title: "Oracle commitment received", asset: text(p, "requestId") }];
+    case "OracleResultRevealed": return [{ role: "insurerAdmin", subject: "", title: "Oracle result revealed", asset: text(p, "requestId") }];
+    case "OracleRequestFinalized": return [{ role: "insurerAdmin", subject: "", title: `Oracle ${text(p, "finalizationCode").toLowerCase().replaceAll("_", " ")}`, asset: text(p, "id") }];
     case "ClaimReviewOpened": return Array.isArray(p.assignedAuditorIds)
       ? p.assignedAuditorIds.filter((value): value is string => typeof value === "string").map((subject) => ({ role: "auditor", subject, title: "Review assignment received", asset: text(p, "id") }))
       : [];

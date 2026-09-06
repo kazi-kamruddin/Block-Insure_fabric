@@ -182,6 +182,8 @@ export type Liability = {
 export type ClaimStatus =
   | "SUBMITTED"
   | "HOSPITAL_VERIFIED"
+  | "ORACLE_PENDING"
+  | "ORACLE_FAILED"
   | "UNDER_REVIEW"
   | "APPEAL_SUBMITTED"
   | "APPROVED"
@@ -203,11 +205,96 @@ export type Claim = {
   auditorDecisionId: string;
   currentReviewId: string;
   currentAppealId: string;
+  currentOracleRequestId: string;
+  oracleOutcome: string;
+  oracleResultHash: string;
+  version: number;
   reviewRound: number;
   appealCount: number;
   status: ClaimStatus;
   createdAt: LedgerTimestamp;
   updatedAt: LedgerTimestamp;
+};
+
+export type OracleRegistrySnapshot = {
+  assetType: "oracleRegistrySnapshot";
+  schemaVersion: number;
+  id: string;
+  version: number;
+  rootHash: string;
+  rulesVersion: string;
+  rulesHash: string;
+  recordCount: number;
+  publishedBy: string;
+  createdAt: LedgerTimestamp;
+};
+
+export type OracleRequest = {
+  assetType: "oracleRequest";
+  schemaVersion: number;
+  id: string;
+  claimId: string;
+  claimVersion: number;
+  hospitalVerificationId: string;
+  queryHash: string;
+  registrySnapshotId: string;
+  registryVersion: number;
+  registryRootHash: string;
+  rulesVersion: string;
+  rulesHash: string;
+  modelVersion: string;
+  modelHash: string;
+  assignedOracleIds: string[];
+  requiredConfirmations: number;
+  expectedResponses: number;
+  commitmentCount: number;
+  revealCount: number;
+  status: "PENDING" | "CONSENSUS" | "FAILED";
+  verifiedResult: boolean;
+  resultHash: string;
+  finalizationCode: "" | "EXACT_CONSENSUS" | "NEGATIVE_RESULT" | "CONFLICT" | "TIMEOUT";
+  commitDeadline: LedgerTimestamp;
+  revealDeadline: LedgerTimestamp;
+  requestedAt: LedgerTimestamp;
+  finalizedAt: LedgerTimestamp;
+};
+
+export type OracleCommitment = {
+  assetType: "oracleCommitment";
+  schemaVersion: number;
+  id: string;
+  requestId: string;
+  claimId: string;
+  claimVersion: number;
+  oracleId: string;
+  oracleIdentity: string;
+  commitmentHash: string;
+  createdAt: LedgerTimestamp;
+};
+
+export type OracleResult = {
+  assetType: "oracleResult";
+  schemaVersion: number;
+  id: string;
+  requestId: string;
+  claimId: string;
+  claimVersion: number;
+  registryVersion: number;
+  modelVersion: string;
+  oracleId: string;
+  oracleIdentity: string;
+  verified: boolean;
+  verificationCode: string;
+  recordHash: string;
+  resultHash: string;
+  createdAt: LedgerTimestamp;
+};
+
+export type OracleRequestHistoryRecord = {
+  txId: string;
+  timestamp: LedgerTimestamp;
+  isDelete: boolean;
+  value?: OracleRequest;
 };
 
 export type EvidenceAccessRecord = {

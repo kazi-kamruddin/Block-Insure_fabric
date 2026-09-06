@@ -13,8 +13,12 @@ This Go chaincode owns the shared, permissioned insurance ledger for
    off-chain.
 3. A `HospitalMSP` identity with `role=hospitalOfficer` verifies or invalidates
    the claim.
-4. The insurer records optional advisory fraud triage and opens a review round
-   with immutable auditor assignments, thresholds, and a deadline. Four distinct
+4. The insurer records optional advisory fraud triage and requests verification
+   from exactly two assigned `OracleMSP` certificate subjects. Each independently
+   commits then reveals a registry/model/version-bound result. Exact positive
+   consensus approves the claim; negative, conflict, or timeout routes through an
+   explicit transaction into a review round with immutable auditor assignments,
+   thresholds, and a deadline. Four distinct
    `AuditorMSP` certificate subjects support the default 3-of-4 approval / 2-of-4
    rejection quorum. A rejected claimant may submit one appeal, which creates a
    new review round without replacing the original votes.
@@ -52,9 +56,10 @@ provenance on every use. Bank identities cannot retrieve clinical evidence.
 Claims link verifications, review rounds, decisions, appeals, fraud assessments,
 access records, and settlements for audit navigation.
 
-The deployed local definition is `insurance-contract` 0.6.1 sequence 9 with
-schema version 5. Any source change requires a new package version and lifecycle
-sequence.
+The Oracle-capable target definition is `insurance-contract` 0.7.0 with schema
+version 6 and an automatically resolved lifecycle sequence. The preserved local
+definition remains 0.6.1 sequence 9/schema 5 until an explicitly approved clean
+Oracle topology bootstrap is performed.
 
 ## Test
 
@@ -75,6 +80,6 @@ With the local network running:
 bash network/scripts/deploy-chaincode.sh
 ```
 
-The lifecycle script packages and installs the contract on all four peers,
-collects all four organization approvals, commits it to `insurance-channel`,
+The lifecycle script packages and installs the contract on all five peers,
+collects all five organization approvals, commits it to `insurance-channel`,
 and queries the committed definition from each peer.

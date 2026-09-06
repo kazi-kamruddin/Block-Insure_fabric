@@ -68,6 +68,14 @@ export async function executeWorkflowCommand(command: WorkflowCommand, session: 
       return ledger.verifyClaim(command);
     case "openClaimReview":
       return ledger.openClaimReview(command);
+    case "publishOracleRegistrySnapshot":
+      return ledger.publishOracleRegistrySnapshot(command);
+    case "requestOracleVerification":
+      return ledger.requestOracleVerification(command);
+    case "finalizeOracleTimeout":
+      return ledger.finalizeOracleTimeout(command.requestId);
+    case "routeOracleFailureToReview":
+      return ledger.routeOracleFailureToReview(command);
     case "submitClaimAppeal":
       return ledger.submitClaimAppeal(command);
     case "grantEvidenceAccess":

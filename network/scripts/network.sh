@@ -6,8 +6,8 @@ network_root="$(cd -- "${script_dir}/.." && pwd -P)"
 samples_root="${network_root}/.fabric/fabric-samples"
 channel_name="insurance-channel"
 chaincode_name="${CHAINCODE_NAME:-insurance-contract}"
-expected_chaincode_version="${EXPECTED_CHAINCODE_VERSION:-0.6.1}"
-expected_schema_version="${EXPECTED_SCHEMA_VERSION:-5}"
+expected_chaincode_version="${EXPECTED_CHAINCODE_VERSION:-0.7.0}"
+expected_schema_version="${EXPECTED_SCHEMA_VERSION:-6}"
 compose_ca="${network_root}/compose/compose-ca.yaml"
 compose_network="${network_root}/compose/compose-network.yaml"
 organizations="${network_root}/organizations"
@@ -86,15 +86,18 @@ join_peer() {
 start_runtime() {
   compose up -d orderer
   compose up -d couchdb-insurer couchdb-hospital couchdb-auditor couchdb-bank
+  compose up -d couchdb-oracle
   compose up -d peer-insurer
   compose up -d peer-hospital
   compose up -d peer-auditor
   compose up -d peer-bank
+  compose up -d peer-oracle
   wait_for_running orderer.blockinsure.test
   wait_for_running peer0.insurer.blockinsure.test
   wait_for_running peer0.hospital.blockinsure.test
   wait_for_running peer0.auditor.blockinsure.test
   wait_for_running peer0.bank.blockinsure.test
+  wait_for_running peer0.oracle.blockinsure.test
 }
 
 up() {
@@ -105,13 +108,21 @@ up() {
   if [ -f "${artifacts}/${channel_name}.block" ] && \
      [ -d "${organizations}/ordererOrganizations/blockinsure.test" ] && \
      [ -d "${organizations}/peerOrganizations/bank.blockinsure.test" ]; then
+    if [ ! -d "${organizations}/peerOrganizations/oracle.blockinsure.test" ]; then
+      echo "Existing channel artifacts predate OracleMSP. A clean Oracle topology bootstrap is required; ordinary startup will not reset the ledger." >&2
+      echo "After explicit approval, run: bash network/scripts/network.sh reset && bash network/scripts/network.sh up" >&2
+      exit 1
+    fi
     compose up -d ca-insurer
     compose up -d ca-hospital
     compose up -d ca-auditor
     compose up -d ca-bank
+    compose up -d ca-oracle
     compose up -d ca-orderer
     wait_for_running ca.auditor.blockinsure.test
+    wait_for_running ca.oracle.blockinsure.test
     bash "${network_root}/scripts/enroll-auditors.sh"
+    bash "${network_root}/scripts/enroll-oracles.sh"
     start_runtime
     verify
     return
@@ -120,11 +131,13 @@ up() {
   compose up -d ca-hospital
   compose up -d ca-auditor
   compose up -d ca-bank
+  compose up -d ca-oracle
   compose up -d ca-orderer
   wait_for_running ca.insurer.blockinsure.test
   wait_for_running ca.hospital.blockinsure.test
   wait_for_running ca.auditor.blockinsure.test
   wait_for_running ca.bank.blockinsure.test
+  wait_for_running ca.oracle.blockinsure.test
   wait_for_running ca.orderer.blockinsure.test
   bash "${network_root}/scripts/enroll-identities.sh"
   mkdir -p "${artifacts}"
@@ -135,6 +148,7 @@ up() {
   join_peer hospital HospitalMSP 8051
   join_peer auditor AuditorMSP 9051
   join_peer bank BankMSP 12051
+  join_peer oracle OracleMSP 13051
   verify
 }
 
@@ -160,17 +174,22 @@ status() {
   peer channel list
   set_peer_context bank BankMSP 12051
   peer channel list
+  set_peer_context oracle OracleMSP 13051
+  peer channel list
 }
 
 verify() {
   local containers=(
     ca.insurer.blockinsure.test ca.hospital.blockinsure.test
     ca.auditor.blockinsure.test ca.bank.blockinsure.test
+    ca.oracle.blockinsure.test
     ca.orderer.blockinsure.test orderer.blockinsure.test
     couchdb.insurer.blockinsure.test couchdb.hospital.blockinsure.test
     couchdb.auditor.blockinsure.test couchdb.bank.blockinsure.test
+    couchdb.oracle.blockinsure.test
     peer0.insurer.blockinsure.test peer0.hospital.blockinsure.test
     peer0.auditor.blockinsure.test peer0.bank.blockinsure.test
+    peer0.oracle.blockinsure.test
   )
   local container port org ca_name definition schema chaincode_verified=false
   require_tool curl
@@ -194,10 +213,11 @@ insurer 7054 ca-insurer
 hospital 8054 ca-hospital
 auditor 9054 ca-auditor
 bank 12054 ca-bank
+oracle 13054 ca-oracle
 orderer 11054 ca-orderer
 EOF
 
-  for port in 5984 6984 7984 8984; do
+  for port in 5984 6984 7984 8984 9984; do
     curl --fail --silent --show-error --user admin:adminpw "http://localhost:${port}/_up" | grep -q '"status":"ok"'
   done
 
@@ -215,6 +235,7 @@ insurer InsurerMSP 7051
 hospital HospitalMSP 8051
 auditor AuditorMSP 9051
 bank BankMSP 12051
+oracle OracleMSP 13051
 EOF
 
   set_peer_context insurer InsurerMSP 7051
@@ -234,6 +255,7 @@ insurer InsurerMSP 7051
 hospital HospitalMSP 8051
 auditor AuditorMSP 9051
 bank BankMSP 12051
+oracle OracleMSP 13051
 EOF
 
     set_peer_context insurer InsurerMSP 7051
@@ -250,12 +272,18 @@ EOF
         exit 1
       fi
     done
+    for index in 1 2; do
+      if ! compgen -G "${organizations}/peerOrganizations/oracle.blockinsure.test/users/oracle${index}@oracle.blockinsure.test/msp/signcerts/*" >/dev/null; then
+        echo "Verification failed: oracle${index} enrollment is missing." >&2
+        exit 1
+      fi
+    done
   fi
 
   if [[ "${chaincode_verified}" == true ]]; then
-    echo "Verified: 14 services healthy, 5 CAs reachable, 4 CouchDBs ready, all 4 peers joined ${channel_name}, and ${chaincode_name} ${expected_chaincode_version} exposes schema ${expected_schema_version}."
+    echo "Verified: 17 services healthy, 6 CAs reachable, 5 CouchDBs ready, all 5 peers joined ${channel_name}, both Oracle identities enrolled, and ${chaincode_name} ${expected_chaincode_version} exposes schema ${expected_schema_version}."
   else
-    echo "Verified: 14 services healthy, 5 CAs reachable, 4 CouchDBs ready, and all 4 peers joined ${channel_name}; no committed ${chaincode_name} was found."
+    echo "Verified: 17 services healthy, 6 CAs reachable, 5 CouchDBs ready, and all 5 peers joined ${channel_name}; no committed ${chaincode_name} was found."
   fi
 }
 

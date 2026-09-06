@@ -12,11 +12,15 @@ import type {
   EvidenceReference,
   FraudAssessment,
   HospitalVerification,
+  OracleCommitment,
+  OracleRegistrySnapshot,
+  OracleRequest,
+  OracleResult,
   Settlement,
 } from "@/lib/fabric/types";
 
 export type ClaimAuditDossier = {
-  schemaVersion: 3;
+  schemaVersion: 4;
   exportedAt: string;
   claim: Claim;
   history: ClaimHistoryRecord[];
@@ -24,6 +28,10 @@ export type ClaimAuditDossier = {
   evidenceAccess: EvidenceAccessRecord[];
   evidenceGrants: EvidenceAccessGrant[];
   hospitalVerification: HospitalVerification | null;
+  oracleRequests: OracleRequest[];
+  oracleCommitments: OracleCommitment[];
+  oracleResults: OracleResult[];
+  oracleRegistrySnapshots: OracleRegistrySnapshot[];
   auditorDecisions: AuditorDecision[];
   reviewRounds: ClaimReview[];
   appeals: ClaimAppeal[];
@@ -33,7 +41,7 @@ export type ClaimAuditDossier = {
 
 export async function loadClaimAuditDossier(claimId: string): Promise<ClaimAuditDossier> {
   const claim = await ledger.readClaim(claimId);
-  const [history, allEvidence, allAccess, allGrants, allVerifications, allDecisions, allReviews, allAppeals, allFraudAssessments, allSettlements] = await Promise.all([
+  const [history, allEvidence, allAccess, allGrants, allVerifications, allDecisions, allReviews, allAppeals, allFraudAssessments, allSettlements, allOracleRequests, allOracleCommitments, allOracleResults, allOracleSnapshots] = await Promise.all([
     ledger.claimHistory(claimId),
     ledger.listEvidenceReferences(),
     ledger.listEvidenceAccessRecords(),
@@ -44,10 +52,14 @@ export async function loadClaimAuditDossier(claimId: string): Promise<ClaimAudit
     ledger.listClaimAppeals(),
     ledger.listFraudAssessments(),
     ledger.listSettlements(),
+    ledger.listOracleRequests(),
+    ledger.listOracleCommitments(),
+    ledger.listOracleResults(),
+    ledger.listOracleRegistrySnapshots(),
   ]);
 
   return {
-    schemaVersion: 3,
+    schemaVersion: 4,
     exportedAt: new Date().toISOString(),
     claim,
     history,
@@ -55,6 +67,10 @@ export async function loadClaimAuditDossier(claimId: string): Promise<ClaimAudit
     evidenceAccess: allAccess.filter((item) => item.claimId === claimId),
     evidenceGrants: allGrants.filter((item) => item.claimId === claimId),
     hospitalVerification: allVerifications.find((item) => item.id === claim.hospitalVerificationId) ?? null,
+    oracleRequests: allOracleRequests.filter((item) => item.claimId === claimId),
+    oracleCommitments: allOracleCommitments.filter((item) => item.claimId === claimId),
+    oracleResults: allOracleResults.filter((item) => item.claimId === claimId),
+    oracleRegistrySnapshots: allOracleSnapshots.filter((snapshot) => allOracleRequests.some((request) => request.claimId === claimId && request.registrySnapshotId === snapshot.id)),
     auditorDecisions: allDecisions.filter((item) => item.claimId === claimId),
     reviewRounds: allReviews.filter((item) => item.claimId === claimId),
     appeals: allAppeals.filter((item) => item.claimId === claimId),

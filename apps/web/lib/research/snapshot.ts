@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import type {
   AuditorDecision, BenefitRequest, Claim, ClaimAppeal, ClaimReview,
   EvidenceAccessGrant, EvidenceAccessRecord, EvidenceReference, FraudAssessment,
-  Liability, Policy, PremiumAdjustment, PremiumPayment, Settlement,
+  Liability, OracleRequest, OracleResult, Policy, PremiumAdjustment, PremiumPayment, Settlement,
 } from "@/lib/fabric/types";
 
 export type ResearchInput = {
@@ -20,6 +20,8 @@ export type ResearchInput = {
   premiumAdjustments: PremiumAdjustment[];
   benefitRequests: BenefitRequest[];
   liabilities: Liability[];
+  oracleRequests: OracleRequest[];
+  oracleResults: OracleResult[];
 };
 
 const countBy = <T>(values: T[], key: (value: T) => string) => values.reduce<Record<string, number>>((counts, value) => {
@@ -49,6 +51,8 @@ export function buildResearchSnapshot(
   const grantState = (grant: EvidenceAccessGrant) => grant.status === "REVOKED" ? "REVOKED" : Date.parse(grant.expiresAt) <= now ? "EXPIRED" : grant.accessCount >= grant.maxAccesses ? "EXHAUSTED" : "ACTIVE";
   const confirmedSettlements = input.settlements.filter((item) => item.status === "CONFIRMED");
   const paidBenefits = input.benefitRequests.filter((item) => item.status === "PAID");
+  const finalizedOracleRequests = input.oracleRequests.filter((item) => item.finalizedAt);
+  const oracleLatencies = finalizedOracleRequests.map((item) => Date.parse(item.finalizedAt) - Date.parse(item.requestedAt)).filter((value) => Number.isFinite(value) && value >= 0);
 
   const body = {
     schemaVersion: 1,
@@ -69,6 +73,15 @@ export function buildResearchSnapshot(
       voteAlignmentBps: input.decisions.length ? Math.round(alignedVotes * 10_000 / input.decisions.length) : null,
       appeals: input.appeals.length,
       appealStatus: countBy(input.appeals, (item) => item.status),
+    },
+    oracleConsensus: {
+      requests: input.oracleRequests.length,
+      status: countBy(input.oracleRequests, (item) => item.status),
+      outcomes: countBy(finalizedOracleRequests, (item) => item.finalizationCode),
+      commitmentsExpected: sum(input.oracleRequests.map((item) => item.expectedResponses)),
+      revealedResults: input.oracleResults.length,
+      agreementBps: finalizedOracleRequests.length ? Math.round(finalizedOracleRequests.filter((item) => ["EXACT_CONSENSUS", "NEGATIVE_RESULT"].includes(item.finalizationCode)).length * 10_000 / finalizedOracleRequests.length) : null,
+      meanFinalizationLatencyMs: oracleLatencies.length ? sum(oracleLatencies) / oracleLatencies.length : null,
     },
     fraudDecisionSupport: {
       assessments: input.fraudAssessments.length,
@@ -98,6 +111,7 @@ export function buildResearchSnapshot(
     interpretationBoundaries: [
       "Metrics describe the current local Fabric ledger and are not clinical or causal findings.",
       "Fraud scores are deterministic triage aids; only governed review transactions decide claims.",
+      "Oracle agreement measures exact canonical result hashes; failed Oracle requests route to fixed-quorum manual review.",
       "Latency reflects transaction timestamps in this development network, not production capacity.",
       "Counts can include uniquely named records created by verification and demonstration runs.",
     ],

@@ -5,6 +5,13 @@ auditor response as the final claim decision. The design keeps eligibility,
 votes, thresholds, deadlines, and appeal history on the shared ledger so every
 member organization can audit how a decision was reached.
 
+In the supervisor workflow, this review system is the governed fallback after a
+negative, conflicting, or timed-out two-Oracle request. The legacy
+`OpenClaimReview` transaction remains available for an explicitly manual initial
+review, while `RouteOracleFailureToReview` proves and records that the normal
+Oracle path failed before opening the same fixed-quorum machinery. Oracle
+agreement never changes the review thresholds and fraud triage remains advisory.
+
 ## Review lifecycle
 
 An insurer administrator opens an initial `ClaimReview` for a hospital-verified
@@ -55,3 +62,5 @@ fraud non-authority. The live CLI smoke completes a 3-of-4 approval and confirms
 the assessment remains advisory. The Playwright suite also completes a rejected
 round, one appeal, and a three-vote overturn through distinct signed application
 sessions and Fabric identities.
+The Oracle suite additionally proves automatic exact-result approval and manual
+fallback without granting either Oracle settlement authority.

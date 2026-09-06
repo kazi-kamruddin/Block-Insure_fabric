@@ -1,0 +1,14 @@
+{
+  "name": "@block-insure/oracle-worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "node --check src/index.mjs && node --check src/config.mjs && node --check src/environment.mjs && node --check src/gateway.mjs && node --check src/health.mjs && node --check src/protocol.mjs && node --check src/registry.mjs && node --check src/cursor.mjs && node --check src/retry.mjs",
+    "test": "node --test test/*.test.mjs",
+    "start": "node src/index.mjs"
+  },
+  "engines": {
+    "node": ">=20.9.0"
+  }
+}

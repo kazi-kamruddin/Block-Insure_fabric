@@ -48,7 +48,7 @@ func (c *Contract) SubmitClaim(ctx contractapi.TransactionContextInterface, id, 
 		AssetType: "claim", SchemaVersion: SchemaVersion, ID: id, PolicyID: policyID,
 		ClaimantID: claimantID, AmountMinor: amountMinor, IncidentDate: incidentDate,
 		DescriptionHash: strings.ToLower(descriptionHash), EvidenceIDs: []string{},
-		Status: "SUBMITTED", CreatedAt: now, UpdatedAt: now,
+		Version: 1, Status: "SUBMITTED", CreatedAt: now, UpdatedAt: now,
 	}
 	if err := putState(ctx, "claim", id, claim); err != nil {
 		return nil, err

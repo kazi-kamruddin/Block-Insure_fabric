@@ -5,7 +5,7 @@ import { findDemoAccount } from "@/lib/auth/accounts";
 import { ledger } from "@/lib/fabric/ledger";
 
 const routeSchema = z.object({
-  assetType: z.enum(["package", "policy", "claim", "evidence", "evidence-grant", "verification", "decision", "review", "appeal", "fraud-assessment", "settlement", "claim-history", "account", "mandate", "premium-payment", "premium-adjustment", "collection", "benefit-plan", "beneficiaries", "benefit-request", "liability"]),
+  assetType: z.enum(["package", "policy", "claim", "evidence", "evidence-grant", "verification", "decision", "review", "appeal", "fraud-assessment", "settlement", "claim-history", "account", "mandate", "premium-payment", "premium-adjustment", "collection", "benefit-plan", "beneficiaries", "benefit-request", "liability", "oracle-snapshot", "oracle-request", "oracle-commitment", "oracle-result", "oracle-history"]),
   id: z.string().trim().min(1).max(100).regex(/^[a-zA-Z0-9._:-]+$/),
 });
 
@@ -41,6 +41,33 @@ export async function GET(_request: Request, context: RouteContext) {
         if (session.role === "policyholder" && claim.claimantId !== session.subjectId) {
           return NextResponse.json({ message: "Asset is not owned by this account" }, { status: 403 });
         }
+        break;
+      }
+      case "oracle-snapshot":
+        result = await ledger.readOracleRegistrySnapshot(id);
+        break;
+      case "oracle-request": {
+        const item = await ledger.readOracleRequest(id);
+        if (session.role === "policyholder" && (await ledger.readClaim(item.claimId)).claimantId !== session.subjectId) return NextResponse.json({ message: "Asset is not owned by this account" }, { status: 403 });
+        result = item;
+        break;
+      }
+      case "oracle-commitment": {
+        const item = await ledger.readOracleCommitment(id);
+        if (session.role === "policyholder" && (await ledger.readClaim(item.claimId)).claimantId !== session.subjectId) return NextResponse.json({ message: "Asset is not owned by this account" }, { status: 403 });
+        result = item;
+        break;
+      }
+      case "oracle-result": {
+        const item = await ledger.readOracleResult(id);
+        if (session.role === "policyholder" && (await ledger.readClaim(item.claimId)).claimantId !== session.subjectId) return NextResponse.json({ message: "Asset is not owned by this account" }, { status: 403 });
+        result = item;
+        break;
+      }
+      case "oracle-history": {
+        const item = await ledger.readOracleRequest(id);
+        if (session.role === "policyholder" && (await ledger.readClaim(item.claimId)).claimantId !== session.subjectId) return NextResponse.json({ message: "Asset is not owned by this account" }, { status: 403 });
+        result = await ledger.oracleRequestHistory(id);
         break;
       }
       case "evidence": {

@@ -14,6 +14,7 @@ import type {
   PremiumCollection,
   PremiumPayment,
   Liability,
+  OracleRequest,
   Settlement,
 } from "@/lib/fabric/types";
 
@@ -53,6 +54,7 @@ export type DashboardAssets = {
   appeals?: ClaimAppeal[];
   decisions?: AuditorDecision[];
   fraudAssessments?: FraudAssessment[];
+  oracleRequests?: OracleRequest[];
 };
 
 const terminalClaimStatuses = new Set(["REJECTED", "SETTLED"]);
@@ -84,6 +86,7 @@ export function buildRoleDashboard(
   const reviews = assets.reviews ?? [];
   const decisions = assets.decisions ?? [];
   const fraudAssessments = assets.fraudAssessments ?? [];
+  const oracleRequests = assets.oracleRequests ?? [];
   const ownedPolicies = role === "policyholder"
     ? assets.policies.filter((policy) => policy.policyholderId === subjectId)
     : assets.policies;
@@ -221,7 +224,7 @@ export function buildRoleDashboard(
   }
 
   const reviewQueue = assets.claims.filter((claim) =>
-    ["HOSPITAL_VERIFIED", "APPEAL_SUBMITTED", "APPROVED"].includes(claim.status),
+    ["HOSPITAL_VERIFIED", "APPEAL_SUBMITTED", "ORACLE_FAILED", "APPROVED"].includes(claim.status),
   );
   return {
     title: "Portfolio oversight",
@@ -230,6 +233,8 @@ export function buildRoleDashboard(
       { label: "Published packages", value: assets.packages.filter((item) => item.status === "PUBLISHED").length, hint: "available product definitions" },
       { label: "Active policies", value: assets.policies.filter((item) => item.status === "ACTIVE").length, hint: "issued coverage records" },
       { label: "Open claims", value: assets.claims.filter((item) => !terminalClaimStatuses.has(item.status)).length, hint: "portfolio work in progress" },
+      { label: "Oracle consensus", value: oracleRequests.filter((item) => item.finalizationCode === "EXACT_CONSENSUS").length, hint: "two exact certificate-bound results" },
+      { label: "Oracle fallback", value: oracleRequests.filter((item) => item.status === "FAILED").length, hint: "negative, conflict, or timeout" },
       { label: "High-risk advisories", value: fraudAssessments.filter((item) => item.riskLevel === "HIGH").length, hint: "triage only; never automatic rejection" },
       { label: "Needs insurer action", value: reviewQueue.length + benefitRequests.filter((item) => ["SUBMITTED", "FUNDING_REQUIRED"].includes(item.status)).length, hint: "claims and benefit liabilities" },
     ],
@@ -242,18 +247,18 @@ export function buildRoleDashboard(
       })),
       ...reviewQueue.map((claim) => {
       const approved = claim.status === "APPROVED";
-      const appealed = claim.status === "APPEAL_SUBMITTED";
+      const oracleFailed = claim.status === "ORACLE_FAILED";
       return {
         id: claim.id,
         title: claim.id,
         detail: `${money(claim.amountMinor)} · policy ${claim.policyId}`,
         status: claim.status,
-        commandLabel: approved ? "Prepare settlement" : appealed ? "Prepare appeal review" : "Prepare distributed review",
+        commandLabel: approved ? "Prepare settlement" : oracleFailed ? "Prepare auditor fallback" : "Prepare Oracle request",
         command: approved
           ? { operation: "authorizeSettlement", settlementId: `settlement-${Date.now()}-${claim.id}`, claimId: claim.id }
-          : appealed
-            ? { operation: "openAppealReview", appealId: claim.currentAppealId, reviewId: `review-appeal-${Date.now()}-${claim.id}` }
-            : { operation: "openClaimReview", claimId: claim.id, reviewId: `review-${Date.now()}-${claim.id}` },
+          : oracleFailed
+            ? { operation: "routeOracleFailureToReview", requestId: claim.currentOracleRequestId, reviewId: `review-oracle-${Date.now()}-${claim.id}` }
+            : { operation: "requestOracleVerification", requestId: `oracle-request-${Date.now()}-${claim.id}`, claimId: claim.id, snapshotId: "registry-demo-v1" },
       };
       }),
     ],

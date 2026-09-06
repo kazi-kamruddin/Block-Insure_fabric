@@ -85,3 +85,19 @@ func (c *Contract) ListBenefitRequests(ctx contractapi.TransactionContextInterfa
 func (c *Contract) ListLiabilities(ctx contractapi.TransactionContextInterface) ([]Liability, error) {
 	return listState[Liability](ctx, "liability")
 }
+
+func (c *Contract) ListOracleRegistrySnapshots(ctx contractapi.TransactionContextInterface) ([]OracleRegistrySnapshot, error) {
+	return listState[OracleRegistrySnapshot](ctx, "oracleRegistrySnapshot")
+}
+
+func (c *Contract) ListOracleRequests(ctx contractapi.TransactionContextInterface) ([]OracleRequest, error) {
+	return listState[OracleRequest](ctx, "oracleRequest")
+}
+
+func (c *Contract) ListOracleCommitments(ctx contractapi.TransactionContextInterface) ([]OracleCommitment, error) {
+	return listState[OracleCommitment](ctx, "oracleCommitment")
+}
+
+func (c *Contract) ListOracleResults(ctx contractapi.TransactionContextInterface) ([]OracleResult, error) {
+	return listState[OracleResult](ctx, "oracleResult")
+}

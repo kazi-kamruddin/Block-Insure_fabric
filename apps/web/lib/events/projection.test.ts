@@ -19,4 +19,18 @@ describe("Fabric event projection", () => {
     expect(notificationsFor(projection, "auditor", "auditor1")).toHaveLength(1);
     expect(notificationsFor(projection, "auditor", "auditor4")).toHaveLength(0);
   });
+
+  it("projects Oracle request and exact-consensus finalization for insurer operations", () => {
+    const requested = applyFabricEvent(emptyEventProjection(), {
+      id: "9:tx-3:OracleVerificationRequested", blockNumber: "9", transactionId: "tx-3", eventName: "OracleVerificationRequested",
+      payload: { id: "oracle-request-1", claimId: "claim-1", commitmentCount: 0, revealCount: 0 },
+    }, "2026-09-06T12:00:00Z");
+    const finalized = applyFabricEvent(requested, {
+      id: "11:tx-5:OracleRequestFinalized", blockNumber: "11", transactionId: "tx-5", eventName: "OracleRequestFinalized",
+      payload: { id: "oracle-request-1", claimId: "claim-1", finalizationCode: "EXACT_CONSENSUS" },
+    }, "2026-09-06T12:01:00Z");
+    expect(finalized.countsByName.OracleVerificationRequested).toBe(1);
+    expect(finalized.countsByName.OracleRequestFinalized).toBe(1);
+    expect(notificationsFor(finalized, "insurerAdmin").at(-1)?.title).toBe("Oracle exact consensus");
+  });
 });

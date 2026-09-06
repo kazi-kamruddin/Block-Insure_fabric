@@ -4,7 +4,7 @@ import { currentSession } from "@/lib/auth/current-session";
 import { findDemoAccount } from "@/lib/auth/accounts";
 import { ledger } from "@/lib/fabric/ledger";
 
-const assetTypeSchema = z.enum(["package", "policy", "claim", "evidence", "evidence-grant", "verification", "decision", "review", "appeal", "fraud-assessment", "settlement", "access", "account", "mandate", "premium-payment", "premium-adjustment", "collection", "benefit-plan", "beneficiaries", "benefit-request", "liability"]);
+const assetTypeSchema = z.enum(["package", "policy", "claim", "evidence", "evidence-grant", "verification", "decision", "review", "appeal", "fraud-assessment", "settlement", "access", "account", "mandate", "premium-payment", "premium-adjustment", "collection", "benefit-plan", "beneficiaries", "benefit-request", "liability", "oracle-snapshot", "oracle-request", "oracle-commitment", "oracle-result"]);
 type RouteContext = { params: Promise<{ assetType: string }> };
 
 export const runtime = "nodejs";
@@ -34,6 +34,30 @@ export async function GET(_request: Request, context: RouteContext) {
         result = session.role === "policyholder"
           ? claims.filter((claim) => claim.claimantId === session.subjectId)
           : claims;
+        break;
+      }
+      case "oracle-snapshot":
+        result = await ledger.listOracleRegistrySnapshots();
+        break;
+      case "oracle-request": {
+        const requests = await ledger.listOracleRequests();
+        if (session.role !== "policyholder") { result = requests; break; }
+        const ownedClaimIds = new Set((await ledger.listClaims()).filter((claim) => claim.claimantId === session.subjectId).map((claim) => claim.id));
+        result = requests.filter((item) => ownedClaimIds.has(item.claimId));
+        break;
+      }
+      case "oracle-commitment": {
+        const commitments = await ledger.listOracleCommitments();
+        if (session.role !== "policyholder") { result = commitments; break; }
+        const ownedClaimIds = new Set((await ledger.listClaims()).filter((claim) => claim.claimantId === session.subjectId).map((claim) => claim.id));
+        result = commitments.filter((item) => ownedClaimIds.has(item.claimId));
+        break;
+      }
+      case "oracle-result": {
+        const results = await ledger.listOracleResults();
+        if (session.role !== "policyholder") { result = results; break; }
+        const ownedClaimIds = new Set((await ledger.listClaims()).filter((claim) => claim.claimantId === session.subjectId).map((claim) => claim.id));
+        result = results.filter((item) => ownedClaimIds.has(item.claimId));
         break;
       }
       case "evidence": {

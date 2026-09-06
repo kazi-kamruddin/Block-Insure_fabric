@@ -13,7 +13,7 @@ import type { WorkflowCommand } from "@/lib/workflows/commands";
 import { bdtToMinor } from "@/lib/workflows/forms";
 import { decryptEvidenceBytes, encryptEvidenceBytes, sha256Hex } from "@/lib/evidence/browser-crypto";
 
-type AssetType = "package" | "policy" | "claim" | "evidence" | "evidence-grant" | "verification" | "decision" | "review" | "appeal" | "fraud-assessment" | "settlement" | "access" | "claim-history" | "account" | "mandate" | "premium-payment" | "premium-adjustment" | "collection" | "benefit-plan" | "beneficiaries" | "benefit-request" | "liability";
+type AssetType = "package" | "policy" | "claim" | "evidence" | "evidence-grant" | "verification" | "decision" | "review" | "appeal" | "fraud-assessment" | "settlement" | "access" | "claim-history" | "account" | "mandate" | "premium-payment" | "premium-adjustment" | "collection" | "benefit-plan" | "beneficiaries" | "benefit-request" | "liability" | "oracle-snapshot" | "oracle-request" | "oracle-commitment" | "oracle-result" | "oracle-history";
 type NotificationItem = { id: string; title: string; message: string; assetId: string; blockNumber: string };
 type ResearchSnapshotView = {
   reproducibilityHash: string;
@@ -22,6 +22,10 @@ type ResearchSnapshotView = {
   adjudication: { reviewRounds: number; appeals: number; meanClosureLatencyMs: number | null };
   fraudDecisionSupport: { assessments: number; advisoryOnly: boolean };
   evidenceGovernance: { grants: number; accesses: number; grantBackedAccesses: number };
+};
+type OracleOperationsView = {
+  workers: Array<{ oracleId: string; label: string; status: string; registrySource: string; registrySnapshotId: string; registryVersion: number; modelVersion: string; updatedAt: string; lastProcessedBlock: string | number | null; lastProcessedRequestId: string | null; lastError: string | null; counts: { requests: number; commitments: number; reveals: number; verified: number; failed: number }; lastProcessingLatencyMs: number | null }>;
+  metrics: { requests: number; pending: number; agreements: number; conflicts: number; timeouts: number; finalized: number };
 };
 
 const hash = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
@@ -32,6 +36,9 @@ const commandTemplates = {
     ["Publish package", { operation: "publishPolicyPackage", id: "package-1" }],
     ["Retire package", { operation: "retirePolicyPackage", id: "package-1" }],
     ["Issue policy", { operation: "issuePolicy", id: "policy-1", packageId: "package-1", policyholderId: "policyholder1", startDate: "2026-01-01", endDate: "2026-12-31" }],
+    ["Publish Oracle registry", { operation: "publishOracleRegistrySnapshot", id: "registry-demo-v1", version: 1, rootHash: "c6da6361115c611b091faa9f35836f9f5c8ee0fdbefb6bc0d8cc6fdde571ebcd", rulesVersion: "rules-v1", rulesHash: hash, recordCount: 3 }],
+    ["Request Oracle verification", { operation: "requestOracleVerification", requestId: "oracle-request-1", claimId: "claim-1", snapshotId: "registry-demo-v1", modelVersion: "model-v1", modelHash: "c".repeat(64), assignedOracleIdsJson: '["oracle1","oracle2"]', commitDeadline: "2026-09-09T12:00:00Z", revealDeadline: "2026-09-09T12:10:00Z" }],
+    ["Route Oracle failure", { operation: "routeOracleFailureToReview", requestId: "oracle-request-1", reviewId: "review-1", assignedAuditorIdsJson: '["auditor1","auditor2","auditor3","auditor4"]', approvalThreshold: 3, rejectionThreshold: 2, deadline: "2026-09-12T12:00:00Z" }],
     ["Open review", { operation: "openClaimReview", claimId: "claim-1", reviewId: "review-1", assignedAuditorIdsJson: '["auditor1","auditor2","auditor3","auditor4"]', approvalThreshold: 3, rejectionThreshold: 2, deadline: "2026-09-09T12:00:00Z" }],
     ["Authorize settlement", { operation: "authorizeSettlement", settlementId: "settlement-1", claimId: "claim-1" }],
   ],
@@ -93,6 +100,7 @@ export function WorkspaceClient({
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [eventCheckpoint, setEventCheckpoint] = useState<string>("Not synchronized");
   const [researchSnapshot, setResearchSnapshot] = useState<ResearchSnapshotView | null>(null);
+  const [oracleOperations, setOracleOperations] = useState<OracleOperationsView | null>(null);
   const templates = useMemo(() => account ? commandTemplates[account.role] : [], [account]);
 
   useEffect(() => () => {
@@ -128,6 +136,17 @@ export function WorkspaceClient({
       setResearchSnapshot(await responseJson(await fetch("/api/research/snapshot", { cache: "no-store" })));
     } catch (error) {
       setOutput(error instanceof Error ? error.message : "Research snapshot failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function refreshOracleOperations() {
+    setBusy(true);
+    try {
+      setOracleOperations(await responseJson(await fetch("/api/operations/oracles", { cache: "no-store" })));
+    } catch (error) {
+      setOutput(error instanceof Error ? error.message : "Oracle operations health failed");
     } finally {
       setBusy(false);
     }
@@ -493,6 +512,24 @@ export function WorkspaceClient({
           </div>}
           {researchSnapshot && <p className="cardNote">Schema {researchSnapshot.provenance.ledgerSchemaVersion}; indexed events {researchSnapshot.provenance.indexedEvents}; hash <code>{researchSnapshot.reproducibilityHash.slice(0, 16)}…</code></p>}
         </article>}
+
+        {(account.role === "insurerAdmin" || account.role === "auditor") && <article className="workCard">
+          <span className="kicker">Certificate-bound services</span>
+          <h2>Oracle operations and consensus</h2>
+          <p className="cardNote">Each worker uses a different OracleMSP certificate and independent registry source. Unrevealed results are never displayed.</p>
+          <button className="primary button" disabled={busy} onClick={refreshOracleOperations}>Refresh Oracle health</button>
+          {oracleOperations && <>
+            <div className="metricGrid">
+              <div className="metricCard"><span>Requests / pending</span><strong>{oracleOperations.metrics.requests} / {oracleOperations.metrics.pending}</strong><small>Ledger requests</small></div>
+              <div className="metricCard"><span>Exact agreements</span><strong>{oracleOperations.metrics.agreements}</strong><small>positive and negative</small></div>
+              <div className="metricCard"><span>Conflicts / timeouts</span><strong>{oracleOperations.metrics.conflicts} / {oracleOperations.metrics.timeouts}</strong><small>auditor fallback outcomes</small></div>
+            </div>
+            <div className="queueList">{oracleOperations.workers.map((worker) => <div className="queueItem" key={worker.oracleId}>
+              <div><div className="queueTitle"><strong>{worker.label} · {worker.oracleId}</strong><span className={`status status-${worker.status.toLowerCase()}`}>{worker.status}</span></div><p>{worker.registrySource} · snapshot {worker.registrySnapshotId || "unavailable"} v{worker.registryVersion} · model {worker.modelVersion || "unavailable"}</p><small>Block {worker.lastProcessedBlock ?? "—"} · request {worker.lastProcessedRequestId ?? "—"} · {worker.lastProcessingLatencyMs ?? "—"} ms</small>{worker.lastError && <p className="evidenceWarning">{worker.lastError}</p>}</div>
+              <span>{worker.counts.commitments} commit / {worker.counts.reveals} reveal</span>
+            </div>)}</div>
+          </>}
+        </article>}
       </div>
 
       <div className="workGrid" id="transaction-console">
@@ -547,6 +584,8 @@ export function WorkspaceClient({
               <option value="verification">Hospital verification</option><option value="decision">Auditor decision</option>
               <option value="review">Claim review round</option><option value="appeal">Claim appeal</option><option value="fraud-assessment">Fraud assessment</option>
               <option value="settlement">Settlement</option><option value="claim-history">Claim history</option>
+              <option value="oracle-snapshot">Oracle registry snapshot</option><option value="oracle-request">Oracle request</option>
+              <option value="oracle-commitment">Oracle commitment</option><option value="oracle-result">Oracle revealed result</option><option value="oracle-history">Oracle request history</option>
               <option value="account">Bank account token</option><option value="mandate">Debit mandate</option>
               <option value="premium-payment">Premium payment</option><option value="premium-adjustment">Premium reversal</option><option value="collection">Premium collection</option>
               <option value="benefit-plan">Benefit plan</option><option value="beneficiaries">Beneficiary designation</option>
@@ -557,7 +596,7 @@ export function WorkspaceClient({
           <label>Asset ID<input value={assetId} onChange={(event) => setAssetId(event.target.value)} placeholder="claim-1" /></label>
           <div className="queryActions">
             <button className="primary button" disabled={busy || assetType === "access"} onClick={queryAsset}>Find by ID</button>
-            <button className="secondary button" disabled={busy || assetType === "claim-history"} onClick={listAssets}>List all allowed</button>
+            <button className="secondary button" disabled={busy || assetType === "claim-history" || assetType === "oracle-history"} onClick={listAssets}>List all allowed</button>
           </div>
         </article>
 
@@ -624,7 +663,7 @@ export function WorkspaceClient({
           <article className="workCard evidenceCard">
             <span className="kicker">Portable audit artifact</span>
             <h2>Export claim dossier</h2>
-            <p className="cardNote">Download the ledger-backed claim, state history, evidence access, review rounds, every auditor vote, appeals, fraud advisories, and settlement as one JSON record.</p>
+            <p className="cardNote">Download the ledger-backed claim timeline, Oracle request/commitments/reveals and registry/model provenance, evidence access, reviews, every auditor vote, appeals, fraud advisories, and settlement as one JSON record.</p>
             <div className="auditExport">
               <label>Claim ID<input value={auditClaimId} onChange={(event) => setAuditClaimId(event.target.value)} placeholder="claim-1" /></label>
               <a

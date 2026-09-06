@@ -1,6 +1,6 @@
 package insurance
 
-const SchemaVersion = 5
+const SchemaVersion = 6
 
 type PolicyPackage struct {
 	AssetType          string `json:"assetType"`
@@ -198,11 +198,96 @@ type Claim struct {
 	AuditorDecisionID      string   `json:"auditorDecisionId"`
 	CurrentReviewID        string   `json:"currentReviewId"`
 	CurrentAppealID        string   `json:"currentAppealId"`
+	CurrentOracleRequestID string   `json:"currentOracleRequestId"`
+	OracleOutcome          string   `json:"oracleOutcome"`
+	OracleResultHash       string   `json:"oracleResultHash"`
+	Version                int      `json:"version"`
 	ReviewRound            int      `json:"reviewRound"`
 	AppealCount            int      `json:"appealCount"`
 	Status                 string   `json:"status"`
 	CreatedAt              string   `json:"createdAt"`
 	UpdatedAt              string   `json:"updatedAt"`
+}
+
+type OracleRegistrySnapshot struct {
+	AssetType     string `json:"assetType"`
+	SchemaVersion int    `json:"schemaVersion"`
+	ID            string `json:"id"`
+	Version       int    `json:"version"`
+	RootHash      string `json:"rootHash"`
+	RulesVersion  string `json:"rulesVersion"`
+	RulesHash     string `json:"rulesHash"`
+	RecordCount   int    `json:"recordCount"`
+	PublishedBy   string `json:"publishedBy"`
+	CreatedAt     string `json:"createdAt"`
+}
+
+type OracleRequest struct {
+	AssetType              string   `json:"assetType"`
+	SchemaVersion          int      `json:"schemaVersion"`
+	ID                     string   `json:"id"`
+	ClaimID                string   `json:"claimId"`
+	ClaimVersion           int      `json:"claimVersion"`
+	HospitalVerificationID string   `json:"hospitalVerificationId"`
+	QueryHash              string   `json:"queryHash"`
+	RegistrySnapshotID     string   `json:"registrySnapshotId"`
+	RegistryVersion        int      `json:"registryVersion"`
+	RegistryRootHash       string   `json:"registryRootHash"`
+	RulesVersion           string   `json:"rulesVersion"`
+	RulesHash              string   `json:"rulesHash"`
+	ModelVersion           string   `json:"modelVersion"`
+	ModelHash              string   `json:"modelHash"`
+	AssignedOracleIDs      []string `json:"assignedOracleIds"`
+	RequiredConfirmations  int      `json:"requiredConfirmations"`
+	ExpectedResponses      int      `json:"expectedResponses"`
+	CommitmentCount        int      `json:"commitmentCount"`
+	RevealCount            int      `json:"revealCount"`
+	Status                 string   `json:"status"`
+	VerifiedResult         bool     `json:"verifiedResult"`
+	ResultHash             string   `json:"resultHash"`
+	FinalizationCode       string   `json:"finalizationCode"`
+	CommitDeadline         string   `json:"commitDeadline"`
+	RevealDeadline         string   `json:"revealDeadline"`
+	RequestedAt            string   `json:"requestedAt"`
+	FinalizedAt            string   `json:"finalizedAt"`
+}
+
+type OracleCommitment struct {
+	AssetType      string `json:"assetType"`
+	SchemaVersion  int    `json:"schemaVersion"`
+	ID             string `json:"id"`
+	RequestID      string `json:"requestId"`
+	ClaimID        string `json:"claimId"`
+	ClaimVersion   int    `json:"claimVersion"`
+	OracleID       string `json:"oracleId"`
+	OracleIdentity string `json:"oracleIdentity"`
+	CommitmentHash string `json:"commitmentHash"`
+	CreatedAt      string `json:"createdAt"`
+}
+
+type OracleResult struct {
+	AssetType        string `json:"assetType"`
+	SchemaVersion    int    `json:"schemaVersion"`
+	ID               string `json:"id"`
+	RequestID        string `json:"requestId"`
+	ClaimID          string `json:"claimId"`
+	ClaimVersion     int    `json:"claimVersion"`
+	RegistryVersion  int    `json:"registryVersion"`
+	ModelVersion     string `json:"modelVersion"`
+	OracleID         string `json:"oracleId"`
+	OracleIdentity   string `json:"oracleIdentity"`
+	Verified         bool   `json:"verified"`
+	VerificationCode string `json:"verificationCode"`
+	RecordHash       string `json:"recordHash"`
+	ResultHash       string `json:"resultHash"`
+	CreatedAt        string `json:"createdAt"`
+}
+
+type OracleRequestHistoryRecord struct {
+	TxID      string         `json:"txId"`
+	Timestamp string         `json:"timestamp"`
+	IsDelete  bool           `json:"isDelete"`
+	Value     *OracleRequest `json:"value,omitempty"`
 }
 
 type EvidenceAccessRecord struct {

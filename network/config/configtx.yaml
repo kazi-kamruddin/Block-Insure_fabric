@@ -57,6 +57,18 @@ Organizations:
     AnchorPeers:
       - Host: peer0.bank.blockinsure.test
         Port: 7051
+  - &OracleOrg
+    Name: OracleMSP
+    ID: OracleMSP
+    MSPDir: ../organizations/peerOrganizations/oracle.blockinsure.test/msp
+    Policies:
+      Readers: { Type: Signature, Rule: "OR('OracleMSP.admin', 'OracleMSP.peer', 'OracleMSP.client')" }
+      Writers: { Type: Signature, Rule: "OR('OracleMSP.admin', 'OracleMSP.client')" }
+      Admins: { Type: Signature, Rule: "OR('OracleMSP.admin')" }
+      Endorsement: { Type: Signature, Rule: "OR('OracleMSP.peer')" }
+    AnchorPeers:
+      - Host: peer0.oracle.blockinsure.test
+        Port: 7051
 
 Capabilities:
   Channel: &ChannelCapabilities
@@ -115,5 +127,5 @@ Profiles:
       Capabilities: *OrdererCapabilities
     Application:
       <<: *ApplicationDefaults
-      Organizations: [*InsurerOrg, *HospitalOrg, *AuditorOrg, *BankOrg]
+      Organizations: [*InsurerOrg, *HospitalOrg, *AuditorOrg, *BankOrg, *OracleOrg]
       Capabilities: *ApplicationCapabilities

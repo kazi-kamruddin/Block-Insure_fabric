@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { buildResearchSnapshot, type ResearchInput } from "./snapshot";
 
-const empty: ResearchInput = { policies: [], claims: [], reviews: [], decisions: [], appeals: [], fraudAssessments: [], evidence: [], evidenceGrants: [], evidenceAccess: [], settlements: [], premiumPayments: [], premiumAdjustments: [], benefitRequests: [], liabilities: [] };
-const provenance = { channel: "insurance-channel", chaincode: "insurance-contract", ledgerSchemaVersion: 5, checkpoint: null, indexedEvents: 0, retainedEvents: 0, eventCounts: {} };
+const empty: ResearchInput = { policies: [], claims: [], reviews: [], decisions: [], appeals: [], fraudAssessments: [], evidence: [], evidenceGrants: [], evidenceAccess: [], settlements: [], premiumPayments: [], premiumAdjustments: [], benefitRequests: [], liabilities: [], oracleRequests: [], oracleResults: [] };
+const provenance = { channel: "insurance-channel", chaincode: "insurance-contract", ledgerSchemaVersion: 6, checkpoint: null, indexedEvents: 0, retainedEvents: 0, eventCounts: {} };
 
 describe("research snapshot", () => {
   it("is reproducible for the same ledger state across export times", () => {

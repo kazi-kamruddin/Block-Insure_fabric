@@ -24,7 +24,7 @@ export type WorkflowFormValues = Record<string, string>;
 export type HashText = (value: string) => Promise<string>;
 
 export const operationsByRole = {
-  insurerAdmin: ["createPolicyPackage", "publishPolicyPackage", "retirePolicyPackage", "createBenefitPlan", "publishBenefitPlan", "retireBenefitPlan", "issuePolicy", "advancePolicyLifecycle", "cancelPolicyAsInsurer", "queuePremiumCollection", "decideBenefitRequest", "markBenefitPaymentReady", "assessClaimFraud", "openClaimReview", "openAppealReview", "finalizeExpiredReview", "authorizeSettlement"],
+  insurerAdmin: ["createPolicyPackage", "publishPolicyPackage", "retirePolicyPackage", "createBenefitPlan", "publishBenefitPlan", "retireBenefitPlan", "issuePolicy", "advancePolicyLifecycle", "cancelPolicyAsInsurer", "queuePremiumCollection", "decideBenefitRequest", "markBenefitPaymentReady", "assessClaimFraud", "publishOracleRegistrySnapshot", "requestOracleVerification", "finalizeOracleTimeout", "routeOracleFailureToReview", "openClaimReview", "openAppealReview", "finalizeExpiredReview", "authorizeSettlement"],
   policyholder: ["acquirePolicy", "requestBankMandate", "cancelBankMandate", "setBeneficiaries", "submitBenefitRequest", "renewPolicy", "cancelPolicy", "submitClaim", "submitClaimAppeal", "grantEvidenceAccess", "revokeEvidenceAccess"],
   hospitalOfficer: ["verifyClaim"],
   auditor: ["recordAuditorDecision"],
@@ -230,6 +230,49 @@ export const workflowFormDefinitions: Record<WorkflowOperation, WorkflowFormDefi
       { name: "deadline", label: "Review deadline (RFC3339)", placeholder: "2026-09-09T12:00:00Z" },
     ],
   },
+  publishOracleRegistrySnapshot: {
+    label: "Publish Oracle registry snapshot",
+    description: "Anchor the versioned registry root independently loaded by both Oracle services.",
+    fields: [
+      { name: "id", label: "Snapshot ID", placeholder: "registry-demo-v1" },
+      { name: "version", label: "Snapshot version", placeholder: "1" },
+      { name: "rootHash", label: "Canonical registry root", help: "Must equal the independently computed worker snapshot root." },
+      { name: "rulesVersion", label: "Rules version", placeholder: "rules-v1" },
+      { name: "rulesHash", label: "Rules commitment" },
+      { name: "recordCount", label: "Registry record count", placeholder: "3" },
+    ],
+  },
+  requestOracleVerification: {
+    label: "Request two-Oracle verification",
+    description: "Snapshot the claim, registry, model, two certificate subjects, and commit/reveal deadlines.",
+    fields: [
+      { name: "requestId", label: "Oracle request ID", placeholder: "oracle-request-1001" },
+      { name: "claimId", label: "Hospital-verified claim ID", placeholder: "claim-1001" },
+      { name: "snapshotId", label: "Registry snapshot ID", placeholder: "registry-demo-v1" },
+      { name: "modelVersion", label: "Model version", placeholder: "model-v1" },
+      { name: "modelHash", label: "Model commitment" },
+      { name: "assignedOracleIdsJson", label: "Assigned Oracle certificate subjects", kind: "textarea", placeholder: '["oracle1","oracle2"]' },
+      { name: "commitDeadline", label: "Commit deadline (RFC3339)" },
+      { name: "revealDeadline", label: "Reveal deadline (RFC3339)" },
+    ],
+  },
+  finalizeOracleTimeout: {
+    label: "Finalize Oracle timeout",
+    description: "After the reveal deadline, close an incomplete request and make governed auditor fallback available.",
+    fields: [{ name: "requestId", label: "Oracle request ID" }],
+  },
+  routeOracleFailureToReview: {
+    label: "Route Oracle failure to auditors",
+    description: "Open the existing fixed-quorum four-auditor review after negative, conflicting, or timed-out Oracle verification.",
+    fields: [
+      { name: "requestId", label: "Failed Oracle request ID" },
+      { name: "reviewId", label: "Review ID" },
+      { name: "assignedAuditorIdsJson", label: "Assigned auditor IDs", kind: "textarea" },
+      { name: "approvalThreshold", label: "Approval threshold" },
+      { name: "rejectionThreshold", label: "Rejection threshold" },
+      { name: "deadline", label: "Review deadline (RFC3339)" },
+    ],
+  },
   submitClaimAppeal: {
     label: "Appeal rejected claim",
     description: "Open the single permitted appeal while preserving the original review and votes.",
@@ -355,6 +398,10 @@ export function createWorkflowFormValues(
     verifyClaim: { claimId: "", verificationId: generatedId("verification", idFactory), outcome: "VERIFIED", clinicalReferenceText: "" },
     assessClaimFraud: { assessmentId: generatedId("fraud", idFactory), claimId: "" },
     openClaimReview: { claimId: "", reviewId: generatedId("review", idFactory), assignedAuditorIdsJson: '["auditor1","auditor2","auditor3","auditor4"]', approvalThreshold: "3", rejectionThreshold: "2", deadline: deadlineOffset(3) },
+    publishOracleRegistrySnapshot: { id: "registry-demo-v1", version: "1", rootHash: "c6da6361115c611b091faa9f35836f9f5c8ee0fdbefb6bc0d8cc6fdde571ebcd", rulesVersion: "rules-v1", rulesHash: "a".repeat(64), recordCount: "3" },
+    requestOracleVerification: { requestId: generatedId("oracle-request", idFactory), claimId: "", snapshotId: "registry-demo-v1", modelVersion: "model-v1", modelHash: "c".repeat(64), assignedOracleIdsJson: '["oracle1","oracle2"]', commitDeadline: new Date(Date.now() + 10 * 60_000).toISOString(), revealDeadline: new Date(Date.now() + 20 * 60_000).toISOString() },
+    finalizeOracleTimeout: { requestId: "" },
+    routeOracleFailureToReview: { requestId: "", reviewId: generatedId("review-oracle", idFactory), assignedAuditorIdsJson: '["auditor1","auditor2","auditor3","auditor4"]', approvalThreshold: "3", rejectionThreshold: "2", deadline: deadlineOffset(3) },
     submitClaimAppeal: { appealId: generatedId("appeal", idFactory), claimId: "", reasonText: "", evidenceText: "" },
     grantEvidenceAccess: { id: generatedId("grant", idFactory), evidenceId: "", granteeMsp: "AuditorMSP", granteeRole: "auditor", granteeSubject: "auditor1", purpose: "AUDIT", expiresAt: deadlineOffset(7), maxAccesses: "3" },
     revokeEvidenceAccess: { grantId: "" },
@@ -545,6 +592,18 @@ export async function buildWorkflowCommand(
       break;
     case "openClaimReview":
       command = { operation, claimId: required(values, "claimId", "Claim ID"), reviewId: required(values, "reviewId", "Review ID"), assignedAuditorIdsJson: required(values, "assignedAuditorIdsJson", "Assigned auditor IDs"), approvalThreshold: positiveInteger(values, "approvalThreshold", "Approval threshold"), rejectionThreshold: positiveInteger(values, "rejectionThreshold", "Rejection threshold"), deadline: required(values, "deadline", "Review deadline") };
+      break;
+    case "publishOracleRegistrySnapshot":
+      command = { operation, id: required(values, "id", "Snapshot ID"), version: positiveInteger(values, "version", "Snapshot version"), rootHash: required(values, "rootHash", "Canonical registry root"), rulesVersion: required(values, "rulesVersion", "Rules version"), rulesHash: required(values, "rulesHash", "Rules commitment"), recordCount: positiveInteger(values, "recordCount", "Registry record count") };
+      break;
+    case "requestOracleVerification":
+      command = { operation, requestId: required(values, "requestId", "Oracle request ID"), claimId: required(values, "claimId", "Claim ID"), snapshotId: required(values, "snapshotId", "Snapshot ID"), modelVersion: required(values, "modelVersion", "Model version"), modelHash: required(values, "modelHash", "Model commitment"), assignedOracleIdsJson: required(values, "assignedOracleIdsJson", "Assigned Oracle IDs"), commitDeadline: required(values, "commitDeadline", "Commit deadline"), revealDeadline: required(values, "revealDeadline", "Reveal deadline") };
+      break;
+    case "finalizeOracleTimeout":
+      command = { operation, requestId: required(values, "requestId", "Oracle request ID") };
+      break;
+    case "routeOracleFailureToReview":
+      command = { operation, requestId: required(values, "requestId", "Oracle request ID"), reviewId: required(values, "reviewId", "Review ID"), assignedAuditorIdsJson: required(values, "assignedAuditorIdsJson", "Assigned auditor IDs"), approvalThreshold: positiveInteger(values, "approvalThreshold", "Approval threshold"), rejectionThreshold: positiveInteger(values, "rejectionThreshold", "Rejection threshold"), deadline: required(values, "deadline", "Review deadline") };
       break;
     case "submitClaimAppeal":
       command = { operation, appealId: required(values, "appealId", "Appeal ID"), claimId: required(values, "claimId", "Claim ID"), reasonHash: await digest("reasonText", "Appeal reason"), evidenceHash: values.evidenceText?.trim() ? await hashText(values.evidenceText.trim()) : "" };

@@ -11,7 +11,7 @@ chaincode_root="${project_root}/chaincode/insurance-contract"
 
 channel_name="${CHANNEL_NAME:-insurance-channel}"
 chaincode_name="${CHAINCODE_NAME:-insurance-contract}"
-chaincode_version="${CHAINCODE_VERSION:-0.6.1}"
+chaincode_version="${CHAINCODE_VERSION:-0.7.0}"
 chaincode_sequence="${CHAINCODE_SEQUENCE:-}"
 chaincode_label="${chaincode_name}_${chaincode_version}"
 package_file="${artifacts}/${chaincode_label}.tar.gz"
@@ -121,12 +121,14 @@ insurer InsurerMSP 7051
 hospital HospitalMSP 8051
 auditor AuditorMSP 9051
 bank BankMSP 12051
+oracle OracleMSP 13051
 EOF
 
 approve_for_org insurer InsurerMSP 7051
 approve_for_org hospital HospitalMSP 8051
 approve_for_org auditor AuditorMSP 9051
 approve_for_org bank BankMSP 12051
+approve_for_org oracle OracleMSP 13051
 
 set_peer_context insurer InsurerMSP 7051
 peer lifecycle chaincode checkcommitreadiness \
@@ -145,7 +147,9 @@ peer lifecycle chaincode commit \
   --peerAddresses localhost:9051 \
   --tlsRootCertFiles "${organizations}/peerOrganizations/auditor.blockinsure.test/peers/peer0.auditor.blockinsure.test/tls/ca.crt" \
   --peerAddresses localhost:12051 \
-  --tlsRootCertFiles "${organizations}/peerOrganizations/bank.blockinsure.test/peers/peer0.bank.blockinsure.test/tls/ca.crt"
+  --tlsRootCertFiles "${organizations}/peerOrganizations/bank.blockinsure.test/peers/peer0.bank.blockinsure.test/tls/ca.crt" \
+  --peerAddresses localhost:13051 \
+  --tlsRootCertFiles "${organizations}/peerOrganizations/oracle.blockinsure.test/peers/peer0.oracle.blockinsure.test/tls/ca.crt"
 
 while read -r org msp port; do
   set_peer_context "${org}" "${msp}" "${port}"
@@ -155,6 +159,7 @@ insurer InsurerMSP 7051
 hospital HospitalMSP 8051
 auditor AuditorMSP 9051
 bank BankMSP 12051
+oracle OracleMSP 13051
 EOF
 
 echo "Committed ${chaincode_name} ${chaincode_version} (sequence ${chaincode_sequence}) to ${channel_name}."

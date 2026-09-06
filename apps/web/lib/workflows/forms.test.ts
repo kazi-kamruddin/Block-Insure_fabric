@@ -68,4 +68,20 @@ describe("guided workflow forms", () => {
     expect(command).toEqual({ operation: "recordPremiumAdjustment", id: "adjustment-1", paymentId: "payment-1", amountMinor: 2_550, externalReferenceHash: "b".repeat(64), reasonHash: "c".repeat(64) });
     expect(hashText).toHaveBeenCalledTimes(2);
   });
+
+  it("builds exact two-Oracle request and governed fallback commands", async () => {
+    const hashText = vi.fn();
+    const oracle = await buildWorkflowCommand("requestOracleVerification", {
+      requestId: "request-1", claimId: "claim-1", snapshotId: "registry-demo-v1",
+      modelVersion: "model-v1", modelHash: "c".repeat(64), assignedOracleIdsJson: '["oracle1","oracle2"]',
+      commitDeadline: "2026-09-09T12:00:00Z", revealDeadline: "2026-09-09T12:10:00Z",
+    }, hashText);
+    expect(oracle).toMatchObject({ operation: "requestOracleVerification", assignedOracleIdsJson: '["oracle1","oracle2"]' });
+    const fallback = await buildWorkflowCommand("routeOracleFailureToReview", {
+      requestId: "request-1", reviewId: "review-1", assignedAuditorIdsJson: '["auditor1","auditor2","auditor3","auditor4"]',
+      approvalThreshold: "3", rejectionThreshold: "2", deadline: "2026-09-12T12:00:00Z",
+    }, hashText);
+    expect(fallback).toMatchObject({ operation: "routeOracleFailureToReview", approvalThreshold: 3, rejectionThreshold: 2 });
+    expect(hashText).not.toHaveBeenCalled();
+  });
 });

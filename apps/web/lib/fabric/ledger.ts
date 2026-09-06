@@ -20,6 +20,11 @@ import type {
   HospitalVerification,
   FraudAssessment,
   Liability,
+  OracleCommitment,
+  OracleRegistrySnapshot,
+  OracleRequest,
+  OracleRequestHistoryRecord,
+  OracleResult,
   Policy,
   PolicyPackage,
   PremiumCollection,
@@ -173,6 +178,42 @@ export const ledger = {
 
   listClaims() {
     return evaluate<Claim[]>("insurerAdmin", "ListClaims");
+  },
+
+  readOracleRegistrySnapshot(id: string) {
+    return evaluate<OracleRegistrySnapshot>("insurerAdmin", "ReadOracleRegistrySnapshot", id);
+  },
+
+  listOracleRegistrySnapshots() {
+    return evaluate<OracleRegistrySnapshot[]>("insurerAdmin", "ListOracleRegistrySnapshots");
+  },
+
+  readOracleRequest(id: string) {
+    return evaluate<OracleRequest>("insurerAdmin", "ReadOracleRequest", id);
+  },
+
+  listOracleRequests() {
+    return evaluate<OracleRequest[]>("insurerAdmin", "ListOracleRequests");
+  },
+
+  readOracleCommitment(id: string) {
+    return evaluate<OracleCommitment>("insurerAdmin", "ReadOracleCommitment", id);
+  },
+
+  listOracleCommitments() {
+    return evaluate<OracleCommitment[]>("insurerAdmin", "ListOracleCommitments");
+  },
+
+  readOracleResult(id: string) {
+    return evaluate<OracleResult>("insurerAdmin", "ReadOracleResult", id);
+  },
+
+  listOracleResults() {
+    return evaluate<OracleResult[]>("insurerAdmin", "ListOracleResults");
+  },
+
+  oracleRequestHistory(id: string) {
+    return evaluate<OracleRequestHistoryRecord[]>("insurerAdmin", "GetOracleRequestHistory", id);
   },
 
   readEvidenceReference(id: string) {
@@ -500,6 +541,41 @@ export const ledger = {
       input.verificationId,
       input.outcome,
       input.clinicalReferenceHash,
+    );
+  },
+
+  publishOracleRegistrySnapshot(input: {
+    id: string; version: number; rootHash: string; rulesVersion: string;
+    rulesHash: string; recordCount: number;
+  }) {
+    return submit<OracleRegistrySnapshot>(
+      "insurerAdmin", "PublishOracleRegistrySnapshot", input.id, input.version,
+      input.rootHash, input.rulesVersion, input.rulesHash, input.recordCount,
+    );
+  },
+
+  requestOracleVerification(input: {
+    requestId: string; claimId: string; snapshotId: string; modelVersion: string;
+    modelHash: string; assignedOracleIdsJson: string; commitDeadline: string; revealDeadline: string;
+  }) {
+    return submit<OracleRequest>(
+      "insurerAdmin", "RequestOracleVerification", input.requestId, input.claimId,
+      input.snapshotId, input.modelVersion, input.modelHash, input.assignedOracleIdsJson,
+      input.commitDeadline, input.revealDeadline,
+    );
+  },
+
+  finalizeOracleTimeout(requestId: string) {
+    return submit<OracleRequest>("insurerAdmin", "FinalizeOracleTimeout", requestId);
+  },
+
+  routeOracleFailureToReview(input: {
+    requestId: string; reviewId: string; assignedAuditorIdsJson: string;
+    approvalThreshold: number; rejectionThreshold: number; deadline: string;
+  }) {
+    return submit<ClaimReview>(
+      "insurerAdmin", "RouteOracleFailureToReview", input.requestId, input.reviewId,
+      input.assignedAuditorIdsJson, input.approvalThreshold, input.rejectionThreshold, input.deadline,
     );
   },
 

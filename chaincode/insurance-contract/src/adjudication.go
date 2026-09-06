@@ -169,6 +169,10 @@ func (c *Contract) SubmitClaimAppeal(ctx contractapi.TransactionContextInterface
 	}
 	claim.AppealCount = appeal.Round
 	claim.CurrentAppealID = appealID
+	claim.Version++
+	claim.CurrentOracleRequestID = ""
+	claim.OracleOutcome = ""
+	claim.OracleResultHash = ""
 	claim.Status = "APPEAL_SUBMITTED"
 	claim.UpdatedAt = now
 	if err := overwriteAsset(ctx, "claim", claimID, claim); err != nil {

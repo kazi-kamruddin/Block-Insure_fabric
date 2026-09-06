@@ -8,14 +8,16 @@ identities and Fabric ledger controls.
 
 ## Project status
 
-The original five implementation areas and the policy/premium/benefit expansion
-are complete for a local thesis and supervisor-demonstration release. The
-four-organization network, Go contract, Next.js Gateway boundary, role-specific
+The original implementation areas and the policy/premium/benefit expansion are
+joined by a certificate-bound two-Oracle consensus subsystem. The source now
+defines a five-business-organization network, Go contract, Next.js Gateway boundary, role-specific
 workflows/evidence, release verification, policy acquisition, premium collection,
 bank mandates, governed benefits, distributed adjudication, appeals, and advisory
 fraud triage, governed evidence grants, durable event projection, and
-ledger-derived research metrics run end to end against `insurance-contract`
-0.6.1, schema 5.
+ledger-derived research metrics, independent Oracle workers, commit/reveal
+consensus, and governed auditor fallback. The target deployment is
+`insurance-contract` 0.7.0, schema 6. A clean topology deployment and final human
+supervisor rehearsal remain required before this revision is declared complete.
 
 This is not a production deployment claim. Institutional authentication,
 durable encrypted object storage and key recovery, multi-node/orderer high
@@ -28,12 +30,13 @@ governance remain environment-specific work outside the local release.
 - `chaincode/insurance-contract/` — insurance domain chaincode and its tests.
 - `apps/web/` — Next.js web application.
 - `docs/` — architecture, role model, and implementation notes.
-- `scripts/` — shared developer automation.
+- `scripts/` — shared verification and supervised demonstration automation.
+- `services/oracle-worker/` — independent Oracle processes, registry fixtures,
+  durable cursors, and health reporting.
 
 Server-side Gateway, identity, evidence, fraud, event, and research modules are
 co-located under `apps/web/lib/`; cross-component browser tests live in
-`apps/web/e2e/`. The empty root `fabric/`, `services/`, and `tests/` directories
-are retained only as initial scaffold seams and contain no runtime implementation.
+`apps/web/e2e/`.
 
 `reference/` contains the prior Ethereum implementation for local study only.
 It is deliberately ignored by Git and must not be modified or committed as part
@@ -42,7 +45,7 @@ of this Fabric project.
 ## Implemented architecture
 
 The local network models separate organizations for the insurer, hospital,
-bank, and auditor, backed by Fabric CAs and CouchDB. Its Go chaincode enforces
+bank, auditor, and Oracle services, backed by Fabric CAs and CouchDB. Its Go chaincode enforces
 MSP membership, certificate role attributes, asset ownership, and the complete
 policy-to-settlement and policy-to-benefit state machines. The Next.js server accesses the ledger
 through Fabric Gateway; browsers never hold Fabric private keys.
@@ -76,16 +79,26 @@ and browser-encrypted evidence storage with on-ledger integrity/access records. 
 local filesystem storage are development adapters, not production identity or
 object-storage implementations.
 
+For a supervised local deployment from the repository root, use
+`scripts/demo-stack.ps1`. `Preflight` is read-only, `Start` reuses the preserved
+ledger, `Status` checks all four application services, and `Stop` retains Fabric
+volumes. `CleanBootstrap -ConfirmReset` is deliberately destructive and is only
+for an explicitly approved clean showcase; it rebuilds the topology, deploys
+chaincode 0.7.0, seeds the policy/benefit/Oracle catalog, and starts the web app,
+event worker, and both Oracle workers.
+
 See [the lifecycle design](docs/policy-premium-benefit-lifecycles.md) for policy,
 OTP, collection-worker, reconciliation, and benefit boundaries;
 [the local demonstration runbook](docs/local-demonstration.md) for the
-five-organization journey and [the evidence security boundary](docs/evidence-security.md)
+six-organization journey and [the evidence security boundary](docs/evidence-security.md)
 for the AES-GCM envelope, authorization path, and production limitations. The
 [adjudication design](docs/distributed-adjudication.md) documents assignment,
 quorum, timeout, appeal, and fraud decision-support boundaries. See the
 [operations and research design](docs/event-driven-operations-and-research.md)
 for Fabric event checkpointing, notification projection, evidence grants, and
-reproducible thesis metrics.
+reproducible thesis metrics. The [Oracle consensus design](docs/oracle-consensus.md)
+documents certificate assignment, exact-result commit/reveal, version binding,
+worker independence, and manual-review fallback.
 
 ## Complete verification
 
@@ -100,7 +113,8 @@ The command writes an ignored machine-readable summary to
 `verification-results/latest.json`. Its browser phase creates uniquely named
 local ledger records and proves role isolation plus the full settlement path.
 
-GitHub Actions also runs locked Next.js lint/type/unit/audit/build checks and
-native Go format/vet/tests on pushes and pull requests. The live Fabric/browser
-gate remains local because it depends on this repository's four-organization
-Docker network and enrolled development identities.
+GitHub Actions also runs locked Next.js lint/type/unit/audit/build checks, Oracle
+worker protocol/durability tests, and native Go format/vet/tests on pushes and
+pull requests. The live Fabric/browser gate remains local because it depends on
+this repository's five-business-organization Docker network and enrolled
+development identities.

@@ -614,3 +614,278 @@ func TestBenefitsBeneficiariesAndLiabilityLifecycle(t *testing.T) {
 		t.Fatalf("benefit payment did not close its liability: request=%+v liability=%+v", request, liability)
 	}
 }
+
+func setupOracleRequest(t *testing.T, suffix string) (*Contract, *testContext, *OracleRequest) {
+	t.Helper()
+	contract := &Contract{}
+	ctx := &testContext{stub: newMemoryStub()}
+	hashA := strings.Repeat("a", 64)
+	hashB := strings.Repeat("b", 64)
+	hashC := strings.Repeat("c", 64)
+
+	setIdentity(ctx, "insurer-admin", "InsurerMSP", "insurerAdmin", nil)
+	_, err := contract.CreatePolicyPackage(ctx, "package-oracle-"+suffix, "Oracle", "", 100, 100_000, hashA)
+	requireNoError(t, err)
+	_, err = contract.PublishPolicyPackage(ctx, "package-oracle-"+suffix)
+	requireNoError(t, err)
+	_, err = contract.IssuePolicy(ctx, "policy-oracle-"+suffix, "package-oracle-"+suffix, "policyholder1", "2026-01-01", "2026-12-31")
+	requireNoError(t, err)
+
+	setIdentity(ctx, "policyholder-cert", "InsurerMSP", "policyholder", map[string]string{"subjectId": "policyholder1"})
+	_, err = contract.SubmitClaim(ctx, "claim-oracle-"+suffix, "policy-oracle-"+suffix, 50_000, "2026-06-01", hashB)
+	requireNoError(t, err)
+	setIdentity(ctx, "hospital-cert", "HospitalMSP", "hospitalOfficer", map[string]string{"subjectId": "hospital1"})
+	_, err = contract.VerifyClaim(ctx, "claim-oracle-"+suffix, "verification-oracle-"+suffix, "VERIFIED", hashC)
+	requireNoError(t, err)
+
+	setIdentity(ctx, "insurer-admin", "InsurerMSP", "insurerAdmin", nil)
+	_, err = contract.PublishOracleRegistrySnapshot(ctx, "registry-oracle-"+suffix, 1, hashA, "rules-v1", hashB, 4)
+	requireNoError(t, err)
+	request, err := contract.RequestOracleVerification(
+		ctx,
+		"request-oracle-"+suffix,
+		"claim-oracle-"+suffix,
+		"registry-oracle-"+suffix,
+		"model-v1",
+		hashC,
+		`["oracle1","oracle2"]`,
+		"2026-09-05T12:05:00Z",
+		"2026-09-05T12:10:00Z",
+	)
+	requireNoError(t, err)
+	return contract, ctx, request
+}
+
+func commitOracleTestResult(t *testing.T, contract *Contract, ctx *testContext, request *OracleRequest, oracleID string, verified bool, code, recordHash, salt string) string {
+	t.Helper()
+	resultHash := oracleResultDigest(request, verified, code, recordHash)
+	commitment := oracleCommitmentDigest(request, verified, resultHash, salt)
+	setIdentity(ctx, "certificate-"+oracleID, "OracleMSP", "oracle", map[string]string{"subjectId": oracleID})
+	_, err := contract.SubmitOracleCommitment(ctx, request.ID, commitment)
+	requireNoError(t, err)
+	return resultHash
+}
+
+func revealOracleTestResult(t *testing.T, contract *Contract, ctx *testContext, request *OracleRequest, oracleID string, verified bool, code, recordHash, resultHash, salt string) *OracleResult {
+	t.Helper()
+	setIdentity(ctx, "certificate-"+oracleID, "OracleMSP", "oracle", map[string]string{"subjectId": oracleID})
+	result, err := contract.RevealOracleResult(
+		ctx, request.ID, verified, code, recordHash, resultHash,
+		request.ClaimVersion, request.RegistryVersion, request.ModelVersion, request.ModelHash, salt,
+	)
+	requireNoError(t, err)
+	return result
+}
+
+func TestOracleAuthorizationCommitRevealAndExactSuccess(t *testing.T) {
+	contract, ctx, request := setupOracleRequest(t, "success")
+	recordHash := strings.Repeat("d", 64)
+	salt1 := strings.Repeat("1", 64)
+	salt2 := strings.Repeat("2", 64)
+	resultHash := oracleResultDigest(request, true, "VERIFIED", recordHash)
+	commitment1 := oracleCommitmentDigest(request, true, resultHash, salt1)
+
+	setIdentity(ctx, "insurer-admin", "InsurerMSP", "insurerAdmin", nil)
+	_, err := contract.SubmitOracleCommitment(ctx, request.ID, commitment1)
+	requireError(t, err, "caller MSP InsurerMSP")
+	setIdentity(ctx, "wrong-role-oracle", "OracleMSP", "hospitalOfficer", map[string]string{"subjectId": "oracle1"})
+	_, err = contract.SubmitOracleCommitment(ctx, request.ID, commitment1)
+	requireError(t, err, "oracle role is required")
+	setIdentity(ctx, "missing-subject-oracle", "OracleMSP", "oracle", nil)
+	_, err = contract.SubmitOracleCommitment(ctx, request.ID, commitment1)
+	requireError(t, err, "requires a valid subjectId")
+
+	setIdentity(ctx, "certificate-oracle3", "OracleMSP", "oracle", map[string]string{"subjectId": "oracle3"})
+	_, err = contract.SubmitOracleCommitment(ctx, request.ID, commitment1)
+	requireError(t, err, "is not assigned")
+
+	commitOracleTestResult(t, contract, ctx, request, "oracle1", true, "VERIFIED", recordHash, salt1)
+	setIdentity(ctx, "another-certificate", "OracleMSP", "oracle", map[string]string{"subjectId": "oracle1"})
+	_, err = contract.SubmitOracleCommitment(ctx, request.ID, commitment1)
+	requireError(t, err, "already exists")
+	commitOracleTestResult(t, contract, ctx, request, "oracle2", true, "VERIFIED", recordHash, salt2)
+
+	setIdentity(ctx, "certificate-oracle1", "OracleMSP", "oracle", map[string]string{"subjectId": "oracle1"})
+	_, err = contract.RevealOracleResult(
+		ctx, request.ID, true, "VERIFIED", recordHash, resultHash,
+		request.ClaimVersion, request.RegistryVersion, request.ModelVersion, request.ModelHash, strings.Repeat("9", 64),
+	)
+	requireError(t, err, "does not match its commitment")
+	_, err = contract.RevealOracleResult(
+		ctx, request.ID, true, "VERIFIED", recordHash, resultHash,
+		request.ClaimVersion, request.RegistryVersion+1, request.ModelVersion, request.ModelHash, salt1,
+	)
+	requireError(t, err, "registry version mismatch")
+
+	revealOracleTestResult(t, contract, ctx, request, "oracle1", true, "VERIFIED", recordHash, resultHash, salt1)
+	_, err = contract.RevealOracleResult(
+		ctx, request.ID, true, "VERIFIED", recordHash, resultHash,
+		request.ClaimVersion, request.RegistryVersion, request.ModelVersion, request.ModelHash, salt1,
+	)
+	requireError(t, err, "already exists")
+	revealOracleTestResult(t, contract, ctx, request, "oracle2", true, "VERIFIED", recordHash, resultHash, salt2)
+	claim, err := contract.ReadClaim(ctx, request.ClaimID)
+	requireNoError(t, err)
+	finalRequest, err := contract.ReadOracleRequest(ctx, request.ID)
+	requireNoError(t, err)
+	if claim.Status != "APPROVED" || claim.OracleOutcome != "EXACT_CONSENSUS" || claim.OracleResultHash != resultHash {
+		t.Fatalf("exact Oracle success did not approve claim: %+v", claim)
+	}
+	if finalRequest.Status != "CONSENSUS" || !finalRequest.VerifiedResult || finalRequest.ResultHash != resultHash {
+		t.Fatalf("unexpected finalized Oracle request: %+v", finalRequest)
+	}
+
+	setIdentity(ctx, "certificate-oracle1", "OracleMSP", "oracle", map[string]string{"subjectId": "oracle1"})
+	_, err = contract.AuthorizeSettlement(ctx, "settlement-forged-by-oracle", claim.ID)
+	requireError(t, err, "caller MSP OracleMSP")
+	setIdentity(ctx, "insurer-admin", "InsurerMSP", "insurerAdmin", nil)
+	_, err = contract.AuthorizeSettlement(ctx, "settlement-oracle-success", claim.ID)
+	requireNoError(t, err)
+}
+
+func TestOracleNegativeConflictTimeoutAndFallback(t *testing.T) {
+	t.Run("matching negative result", func(t *testing.T) {
+		contract, ctx, request := setupOracleRequest(t, "negative")
+		recordHash := strings.Repeat("d", 64)
+		salt1 := strings.Repeat("1", 64)
+		salt2 := strings.Repeat("2", 64)
+		resultHash := commitOracleTestResult(t, contract, ctx, request, "oracle1", false, "RECORD_INVALID", recordHash, salt1)
+		commitOracleTestResult(t, contract, ctx, request, "oracle2", false, "RECORD_INVALID", recordHash, salt2)
+		revealOracleTestResult(t, contract, ctx, request, "oracle1", false, "RECORD_INVALID", recordHash, resultHash, salt1)
+		revealOracleTestResult(t, contract, ctx, request, "oracle2", false, "RECORD_INVALID", recordHash, resultHash, salt2)
+		claim, err := contract.ReadClaim(ctx, request.ClaimID)
+		requireNoError(t, err)
+		if claim.Status != "ORACLE_FAILED" || claim.OracleOutcome != "NEGATIVE_RESULT" {
+			t.Fatalf("matching negative result was not classified correctly: %+v", claim)
+		}
+
+		setIdentity(ctx, "insurer-admin", "InsurerMSP", "insurerAdmin", nil)
+		review, err := contract.RouteOracleFailureToReview(
+			ctx, request.ID, "review-oracle-negative", `["auditor1","auditor2","auditor3","auditor4"]`,
+			3, 2, "2026-09-08T12:00:00Z",
+		)
+		requireNoError(t, err)
+		if review.Kind != "INITIAL" || review.Status != "OPEN" {
+			t.Fatalf("Oracle failure did not open governed fallback review: %+v", review)
+		}
+	})
+
+	t.Run("different complete results conflict", func(t *testing.T) {
+		contract, ctx, request := setupOracleRequest(t, "conflict")
+		recordA := strings.Repeat("d", 64)
+		recordB := strings.Repeat("e", 64)
+		salt1 := strings.Repeat("1", 64)
+		salt2 := strings.Repeat("2", 64)
+		resultA := commitOracleTestResult(t, contract, ctx, request, "oracle1", true, "VERIFIED", recordA, salt1)
+		resultB := commitOracleTestResult(t, contract, ctx, request, "oracle2", true, "VERIFIED", recordB, salt2)
+		revealOracleTestResult(t, contract, ctx, request, "oracle1", true, "VERIFIED", recordA, resultA, salt1)
+		revealOracleTestResult(t, contract, ctx, request, "oracle2", true, "VERIFIED", recordB, resultB, salt2)
+		claim, err := contract.ReadClaim(ctx, request.ClaimID)
+		requireNoError(t, err)
+		if claim.Status != "ORACLE_FAILED" || claim.OracleOutcome != "CONFLICT" || claim.OracleResultHash != "" {
+			t.Fatalf("different exact results did not fail conservatively: %+v", claim)
+		}
+	})
+
+	t.Run("timeout after reveal deadline", func(t *testing.T) {
+		contract, ctx, request := setupOracleRequest(t, "timeout")
+		setIdentity(ctx, "policyholder-cert", "InsurerMSP", "policyholder", map[string]string{"subjectId": "policyholder1"})
+		_, err := contract.FinalizeOracleTimeout(ctx, request.ID)
+		requireError(t, err, "has not timed out")
+		ctx.stub.timestamp = timestamppb.New(time.Date(2026, time.September, 5, 12, 11, 0, 0, time.UTC))
+		finalRequest, err := contract.FinalizeOracleTimeout(ctx, request.ID)
+		requireNoError(t, err)
+		claim, err := contract.ReadClaim(ctx, request.ClaimID)
+		requireNoError(t, err)
+		if finalRequest.FinalizationCode != "TIMEOUT" || claim.OracleOutcome != "TIMEOUT" || claim.Status != "ORACLE_FAILED" {
+			t.Fatalf("Oracle timeout did not fail safely: request=%+v claim=%+v", finalRequest, claim)
+		}
+	})
+}
+
+func TestOracleDeadlinesStaleVersionsAndAppealIsolation(t *testing.T) {
+	contract, ctx, request := setupOracleRequest(t, "versioning")
+	recordHash := strings.Repeat("d", 64)
+	salt1 := strings.Repeat("1", 64)
+	salt2 := strings.Repeat("2", 64)
+	resultHash := oracleResultDigest(request, false, "RECORD_INVALID", recordHash)
+
+	setIdentity(ctx, "certificate-oracle1", "OracleMSP", "oracle", map[string]string{"subjectId": "oracle1"})
+	_, err := contract.RevealOracleResult(
+		ctx, request.ID, false, "RECORD_INVALID", recordHash, resultHash,
+		request.ClaimVersion+1, request.RegistryVersion, request.ModelVersion, request.ModelHash, salt1,
+	)
+	requireError(t, err, "claim version mismatch")
+
+	commitOracleTestResult(t, contract, ctx, request, "oracle1", false, "RECORD_INVALID", recordHash, salt1)
+	commitOracleTestResult(t, contract, ctx, request, "oracle2", false, "RECORD_INVALID", recordHash, salt2)
+	revealOracleTestResult(t, contract, ctx, request, "oracle1", false, "RECORD_INVALID", recordHash, resultHash, salt1)
+	revealOracleTestResult(t, contract, ctx, request, "oracle2", false, "RECORD_INVALID", recordHash, resultHash, salt2)
+
+	setIdentity(ctx, "insurer-admin", "InsurerMSP", "insurerAdmin", nil)
+	_, err = contract.RouteOracleFailureToReview(
+		ctx, request.ID, "review-oracle-versioning", `["auditor1","auditor2","auditor3","auditor4"]`,
+		3, 2, "2026-09-08T12:00:00Z",
+	)
+	requireNoError(t, err)
+	for _, auditorID := range []string{"auditor1", "auditor2"} {
+		setIdentity(ctx, "certificate-"+auditorID, "AuditorMSP", "auditor", map[string]string{"subjectId": auditorID})
+		_, err = contract.RecordAuditorDecision(ctx, "review-oracle-versioning", "decision-oracle-versioning-"+auditorID, "REJECT", strings.Repeat("e", 64))
+		requireNoError(t, err)
+	}
+	setIdentity(ctx, "policyholder-cert", "InsurerMSP", "policyholder", map[string]string{"subjectId": "policyholder1"})
+	appeal, err := contract.SubmitClaimAppeal(ctx, "appeal-oracle-versioning", request.ClaimID, strings.Repeat("a", 64), "")
+	requireNoError(t, err)
+	claim, err := contract.ReadClaim(ctx, request.ClaimID)
+	requireNoError(t, err)
+	if claim.Version != 2 || claim.CurrentOracleRequestID != "" || appeal.Round != 1 {
+		t.Fatalf("appeal did not isolate the prior Oracle request: claim=%+v appeal=%+v", claim, appeal)
+	}
+
+	setIdentity(ctx, "certificate-oracle1", "OracleMSP", "oracle", map[string]string{"subjectId": "oracle1"})
+	_, err = contract.RevealOracleResult(
+		ctx, request.ID, false, "RECORD_INVALID", recordHash, resultHash,
+		request.ClaimVersion, request.RegistryVersion, request.ModelVersion, request.ModelHash, salt1,
+	)
+	requireError(t, err, "already finalized")
+
+	setIdentity(ctx, "insurer-admin", "InsurerMSP", "insurerAdmin", nil)
+	appealRequest, err := contract.RequestOracleVerification(
+		ctx, "request-oracle-appeal", claim.ID, request.RegistrySnapshotID, request.ModelVersion, request.ModelHash,
+		`["oracle1","oracle2"]`, "2026-09-05T12:05:00Z", "2026-09-05T12:10:00Z",
+	)
+	requireNoError(t, err)
+	if appealRequest.ClaimVersion != 2 || appealRequest.QueryHash == request.QueryHash {
+		t.Fatalf("appeal Oracle request was not rebound to claim version 2: %+v", appealRequest)
+	}
+}
+
+func TestOracleLateSubmissionsAreRejected(t *testing.T) {
+	contract, ctx, request := setupOracleRequest(t, "late")
+	recordHash := strings.Repeat("d", 64)
+	salt := strings.Repeat("1", 64)
+	resultHash := oracleResultDigest(request, true, "VERIFIED", recordHash)
+	commitment := oracleCommitmentDigest(request, true, resultHash, salt)
+	ctx.stub.timestamp = timestamppb.New(time.Date(2026, time.September, 5, 12, 6, 0, 0, time.UTC))
+	setIdentity(ctx, "certificate-oracle1", "OracleMSP", "oracle", map[string]string{"subjectId": "oracle1"})
+	_, err := contract.SubmitOracleCommitment(ctx, request.ID, commitment)
+	requireError(t, err, "commit phase has ended")
+}
+
+func TestOracleProtocolMatchesWorkerHashVector(t *testing.T) {
+	request := &OracleRequest{
+		ID: "request-vector-1", ClaimID: "claim-vector-1", QueryHash: strings.Repeat("1", 64),
+		ClaimVersion: 2, HospitalVerificationID: "verification-vector-1",
+		RegistrySnapshotID: "registry-demo-v1", RegistryVersion: 1, RegistryRootHash: strings.Repeat("2", 64),
+		RulesVersion: "rules-v1", RulesHash: strings.Repeat("3", 64),
+		ModelVersion: "model-v1", ModelHash: strings.Repeat("4", 64),
+	}
+	resultHash := oracleResultDigest(request, true, "VERIFIED", strings.Repeat("5", 64))
+	if resultHash != "310ba46f898f75725e6c041800559faf9d69f72c40749874e15c1f7b7afd89e2" {
+		t.Fatalf("Go Oracle result hash diverged from the Node worker: %s", resultHash)
+	}
+	commitment := oracleCommitmentDigest(request, true, resultHash, strings.Repeat("6", 64))
+	if commitment != "dc82bc23fc7d06bce5a00726f88b387baf6a82acfa5d70c7e2bfe49524708d89" {
+		t.Fatalf("Go Oracle commitment diverged from the Node worker: %s", commitment)
+	}
+}

@@ -1,7 +1,8 @@
-# Local five-organization demonstration
+# Local six-organization demonstration
 
 This runbook demonstrates the permissioned insurance journey using the local
-InsurerMSP, HospitalMSP, AuditorMSP, and BankMSP network. It assumes the documented
+InsurerMSP, HospitalMSP, AuditorMSP, BankMSP, and OracleMSP business network plus
+the development orderer. It assumes the documented
 WSL2, Docker Desktop, Fabric, Go, and Node prerequisites are already available.
 
 ## 1. Confirm the network and contract
@@ -14,11 +15,43 @@ bash network/scripts/deploy-chaincode.sh
 bash network/scripts/network.sh verify
 ```
 
-The verifier should report 14 healthy services, five reachable CAs, four ready
-CouchDB instances, all four peers joined to `insurance-channel`, chaincode
-`insurance-contract` 0.6.1, and schema version 5.
+The verifier should report 17 healthy services, six reachable CAs, five ready
+CouchDB instances, all five peers joined to `insurance-channel`, both Oracle
+identities enrolled, chaincode `insurance-contract` 0.7.0, and schema version 6.
 
-## 2. Start the application
+## 2. Start the supervised application stack
+
+The normal start path is non-destructive and never replaces ledger data:
+
+```powershell
+.\scripts\demo-stack.ps1 Preflight
+.\scripts\demo-stack.ps1 Start
+.\scripts\demo-stack.ps1 Status
+```
+
+It supervises the standalone Next.js application, durable event worker, Oracle 1,
+and Oracle 2. `Stop` stops application services and Fabric containers while
+retaining ledger volumes; add `-KeepNetwork` to leave Fabric running.
+
+The default `-OracleScenario Baseline` gives exact positive/negative agreement.
+After stopping only the managed processes with `Stop -KeepNetwork`, use
+`Start -OracleScenario Conflict` for the tracked divergent Oracle 2 snapshot or
+`Start -OracleScenario Oracle2Unavailable` for a deliberate timeout. No source or
+private-key edit is required during the presentation.
+
+Only after deliberately approving loss of the local development ledger, create a
+clean showcase with the small policy/benefit/Oracle catalog and no old claims:
+
+```powershell
+.\scripts\demo-stack.ps1 CleanBootstrap -ConfirmReset
+```
+
+The command refuses to reset anything unless `-ConfirmReset` is present.
+It clears only this project's generated Fabric identities/channel/ledger volumes
+and ignored evidence, event, Oracle cursor/health, and supervisor state before
+seeding; tracked source and `reference/` are untouched.
+
+### Manual alternatives
 
 From Windows PowerShell in `apps/web`, prepare `.env.local` from `.env.example`,
 set a local `AUTH_SECRET` of at least 32 characters, and enable demo authentication.
@@ -67,22 +100,33 @@ inside the browser and convert BDT values to exact integer poisha.
    optionally retrieve/decrypt evidence with the shared demonstration passphrase,
    then record `VERIFIED` or `INVALID`.
 4. **Insurer Administrator** — record the transparent advisory fraud assessment,
-   then open an independent review with immutable auditor assignments, quorum
-   thresholds, and a deadline.
-5. **Independent Auditors One through Four** — inspect assigned claim/evidence
+   then request two-Oracle verification with `registry-demo-v1`, `model-v1`,
+   assigned subjects `oracle1`/`oracle2`, and future commit/reveal deadlines.
+5. **Oracle 1 and Oracle 2 services** — independently consume the committed request,
+   query their own registry snapshots, submit salted commitments, and reveal only
+   after the commit phase. Show identities, sources, progress, and latency in the
+   Oracle operations panel.
+6. **Automatic success path** — use the `11…11` registry lookup and matching claim
+   description to demonstrate exact positive consensus. The claim becomes
+   `APPROVED`; the insurer then authorizes settlement and BankMSP confirms it.
+7. **Failure/fallback path** — use the `22…22` lookup and matching negative record.
+   Both Oracles agree on `RECORD_INVALID`, producing `ORACLE_FAILED`. The insurer
+   routes that request into a new four-auditor review with immutable assignments,
+   quorum thresholds, and a deadline.
+8. **Independent Auditors One through Four** — inspect assigned claim/evidence
    and cast certificate-bound `APPROVE` or `REJECT` votes. Three approvals or two
    rejections finalize the default 3-of-4 review; duplicate votes are rejected.
-6. **Policyholder One** — if the initial review rejects the claim, submit the
+9. **Policyholder One** — if the manual review rejects the claim, submit the
    single permitted appeal. The insurer opens a new round and a fresh quorum can
    overturn or uphold the decision without erasing round-one votes.
-7. **Insurer Administrator** — authorize a settlement for an approved claim.
-8. **Bank Officer** — confirm the authorized settlement using an external payment
+10. **Insurer Administrator** — authorize a settlement for an approved claim.
+11. **Bank Officer** — confirm the authorized settlement using an external payment
    reference; only its browser-generated hash is written to the ledger.
-9. **Policyholder One** — read the claim and confirm its final state is `SETTLED`.
-10. **Insurer Administrator or an assigned Independent Auditor** — list evidence access records
+12. **Policyholder One** — read the claim and confirm its final state is `SETTLED`.
+13. **Insurer Administrator or an assigned Independent Auditor** — list evidence access records
    and show the immutable role/purpose trail created by retrievals. Enter the
    claim ID in **Export claim dossier** to download the consolidated JSON artifact.
-11. **Insurer Administrator** — synchronize committed Fabric events. Show the
+14. **Insurer Administrator** — synchronize committed Fabric events. Show the
     transaction-aware checkpoint and role inbox, then open the thesis dashboard
     and download its reproducibility-hashed JSON snapshot.
 
@@ -99,11 +143,11 @@ From the repository root in Windows PowerShell:
 ```
 
 This runs lint, TypeScript, unit and cryptographic tests, dependency audit,
-event-worker syntax validation, standalone production build, Go chaincode tests,
+event-worker syntax validation, Oracle worker tests and health, standalone production build, Go chaincode tests,
 live Fabric topology/schema
 verification, role isolation, WCAG 2.1 AA checks, encrypted evidence
-round-trip/access logging, multi-auditor appeal adjudication, and the complete
-multi-session settlement workflow.
+round-trip/access logging, multi-auditor appeal adjudication, automatic Oracle
+settlement, negative-result auditor fallback, and the existing multi-session workflows.
 The ignored result is written to `verification-results/latest.json`, including
 the commit/branch, dirty-tree flag, selected gates, runtime versions, and timings.
 

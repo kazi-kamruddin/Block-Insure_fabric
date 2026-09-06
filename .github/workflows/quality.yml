@@ -63,3 +63,21 @@ jobs:
         run: go vet ./...
       - name: Test chaincode
         run: go test ./...
+
+  oracle-worker:
+    name: Oracle worker protocol and durability
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/oracle-worker
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+      - name: Check worker source
+        run: npm run check
+      - name: Test independent Oracle behavior
+        run: npm test

@@ -12,10 +12,10 @@ business authorities without claiming production high availability.
                         insurance-channel
       ┌─────────────────┬───────┼────────┬──────────────────┐
       │                 │       │        │                  │
- InsurerMSP       HospitalMSP AuditorMSP BankMSP
- peer0.insurer    peer0.hospital peer0.auditor peer0.bank
- CouchDB          CouchDB        CouchDB       CouchDB
- Fabric CA        Fabric CA      Fabric CA     Fabric CA
+ InsurerMSP       HospitalMSP AuditorMSP BankMSP       OracleMSP
+ peer0.insurer    peer0.hospital peer0.auditor peer0.bank peer0.oracle
+ CouchDB          CouchDB        CouchDB       CouchDB   CouchDB
+ Fabric CA        Fabric CA      Fabric CA     Fabric CA Fabric CA
 ```
 
 ## Identity convention
@@ -32,6 +32,7 @@ validate both the caller MSP and that attribute.
 | Hospital officer | `HospitalMSP` | `hospitalOfficer` |
 | Auditor subjects `auditor1`–`auditor4` | `AuditorMSP` | `auditor` |
 | Bank officer | `BankMSP` | `bankOfficer` |
+| Oracle services `oracle1` and `oracle2` | `OracleMSP` | `oracle` plus unique `subjectId` |
 
 ## Data boundary
 
@@ -51,11 +52,11 @@ development network.
 
 ## Endorsement governance
 
-The channel application policy uses `MAJORITY Endorsement`. With four business
+The channel application policy uses `MAJORITY Endorsement`. With five business
 organizations, a valid chaincode transaction therefore needs endorsements from
 three organization peers. The chaincode definition lifecycle similarly uses
 `MAJORITY LifecycleEndorsement`, while the deployment script deliberately obtains
-definition approvals from all four organizations before commit.
+definition approvals from all five organizations before commit.
 
 Endorsement is not the actor authorization rule. Every mutating transaction also
 checks the proposal creator's MSP and CA-issued `role` attribute inside chaincode.

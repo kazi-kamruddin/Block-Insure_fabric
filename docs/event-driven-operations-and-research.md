@@ -56,10 +56,13 @@ The operational APIs are:
 - `/api/operations/events` — insurer/auditor event inspection with event, asset,
   block, and limit filters;
 - `/api/internal/events/sync` — idempotent projection catch-up.
+- `/api/operations/oracles` — insurer/auditor view of both service identities,
+  registry/model provenance, cursor progress, counts, errors, and ledger-derived
+  agreement/conflict/timeout totals.
 
 ## Research snapshot
 
-`/research` renders portfolio, adjudication, appeal, fraud-triage, evidence,
+`/research` renders portfolio, Oracle consensus/latency, adjudication, appeal, fraud-triage, evidence,
 event, settlement, premium, benefit, and liability measurements obtained from
 the current ledger. `/api/research/snapshot` returns the same structured artifact.
 It includes channel, chaincode, ledger schema, event checkpoint, interpretation
