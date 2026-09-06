@@ -47,7 +47,7 @@ $env:PORT = "3000"
 npm run start
 ```
 
-Open `http://127.0.0.1:3000/workspace`. Fabric certificates and private keys
+Open `http://localhost:3000/workspace`. Fabric certificates and private keys
 remain server-side throughout the demonstration.
 
 ## 3. Complete the governed journey

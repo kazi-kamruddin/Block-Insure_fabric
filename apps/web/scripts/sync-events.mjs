@@ -1,3 +1,7 @@
+import { loadApplicationEnvironment } from "./load-environment.mjs";
+
+loadApplicationEnvironment();
+
 const once = process.argv.includes("--once");
 const endpoint = process.env.EVENT_SYNC_URL ?? "http://127.0.0.1:3000/api/internal/events/sync";
 const secret = process.env.EVENT_WORKER_SECRET ?? "";
