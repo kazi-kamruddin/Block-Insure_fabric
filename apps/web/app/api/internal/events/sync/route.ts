@@ -1,13 +1,17 @@
 import { NextResponse } from "next/server";
 import { currentSession } from "@/lib/auth/current-session";
 import { checkMutationOrigin } from "@/lib/security/request-origin";
+import { verifyBearerToken } from "@/lib/security/bearer-token";
 import { syncFabricEvents } from "@/lib/events/sync";
 
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
-  const supplied = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ?? "";
-  const workerAuthorized = Boolean(process.env.EVENT_WORKER_SECRET && supplied === process.env.EVENT_WORKER_SECRET);
+  const authorization = request.headers.get("authorization");
+  const workerAuthorized = verifyBearerToken(authorization, process.env.EVENT_WORKER_SECRET);
+  if (authorization && !workerAuthorized) {
+    return NextResponse.json({ message: "Worker authentication failed" }, { status: 401 });
+  }
   const session = workerAuthorized ? null : await currentSession().catch(() => null);
   if (!workerAuthorized) {
     const trust = checkMutationOrigin(request);

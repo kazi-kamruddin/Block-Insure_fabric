@@ -27,11 +27,13 @@ governance remain environment-specific work outside the local release.
 - `network/` — local Fabric topology, channel configuration, and lifecycle scripts.
 - `chaincode/insurance-contract/` — insurance domain chaincode and its tests.
 - `apps/web/` — Next.js web application.
-- `fabric/` — server-side Gateway, identity, and ledger integration modules.
-- `services/` — off-chain document, fraud-scoring, and external-system adapters.
 - `docs/` — architecture, role model, and implementation notes.
 - `scripts/` — shared developer automation.
-- `tests/` — cross-component tests.
+
+Server-side Gateway, identity, evidence, fraud, event, and research modules are
+co-located under `apps/web/lib/`; cross-component browser tests live in
+`apps/web/e2e/`. The empty root `fabric/`, `services/`, and `tests/` directories
+are retained only as initial scaffold seams and contain no runtime implementation.
 
 `reference/` contains the prior Ethereum implementation for local study only.
 It is deliberately ignored by Git and must not be modified or committed as part
@@ -63,6 +65,10 @@ The web application lives under `apps/web`. Copy `.env.example` to the ignored
 npm install
 npm run dev
 ```
+
+An optional supervised local event consumer can then be run from `apps/web`
+with `npm run events:sync`; `-- --once` performs a bounded complete catch-up and
+exits. It uses `EVENT_WORKER_SECRET` and never receives a Fabric private key.
 
 The application provides process and live-ledger health routes, signed local
 demo sessions, role-specific dashboards and guided transactions, ledger queries,

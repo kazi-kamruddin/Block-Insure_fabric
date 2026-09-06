@@ -40,6 +40,15 @@ backup policy, delivery-lag monitoring, and a supervised continuously running
 worker. Fabric is final within this network, so Ethereum confirmation/reorg
 rollback logic from the reference project is intentionally not copied.
 
+`npm run events:sync` is the supervised-worker entry point. It authenticates with
+the same `EVENT_WORKER_SECRET` configured on the web process, drains consecutive
+full batches immediately, polls after reaching the live tip, backs off boundedly
+after transient failures, and logs structured JSON without credentials. Use
+`--once` for a deployment or demonstration catch-up. The API compares worker
+credentials through fixed-length digests, rejects malformed authorization
+schemes, and coalesces concurrent in-process synchronization requests so multiple
+triggers cannot open redundant Gateway event streams.
+
 The operational APIs are:
 
 - `/api/operations/notifications` — current role/subject inbox derived from
@@ -54,7 +63,8 @@ The operational APIs are:
 event, settlement, premium, benefit, and liability measurements obtained from
 the current ledger. `/api/research/snapshot` returns the same structured artifact.
 It includes channel, chaincode, ledger schema, event checkpoint, interpretation
-limits, and a canonical SHA-256 reproducibility hash. Export time is excluded
+limits, cumulative indexed-event count, bounded retained-event count, and a
+canonical SHA-256 reproducibility hash. Export time is excluded
 from that hash, so the same measured state produces the same identifier.
 
 The dashboard is deliberately descriptive. Fraud assessment is advisory;
@@ -71,5 +81,5 @@ and reproducible hashing. The live CLI
 workflow creates, uses, and revokes a grant. Playwright validates grant-backed
 ciphertext delivery, dossier provenance, event synchronization, role inboxes,
 research authorization, the dedicated dashboard, and WCAG 2.1 AA checks.
-The consolidated verifier passes all eight gates, including 37 web unit tests,
-the Go suite, the live network check, and 24 browser tests.
+The consolidated verifier covers worker authentication as part of the live
+browser suite in addition to the Go suite and live network check.

@@ -55,6 +55,19 @@ test("anonymous users cannot read ledger dashboards", async ({ request }) => {
   expect(response.status()).toBe(401);
 });
 
+test("event worker requires its exact bearer credential", async ({ request }) => {
+  const rejected = await request.post("/api/internal/events/sync", {
+    headers: { authorization: "Bearer incorrect-event-worker-secret-with-32-characters" },
+  });
+  expect(rejected.status()).toBe(401);
+
+  const accepted = await request.post("/api/internal/events/sync", {
+    headers: { authorization: "Bearer browser-event-worker-secret-with-32-characters" },
+  });
+  expect(accepted.ok(), await accepted.text()).toBe(true);
+  expect(await accepted.json()).toMatchObject({ limitReached: expect.any(Boolean), processed: expect.any(Number) });
+});
+
 test("research metrics are role-restricted and reproducibly identified", async ({ page }) => {
   await signIn(page, "policyholder-1");
   await page.goto("/research");

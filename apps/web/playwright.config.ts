@@ -28,6 +28,8 @@ export default defineConfig({
       APP_ORIGIN: baseURL,
       HOSTNAME: "127.0.0.1",
       PORT: String(port),
+      EVENT_WORKER_SECRET: "browser-event-worker-secret-with-32-characters",
+      FABRIC_EVENT_SYNC_DEADLINE_SECONDS: "5",
     },
   },
 });

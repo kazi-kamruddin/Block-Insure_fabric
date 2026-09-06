@@ -6,8 +6,12 @@ import { withFabricContract } from "@/lib/fabric/gateway";
 import { appendProjectedEvent, readEventProjection } from "./store";
 
 const decoder = new TextDecoder();
+let activeSynchronization: Promise<EventSyncResult> | null = null;
 
-export async function syncFabricEvents(maxEvents = 5_000) {
+async function performFabricEventSync(maxEvents: number) {
+  if (!Number.isInteger(maxEvents) || maxEvents < 1 || maxEvents > 50_000) {
+    throw new Error("maxEvents must be an integer between 1 and 50000");
+  }
   const before = await readEventProjection();
   const config = loadFabricConfig();
   let processed = 0;
@@ -49,4 +53,16 @@ export async function syncFabricEvents(maxEvents = 5_000) {
     totalEvents: projection.events.length,
     countsByName: projection.countsByName,
   };
+}
+
+export type EventSyncResult = Awaited<ReturnType<typeof performFabricEventSync>>;
+
+export function syncFabricEvents(maxEvents = 5_000) {
+  if (activeSynchronization) return activeSynchronization;
+  const operation = performFabricEventSync(maxEvents);
+  activeSynchronization = operation;
+  void operation.finally(() => {
+    if (activeSynchronization === operation) activeSynchronization = null;
+  }).catch(() => undefined);
+  return operation;
 }

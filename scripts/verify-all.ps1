@@ -48,12 +48,25 @@ function Save-VerificationReport {
     param([string]$Status)
 
     New-Item -ItemType Directory -Path $resultsRoot -Force | Out-Null
+    $gitStatus = @(git -c "safe.directory=$gitSafeRoot" -C $projectRoot status --porcelain=v1 --untracked-files=normal)
     [pscustomobject]@{
-        schemaVersion = 1
+        schemaVersion = 2
         status = $Status
         startedAt = $startedAt.ToString("o")
         completedAt = [DateTimeOffset]::UtcNow.ToString("o")
         gitCommit = (git -c "safe.directory=$gitSafeRoot" -C $projectRoot rev-parse --short HEAD).Trim()
+        gitBranch = (git -c "safe.directory=$gitSafeRoot" -C $projectRoot branch --show-current).Trim()
+        gitDirty = $gitStatus.Count -gt 0
+        options = [pscustomobject]@{
+            networkIncluded = -not $SkipNetwork
+            browserIncluded = -not $SkipBrowser
+            auditIncluded = -not $SkipAudit
+        }
+        runtime = [pscustomobject]@{
+            node = (node --version).Trim()
+            npm = (npm --version).Trim()
+            powerShell = $PSVersionTable.PSVersion.ToString()
+        }
         results = $results
     } | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $reportPath -Encoding utf8
 }
@@ -63,6 +76,7 @@ try {
     Invoke-VerificationStep "Web lint" { npm run lint }
     Invoke-VerificationStep "Web type check" { npm run typecheck }
     Invoke-VerificationStep "Web unit tests" { npm run test }
+    Invoke-VerificationStep "Event worker syntax" { npm run check:worker }
     if (-not $SkipAudit) {
         Invoke-VerificationStep "Dependency audit" { npm audit --audit-level=high }
     }

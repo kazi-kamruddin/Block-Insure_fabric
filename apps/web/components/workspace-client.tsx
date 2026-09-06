@@ -17,7 +17,7 @@ type AssetType = "package" | "policy" | "claim" | "evidence" | "evidence-grant" 
 type NotificationItem = { id: string; title: string; message: string; assetId: string; blockNumber: string };
 type ResearchSnapshotView = {
   reproducibilityHash: string;
-  provenance: { ledgerSchemaVersion: number; indexedEvents: number; checkpoint: { blockNumber: string } | null };
+  provenance: { ledgerSchemaVersion: number; indexedEvents: number; retainedEvents: number; checkpoint: { blockNumber: string } | null };
   portfolio: { policies: number; claims: number };
   adjudication: { reviewRounds: number; appeals: number; meanClosureLatencyMs: number | null };
   fraudDecisionSupport: { assessments: number; advisoryOnly: boolean };

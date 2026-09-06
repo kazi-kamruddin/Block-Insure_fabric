@@ -42,6 +42,24 @@ material exists under `../../network/organizations`. Check application health at
   ledger-derived thesis dashboard and reproducibility-hashed JSON artifact.
 - `/api/banking/otp` and `/api/banking/premium-payment` provide policy-bound,
   single-use manual premium authorization for policyholders.
+
+## Supervised event worker
+
+Set the same random `EVENT_WORKER_SECRET` (at least 32 characters) for the web
+server and worker. With the web application already running, perform one full
+catch-up or keep a supervised consumer running:
+
+```powershell
+npm run events:sync -- --once
+npm run events:sync
+```
+
+The worker immediately requests another bounded batch when `limitReached` is
+true, otherwise polls at `EVENT_WORKER_INTERVAL_MS`. Transient failures use
+bounded exponential backoff and produce structured JSON logs. It accepts HTTP
+only for a loopback URL; remote endpoints must use HTTPS. Process supervision
+(for example a container restart policy or service manager) remains a deployment
+responsibility.
 - `/api/internal/banking/collections` is the bearer-protected durable collection
   worker boundary for due/retry discovery and bank reconciliation.
 - `/api/policies/[id]/statement` exports an ownership-filtered policy, premium,

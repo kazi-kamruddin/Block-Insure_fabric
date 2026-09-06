@@ -28,6 +28,16 @@ Then use either development mode:
 npm run dev
 ```
 
+For automatic event catch-up, configure the same `EVENT_WORKER_SECRET` in the
+web and worker environments, then start a second terminal in `apps/web`:
+
+```powershell
+npm run events:sync
+```
+
+Use `npm run events:sync -- --once` when only a pre-demonstration catch-up is
+needed. Stop the continuous worker with Ctrl+C.
+
 or the deployable standalone build:
 
 ```powershell
@@ -89,11 +99,13 @@ From the repository root in Windows PowerShell:
 ```
 
 This runs lint, TypeScript, unit and cryptographic tests, dependency audit,
-standalone production build, Go chaincode tests, live Fabric topology/schema
+event-worker syntax validation, standalone production build, Go chaincode tests,
+live Fabric topology/schema
 verification, role isolation, WCAG 2.1 AA checks, encrypted evidence
 round-trip/access logging, multi-auditor appeal adjudication, and the complete
 multi-session settlement workflow.
-The ignored result is written to `verification-results/latest.json`.
+The ignored result is written to `verification-results/latest.json`, including
+the commit/branch, dirty-tree flag, selected gates, runtime versions, and timings.
 
 The browser workflow creates uniquely named ledger records. Use the local
 development network for rehearsals; do not point it at shared or production state.

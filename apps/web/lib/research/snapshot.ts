@@ -38,7 +38,7 @@ function canonical(value: unknown): string {
 
 export function buildResearchSnapshot(
   input: ResearchInput,
-  provenance: { channel: string; chaincode: string; ledgerSchemaVersion: number; checkpoint: { blockNumber: string; transactionId: string } | null; indexedEvents: number; eventCounts: Record<string, number> },
+  provenance: { channel: string; chaincode: string; ledgerSchemaVersion: number; checkpoint: { blockNumber: string; transactionId: string } | null; indexedEvents: number; retainedEvents: number; eventCounts: Record<string, number> },
   generatedAt = new Date().toISOString(),
 ) {
   const closedReviews = input.reviews.filter((review) => review.closedAt);

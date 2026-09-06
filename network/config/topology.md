@@ -28,21 +28,19 @@ validate both the caller MSP and that attribute.
 | Identity class | MSP | Required role attribute |
 |---|---|---|
 | Insurer administrator | `InsurerMSP` | `insurerAdmin` |
-| Claim officer | `InsurerMSP` | `claimOfficer` |
 | Policyholder | `InsurerMSP` | `policyholder` |
 | Hospital officer | `HospitalMSP` | `hospitalOfficer` |
-| Auditor | `AuditorMSP` | `auditor` |
+| Auditor subjects `auditor1`–`auditor4` | `AuditorMSP` | `auditor` |
 | Bank officer | `BankMSP` | `bankOfficer` |
-| System worker | `InsurerMSP` | `systemWorker` |
 
 ## Data boundary
 
 All organizations share the workflow ledger on `insurance-channel`. The
 channel ledger stores only safe operational identifiers, states, hashes, and
-references. Private Data Collections will be added with the insurance
-chaincode only for confidential metadata that must be shared between specified
-organizations. Encrypted medical documents and encryption keys remain off
-chain.
+references. Encrypted medical documents and encryption keys remain off chain.
+The local release does not configure Private Data Collections; whether shared
+confidential metadata requires them is an explicit production-governance
+decision, not an implied capability of this topology.
 
 ## Development ordering model
 

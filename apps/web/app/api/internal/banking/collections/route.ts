@@ -1,7 +1,7 @@
-import { createHash, timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { ledger } from "@/lib/fabric/ledger";
+import { verifyBearerToken } from "@/lib/security/bearer-token";
 
 const hash = z.string().regex(/^[a-fA-F0-9]{64}$/).transform((value) => value.toLowerCase());
 const commandSchema = z.discriminatedUnion("action", [
@@ -13,12 +13,7 @@ const commandSchema = z.discriminatedUnion("action", [
 export const runtime = "nodejs";
 
 function authorized(request: Request) {
-  const secret = process.env.BANKING_WORKER_SECRET ?? "";
-  const supplied = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ?? "";
-  if (secret.length < 32 || supplied.length === 0) return false;
-  const expectedDigest = createHash("sha256").update(secret).digest();
-  const suppliedDigest = createHash("sha256").update(supplied).digest();
-  return timingSafeEqual(expectedDigest, suppliedDigest);
+  return verifyBearerToken(request.headers.get("authorization"), process.env.BANKING_WORKER_SECRET);
 }
 
 export async function POST(request: Request) {

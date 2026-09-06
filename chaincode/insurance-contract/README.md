@@ -13,8 +13,11 @@ This Go chaincode owns the shared, permissioned insurance ledger for
    off-chain.
 3. A `HospitalMSP` identity with `role=hospitalOfficer` verifies or invalidates
    the claim.
-4. The insurer starts review and an `AuditorMSP` identity with `role=auditor`
-   records the decision.
+4. The insurer records optional advisory fraud triage and opens a review round
+   with immutable auditor assignments, thresholds, and a deadline. Four distinct
+   `AuditorMSP` certificate subjects support the default 3-of-4 approval / 2-of-4
+   rejection quorum. A rejected claimant may submit one appeal, which creates a
+   new review round without replacing the original votes.
 5. The insurer authorizes settlement and a `BankMSP` identity with
    `role=bankOfficer` confirms the bank reference.
 
@@ -27,9 +30,10 @@ replay markers, append-only reversals, explicit funding gates, and claim/benefit
 liabilities preserve the external-fiat audit trail without putting account
 numbers or real BDT on-chain.
 
-The initial review model deliberately uses one auditor decision per claim. A
-multi-auditor quorum can be introduced later without weakening this state
-machine.
+Fraud assessments are explainable, versioned, and strictly advisory: there is no
+transaction path from a fraud score to a claim decision. Review votes are unique
+per auditor subject and round; timeout finalization and appeal processing retain
+the complete adjudication history.
 
 Money is represented as signed 64-bit integer minor units. Dates use
 `YYYY-MM-DD`; ledger timestamps come from the Fabric transaction timestamp.
@@ -40,9 +44,17 @@ policyholder ownership filter before returning collections.
 Successful evidence retrievals are separately committed as
 `EvidenceAccessRecord` assets. The contract permits the owning policyholder,
 the insurer administrator, a hospital officer in the claim verification path,
-and an auditor after review starts. Bank identities cannot retrieve clinical
-evidence. Claims link their hospital-verification and auditor-decision records
-for audit navigation.
+and an auditor assigned to the current review. Policyholders can additionally
+create revocable, expiring, use-limited `EvidenceAccessGrant` assets scoped to
+one organization, role, certificate subject (or explicit wildcard), evidence
+item, and purpose. Chaincode binds purposes to role semantics and records grant
+provenance on every use. Bank identities cannot retrieve clinical evidence.
+Claims link verifications, review rounds, decisions, appeals, fraud assessments,
+access records, and settlements for audit navigation.
+
+The deployed local definition is `insurance-contract` 0.6.1 sequence 9 with
+schema version 5. Any source change requires a new package version and lifecycle
+sequence.
 
 ## Test
 

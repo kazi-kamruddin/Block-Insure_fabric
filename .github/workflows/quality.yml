@@ -36,6 +36,8 @@ jobs:
         run: npm run typecheck
       - name: Unit and cryptographic tests
         run: npm test
+      - name: Check event worker executable
+        run: npm run check:worker
       - name: Audit production dependency tree
         run: npm audit --audit-level=high
       - name: Build standalone application

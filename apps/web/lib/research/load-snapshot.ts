@@ -14,8 +14,9 @@ export async function loadResearchSnapshot() {
     ledger.listLiabilities(), ledger.schemaVersion(), readEventProjection(),
   ]);
   const config = loadFabricConfig();
+  const indexedEvents = Object.values(projection.countsByName).reduce((total, count) => total + count, 0);
   return buildResearchSnapshot(
     { policies, claims, reviews, decisions, appeals, fraudAssessments, evidence, evidenceGrants, evidenceAccess, settlements, premiumPayments, premiumAdjustments, benefitRequests, liabilities },
-    { channel: config.channelName, chaincode: config.chaincodeName, ledgerSchemaVersion, checkpoint: projection.checkpoint, indexedEvents: projection.events.length, eventCounts: projection.countsByName },
+    { channel: config.channelName, chaincode: config.chaincodeName, ledgerSchemaVersion, checkpoint: projection.checkpoint, indexedEvents, retainedEvents: projection.events.length, eventCounts: projection.countsByName },
   );
 }
