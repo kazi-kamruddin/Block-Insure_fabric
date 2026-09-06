@@ -6,8 +6,8 @@ network_root="$(cd -- "${script_dir}/.." && pwd -P)"
 samples_root="${network_root}/.fabric/fabric-samples"
 channel_name="insurance-channel"
 chaincode_name="${CHAINCODE_NAME:-insurance-contract}"
-expected_chaincode_version="${EXPECTED_CHAINCODE_VERSION:-0.4.1}"
-expected_schema_version="${EXPECTED_SCHEMA_VERSION:-3}"
+expected_chaincode_version="${EXPECTED_CHAINCODE_VERSION:-0.5.0}"
+expected_schema_version="${EXPECTED_SCHEMA_VERSION:-4}"
 compose_ca="${network_root}/compose/compose-ca.yaml"
 compose_network="${network_root}/compose/compose-network.yaml"
 organizations="${network_root}/organizations"
@@ -110,6 +110,8 @@ up() {
     compose up -d ca-auditor
     compose up -d ca-bank
     compose up -d ca-orderer
+    wait_for_running ca.auditor.blockinsure.test
+    bash "${network_root}/scripts/enroll-auditors.sh"
     start_runtime
     verify
     return
@@ -242,6 +244,12 @@ EOF
       exit 1
     fi
     chaincode_verified=true
+    for index in 1 2 3 4; do
+      if ! compgen -G "${organizations}/peerOrganizations/auditor.blockinsure.test/users/auditor${index}@auditor.blockinsure.test/msp/signcerts/*" >/dev/null; then
+        echo "Verification failed: auditor${index} enrollment is missing." >&2
+        exit 1
+      fi
+    done
   fi
 
   if [[ "${chaincode_verified}" == true ]]; then

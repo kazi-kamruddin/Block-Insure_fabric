@@ -3,7 +3,7 @@ import { z } from "zod";
 import { currentSession } from "@/lib/auth/current-session";
 import { ledger } from "@/lib/fabric/ledger";
 
-const assetTypeSchema = z.enum(["package", "policy", "claim", "evidence", "verification", "decision", "settlement", "access", "account", "mandate", "premium-payment", "premium-adjustment", "collection", "benefit-plan", "beneficiaries", "benefit-request", "liability"]);
+const assetTypeSchema = z.enum(["package", "policy", "claim", "evidence", "verification", "decision", "review", "appeal", "fraud-assessment", "settlement", "access", "account", "mandate", "premium-payment", "premium-adjustment", "collection", "benefit-plan", "beneficiaries", "benefit-request", "liability"]);
 type RouteContext = { params: Promise<{ assetType: string }> };
 
 export const runtime = "nodejs";
@@ -68,6 +68,29 @@ export async function GET(_request: Request, context: RouteContext) {
             .map((claim) => claim.id),
         );
         result = decisions.filter((item) => ownedClaimIds.has(item.claimId));
+        break;
+      }
+      case "review": {
+        const reviews = await ledger.listClaimReviews();
+        if (session.role === "auditor") {
+          result = reviews.filter((item) => item.assignedAuditorIds.includes(session.subjectId ?? ""));
+          break;
+        }
+        if (session.role !== "policyholder") { result = reviews; break; }
+        const ownedClaimIds = new Set((await ledger.listClaims()).filter((claim) => claim.claimantId === session.subjectId).map((claim) => claim.id));
+        result = reviews.filter((item) => ownedClaimIds.has(item.claimId));
+        break;
+      }
+      case "appeal": {
+        const appeals = await ledger.listClaimAppeals();
+        result = session.role === "policyholder" ? appeals.filter((item) => item.claimantId === session.subjectId) : appeals;
+        break;
+      }
+      case "fraud-assessment": {
+        const assessments = await ledger.listFraudAssessments();
+        if (session.role !== "policyholder") { result = assessments; break; }
+        const ownedClaimIds = new Set((await ledger.listClaims()).filter((claim) => claim.claimantId === session.subjectId).map((claim) => claim.id));
+        result = assessments.filter((item) => ownedClaimIds.has(item.claimId));
         break;
       }
       case "settlement": {

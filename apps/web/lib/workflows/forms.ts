@@ -24,8 +24,8 @@ export type WorkflowFormValues = Record<string, string>;
 export type HashText = (value: string) => Promise<string>;
 
 export const operationsByRole = {
-  insurerAdmin: ["createPolicyPackage", "publishPolicyPackage", "retirePolicyPackage", "createBenefitPlan", "publishBenefitPlan", "retireBenefitPlan", "issuePolicy", "advancePolicyLifecycle", "cancelPolicyAsInsurer", "queuePremiumCollection", "decideBenefitRequest", "markBenefitPaymentReady", "startClaimReview", "authorizeSettlement"],
-  policyholder: ["acquirePolicy", "requestBankMandate", "cancelBankMandate", "setBeneficiaries", "submitBenefitRequest", "renewPolicy", "cancelPolicy", "submitClaim"],
+  insurerAdmin: ["createPolicyPackage", "publishPolicyPackage", "retirePolicyPackage", "createBenefitPlan", "publishBenefitPlan", "retireBenefitPlan", "issuePolicy", "advancePolicyLifecycle", "cancelPolicyAsInsurer", "queuePremiumCollection", "decideBenefitRequest", "markBenefitPaymentReady", "assessClaimFraud", "openClaimReview", "openAppealReview", "finalizeExpiredReview", "authorizeSettlement"],
+  policyholder: ["acquirePolicy", "requestBankMandate", "cancelBankMandate", "setBeneficiaries", "submitBenefitRequest", "renewPolicy", "cancelPolicy", "submitClaim", "submitClaimAppeal"],
   hospitalOfficer: ["verifyClaim"],
   auditor: ["recordAuditorDecision"],
   bankOfficer: ["registerBankAccountReference", "reviewBankMandate", "recordPremiumPayment", "recordPremiumAdjustment", "completePremiumCollection", "failPremiumCollection", "expireBankMandate", "confirmBenefitPayment", "confirmSettlement"],
@@ -213,16 +213,55 @@ export const workflowFormDefinitions: Record<WorkflowOperation, WorkflowFormDefi
       { name: "clinicalReferenceText", label: "Clinical reference", kind: "textarea", placeholder: "Hospital record identifier or attestation summary", help: "Hashed locally; no clinical document text is written to Fabric." },
     ],
   },
-  startClaimReview: {
-    label: "Start independent review",
-    description: "Move a hospital-verified claim into the auditor's decision queue.",
-    fields: [{ name: "claimId", label: "Claim ID", placeholder: "claim-1001" }],
+  assessClaimFraud: {
+    label: "Generate fraud triage assessment",
+    description: "Run the transparent server-side rules engine and anchor its advisory result without changing claim status.",
+    fields: [{ name: "assessmentId", label: "Assessment ID", placeholder: "fraud-1001" }, { name: "claimId", label: "Claim ID", placeholder: "claim-1001" }],
+  },
+  openClaimReview: {
+    label: "Open distributed review",
+    description: "Snapshot assigned auditor subjects and quorum rules for a hospital-verified claim.",
+    fields: [
+      { name: "claimId", label: "Claim ID", placeholder: "claim-1001" },
+      { name: "reviewId", label: "Review ID", placeholder: "review-1001" },
+      { name: "assignedAuditorIdsJson", label: "Assigned auditor IDs", kind: "textarea", help: "Immutable JSON array of Fabric certificate subject IDs." },
+      { name: "approvalThreshold", label: "Approval threshold" },
+      { name: "rejectionThreshold", label: "Rejection threshold" },
+      { name: "deadline", label: "Review deadline (RFC3339)", placeholder: "2026-09-09T12:00:00Z" },
+    ],
+  },
+  submitClaimAppeal: {
+    label: "Appeal rejected claim",
+    description: "Open the single permitted appeal while preserving the original review and votes.",
+    fields: [
+      { name: "appealId", label: "Appeal ID", placeholder: "appeal-1001" },
+      { name: "claimId", label: "Claim ID", placeholder: "claim-1001" },
+      { name: "reasonText", label: "Appeal reason reference", kind: "textarea", help: "Hashed locally before submission." },
+      { name: "evidenceText", label: "Optional appeal evidence reference", kind: "textarea", help: "If supplied, only its hash is committed." },
+    ],
+  },
+  openAppealReview: {
+    label: "Open appeal review",
+    description: "Create a new immutable review round for a submitted appeal.",
+    fields: [
+      { name: "appealId", label: "Appeal ID", placeholder: "appeal-1001" },
+      { name: "reviewId", label: "Review ID", placeholder: "review-appeal-1001" },
+      { name: "assignedAuditorIdsJson", label: "Assigned auditor IDs", kind: "textarea" },
+      { name: "approvalThreshold", label: "Approval threshold" },
+      { name: "rejectionThreshold", label: "Rejection threshold" },
+      { name: "deadline", label: "Review deadline (RFC3339)" },
+    ],
+  },
+  finalizeExpiredReview: {
+    label: "Finalize expired review",
+    description: "Close an open review after its deadline; timeout rejects the claim and upholds an appeal.",
+    fields: [{ name: "reviewId", label: "Review ID" }],
   },
   recordAuditorDecision: {
     label: "Record auditor decision",
     description: "Commit one independent approve or reject decision for a claim under review.",
     fields: [
-      { name: "claimId", label: "Claim ID", placeholder: "claim-1001" },
+      { name: "reviewId", label: "Review ID", placeholder: "review-1001" },
       { name: "decisionId", label: "Decision ID", placeholder: "decision-1001" },
       { name: "outcome", label: "Audit outcome", kind: "select", options: ["APPROVE", "REJECT"] },
       { name: "reasonText", label: "Decision reason reference", kind: "textarea", placeholder: "Audit file identifier or concise rationale", help: "Hashed locally before submission." },
@@ -254,6 +293,10 @@ function dateOffset(years: number) {
 
 function generatedId(prefix: string, idFactory: () => string) {
   return `${prefix}-${idFactory().replaceAll("-", "").slice(0, 12)}`;
+}
+
+function deadlineOffset(days: number) {
+  return new Date(Date.now() + days * 86_400_000).toISOString();
 }
 
 export function createWorkflowFormValues(
@@ -291,8 +334,12 @@ export function createWorkflowFormValues(
     confirmBenefitPayment: { id: "", bankReferenceText: "" },
     submitClaim: { id: generatedId("claim", idFactory), policyId: "", amountBdt: "", incidentDate: today, descriptionText: "" },
     verifyClaim: { claimId: "", verificationId: generatedId("verification", idFactory), outcome: "VERIFIED", clinicalReferenceText: "" },
-    startClaimReview: { claimId: "" },
-    recordAuditorDecision: { claimId: "", decisionId: generatedId("decision", idFactory), outcome: "APPROVE", reasonText: "" },
+    assessClaimFraud: { assessmentId: generatedId("fraud", idFactory), claimId: "" },
+    openClaimReview: { claimId: "", reviewId: generatedId("review", idFactory), assignedAuditorIdsJson: '["auditor1","auditor2","auditor3","auditor4"]', approvalThreshold: "3", rejectionThreshold: "2", deadline: deadlineOffset(3) },
+    submitClaimAppeal: { appealId: generatedId("appeal", idFactory), claimId: "", reasonText: "", evidenceText: "" },
+    openAppealReview: { appealId: "", reviewId: generatedId("review-appeal", idFactory), assignedAuditorIdsJson: '["auditor1","auditor2","auditor3","auditor4"]', approvalThreshold: "3", rejectionThreshold: "2", deadline: deadlineOffset(3) },
+    finalizeExpiredReview: { reviewId: "" },
+    recordAuditorDecision: { reviewId: "", decisionId: generatedId("decision", idFactory), outcome: "APPROVE", reasonText: "" },
     authorizeSettlement: { settlementId: generatedId("settlement", idFactory), claimId: "" },
     confirmSettlement: { settlementId: "", bankReferenceText: "" },
   };
@@ -333,6 +380,12 @@ export function applyCommandPreset(
 function required(values: WorkflowFormValues, name: string, label: string) {
   const value = values[name]?.trim();
   if (!value) throw new Error(`${label} is required.`);
+  return value;
+}
+
+function positiveInteger(values: WorkflowFormValues, name: string, label: string) {
+  const value = Number(required(values, name, label));
+  if (!Number.isSafeInteger(value) || value < 1) throw new Error(`${label} must be a positive integer.`);
   return value;
 }
 
@@ -466,13 +519,25 @@ export async function buildWorkflowCommand(
         clinicalReferenceHash: await digest("clinicalReferenceText", "Clinical reference"),
       };
       break;
-    case "startClaimReview":
-      command = { operation, claimId: required(values, "claimId", "Claim ID") };
+    case "assessClaimFraud":
+      command = { operation, assessmentId: required(values, "assessmentId", "Assessment ID"), claimId: required(values, "claimId", "Claim ID") };
+      break;
+    case "openClaimReview":
+      command = { operation, claimId: required(values, "claimId", "Claim ID"), reviewId: required(values, "reviewId", "Review ID"), assignedAuditorIdsJson: required(values, "assignedAuditorIdsJson", "Assigned auditor IDs"), approvalThreshold: positiveInteger(values, "approvalThreshold", "Approval threshold"), rejectionThreshold: positiveInteger(values, "rejectionThreshold", "Rejection threshold"), deadline: required(values, "deadline", "Review deadline") };
+      break;
+    case "submitClaimAppeal":
+      command = { operation, appealId: required(values, "appealId", "Appeal ID"), claimId: required(values, "claimId", "Claim ID"), reasonHash: await digest("reasonText", "Appeal reason"), evidenceHash: values.evidenceText?.trim() ? await hashText(values.evidenceText.trim()) : "" };
+      break;
+    case "openAppealReview":
+      command = { operation, appealId: required(values, "appealId", "Appeal ID"), reviewId: required(values, "reviewId", "Review ID"), assignedAuditorIdsJson: required(values, "assignedAuditorIdsJson", "Assigned auditor IDs"), approvalThreshold: positiveInteger(values, "approvalThreshold", "Approval threshold"), rejectionThreshold: positiveInteger(values, "rejectionThreshold", "Rejection threshold"), deadline: required(values, "deadline", "Review deadline") };
+      break;
+    case "finalizeExpiredReview":
+      command = { operation, reviewId: required(values, "reviewId", "Review ID") };
       break;
     case "recordAuditorDecision":
       command = {
         operation,
-        claimId: required(values, "claimId", "Claim ID"),
+        reviewId: required(values, "reviewId", "Review ID"),
         decisionId: required(values, "decisionId", "Decision ID"),
         outcome: required(values, "outcome", "Audit outcome"),
         reasonHash: await digest("reasonText", "Decision reason reference"),

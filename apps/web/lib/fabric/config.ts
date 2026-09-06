@@ -65,7 +65,7 @@ const roleDefinitions: Record<FabricRole, RoleDefinition> = {
   auditor: {
     mspId: "AuditorMSP",
     organizationDomain: "auditor.blockinsure.test",
-    userName: "auditor",
+    userName: "auditor1",
     peerPort: 9051,
   },
   bankOfficer: {
@@ -96,7 +96,8 @@ export function loadFabricConfig(environment: NodeJS.ProcessEnv = process.env) {
 }
 
 export function resolveRoleProfile(role: FabricRole, config: FabricConfig) {
-  const definition = roleDefinitions[role];
+	const definition = roleDefinitions[role];
+	const userName = definition.userName;
   const peerName = `peer0.${definition.organizationDomain}`;
   const organizationRoot = path.join(
     config.networkRoot,
@@ -114,8 +115,27 @@ export function resolveRoleProfile(role: FabricRole, config: FabricConfig) {
     userMspPath: path.join(
       organizationRoot,
       "users",
-      `${definition.userName}@${definition.organizationDomain}`,
+      `${userName}@${definition.organizationDomain}`,
       "msp",
     ),
+  };
+}
+
+const auditorIdentityNames = new Set(["auditor1", "auditor2", "auditor3", "auditor4"]);
+
+export function resolveAuditorProfile(userName: string, config: FabricConfig) {
+  if (!auditorIdentityNames.has(userName)) {
+    throw new Error("Unknown server-owned auditor identity profile");
+  }
+  const definition = roleDefinitions.auditor;
+  const peerName = `peer0.${definition.organizationDomain}`;
+  const organizationRoot = path.join(config.networkRoot, "organizations", "peerOrganizations", definition.organizationDomain);
+  return {
+    role: "auditor" as const,
+    mspId: definition.mspId,
+    peerEndpoint: `localhost:${definition.peerPort}`,
+    peerHostAlias: peerName,
+    tlsCertificatePath: path.join(organizationRoot, "peers", peerName, "tls", "ca.crt"),
+    userMspPath: path.join(organizationRoot, "users", `${userName}@${definition.organizationDomain}`, "msp"),
   };
 }

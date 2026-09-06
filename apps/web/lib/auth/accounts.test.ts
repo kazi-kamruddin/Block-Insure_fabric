@@ -7,6 +7,8 @@ describe("canonical role workspaces", () => {
     expect(workspaceForAccount(demoAccounts["policyholder-1"])).toBe("policyholder");
     expect(workspaceForAccount(demoAccounts["hospital-officer"])).toBe("hospital");
     expect(workspaceForAccount(demoAccounts.auditor)).toBe("auditor");
+    expect(workspaceForAccount(demoAccounts["auditor-2"])).toBe("auditor");
+    expect(new Set([demoAccounts.auditor, demoAccounts["auditor-2"], demoAccounts["auditor-3"], demoAccounts["auditor-4"]].map((item) => item.fabricUserName)).size).toBe(4);
     expect(workspaceForAccount(demoAccounts["bank-officer"])).toBe("bank");
   });
 });

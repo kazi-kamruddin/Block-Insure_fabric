@@ -13,7 +13,7 @@ import type { WorkflowCommand } from "@/lib/workflows/commands";
 import { bdtToMinor } from "@/lib/workflows/forms";
 import { decryptEvidenceBytes, encryptEvidenceBytes, sha256Hex } from "@/lib/evidence/browser-crypto";
 
-type AssetType = "package" | "policy" | "claim" | "evidence" | "verification" | "decision" | "settlement" | "access" | "claim-history" | "account" | "mandate" | "premium-payment" | "premium-adjustment" | "collection" | "benefit-plan" | "beneficiaries" | "benefit-request" | "liability";
+type AssetType = "package" | "policy" | "claim" | "evidence" | "verification" | "decision" | "review" | "appeal" | "fraud-assessment" | "settlement" | "access" | "claim-history" | "account" | "mandate" | "premium-payment" | "premium-adjustment" | "collection" | "benefit-plan" | "beneficiaries" | "benefit-request" | "liability";
 
 const hash = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 
@@ -23,17 +23,18 @@ const commandTemplates = {
     ["Publish package", { operation: "publishPolicyPackage", id: "package-1" }],
     ["Retire package", { operation: "retirePolicyPackage", id: "package-1" }],
     ["Issue policy", { operation: "issuePolicy", id: "policy-1", packageId: "package-1", policyholderId: "policyholder1", startDate: "2026-01-01", endDate: "2026-12-31" }],
-    ["Start review", { operation: "startClaimReview", claimId: "claim-1" }],
+    ["Open review", { operation: "openClaimReview", claimId: "claim-1", reviewId: "review-1", assignedAuditorIdsJson: '["auditor1","auditor2","auditor3","auditor4"]', approvalThreshold: 3, rejectionThreshold: 2, deadline: "2026-09-09T12:00:00Z" }],
     ["Authorize settlement", { operation: "authorizeSettlement", settlementId: "settlement-1", claimId: "claim-1" }],
   ],
   policyholder: [
     ["Submit claim", { operation: "submitClaim", id: "claim-1", policyId: "policy-1", amountMinor: 250000, incidentDate: "2026-06-15", descriptionHash: hash }],
+    ["Appeal claim", { operation: "submitClaimAppeal", appealId: "appeal-1", claimId: "claim-1", reasonHash: hash, evidenceHash: "" }],
   ],
   hospitalOfficer: [
     ["Verify claim", { operation: "verifyClaim", claimId: "claim-1", verificationId: "verification-1", outcome: "VERIFIED", clinicalReferenceHash: hash }],
   ],
   auditor: [
-    ["Approve claim", { operation: "recordAuditorDecision", claimId: "claim-1", decisionId: "decision-1", outcome: "APPROVE", reasonHash: hash }],
+    ["Approve claim", { operation: "recordAuditorDecision", reviewId: "review-1", decisionId: "decision-1", outcome: "APPROVE", reasonHash: hash }],
   ],
   bankOfficer: [
     ["Confirm settlement", { operation: "confirmSettlement", settlementId: "settlement-1", bankReferenceHash: hash }],
@@ -458,6 +459,7 @@ export function WorkspaceClient({
               <option value="package">Policy package</option><option value="policy">Policy</option>
               <option value="claim">Claim</option><option value="evidence">Evidence reference</option>
               <option value="verification">Hospital verification</option><option value="decision">Auditor decision</option>
+              <option value="review">Claim review round</option><option value="appeal">Claim appeal</option><option value="fraud-assessment">Fraud assessment</option>
               <option value="settlement">Settlement</option><option value="claim-history">Claim history</option>
               <option value="account">Bank account token</option><option value="mandate">Debit mandate</option>
               <option value="premium-payment">Premium payment</option><option value="premium-adjustment">Premium reversal</option><option value="collection">Premium collection</option>
@@ -535,7 +537,7 @@ export function WorkspaceClient({
           <article className="workCard evidenceCard">
             <span className="kicker">Portable audit artifact</span>
             <h2>Export claim dossier</h2>
-            <p className="cardNote">Download the ledger-backed claim, full state history, evidence anchors and access events, hospital verification, auditor decision, and settlement as one JSON record.</p>
+            <p className="cardNote">Download the ledger-backed claim, state history, evidence access, review rounds, every auditor vote, appeals, fraud advisories, and settlement as one JSON record.</p>
             <div className="auditExport">
               <label>Claim ID<input value={auditClaimId} onChange={(event) => setAuditClaimId(event.target.value)} placeholder="claim-1" /></label>
               <a

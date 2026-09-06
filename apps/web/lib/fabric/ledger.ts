@@ -11,10 +11,13 @@ import type {
   BenefitPlan,
   BenefitRequest,
   Claim,
+  ClaimAppeal,
+  ClaimReview,
   ClaimHistoryRecord,
   EvidenceReference,
   EvidenceAccessRecord,
   HospitalVerification,
+  FraudAssessment,
   Liability,
   Policy,
   PolicyPackage,
@@ -49,6 +52,21 @@ async function submit<T>(
     decodeJson<T>(
       await contract.submitTransaction(transactionName, ...stringifyArguments(args)),
     ),
+  );
+}
+
+async function submitAsAuditor<T>(
+  auditorUserName: string | undefined,
+  transactionName: string,
+  ...args: Array<string | number>
+) {
+  if (!auditorUserName) throw new Error("This auditor account has no server-owned Fabric identity");
+  return withFabricContract(
+    "auditor",
+    async (contract) => decodeJson<T>(
+      await contract.submitTransaction(transactionName, ...stringifyArguments(args)),
+    ),
+    auditorUserName,
   );
 }
 
@@ -185,6 +203,30 @@ export const ledger = {
 
   listAuditorDecisions() {
     return evaluate<AuditorDecision[]>("insurerAdmin", "ListAuditorDecisions");
+  },
+
+  readClaimReview(id: string) {
+    return evaluate<ClaimReview>("insurerAdmin", "ReadClaimReview", id);
+  },
+
+  listClaimReviews() {
+    return evaluate<ClaimReview[]>("insurerAdmin", "ListClaimReviews");
+  },
+
+  readClaimAppeal(id: string) {
+    return evaluate<ClaimAppeal>("insurerAdmin", "ReadClaimAppeal", id);
+  },
+
+  listClaimAppeals() {
+    return evaluate<ClaimAppeal[]>("insurerAdmin", "ListClaimAppeals");
+  },
+
+  readFraudAssessment(id: string) {
+    return evaluate<FraudAssessment>("insurerAdmin", "ReadFraudAssessment", id);
+  },
+
+  listFraudAssessments() {
+    return evaluate<FraudAssessment[]>("insurerAdmin", "ListFraudAssessments");
   },
 
   readSettlement(id: string) {
@@ -396,7 +438,11 @@ export const ledger = {
   recordEvidenceAccess(
     role: FabricRole,
     input: { id: string; evidenceId: string; purpose: "DOWNLOAD" | "VERIFY" | "AUDIT" },
+    auditorUserName?: string,
   ) {
+    if (role === "auditor") {
+      return submitAsAuditor<EvidenceAccessRecord>(auditorUserName, "RecordEvidenceAccess", input.id, input.evidenceId, input.purpose);
+    }
     return submit<EvidenceAccessRecord>(
       role,
       "RecordEvidenceAccess",
@@ -422,20 +468,56 @@ export const ledger = {
     );
   },
 
-  startClaimReview(claimId: string) {
-    return submit<Claim>("insurerAdmin", "StartClaimReview", claimId);
+  openClaimReview(input: {
+    claimId: string; reviewId: string; assignedAuditorIdsJson: string;
+    approvalThreshold: number; rejectionThreshold: number; deadline: string;
+  }) {
+    return submit<ClaimReview>(
+      "insurerAdmin", "OpenClaimReview", input.claimId, input.reviewId,
+      input.assignedAuditorIdsJson, input.approvalThreshold, input.rejectionThreshold, input.deadline,
+    );
+  },
+
+  submitClaimAppeal(input: { appealId: string; claimId: string; reasonHash: string; evidenceHash: string }) {
+    return submit<ClaimAppeal>(
+      "policyholder", "SubmitClaimAppeal", input.appealId, input.claimId, input.reasonHash, input.evidenceHash,
+    );
+  },
+
+  openAppealReview(input: {
+    appealId: string; reviewId: string; assignedAuditorIdsJson: string;
+    approvalThreshold: number; rejectionThreshold: number; deadline: string;
+  }) {
+    return submit<ClaimReview>(
+      "insurerAdmin", "OpenAppealReview", input.appealId, input.reviewId,
+      input.assignedAuditorIdsJson, input.approvalThreshold, input.rejectionThreshold, input.deadline,
+    );
+  },
+
+  finalizeExpiredReview(reviewId: string) {
+    return submit<ClaimReview>("insurerAdmin", "FinalizeExpiredReview", reviewId);
+  },
+
+  recordFraudAssessment(input: {
+    id: string; claimId: string; engineId: string; engineVersion: string; modelHash: string;
+    inputHash: string; scoreBps: number; riskLevel: "LOW" | "MEDIUM" | "HIGH"; signalsJson: string;
+  }) {
+    return submit<FraudAssessment>(
+      "insurerAdmin", "RecordFraudAssessment", input.id, input.claimId, input.engineId,
+      input.engineVersion, input.modelHash, input.inputHash, input.scoreBps, input.riskLevel, input.signalsJson,
+    );
   },
 
   recordAuditorDecision(input: {
-    claimId: string;
+    reviewId: string;
     decisionId: string;
     outcome: "APPROVE" | "REJECT";
     reasonHash: string;
-  }) {
-    return submit<AuditorDecision>(
-      "auditor",
+  }, auditorUserName?: string) {
+    return submitAsAuditor<AuditorDecision>(
+      auditorUserName,
       "RecordAuditorDecision",
-      input.claimId,
+      input.reviewId,
       input.decisionId,
       input.outcome,
       input.reasonHash,

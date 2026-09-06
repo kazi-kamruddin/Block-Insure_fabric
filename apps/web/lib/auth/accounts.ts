@@ -8,6 +8,7 @@ export type DemoAccount = {
   organization: string;
   role: FabricRole;
   subjectId?: string;
+  fabricUserName?: string;
 };
 
 export const demoAccounts = {
@@ -32,9 +33,35 @@ export const demoAccounts = {
   },
   auditor: {
     id: "auditor",
-    displayName: "Independent Auditor",
+    displayName: "Independent Auditor One",
     organization: "AuditorMSP",
     role: "auditor",
+    subjectId: "auditor1",
+    fabricUserName: "auditor1",
+  },
+  "auditor-2": {
+    id: "auditor-2",
+    displayName: "Independent Auditor Two",
+    organization: "AuditorMSP",
+    role: "auditor",
+    subjectId: "auditor2",
+    fabricUserName: "auditor2",
+  },
+  "auditor-3": {
+    id: "auditor-3",
+    displayName: "Independent Auditor Three",
+    organization: "AuditorMSP",
+    role: "auditor",
+    subjectId: "auditor3",
+    fabricUserName: "auditor3",
+  },
+  "auditor-4": {
+    id: "auditor-4",
+    displayName: "Independent Auditor Four",
+    organization: "AuditorMSP",
+    role: "auditor",
+    subjectId: "auditor4",
+    fabricUserName: "auditor4",
   },
   "bank-officer": {
     id: "bank-officer",

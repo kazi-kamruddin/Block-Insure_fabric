@@ -26,6 +26,18 @@ func (c *Contract) ListAuditorDecisions(ctx contractapi.TransactionContextInterf
 	return listState[AuditorDecision](ctx, "auditorDecision")
 }
 
+func (c *Contract) ListClaimReviews(ctx contractapi.TransactionContextInterface) ([]ClaimReview, error) {
+	return listState[ClaimReview](ctx, "claimReview")
+}
+
+func (c *Contract) ListClaimAppeals(ctx contractapi.TransactionContextInterface) ([]ClaimAppeal, error) {
+	return listState[ClaimAppeal](ctx, "claimAppeal")
+}
+
+func (c *Contract) ListFraudAssessments(ctx contractapi.TransactionContextInterface) ([]FraudAssessment, error) {
+	return listState[FraudAssessment](ctx, "fraudAssessment")
+}
+
 func (c *Contract) ListEvidenceAccessRecords(ctx contractapi.TransactionContextInterface) ([]EvidenceAccessRecord, error) {
 	return listState[EvidenceAccessRecord](ctx, "evidenceAccess")
 }

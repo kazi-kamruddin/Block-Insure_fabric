@@ -25,7 +25,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const result = await executeWorkflowCommand(parsed.data);
+    const result = await executeWorkflowCommand(parsed.data, session);
     return NextResponse.json({ result });
   } catch (error) {
     console.error("Workflow command failed", error);

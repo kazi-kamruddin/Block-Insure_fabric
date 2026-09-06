@@ -1,9 +1,12 @@
 import "server-only";
 
 import { ledger } from "@/lib/fabric/ledger";
+import { findDemoAccount } from "@/lib/auth/accounts";
+import type { Session } from "@/lib/auth/session-token";
+import { assessClaimFraud } from "@/lib/fraud/assess-claim";
 import type { WorkflowCommand } from "./commands";
 
-export function executeWorkflowCommand(command: WorkflowCommand) {
+export async function executeWorkflowCommand(command: WorkflowCommand, session: Session) {
   switch (command.operation) {
     case "createPolicyPackage":
       return ledger.createPolicyPackage(command);
@@ -63,10 +66,20 @@ export function executeWorkflowCommand(command: WorkflowCommand) {
       return ledger.submitClaim(command);
     case "verifyClaim":
       return ledger.verifyClaim(command);
-    case "startClaimReview":
-      return ledger.startClaimReview(command.claimId);
+    case "openClaimReview":
+      return ledger.openClaimReview(command);
+    case "submitClaimAppeal":
+      return ledger.submitClaimAppeal(command);
+    case "openAppealReview":
+      return ledger.openAppealReview(command);
+    case "finalizeExpiredReview":
+      return ledger.finalizeExpiredReview(command.reviewId);
+    case "assessClaimFraud": {
+      const assessment = await assessClaimFraud(command.claimId);
+      return ledger.recordFraudAssessment({ id: command.assessmentId, claimId: command.claimId, ...assessment });
+    }
     case "recordAuditorDecision":
-      return ledger.recordAuditorDecision(command);
+      return ledger.recordAuditorDecision(command, findDemoAccount(session.accountId)?.fabricUserName);
     case "authorizeSettlement":
       return ledger.authorizeSettlement(command.settlementId, command.claimId);
     case "confirmSettlement":

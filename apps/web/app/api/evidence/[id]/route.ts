@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { currentSession } from "@/lib/auth/current-session";
+import { findDemoAccount } from "@/lib/auth/accounts";
 import {
   evidenceStorageReference,
   evidenceStorageRoot,
@@ -28,11 +29,14 @@ export async function POST(request: Request, context: RouteContext) {
   try {
     const evidence = await ledger.readEvidenceReference(id.data);
     const claim = await ledger.readClaim(evidence.claimId);
+    const auditorAssigned = session.role === "auditor" && Boolean(claim.currentReviewId)
+      ? (await ledger.readClaimReview(claim.currentReviewId)).assignedAuditorIds.includes(session.subjectId ?? "")
+      : false;
     const authorized =
       session.role === "insurerAdmin" ||
       (session.role === "policyholder" && claim.claimantId === session.subjectId) ||
       (session.role === "hospitalOfficer" && (claim.status === "SUBMITTED" || Boolean(claim.hospitalVerificationId))) ||
-      (session.role === "auditor" && !["SUBMITTED", "HOSPITAL_VERIFIED"].includes(claim.status));
+      (session.role === "auditor" && auditorAssigned && !["SUBMITTED", "HOSPITAL_VERIFIED"].includes(claim.status));
     if (!authorized) return NextResponse.json({ message: "This account cannot retrieve that evidence" }, { status: 403 });
 
     const reference = evidenceStorageReference(evidence.submittedBy, evidence.id);
@@ -48,7 +52,7 @@ export async function POST(request: Request, context: RouteContext) {
       id: `access-${randomUUID()}`,
       evidenceId: evidence.id,
       purpose,
-    });
+    }, findDemoAccount(session.accountId)?.fabricUserName);
     return new NextResponse(ciphertext, {
       headers: {
         "content-type": "application/octet-stream",

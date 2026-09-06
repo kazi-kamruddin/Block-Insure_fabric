@@ -52,6 +52,8 @@ claim_id="smoke-claim-${suffix}"
 evidence_id="smoke-evidence-${suffix}"
 verification_id="smoke-verification-${suffix}"
 decision_id="smoke-decision-${suffix}"
+review_id="smoke-review-${suffix}"
+fraud_id="smoke-fraud-${suffix}"
 settlement_id="smoke-settlement-${suffix}"
 account_id="smoke-account-${suffix}"
 mandate_id="smoke-mandate-${suffix}"
@@ -67,6 +69,7 @@ hash_c="cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
 hash_d="dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
 premium_receipt_hash="$(printf '%s' "premium-${suffix}" | sha256sum | cut -d' ' -f1)"
 collection_receipt_hash="$(printf '%s' "collection-${suffix}" | sha256sum | cut -d' ' -f1)"
+review_deadline="$(date -u -d '+3 days' '+%Y-%m-%dT%H:%M:%SZ')"
 
 set_client_context insurer InsurerMSP 7051 insurerAdmin
 invoke CreatePolicyPackage "${package_id}" "Smoke Health Plan" "Live Fabric workflow verification" 10000 1000000 "${hash_a}"
@@ -111,10 +114,13 @@ set_client_context hospital HospitalMSP 8051 hospitalOfficer
 invoke VerifyClaim "${claim_id}" "${verification_id}" VERIFIED "${hash_a}"
 
 set_client_context insurer InsurerMSP 7051 insurerAdmin
-invoke StartClaimReview "${claim_id}"
+invoke RecordFraudAssessment "${fraud_id}" "${claim_id}" transparent-claim-triage 1.0.0 "${hash_a}" "${hash_b}" 4300 MEDIUM '["COVERAGE_RATIO_40_PLUS","SINGLE_EVIDENCE_REFERENCE"]'
+invoke OpenClaimReview "${claim_id}" "${review_id}" '["auditor1","auditor2","auditor3","auditor4"]' 3 2 "${review_deadline}"
 
-set_client_context auditor AuditorMSP 9051 auditor
-invoke RecordAuditorDecision "${claim_id}" "${decision_id}" APPROVE "${hash_b}"
+for index in 1 2 3; do
+  set_client_context auditor AuditorMSP 9051 "auditor${index}"
+  invoke RecordAuditorDecision "${review_id}" "${decision_id}-${index}" APPROVE "${hash_b}"
+done
 
 set_client_context insurer InsurerMSP 7051 insurerAdmin
 invoke AuthorizeSettlement "${settlement_id}" "${claim_id}"
@@ -128,6 +134,8 @@ policy_json="$(peer chaincode query -C "${channel_name}" -n "${chaincode_name}" 
 collection_json="$(peer chaincode query -C "${channel_name}" -n "${chaincode_name}" -c "$(payload ReadPremiumCollection "${collection_id}")")"
 benefit_json="$(peer chaincode query -C "${channel_name}" -n "${chaincode_name}" -c "$(payload ReadBenefitRequest "${benefit_request_id}")")"
 liability_json="$(peer chaincode query -C "${channel_name}" -n "${chaincode_name}" -c "$(payload ReadLiability "liability-benefit-${benefit_request_id}")")"
+review_json="$(peer chaincode query -C "${channel_name}" -n "${chaincode_name}" -c "$(payload ReadClaimReview "${review_id}")")"
+fraud_json="$(peer chaincode query -C "${channel_name}" -n "${chaincode_name}" -c "$(payload ReadFraudAssessment "${fraud_id}")")"
 
 test "$(jq -r '.status' <<<"${claim_json}")" = "SETTLED"
 test "$(jq -r '.status' <<<"${settlement_json}")" = "CONFIRMED"
@@ -137,5 +145,8 @@ test "$(jq -r '.nextPremiumDueDate' <<<"${policy_json}")" = "2026-03-02"
 test "$(jq -r '.status' <<<"${collection_json}")" = "COMPLETED"
 test "$(jq -r '.status' <<<"${benefit_json}")" = "PAID"
 test "$(jq -r '.status' <<<"${liability_json}")" = "PAID"
+test "$(jq -r '.status' <<<"${review_json}")" = "APPROVED"
+test "$(jq -r '.votesCast' <<<"${review_json}")" = "3"
+test "$(jq -r '.advisory' <<<"${fraud_json}")" = "true"
 
-echo "Verified live workflows: claim ${claim_id} SETTLED; policy ${acquired_policy_id} ACTIVE; collection COMPLETED; benefit PAID."
+echo "Verified live workflows: claim ${claim_id} SETTLED by 3-of-4 review quorum; fraud triage remained advisory; policy ${acquired_policy_id} ACTIVE; collection COMPLETED; benefit PAID."

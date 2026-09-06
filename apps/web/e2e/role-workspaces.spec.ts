@@ -5,6 +5,9 @@ const actors = [
   { account: "policyholder-1", workspace: "policyholder", heading: "Coverage and claims overview", action: "acquirePolicy" },
   { account: "hospital-officer", workspace: "hospital", heading: "Hospital verification desk", action: "verifyClaim" },
   { account: "auditor", workspace: "auditor", heading: "Independent claim audit", action: "recordAuditorDecision" },
+  { account: "auditor-2", workspace: "auditor", heading: "Independent claim audit", action: "recordAuditorDecision" },
+  { account: "auditor-3", workspace: "auditor", heading: "Independent claim audit", action: "recordAuditorDecision" },
+  { account: "auditor-4", workspace: "auditor", heading: "Independent claim audit", action: "recordAuditorDecision" },
   { account: "bank-officer", workspace: "bank", heading: "Banking operations desk", action: "registerBankAccountReference" },
 ] as const;
 
@@ -14,7 +17,10 @@ async function signIn(page: Page, account: string) {
     "insurer-admin": "Insurer Administrator",
     "policyholder-1": "Policyholder One",
     "hospital-officer": "Hospital Officer",
-    auditor: "Independent Auditor",
+    auditor: "Independent Auditor One",
+    "auditor-2": "Independent Auditor Two",
+    "auditor-3": "Independent Auditor Three",
+    "auditor-4": "Independent Auditor Four",
     "bank-officer": "Bank Officer",
   };
   await page.getByRole("button", { name: new RegExp(labels[account]) }).click();

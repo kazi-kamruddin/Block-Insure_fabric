@@ -176,12 +176,14 @@ func TestPolicyToSettlementWorkflow(t *testing.T) {
 	requireNoError(t, err)
 
 	setIdentity(ctx, "insurer-admin", "InsurerMSP", "insurerAdmin", nil)
-	_, err = contract.StartClaimReview(ctx, "claim-001")
+	_, err = contract.OpenClaimReview(ctx, "claim-001", "review-001", `["auditor1","auditor2","auditor3","auditor4"]`, 3, 2, "2026-09-08T12:00:00Z")
 	requireNoError(t, err)
 
-	setIdentity(ctx, "auditor-001", "AuditorMSP", "auditor", nil)
-	_, err = contract.RecordAuditorDecision(ctx, "claim-001", "decision-001", "APPROVE", hashB)
-	requireNoError(t, err)
+	for index, auditorID := range []string{"auditor1", "auditor2", "auditor3"} {
+		setIdentity(ctx, "certificate-"+auditorID, "AuditorMSP", "auditor", map[string]string{"subjectId": auditorID})
+		_, err = contract.RecordAuditorDecision(ctx, "review-001", fmt.Sprintf("decision-00%d", index+1), "APPROVE", hashB)
+		requireNoError(t, err)
+	}
 
 	setIdentity(ctx, "insurer-admin", "InsurerMSP", "insurerAdmin", nil)
 	settlement, err := contract.AuthorizeSettlement(ctx, "settlement-001", "claim-001")
@@ -198,7 +200,7 @@ func TestPolicyToSettlementWorkflow(t *testing.T) {
 	if claim.Status != "SETTLED" {
 		t.Fatalf("expected SETTLED claim, got %s", claim.Status)
 	}
-	if claim.HospitalVerificationID != "verification-001" || claim.AuditorDecisionID != "decision-001" {
+	if claim.HospitalVerificationID != "verification-001" || claim.AuditorDecisionID != "decision-003" {
 		t.Fatalf("claim did not retain verification and decision links: %+v", claim)
 	}
 }
@@ -231,10 +233,103 @@ func TestAuthorizationAndInvalidTransitions(t *testing.T) {
 	requireNoError(t, err)
 
 	setIdentity(ctx, "insurer-admin", "InsurerMSP", "insurerAdmin", nil)
-	_, err = contract.StartClaimReview(ctx, "claim-001")
+	_, err = contract.OpenClaimReview(ctx, "claim-001", "review-invalid", `["auditor1","auditor2","auditor3","auditor4"]`, 3, 2, "2026-09-08T12:00:00Z")
 	requireError(t, err, "must be HOSPITAL_VERIFIED")
 	_, err = contract.AuthorizeSettlement(ctx, "settlement-001", "claim-001")
 	requireError(t, err, "must be APPROVED")
+}
+
+func TestDistributedReviewAppealAndFraudDecisionSupport(t *testing.T) {
+	contract := &Contract{}
+	ctx := &testContext{stub: newMemoryStub()}
+	hashA := strings.Repeat("a", 64)
+	hashB := strings.Repeat("b", 64)
+	hashC := strings.Repeat("c", 64)
+	assignments := `["auditor1","auditor2","auditor3","auditor4"]`
+
+	setIdentity(ctx, "insurer-admin", "InsurerMSP", "insurerAdmin", nil)
+	_, err := contract.CreatePolicyPackage(ctx, "package-review", "Review", "", 100, 100_000, hashA)
+	requireNoError(t, err)
+	_, err = contract.PublishPolicyPackage(ctx, "package-review")
+	requireNoError(t, err)
+	_, err = contract.IssuePolicy(ctx, "policy-review", "package-review", "policyholder1", "2026-01-01", "2026-12-31")
+	requireNoError(t, err)
+
+	setIdentity(ctx, "policyholder-cert", "InsurerMSP", "policyholder", map[string]string{"subjectId": "policyholder1"})
+	_, err = contract.SubmitClaim(ctx, "claim-review", "policy-review", 50_000, "2026-06-01", hashA)
+	requireNoError(t, err)
+
+	setIdentity(ctx, "hospital", "HospitalMSP", "hospitalOfficer", nil)
+	_, err = contract.VerifyClaim(ctx, "claim-review", "verification-review", "VERIFIED", hashB)
+	requireNoError(t, err)
+
+	setIdentity(ctx, "insurer-admin", "InsurerMSP", "insurerAdmin", nil)
+	review, err := contract.OpenClaimReview(ctx, "claim-review", "review-initial", assignments, 3, 2, "2026-09-08T12:00:00Z")
+	requireNoError(t, err)
+	if review.Round != 1 || review.ApprovalThreshold != 3 || review.RejectionThreshold != 2 {
+		t.Fatalf("unexpected initial review: %+v", review)
+	}
+	_, err = contract.RecordFraudAssessment(ctx, "fraud-review", "claim-review", "transparent-rules", "1.0.0", hashA, hashB, 7200, "HIGH", `["HIGH_COVERAGE_RATIO","REPEAT_POLICY_CLAIM"]`)
+	requireNoError(t, err)
+	claim, err := contract.ReadClaim(ctx, "claim-review")
+	requireNoError(t, err)
+	if claim.Status != "UNDER_REVIEW" {
+		t.Fatalf("advisory score changed claim authority: %+v", claim)
+	}
+
+	setIdentity(ctx, "unassigned", "AuditorMSP", "auditor", map[string]string{"subjectId": "auditor9"})
+	_, err = contract.RecordAuditorDecision(ctx, "review-initial", "decision-unassigned", "REJECT", hashC)
+	requireError(t, err, "is not assigned")
+
+	setIdentity(ctx, "auditor1-cert", "AuditorMSP", "auditor", map[string]string{"subjectId": "auditor1"})
+	_, err = contract.RecordAuditorDecision(ctx, "review-initial", "decision-r1-a1", "REJECT", hashC)
+	requireNoError(t, err)
+	_, err = contract.RecordAuditorDecision(ctx, "review-initial", "decision-r1-duplicate", "REJECT", hashC)
+	requireError(t, err, "already voted")
+	setIdentity(ctx, "auditor2-cert", "AuditorMSP", "auditor", map[string]string{"subjectId": "auditor2"})
+	_, err = contract.RecordAuditorDecision(ctx, "review-initial", "decision-r1-a2", "REJECT", hashC)
+	requireNoError(t, err)
+	claim, err = contract.ReadClaim(ctx, "claim-review")
+	requireNoError(t, err)
+	if claim.Status != "REJECTED" {
+		t.Fatalf("two rejection votes did not reject claim: %+v", claim)
+	}
+
+	setIdentity(ctx, "policyholder-cert", "InsurerMSP", "policyholder", map[string]string{"subjectId": "policyholder1"})
+	appeal, err := contract.SubmitClaimAppeal(ctx, "appeal-review", "claim-review", hashA, hashB)
+	requireNoError(t, err)
+	if appeal.Round != 1 || appeal.Status != "SUBMITTED" {
+		t.Fatalf("unexpected appeal: %+v", appeal)
+	}
+
+	setIdentity(ctx, "insurer-admin", "InsurerMSP", "insurerAdmin", nil)
+	review, err = contract.OpenAppealReview(ctx, "appeal-review", "review-appeal", assignments, 3, 2, "2026-09-08T12:00:00Z")
+	requireNoError(t, err)
+	if review.Round != 2 || review.Kind != "APPEAL" {
+		t.Fatalf("appeal review did not version review state: %+v", review)
+	}
+	for _, auditorID := range []string{"auditor1", "auditor2", "auditor3"} {
+		setIdentity(ctx, auditorID+"-cert", "AuditorMSP", "auditor", map[string]string{"subjectId": auditorID})
+		_, err = contract.RecordAuditorDecision(ctx, "review-appeal", "decision-appeal-"+auditorID, "APPROVE", hashB)
+		requireNoError(t, err)
+	}
+	appeal, err = contract.ReadClaimAppeal(ctx, "appeal-review")
+	requireNoError(t, err)
+	claim, err = contract.ReadClaim(ctx, "claim-review")
+	requireNoError(t, err)
+	if appeal.Status != "OVERTURNED" || claim.Status != "APPROVED" || claim.ReviewRound != 2 {
+		t.Fatalf("appeal quorum did not overturn decision: appeal=%+v claim=%+v", appeal, claim)
+	}
+
+	setIdentity(ctx, "policyholder-cert", "InsurerMSP", "policyholder", map[string]string{"subjectId": "policyholder1"})
+	_, err = contract.SubmitClaimAppeal(ctx, "appeal-second", "claim-review", hashA, "")
+	requireError(t, err, "must be REJECTED")
+
+	assessments, err := contract.ListFraudAssessments(ctx)
+	requireNoError(t, err)
+	if len(assessments) != 1 || !assessments[0].Advisory || assessments[0].RiskLevel != "HIGH" {
+		t.Fatalf("unexpected fraud assessment: %+v", assessments)
+	}
 }
 
 func TestListQueriesUseDeterministicCompositeKeyOrder(t *testing.T) {

@@ -183,6 +183,7 @@ export type ClaimStatus =
   | "SUBMITTED"
   | "HOSPITAL_VERIFIED"
   | "UNDER_REVIEW"
+  | "APPEAL_SUBMITTED"
   | "APPROVED"
   | "REJECTED"
   | "SETTLEMENT_AUTHORIZED"
@@ -200,6 +201,10 @@ export type Claim = {
   evidenceIds: string[];
   hospitalVerificationId: string;
   auditorDecisionId: string;
+  currentReviewId: string;
+  currentAppealId: string;
+  reviewRound: number;
+  appealCount: number;
   status: ClaimStatus;
   createdAt: LedgerTimestamp;
   updatedAt: LedgerTimestamp;
@@ -246,9 +251,64 @@ export type AuditorDecision = {
   schemaVersion: number;
   id: string;
   claimId: string;
+  reviewId: string;
+  reviewRound: number;
+  auditorId: string;
   auditorIdentity: string;
   outcome: "APPROVE" | "REJECT";
   reasonHash: string;
+  createdAt: LedgerTimestamp;
+};
+
+export type ClaimReview = {
+  assetType: "claimReview";
+  schemaVersion: number;
+  id: string;
+  claimId: string;
+  appealId: string;
+  round: number;
+  kind: "INITIAL" | "APPEAL";
+  assignedAuditorIds: string[];
+  approvalThreshold: number;
+  rejectionThreshold: number;
+  approvals: number;
+  rejections: number;
+  votesCast: number;
+  status: "OPEN" | "APPROVED" | "REJECTED" | "TIMED_OUT";
+  deadline: LedgerTimestamp;
+  openedAt: LedgerTimestamp;
+  closedAt: LedgerTimestamp;
+};
+
+export type ClaimAppeal = {
+  assetType: "claimAppeal";
+  schemaVersion: number;
+  id: string;
+  claimId: string;
+  claimantId: string;
+  round: number;
+  reasonHash: string;
+  evidenceHash: string;
+  reviewId: string;
+  status: "SUBMITTED" | "UNDER_REVIEW" | "UPHELD" | "OVERTURNED";
+  createdAt: LedgerTimestamp;
+  resolvedAt: LedgerTimestamp;
+};
+
+export type FraudAssessment = {
+  assetType: "fraudAssessment";
+  schemaVersion: number;
+  id: string;
+  claimId: string;
+  engineId: string;
+  engineVersion: string;
+  modelHash: string;
+  inputHash: string;
+  scoreBps: number;
+  riskLevel: "LOW" | "MEDIUM" | "HIGH";
+  signals: string[];
+  advisory: true;
+  recordedBy: string;
   createdAt: LedgerTimestamp;
 };
 

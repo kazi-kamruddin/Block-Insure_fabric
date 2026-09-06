@@ -4,7 +4,7 @@ import { currentSession } from "@/lib/auth/current-session";
 import { ledger } from "@/lib/fabric/ledger";
 
 const routeSchema = z.object({
-  assetType: z.enum(["package", "policy", "claim", "evidence", "verification", "decision", "settlement", "claim-history", "account", "mandate", "premium-payment", "premium-adjustment", "collection", "benefit-plan", "beneficiaries", "benefit-request", "liability"]),
+  assetType: z.enum(["package", "policy", "claim", "evidence", "verification", "decision", "review", "appeal", "fraud-assessment", "settlement", "claim-history", "account", "mandate", "premium-payment", "premium-adjustment", "collection", "benefit-plan", "beneficiaries", "benefit-request", "liability"]),
   id: z.string().trim().min(1).max(100).regex(/^[a-zA-Z0-9._:-]+$/),
 });
 
@@ -73,6 +73,25 @@ export async function GET(_request: Request, context: RouteContext) {
             return NextResponse.json({ message: "Asset is not owned by this account" }, { status: 403 });
           }
         }
+        break;
+      }
+      case "review": {
+        const review = await ledger.readClaimReview(id);
+        if (session.role === "auditor" && !review.assignedAuditorIds.includes(session.subjectId ?? "")) return NextResponse.json({ message: "Review is not assigned to this auditor" }, { status: 403 });
+        if (session.role === "policyholder" && (await ledger.readClaim(review.claimId)).claimantId !== session.subjectId) return NextResponse.json({ message: "Asset is not owned by this account" }, { status: 403 });
+        result = review;
+        break;
+      }
+      case "appeal": {
+        const appeal = await ledger.readClaimAppeal(id);
+        if (session.role === "policyholder" && appeal.claimantId !== session.subjectId) return NextResponse.json({ message: "Asset is not owned by this account" }, { status: 403 });
+        result = appeal;
+        break;
+      }
+      case "fraud-assessment": {
+        const assessment = await ledger.readFraudAssessment(id);
+        if (session.role === "policyholder" && (await ledger.readClaim(assessment.claimId)).claimantId !== session.subjectId) return NextResponse.json({ message: "Asset is not owned by this account" }, { status: 403 });
+        result = assessment;
         break;
       }
       case "settlement": {

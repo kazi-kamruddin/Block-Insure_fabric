@@ -156,29 +156,3 @@ func (c *Contract) VerifyClaim(ctx contractapi.TransactionContextInterface, clai
 	}
 	return verification, nil
 }
-
-func (c *Contract) StartClaimReview(ctx contractapi.TransactionContextInterface, claimID string) (*Claim, error) {
-	if _, err := requireIdentity(ctx, "InsurerMSP", "insurerAdmin"); err != nil {
-		return nil, err
-	}
-	claim, err := c.ReadClaim(ctx, claimID)
-	if err != nil {
-		return nil, err
-	}
-	if claim.Status != "HOSPITAL_VERIFIED" {
-		return nil, fmt.Errorf("claim %s must be HOSPITAL_VERIFIED to start review", claimID)
-	}
-	now, err := timestamp(ctx)
-	if err != nil {
-		return nil, err
-	}
-	claim.Status = "UNDER_REVIEW"
-	claim.UpdatedAt = now
-	if err := overwriteAsset(ctx, "claim", claimID, claim); err != nil {
-		return nil, err
-	}
-	if err := emit(ctx, "ClaimReviewStarted", claim); err != nil {
-		return nil, err
-	}
-	return claim, nil
-}

@@ -5,7 +5,7 @@ const accounts = [
   "Insurer Administrator",
   "Policyholder One",
   "Hospital Officer",
-  "Independent Auditor",
+  "Independent Auditor One",
   "Bank Officer",
 ] as const;
 

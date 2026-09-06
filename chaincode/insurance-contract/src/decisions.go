@@ -8,68 +8,6 @@ import (
 	"github.com/hyperledger/fabric-contract-api-go/v2/contractapi"
 )
 
-func (c *Contract) RecordAuditorDecision(ctx contractapi.TransactionContextInterface, claimID, decisionID, outcome, reasonHash string) (*AuditorDecision, error) {
-	auditorID, err := requireIdentity(ctx, "AuditorMSP", "auditor")
-	if err != nil {
-		return nil, err
-	}
-	claim, err := c.ReadClaim(ctx, claimID)
-	if err != nil {
-		return nil, err
-	}
-	if claim.Status != "UNDER_REVIEW" {
-		return nil, fmt.Errorf("claim %s must be UNDER_REVIEW for an auditor decision", claimID)
-	}
-	outcome = strings.ToUpper(strings.TrimSpace(outcome))
-	if outcome != "APPROVE" && outcome != "REJECT" {
-		return nil, fmt.Errorf("outcome must be APPROVE or REJECT")
-	}
-	if err := validateHash("reasonHash", reasonHash); err != nil {
-		return nil, err
-	}
-	key, err := decisionKey(ctx, claimID, auditorID)
-	if err != nil {
-		return nil, err
-	}
-	existing, err := ctx.GetStub().GetState(key)
-	if err != nil {
-		return nil, fmt.Errorf("check auditor decision: %w", err)
-	}
-	if existing != nil {
-		return nil, fmt.Errorf("auditor has already decided claim %s", claimID)
-	}
-	now, err := timestamp(ctx)
-	if err != nil {
-		return nil, err
-	}
-	decision := &AuditorDecision{
-		AssetType: "auditorDecision", SchemaVersion: SchemaVersion, ID: decisionID,
-		ClaimID: claimID, AuditorIdentity: auditorID, Outcome: outcome,
-		ReasonHash: strings.ToLower(reasonHash), CreatedAt: now,
-	}
-	payload, err := json.Marshal(decision)
-	if err != nil {
-		return nil, fmt.Errorf("encode auditor decision: %w", err)
-	}
-	if err := ctx.GetStub().PutState(key, payload); err != nil {
-		return nil, fmt.Errorf("write auditor decision: %w", err)
-	}
-	if outcome == "APPROVE" {
-		claim.Status = "APPROVED"
-	} else {
-		claim.Status = "REJECTED"
-	}
-	claim.AuditorDecisionID = decisionID
-	claim.UpdatedAt = now
-	if err := overwriteAsset(ctx, "claim", claimID, claim); err != nil {
-		return nil, err
-	}
-	if err := emit(ctx, "AuditorDecisionRecorded", decision); err != nil {
-		return nil, err
-	}
-	return decision, nil
-}
-
 func (c *Contract) AuthorizeSettlement(ctx contractapi.TransactionContextInterface, settlementID, claimID string) (*Settlement, error) {
 	if _, err := requireIdentity(ctx, "InsurerMSP", "insurerAdmin"); err != nil {
 		return nil, err

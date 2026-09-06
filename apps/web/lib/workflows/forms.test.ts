@@ -14,6 +14,16 @@ describe("guided workflow forms", () => {
     expect(() => bdtToMinor("0")).toThrow(/positive/);
   });
 
+  it("builds immutable quorum and appeal commands", async () => {
+    const hashText = vi.fn().mockResolvedValue("d".repeat(64));
+    const review = await buildWorkflowCommand("openClaimReview", {
+      claimId: "claim-1", reviewId: "review-1", assignedAuditorIdsJson: '["auditor1","auditor2","auditor3","auditor4"]', approvalThreshold: "3", rejectionThreshold: "2", deadline: "2026-09-09T12:00:00Z",
+    }, hashText);
+    expect(review).toMatchObject({ operation: "openClaimReview", approvalThreshold: 3, rejectionThreshold: 2 });
+    const appeal = await buildWorkflowCommand("submitClaimAppeal", { appealId: "appeal-1", claimId: "claim-1", reasonText: "new medical facts", evidenceText: "" }, hashText);
+    expect(appeal).toMatchObject({ operation: "submitClaimAppeal", reasonHash: "d".repeat(64), evidenceHash: "" });
+  });
+
   it("builds a validated command and hashes private source text", async () => {
     const hashText = vi.fn().mockResolvedValue("a".repeat(64));
     const command = await buildWorkflowCommand("submitClaim", {

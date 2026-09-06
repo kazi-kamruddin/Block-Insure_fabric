@@ -1,6 +1,6 @@
 package insurance
 
-const SchemaVersion = 3
+const SchemaVersion = 4
 
 type PolicyPackage struct {
 	AssetType          string `json:"assetType"`
@@ -196,6 +196,10 @@ type Claim struct {
 	EvidenceIDs            []string `json:"evidenceIds"`
 	HospitalVerificationID string   `json:"hospitalVerificationId"`
 	AuditorDecisionID      string   `json:"auditorDecisionId"`
+	CurrentReviewID        string   `json:"currentReviewId"`
+	CurrentAppealID        string   `json:"currentAppealId"`
+	ReviewRound            int      `json:"reviewRound"`
+	AppealCount            int      `json:"appealCount"`
 	Status                 string   `json:"status"`
 	CreatedAt              string   `json:"createdAt"`
 	UpdatedAt              string   `json:"updatedAt"`
@@ -242,10 +246,65 @@ type AuditorDecision struct {
 	SchemaVersion   int    `json:"schemaVersion"`
 	ID              string `json:"id"`
 	ClaimID         string `json:"claimId"`
+	ReviewID        string `json:"reviewId"`
+	ReviewRound     int    `json:"reviewRound"`
+	AuditorID       string `json:"auditorId"`
 	AuditorIdentity string `json:"auditorIdentity"`
 	Outcome         string `json:"outcome"`
 	ReasonHash      string `json:"reasonHash"`
 	CreatedAt       string `json:"createdAt"`
+}
+
+type ClaimReview struct {
+	AssetType          string   `json:"assetType"`
+	SchemaVersion      int      `json:"schemaVersion"`
+	ID                 string   `json:"id"`
+	ClaimID            string   `json:"claimId"`
+	AppealID           string   `json:"appealId"`
+	Round              int      `json:"round"`
+	Kind               string   `json:"kind"`
+	AssignedAuditorIDs []string `json:"assignedAuditorIds"`
+	ApprovalThreshold  int      `json:"approvalThreshold"`
+	RejectionThreshold int      `json:"rejectionThreshold"`
+	Approvals          int      `json:"approvals"`
+	Rejections         int      `json:"rejections"`
+	VotesCast          int      `json:"votesCast"`
+	Status             string   `json:"status"`
+	Deadline           string   `json:"deadline"`
+	OpenedAt           string   `json:"openedAt"`
+	ClosedAt           string   `json:"closedAt"`
+}
+
+type ClaimAppeal struct {
+	AssetType     string `json:"assetType"`
+	SchemaVersion int    `json:"schemaVersion"`
+	ID            string `json:"id"`
+	ClaimID       string `json:"claimId"`
+	ClaimantID    string `json:"claimantId"`
+	Round         int    `json:"round"`
+	ReasonHash    string `json:"reasonHash"`
+	EvidenceHash  string `json:"evidenceHash"`
+	ReviewID      string `json:"reviewId"`
+	Status        string `json:"status"`
+	CreatedAt     string `json:"createdAt"`
+	ResolvedAt    string `json:"resolvedAt"`
+}
+
+type FraudAssessment struct {
+	AssetType     string   `json:"assetType"`
+	SchemaVersion int      `json:"schemaVersion"`
+	ID            string   `json:"id"`
+	ClaimID       string   `json:"claimId"`
+	EngineID      string   `json:"engineId"`
+	EngineVersion string   `json:"engineVersion"`
+	ModelHash     string   `json:"modelHash"`
+	InputHash     string   `json:"inputHash"`
+	ScoreBps      int      `json:"scoreBps"`
+	RiskLevel     string   `json:"riskLevel"`
+	Signals       []string `json:"signals"`
+	Advisory      bool     `json:"advisory"`
+	RecordedBy    string   `json:"recordedBy"`
+	CreatedAt     string   `json:"createdAt"`
 }
 
 type Settlement struct {

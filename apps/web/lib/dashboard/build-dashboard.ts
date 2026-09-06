@@ -1,8 +1,12 @@
 import type { FabricRole } from "@/lib/fabric/config";
 import type {
   BankMandate,
+  AuditorDecision,
   BenefitRequest,
   Claim,
+  ClaimAppeal,
+  ClaimReview,
+  FraudAssessment,
   EvidenceReference,
   EvidenceAccessRecord,
   Policy,
@@ -45,6 +49,10 @@ export type DashboardAssets = {
   premiumCollections?: PremiumCollection[];
   benefitRequests?: BenefitRequest[];
   liabilities?: Liability[];
+  reviews?: ClaimReview[];
+  appeals?: ClaimAppeal[];
+  decisions?: AuditorDecision[];
+  fraudAssessments?: FraudAssessment[];
 };
 
 const terminalClaimStatuses = new Set(["REJECTED", "SETTLED"]);
@@ -73,6 +81,9 @@ export function buildRoleDashboard(
   const premiumCollections = assets.premiumCollections ?? [];
   const benefitRequests = assets.benefitRequests ?? [];
   const liabilities = assets.liabilities ?? [];
+  const reviews = assets.reviews ?? [];
+  const decisions = assets.decisions ?? [];
+  const fraudAssessments = assets.fraudAssessments ?? [];
   const ownedPolicies = role === "policyholder"
     ? assets.policies.filter((policy) => policy.policyholderId === subjectId)
     : assets.policies;
@@ -96,7 +107,16 @@ export function buildRoleDashboard(
         { label: "Active mandates", value: visibleMandates.filter((item) => item.status === "ACTIVE").length, hint: "bank-approved collections" },
       ],
       queueTitle: "Your active coverage",
-      queue: ownedPolicies.map((policy) => ({
+      queue: [
+        ...ownedClaims.filter((claim) => claim.status === "REJECTED" && claim.appealCount < 1).map((claim) => ({
+          id: claim.id,
+          title: claim.id,
+          detail: `${money(claim.amountMinor)} rejected claim · one appeal available`,
+          status: claim.status,
+          commandLabel: "Prepare appeal",
+          command: { operation: "submitClaimAppeal", appealId: `appeal-${Date.now()}-${claim.id}`, claimId: claim.id },
+        })),
+        ...ownedPolicies.map((policy) => ({
         id: policy.id,
         title: policy.id,
         detail: `${money(policy.coverageLimitMinor)} coverage · ends ${policy.endDate}`,
@@ -106,7 +126,8 @@ export function buildRoleDashboard(
           operation: "submitClaim", id: `claim-${Date.now()}`, policyId: policy.id,
           amountMinor: 250000, incidentDate: new Date().toISOString().slice(0, 10), descriptionHash: "a".repeat(64),
         } : { operation: "requestBankMandate", policyId: policy.id },
-      })),
+        })),
+      ],
       recentClaims: newestClaims(ownedClaims),
     };
   }
@@ -141,26 +162,29 @@ export function buildRoleDashboard(
   }
 
   if (role === "auditor") {
-    const queue = assets.claims.filter((claim) => claim.status === "UNDER_REVIEW");
+    const decidedReviewIds = new Set(decisions.filter((decision) => decision.auditorId === subjectId).map((decision) => decision.reviewId));
+    const queue = reviews.filter((review) =>
+      review.status === "OPEN" && Boolean(subjectId) && review.assignedAuditorIds.includes(subjectId!) && !decidedReviewIds.has(review.id),
+    );
     return {
       title: "Independent claim audit",
-      description: "Review hospital-verified claims and record one immutable auditor decision.",
+      description: "Vote with an assigned Fabric identity; no single auditor can finalize a claim.",
       metrics: [
-        { label: "Decision queue", value: queue.length, hint: "claims under review" },
+        { label: "Assigned votes", value: queue.length, hint: "open rounds awaiting your vote" },
         { label: "Approved", value: assets.claims.filter((item) => ["APPROVED", "SETTLEMENT_AUTHORIZED", "SETTLED"].includes(item.status)).length, hint: "positive decisions" },
         { label: "Evidence audits", value: assets.evidenceAccess.filter((item) => item.accessorRole === "auditor").length, hint: "auditor retrieval events" },
       ],
       queueTitle: "Claims requiring a decision",
-      queue: queue.map((claim) => ({
-        id: claim.id,
-        title: claim.id,
-        detail: `${money(claim.amountMinor)} · ${claim.evidenceIds.length} evidence reference(s)`,
-        status: claim.status,
+      queue: queue.map((review) => ({
+        id: review.id,
+        title: review.claimId,
+        detail: `Round ${review.round} · ${review.approvals}/${review.approvalThreshold} approve · ${review.rejections}/${review.rejectionThreshold} reject`,
+        status: review.status,
         commandLabel: "Prepare decision",
         command: {
           operation: "recordAuditorDecision",
-          claimId: claim.id,
-          decisionId: `decision-${Date.now()}-${claim.id}`,
+          reviewId: review.id,
+          decisionId: `decision-${Date.now()}-${review.id}`,
           outcome: "APPROVE",
           reasonHash: "a".repeat(64),
         },
@@ -197,7 +221,7 @@ export function buildRoleDashboard(
   }
 
   const reviewQueue = assets.claims.filter((claim) =>
-    ["HOSPITAL_VERIFIED", "APPROVED"].includes(claim.status),
+    ["HOSPITAL_VERIFIED", "APPEAL_SUBMITTED", "APPROVED"].includes(claim.status),
   );
   return {
     title: "Portfolio oversight",
@@ -206,6 +230,7 @@ export function buildRoleDashboard(
       { label: "Published packages", value: assets.packages.filter((item) => item.status === "PUBLISHED").length, hint: "available product definitions" },
       { label: "Active policies", value: assets.policies.filter((item) => item.status === "ACTIVE").length, hint: "issued coverage records" },
       { label: "Open claims", value: assets.claims.filter((item) => !terminalClaimStatuses.has(item.status)).length, hint: "portfolio work in progress" },
+      { label: "High-risk advisories", value: fraudAssessments.filter((item) => item.riskLevel === "HIGH").length, hint: "triage only; never automatic rejection" },
       { label: "Needs insurer action", value: reviewQueue.length + benefitRequests.filter((item) => ["SUBMITTED", "FUNDING_REQUIRED"].includes(item.status)).length, hint: "claims and benefit liabilities" },
     ],
     queueTitle: "Insurer action queue",
@@ -217,15 +242,18 @@ export function buildRoleDashboard(
       })),
       ...reviewQueue.map((claim) => {
       const approved = claim.status === "APPROVED";
+      const appealed = claim.status === "APPEAL_SUBMITTED";
       return {
         id: claim.id,
         title: claim.id,
         detail: `${money(claim.amountMinor)} · policy ${claim.policyId}`,
         status: claim.status,
-        commandLabel: approved ? "Prepare settlement" : "Prepare review",
+        commandLabel: approved ? "Prepare settlement" : appealed ? "Prepare appeal review" : "Prepare distributed review",
         command: approved
           ? { operation: "authorizeSettlement", settlementId: `settlement-${Date.now()}-${claim.id}`, claimId: claim.id }
-          : { operation: "startClaimReview", claimId: claim.id },
+          : appealed
+            ? { operation: "openAppealReview", appealId: claim.currentAppealId, reviewId: `review-appeal-${Date.now()}-${claim.id}` }
+            : { operation: "openClaimReview", claimId: claim.id, reviewId: `review-${Date.now()}-${claim.id}` },
       };
       }),
     ],

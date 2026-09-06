@@ -31,6 +31,8 @@ test("five organization sessions complete a Fabric insurance workflow", async ({
     evidence: `e2e-evidence-${suffix}`,
     verification: `e2e-verification-${suffix}`,
     decision: `e2e-decision-${suffix}`,
+    review: `e2e-review-${suffix}`,
+    fraud: `e2e-fraud-${suffix}`,
     settlement: `e2e-settlement-${suffix}`,
   };
 
@@ -38,6 +40,8 @@ test("five organization sessions complete a Fabric insurance workflow", async ({
   const policyholder = await actor(baseURL, "policyholder-1");
   const hospital = await actor(baseURL, "hospital-officer");
   const auditor = await actor(baseURL, "auditor");
+  const auditor2 = await actor(baseURL, "auditor-2");
+  const auditor3 = await actor(baseURL, "auditor-3");
   const bank = await actor(baseURL, "bank-officer");
 
   try {
@@ -106,17 +110,28 @@ test("five organization sessions complete a Fabric insurance workflow", async ({
     const verification = await policyholder.get(`/api/ledger/verification/${ids.verification}`);
     expect(verification.ok(), await verification.text()).toBe(true);
     expect((await verification.json()).result).toMatchObject({ id: ids.verification, claimId: ids.claim, outcome: "VERIFIED" });
-    await command(insurer, { operation: "startClaimReview", claimId: ids.claim });
+    const assessment = await command(insurer, { operation: "assessClaimFraud", assessmentId: ids.fraud, claimId: ids.claim });
+    expect(assessment.result).toMatchObject({ id: ids.fraud, claimId: ids.claim, advisory: true });
+    await command(insurer, {
+      operation: "openClaimReview", claimId: ids.claim, reviewId: ids.review,
+      assignedAuditorIdsJson: '["auditor1","auditor2","auditor3","auditor4"]',
+      approvalThreshold: 3, rejectionThreshold: 2,
+      deadline: new Date(Date.now() + 3 * 86_400_000).toISOString(),
+    });
 
     const auditorBefore = await auditor.get("/api/dashboard");
     expect((await auditorBefore.json()).dashboard.queue.some((item: { id: string }) => item.id === ids.claim)).toBe(true);
     await command(auditor, {
-      operation: "recordAuditorDecision", claimId: ids.claim, decisionId: ids.decision,
+      operation: "recordAuditorDecision", reviewId: ids.review, decisionId: `${ids.decision}-1`,
       outcome: "APPROVE", reasonHash: hashA,
     });
-    const decision = await policyholder.get(`/api/ledger/decision/${ids.decision}`);
+    const pendingClaim = await policyholder.get(`/api/ledger/claim/${ids.claim}`);
+    expect((await pendingClaim.json()).result.status).toBe("UNDER_REVIEW");
+    await command(auditor2, { operation: "recordAuditorDecision", reviewId: ids.review, decisionId: `${ids.decision}-2`, outcome: "APPROVE", reasonHash: hashA });
+    await command(auditor3, { operation: "recordAuditorDecision", reviewId: ids.review, decisionId: `${ids.decision}-3`, outcome: "APPROVE", reasonHash: hashA });
+    const decision = await policyholder.get(`/api/ledger/decision/${ids.decision}-3`);
     expect(decision.ok(), await decision.text()).toBe(true);
-    expect((await decision.json()).result).toMatchObject({ id: ids.decision, claimId: ids.claim, outcome: "APPROVE" });
+    expect((await decision.json()).result).toMatchObject({ id: `${ids.decision}-3`, claimId: ids.claim, reviewId: ids.review, outcome: "APPROVE" });
     await command(insurer, {
       operation: "authorizeSettlement", settlementId: ids.settlement, claimId: ids.claim,
     });
@@ -140,12 +155,14 @@ test("five organization sessions complete a Fabric insurance workflow", async ({
     expect(dossierResponse.headers()["content-disposition"]).toContain(`${ids.claim}-audit.json`);
     const dossier = await dossierResponse.json();
     expect(dossier).toMatchObject({
-      schemaVersion: 1,
+      schemaVersion: 2,
       claim: { id: ids.claim, status: "SETTLED" },
       hospitalVerification: { id: ids.verification, outcome: "VERIFIED" },
-      auditorDecision: { id: ids.decision, outcome: "APPROVE" },
       settlement: { id: ids.settlement, status: "CONFIRMED" },
     });
+    expect(dossier.reviewRounds).toEqual(expect.arrayContaining([expect.objectContaining({ id: ids.review, status: "APPROVED", votesCast: 3 })]));
+    expect(dossier.auditorDecisions).toHaveLength(3);
+    expect(dossier.fraudAssessments).toEqual(expect.arrayContaining([expect.objectContaining({ id: ids.fraud, advisory: true })]));
     expect(dossier.history.length).toBeGreaterThanOrEqual(6);
     expect(dossier.evidence.some((item: { id: string }) => item.id === ids.evidence)).toBe(true);
     expect(dossier.evidenceAccess.some((item: { evidenceId: string }) => item.evidenceId === ids.evidence)).toBe(true);
@@ -154,13 +171,61 @@ test("five organization sessions complete a Fabric insurance workflow", async ({
     expect(forbiddenDossier.status()).toBe(403);
 
     const forbidden = await bank.post("/api/workflows", {
-      data: { operation: "startClaimReview", claimId: ids.claim },
+      data: { operation: "openClaimReview", claimId: ids.claim, reviewId: ids.review, assignedAuditorIdsJson: "[]", approvalThreshold: 1, rejectionThreshold: 1, deadline: new Date(Date.now() + 86_400_000).toISOString() },
     });
     expect(forbidden.status()).toBe(403);
   } finally {
     await Promise.all([
-      insurer.dispose(), policyholder.dispose(), hospital.dispose(), auditor.dispose(), bank.dispose(),
+      insurer.dispose(), policyholder.dispose(), hospital.dispose(), auditor.dispose(), auditor2.dispose(), auditor3.dispose(), bank.dispose(),
     ]);
+  }
+});
+
+test("rejected claim appeal preserves round one and can be overturned by a new quorum", async ({ baseURL }) => {
+  test.setTimeout(120_000);
+  if (!baseURL) throw new Error("Playwright baseURL is required");
+  const suffix = `appeal-${Date.now()}-${Math.floor(Math.random() * 1_000_000)}`;
+  const packageId = `e2e-package-${suffix}`;
+  const policyId = `e2e-policy-${suffix}`;
+  const claimId = `e2e-claim-${suffix}`;
+  const review1 = `e2e-review-initial-${suffix}`;
+  const appealId = `e2e-appeal-${suffix}`;
+  const review2 = `e2e-review-appeal-${suffix}`;
+  const deadline = new Date(Date.now() + 3 * 86_400_000).toISOString();
+  const assignedAuditorIdsJson = '["auditor1","auditor2","auditor3","auditor4"]';
+  const insurer = await actor(baseURL, "insurer-admin");
+  const policyholder = await actor(baseURL, "policyholder-1");
+  const hospital = await actor(baseURL, "hospital-officer");
+  const auditors = await Promise.all(["auditor", "auditor-2", "auditor-3"].map((id) => actor(baseURL, id)));
+
+  try {
+    await command(insurer, { operation: "createPolicyPackage", id: packageId, name: "Appeal Plan", description: "Appeal regression", premiumMinor: 10_000, coverageLimitMinor: 1_000_000, termsHash: hashA });
+    await command(insurer, { operation: "publishPolicyPackage", id: packageId });
+    await command(insurer, { operation: "issuePolicy", id: policyId, packageId, policyholderId: "policyholder1", startDate: "2026-01-01", endDate: "2026-12-31" });
+    await command(policyholder, { operation: "submitClaim", id: claimId, policyId, amountMinor: 400_000, incidentDate: "2026-06-15", descriptionHash: hashB });
+    await command(hospital, { operation: "verifyClaim", claimId, verificationId: `verification-${suffix}`, outcome: "VERIFIED", clinicalReferenceHash: hashC });
+    await command(insurer, { operation: "openClaimReview", claimId, reviewId: review1, assignedAuditorIdsJson, approvalThreshold: 3, rejectionThreshold: 2, deadline });
+    await command(auditors[0], { operation: "recordAuditorDecision", reviewId: review1, decisionId: `decision-r1-a1-${suffix}`, outcome: "REJECT", reasonHash: hashA });
+    const duplicate = await auditors[0].post("/api/workflows", { data: { operation: "recordAuditorDecision", reviewId: review1, decisionId: `decision-r1-duplicate-${suffix}`, outcome: "REJECT", reasonHash: hashA } });
+    expect(duplicate.status()).toBe(409);
+    await command(auditors[1], { operation: "recordAuditorDecision", reviewId: review1, decisionId: `decision-r1-a2-${suffix}`, outcome: "REJECT", reasonHash: hashA });
+    await command(policyholder, { operation: "submitClaimAppeal", appealId, claimId, reasonHash: hashB, evidenceHash: hashC });
+    await command(insurer, { operation: "openAppealReview", appealId, reviewId: review2, assignedAuditorIdsJson, approvalThreshold: 3, rejectionThreshold: 2, deadline });
+    for (let index = 0; index < auditors.length; index += 1) {
+      await command(auditors[index], { operation: "recordAuditorDecision", reviewId: review2, decisionId: `decision-r2-a${index + 1}-${suffix}`, outcome: "APPROVE", reasonHash: hashB });
+    }
+
+    const claim = await (await policyholder.get(`/api/ledger/claim/${claimId}`)).json();
+    const appeal = await (await policyholder.get(`/api/ledger/appeal/${appealId}`)).json();
+    const reviews = await (await policyholder.get("/api/ledger/review")).json();
+    expect(claim.result).toMatchObject({ status: "APPROVED", appealCount: 1, reviewRound: 2, currentAppealId: appealId });
+    expect(appeal.result).toMatchObject({ status: "OVERTURNED", reviewId: review2, round: 1 });
+    expect(reviews.result.filter((item: { claimId: string }) => item.claimId === claimId)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: review1, status: "REJECTED", round: 1 }),
+      expect.objectContaining({ id: review2, status: "APPROVED", round: 2, kind: "APPEAL" }),
+    ]));
+  } finally {
+    await Promise.all([insurer.dispose(), policyholder.dispose(), hospital.dispose(), ...auditors.map((item) => item.dispose())]);
   }
 });
 

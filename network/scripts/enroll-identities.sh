@@ -60,6 +60,7 @@ enroll_peer_org insurer InsurerMSP 7054 insurerAdmin
 enroll_peer_org hospital HospitalMSP 8054 hospitalOfficer
 enroll_peer_org auditor AuditorMSP 9054 auditor
 enroll_peer_org bank BankMSP 12054 bankOfficer
+bash "${network_root}/scripts/enroll-auditors.sh"
 
 enroll_orderer() {
   local domain="blockinsure.test"
