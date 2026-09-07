@@ -98,16 +98,16 @@ function Invoke-WslVerification {
         [Parameter(Mandatory)][string]$ProjectRoot,
         [Parameter(Mandatory)][string]$Command
     )
-    for ($attempt = 1; $attempt -le 3; $attempt++) {
+    for ($attempt = 1; $attempt -le 5; $attempt++) {
         & wsl.exe -d Ubuntu -- bash -lc "cd '$ProjectRoot' && $Command"
         $exitCode = $LASTEXITCODE
         if ($exitCode -eq 0) { return }
-        if ($attempt -lt 3) {
-            Write-Warning "WSL verification command failed with exit code $exitCode (attempt $attempt/3); retrying the read-only/idempotent operation."
+        if ($attempt -lt 5) {
+            Write-Warning "WSL verification command failed with exit code $exitCode (attempt $attempt/5); retrying the read-only/idempotent operation."
             Start-Sleep -Seconds 2
         }
     }
-    throw "WSL verification command failed with exit code $exitCode after 3 attempts"
+    throw "WSL verification command failed with exit code $exitCode after 5 attempts"
 }
 
 function Ensure-OracleWorker {

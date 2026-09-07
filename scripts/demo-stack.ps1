@@ -29,7 +29,7 @@ function Resolve-WslProjectRoot {
 
 function Invoke-NetworkScript {
     param([Parameter(Mandatory)][string]$Command)
-    $maximumAttempts = if ($Command -in "network.sh up", "network.sh verify") { 3 } else { 1 }
+    $maximumAttempts = if ($Command -in "network.sh up", "network.sh verify") { 5 } else { 1 }
     for ($attempt = 1; $attempt -le $maximumAttempts; $attempt++) {
         $wslRoot = Resolve-WslProjectRoot
         & wsl.exe -d Ubuntu -- bash -lc "cd '$wslRoot' && bash network/scripts/$Command"

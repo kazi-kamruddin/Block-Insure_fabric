@@ -58,6 +58,20 @@ wait_for_running() {
   done
 }
 
+container_is_running() {
+  local container="$1" attempt state
+  for attempt in {1..5}; do
+    state="$(docker_cli inspect -f '{{.State.Running}}' "${container}" 2>/dev/null || true)"
+    if [ "${state}" = "true" ]; then
+      return 0
+    fi
+    if [ "${attempt}" -lt 5 ]; then
+      sleep 1
+    fi
+  done
+  return 1
+}
+
 set_peer_context() {
   local org="$1" msp="$2" port="$3"
   local domain="${org}.blockinsure.test"
@@ -198,7 +212,7 @@ verify() {
   require_tool peer
 
   for container in "${containers[@]}"; do
-    if [ "$(docker_cli inspect -f '{{.State.Running}}' "${container}" 2>/dev/null || true)" != "true" ]; then
+    if ! container_is_running "${container}"; then
       echo "Verification failed: ${container} is not running." >&2
       exit 1
     fi
