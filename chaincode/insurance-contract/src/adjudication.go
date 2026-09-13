@@ -3,13 +3,56 @@ package insurance
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/hyperledger/fabric-contract-api-go/v2/contractapi"
 )
 
-const maxAppealsPerClaim = 1
+const (
+	maxAppealsPerClaim      = 1
+	appealCommitmentVersion = "block-insure-fabric-appeal-v1"
+)
+
+var appealReasonCategories = map[string]bool{
+	"DOCUMENT_ERROR":      true,
+	"CLINICAL_CORRECTION": true,
+	"AMOUNT_CORRECTION":   true,
+	"OTHER":               true,
+}
+
+func claimFactsHash(claim *Claim) string {
+	return canonicalProtocolHash(
+		appealCommitmentVersion+":original-claim",
+		claim.ID,
+		strconv.Itoa(claim.Version),
+		claim.PolicyID,
+		claim.ClaimantID,
+		claim.HospitalID,
+		strconv.FormatInt(claim.AmountMinor, 10),
+		claim.IncidentDate,
+		strings.ToLower(claim.DescriptionHash),
+	)
+}
+
+func appealCommitmentHash(appeal *ClaimAppeal) string {
+	return canonicalProtocolHash(
+		appealCommitmentVersion+":commitment",
+		appeal.ClaimID,
+		strconv.Itoa(appeal.ClaimVersion),
+		appeal.ReasonCategory,
+		strings.ToLower(appeal.ReasonHash),
+		strings.ToLower(appeal.DescriptionHash),
+		strings.ToLower(appeal.EvidenceHash),
+		strings.ToLower(appeal.OriginalClaimHash),
+		appeal.ProposedHospitalID,
+		strconv.FormatInt(appeal.ProposedAmountMinor, 10),
+		appeal.ProposedIncidentDate,
+		strings.ToLower(appeal.ProposedDescriptionHash),
+		strings.ToLower(appeal.ProposedClinicalReferenceHash),
+	)
+}
 
 func parseAuditorAssignments(raw string) ([]string, error) {
 	var assignments []string
@@ -125,7 +168,12 @@ func (c *Contract) OpenClaimReview(
 	return c.openReview(ctx, claim, reviewID, "", "INITIAL", assignedAuditorIDsJSON, approvalThreshold, rejectionThreshold, deadline)
 }
 
-func (c *Contract) SubmitClaimAppeal(ctx contractapi.TransactionContextInterface, appealID, claimID, reasonHash, evidenceHash string) (*ClaimAppeal, error) {
+func (c *Contract) SubmitClaimAppeal(
+	ctx contractapi.TransactionContextInterface,
+	appealID, claimID, reasonCategory, reasonHash, descriptionHash, evidenceHash, proposedHospitalID string,
+	proposedAmountMinor int64,
+	proposedIncidentDate, proposedDescriptionHash, proposedClinicalReferenceHash string,
+) (*ClaimAppeal, error) {
 	if _, err := requireIdentity(ctx, "InsurerMSP", "policyholder"); err != nil {
 		return nil, err
 	}
@@ -146,7 +194,14 @@ func (c *Contract) SubmitClaimAppeal(ctx contractapi.TransactionContextInterface
 	if claim.AppealCount >= maxAppealsPerClaim {
 		return nil, fmt.Errorf("claim %s has reached the maximum appeal count", claimID)
 	}
+	reasonCategory = strings.ToUpper(strings.TrimSpace(reasonCategory))
+	if !appealReasonCategories[reasonCategory] {
+		return nil, fmt.Errorf("reasonCategory is unsupported")
+	}
 	if err := validateHash("reasonHash", reasonHash); err != nil {
+		return nil, err
+	}
+	if err := validateHash("descriptionHash", descriptionHash); err != nil {
 		return nil, err
 	}
 	if evidenceHash != "" {
@@ -154,22 +209,76 @@ func (c *Contract) SubmitClaimAppeal(ctx contractapi.TransactionContextInterface
 			return nil, err
 		}
 	}
+	if err := validateHash("proposedClinicalReferenceHash", proposedClinicalReferenceHash); err != nil {
+		return nil, err
+	}
+	effectiveHospitalID := strings.TrimSpace(proposedHospitalID)
+	if effectiveHospitalID == "" {
+		effectiveHospitalID = claim.HospitalID
+	}
+	if !idPattern.MatchString(effectiveHospitalID) {
+		return nil, fmt.Errorf("proposedHospitalId is invalid")
+	}
+	policy, err := c.ReadPolicy(ctx, claim.PolicyID)
+	if err != nil {
+		return nil, err
+	}
+	effectiveAmount := proposedAmountMinor
+	if effectiveAmount == 0 {
+		effectiveAmount = claim.AmountMinor
+	}
+	if effectiveAmount <= 0 || effectiveAmount > policy.CoverageLimitMinor {
+		return nil, fmt.Errorf("proposedAmountMinor must be within the policy coverage limit")
+	}
+	effectiveIncidentDate := strings.TrimSpace(proposedIncidentDate)
+	if effectiveIncidentDate == "" {
+		effectiveIncidentDate = claim.IncidentDate
+	}
+	incident, err := validateDate("proposedIncidentDate", effectiveIncidentDate)
+	if err != nil {
+		return nil, err
+	}
+	start, _ := validateDate("startDate", policy.StartDate)
+	end, _ := validateDate("endDate", policy.EndDate)
+	if incident.Before(start) || incident.After(end) {
+		return nil, fmt.Errorf("proposedIncidentDate is outside the policy coverage period")
+	}
+	effectiveDescriptionHash := strings.ToLower(strings.TrimSpace(proposedDescriptionHash))
+	if effectiveDescriptionHash == "" {
+		effectiveDescriptionHash = strings.ToLower(claim.DescriptionHash)
+	} else if err := validateHash("proposedDescriptionHash", effectiveDescriptionHash); err != nil {
+		return nil, err
+	}
 	now, err := timestamp(ctx)
 	if err != nil {
 		return nil, err
 	}
 	appeal := &ClaimAppeal{
 		AssetType: "claimAppeal", SchemaVersion: SchemaVersion, ID: appealID,
-		ClaimID: claimID, ClaimantID: subject, Round: claim.AppealCount + 1,
-		ReasonHash: strings.ToLower(reasonHash), EvidenceHash: strings.ToLower(evidenceHash),
-		Status: "SUBMITTED", CreatedAt: now,
+		ClaimID: claimID, ClaimantID: subject, ClaimVersion: claim.Version + 1,
+		Round: claim.AppealCount + 1, CommitmentVersion: appealCommitmentVersion,
+		ReasonCategory: reasonCategory, ReasonHash: strings.ToLower(reasonHash),
+		DescriptionHash: strings.ToLower(descriptionHash), EvidenceHash: strings.ToLower(evidenceHash),
+		OriginalClaimHash: claimFactsHash(claim), ProposedHospitalID: effectiveHospitalID,
+		ProposedAmountMinor: effectiveAmount,
+		ProposedIncidentDate: effectiveIncidentDate, ProposedDescriptionHash: effectiveDescriptionHash,
+		ProposedClinicalReferenceHash: strings.ToLower(proposedClinicalReferenceHash),
+		Status:                        "SUBMITTED", CreatedAt: now,
 	}
+	appeal.CommitmentHash = appealCommitmentHash(appeal)
 	if err := putState(ctx, "claimAppeal", appealID, appeal); err != nil {
 		return nil, err
 	}
 	claim.AppealCount = appeal.Round
 	claim.CurrentAppealID = appealID
-	claim.Version++
+	claim.Version = appeal.ClaimVersion
+	claim.HospitalID = effectiveHospitalID
+	claim.AmountMinor = effectiveAmount
+	claim.IncidentDate = effectiveIncidentDate
+	claim.DescriptionHash = effectiveDescriptionHash
+	claim.HospitalVerificationID = ""
+	claim.AuditorDecisionID = ""
+	claim.CurrentReviewID = ""
 	claim.CurrentOracleRequestID = ""
 	claim.OracleOutcome = ""
 	claim.OracleResultHash = ""
@@ -193,30 +302,7 @@ func (c *Contract) OpenAppealReview(
 	if _, err := requireIdentity(ctx, "InsurerMSP", "insurerAdmin"); err != nil {
 		return nil, err
 	}
-	appeal, err := c.ReadClaimAppeal(ctx, appealID)
-	if err != nil {
-		return nil, err
-	}
-	if appeal.Status != "SUBMITTED" {
-		return nil, fmt.Errorf("appeal %s must be SUBMITTED to open review", appealID)
-	}
-	claim, err := c.ReadClaim(ctx, appeal.ClaimID)
-	if err != nil {
-		return nil, err
-	}
-	if claim.Status != "APPEAL_SUBMITTED" || claim.CurrentAppealID != appealID {
-		return nil, fmt.Errorf("appeal %s is not the claim's active appeal", appealID)
-	}
-	review, err := c.openReview(ctx, claim, reviewID, appealID, "APPEAL", assignedAuditorIDsJSON, approvalThreshold, rejectionThreshold, deadline)
-	if err != nil {
-		return nil, err
-	}
-	appeal.Status = "UNDER_REVIEW"
-	appeal.ReviewID = reviewID
-	if err := overwriteAsset(ctx, "claimAppeal", appealID, appeal); err != nil {
-		return nil, err
-	}
-	return review, nil
+	return nil, fmt.Errorf("appeal %s must complete fresh hospital and Oracle verification; route a finalized Oracle failure to review instead", appealID)
 }
 
 func containsAssignment(assignments []string, auditorID string) bool {

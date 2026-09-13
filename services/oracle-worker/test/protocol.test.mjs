@@ -7,7 +7,7 @@ import { loadOracleConfig } from "../src/config.mjs";
 import { emptyCursor, loadCursor, persistCursor } from "../src/cursor.mjs";
 import { buildCommitmentDigest, buildDeterministicSalt, buildResultDigest, oracleRequestPhase } from "../src/protocol.mjs";
 import { createHealthState, loadPersistedHealth, persistHealth } from "../src/health.mjs";
-import { assessRegistryRecord, loadRegistrySnapshot, validateRegistrySnapshot } from "../src/registry.mjs";
+import { appealCommitmentHash, assessRegistryRecord, loadRegistrySnapshot, validateAppealBinding, validateRegistrySnapshot } from "../src/registry.mjs";
 import { withBoundedRetry } from "../src/retry.mjs";
 
 const request = {
@@ -16,6 +16,8 @@ const request = {
   queryHash: "1".repeat(64),
   claimVersion: 2,
   hospitalVerificationId: "verification-vector-1",
+  appealId: "appeal-vector-1",
+  appealCommitmentHash: "7".repeat(64),
   registrySnapshotId: "registry-demo-v1",
   registryVersion: 1,
   registryRootHash: "2".repeat(64),
@@ -28,10 +30,10 @@ const request = {
 test("canonical result and commitment digests bind every adjudication version", () => {
   const common = { verified: true, verificationCode: "VERIFIED", recordHash: "5".repeat(64) };
   const resultHash = buildResultDigest(request, common);
-  assert.equal(resultHash, "310ba46f898f75725e6c041800559faf9d69f72c40749874e15c1f7b7afd89e2");
+  assert.equal(resultHash, "82f423a623598cfdcbff6239a447f9ac774eec08175ba8c2f76ae7485e131eb7");
   assert.equal(
     buildCommitmentDigest(request, { verified: true, resultHash, salt: "6".repeat(64) }),
-    "dc82bc23fc7d06bce5a00726f88b387baf6a82acfa5d70c7e2bfe49524708d89",
+    "d72e0d6dc8003404d09d75d6db5d5e7eba6f48437c536784b97c6f1afcc0a942",
   );
   assert.equal(resultHash, buildResultDigest({ ...request }, { ...common }));
   assert.notEqual(resultHash, buildResultDigest({ ...request, claimVersion: 3 }, common));
@@ -56,14 +58,15 @@ test("independent baseline snapshots have distinct sources but identical canonic
   assert.notEqual(oracle1.rootHash, conflict.rootHash);
 
   const oracleRequest = {
+    claimVersion: 1,
     registrySnapshotId: oracle1.snapshotId,
     registryVersion: oracle1.version,
     registryRootHash: oracle1.rootHash,
     rulesVersion: oracle1.rulesVersion,
     rulesHash: oracle1.rulesHash,
   };
-  const claim = { amountMinor: 50_000, incidentDate: "2026-06-01", descriptionHash: "a".repeat(64) };
-  const hospitalVerification = { clinicalReferenceHash: "1".repeat(64) };
+  const claim = { hospitalId: "hospital-demo", amountMinor: 50_000, incidentDate: "2026-06-01", descriptionHash: "a".repeat(64) };
+  const hospitalVerification = { claimVersion: 1, appealId: "", clinicalReferenceHash: "1".repeat(64) };
   assert.deepEqual(
     assessRegistryRecord({ snapshot: oracle1, request: oracleRequest, claim, hospitalVerification }).verificationCode,
     "VERIFIED",
@@ -81,6 +84,7 @@ test("matching snapshots independently return the same negative record result", 
     loadRegistrySnapshot(path.join(root, "registry", "oracle2-v1.json")),
   ]);
   const oracleRequest = {
+    claimVersion: 1,
     registrySnapshotId: oracle1.snapshotId,
     registryVersion: oracle1.version,
     registryRootHash: oracle1.rootHash,
@@ -89,8 +93,8 @@ test("matching snapshots independently return the same negative record result", 
   };
   const input = {
     request: oracleRequest,
-    claim: { amountMinor: 50_000, incidentDate: "2026-06-01", descriptionHash: "b".repeat(64) },
-    hospitalVerification: { clinicalReferenceHash: "2".repeat(64) },
+    claim: { hospitalId: "hospital-demo", amountMinor: 50_000, incidentDate: "2026-06-01", descriptionHash: "b".repeat(64) },
+    hospitalVerification: { claimVersion: 1, appealId: "", clinicalReferenceHash: "2".repeat(64) },
   };
   const first = assessRegistryRecord({ snapshot: oracle1, ...input });
   const second = assessRegistryRecord({ snapshot: oracle2, ...input });
@@ -104,14 +108,45 @@ test("a request for a different model produces a deterministic negative result",
   const snapshot = await loadRegistrySnapshot(path.join(root, "registry", "oracle1-v1.json"));
   const result = assessRegistryRecord({
     snapshot,
-    request: { ...request, registrySnapshotId: snapshot.snapshotId, registryVersion: snapshot.version, registryRootHash: snapshot.rootHash, rulesVersion: snapshot.rulesVersion, rulesHash: snapshot.rulesHash },
-    claim: { amountMinor: 50_000, incidentDate: "2026-06-01", descriptionHash: "a".repeat(64) },
-    hospitalVerification: { clinicalReferenceHash: "1".repeat(64) },
+    request: { ...request, claimVersion: 1, appealId: "", appealCommitmentHash: "", registrySnapshotId: snapshot.snapshotId, registryVersion: snapshot.version, registryRootHash: snapshot.rootHash, rulesVersion: snapshot.rulesVersion, rulesHash: snapshot.rulesHash },
+    claim: { hospitalId: "hospital-demo", amountMinor: 50_000, incidentDate: "2026-06-01", descriptionHash: "a".repeat(64) },
+    hospitalVerification: { claimVersion: 1, appealId: "", clinicalReferenceHash: "1".repeat(64) },
     configuredModelVersion: "model-v2",
     configuredModelHash: "9".repeat(64),
   });
   assert.equal(result.verified, false);
   assert.equal(result.verificationCode, "MODEL_VERSION_MISMATCH");
+});
+
+test("corrected appeals require an exact commitment, claim, and hospital-version binding", () => {
+  const appeal = {
+    id: "appeal-1", claimId: "claim-1", claimVersion: 2,
+    commitmentVersion: "block-insure-fabric-appeal-v1",
+    reasonCategory: "DOCUMENT_ERROR", reasonHash: "a".repeat(64), descriptionHash: "b".repeat(64),
+    evidenceHash: "c".repeat(64), originalClaimHash: "d".repeat(64), proposedHospitalId: "hospital-demo", proposedAmountMinor: 50000,
+    proposedIncidentDate: "2026-06-01", proposedDescriptionHash: "e".repeat(64),
+    proposedClinicalReferenceHash: "1".repeat(64), hospitalVerificationId: "verification-2",
+  };
+  appeal.commitmentHash = appealCommitmentHash(appeal);
+  const binding = {
+    request: { claimVersion: 2, appealId: appeal.id, appealCommitmentHash: appeal.commitmentHash },
+    claim: { currentAppealId: appeal.id, hospitalId: "hospital-demo", amountMinor: 50000, incidentDate: "2026-06-01", descriptionHash: "e".repeat(64) },
+    hospitalVerification: { id: "verification-2", claimVersion: 2, appealId: appeal.id, clinicalReferenceHash: "1".repeat(64) },
+    appeal,
+  };
+  assert.equal(validateAppealBinding(binding), true);
+  assert.equal(validateAppealBinding({ ...binding, claim: { ...binding.claim, amountMinor: 50001 } }), false);
+  assert.equal(validateAppealBinding({ ...binding, request: { ...binding.request, appealCommitmentHash: "f".repeat(64) } }), false);
+});
+
+test("appeal commitment digest matches the Go chaincode protocol vector", () => {
+  assert.equal(appealCommitmentHash({
+    claimId: "claim-vector", claimVersion: 2, reasonCategory: "DOCUMENT_ERROR",
+    reasonHash: "a".repeat(64), descriptionHash: "b".repeat(64), evidenceHash: "c".repeat(64),
+    originalClaimHash: "d".repeat(64), proposedHospitalId: "hospital-2", proposedAmountMinor: 50000,
+    proposedIncidentDate: "2026-06-15", proposedDescriptionHash: "e".repeat(64),
+    proposedClinicalReferenceHash: "f".repeat(64),
+  }), "6ce90e23704ce9c29a2a814804546af406c143cc497c632d2220fe025c1e97e8");
 });
 
 test("registry validation rejects impossible dates, reversed ranges, and unknown statuses", () => {

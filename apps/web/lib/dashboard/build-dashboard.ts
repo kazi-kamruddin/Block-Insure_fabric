@@ -126,7 +126,7 @@ export function buildRoleDashboard(
         status: policy.status,
         commandLabel: policy.status === "ACTIVE" ? "Prepare claim" : "Manage coverage",
         command: policy.status === "ACTIVE" ? {
-          operation: "submitClaim", id: `claim-${Date.now()}`, policyId: policy.id,
+          operation: "submitClaim", id: `claim-${Date.now()}`, policyId: policy.id, hospitalId: "hospital-demo",
           amountMinor: 250000, incidentDate: new Date().toISOString().slice(0, 10), descriptionHash: "a".repeat(64),
         } : { operation: "requestBankMandate", policyId: policy.id },
         })),
@@ -136,13 +136,16 @@ export function buildRoleDashboard(
   }
 
   if (role === "hospitalOfficer") {
-    const queue = assets.claims.filter((claim) => claim.status === "SUBMITTED");
+    const hospitalClaims = assets.claims.filter((claim) => claim.hospitalId === subjectId);
+    const queue = hospitalClaims.filter((claim) =>
+      claim.status === "SUBMITTED" || (claim.status === "APPEAL_SUBMITTED" && !claim.hospitalVerificationId),
+    );
     return {
       title: "Hospital verification desk",
       description: "Claims awaiting an independent clinical attestation from HospitalMSP.",
       metrics: [
-        { label: "Awaiting verification", value: queue.length, hint: "submitted claims" },
-        { label: "Verified", value: assets.claims.filter((item) => item.status !== "SUBMITTED").length, hint: "claims past hospital review" },
+        { label: "Awaiting verification", value: queue.length, hint: "new and corrected claim versions" },
+        { label: "Verified", value: hospitalClaims.filter((item) => item.status !== "SUBMITTED" && Boolean(item.hospitalVerificationId)).length, hint: "assigned claims past hospital review" },
         { label: "Evidence access", value: assets.evidenceAccess.length, hint: "auditable retrieval events" },
       ],
       queueTitle: "Verification requests",
@@ -160,12 +163,18 @@ export function buildRoleDashboard(
           clinicalReferenceHash: "a".repeat(64),
         },
       })),
-      recentClaims: newestClaims(assets.claims),
+      recentClaims: newestClaims(hospitalClaims),
     };
   }
 
   if (role === "auditor") {
     const decidedReviewIds = new Set(decisions.filter((decision) => decision.auditorId === subjectId).map((decision) => decision.reviewId));
+    const ownDecisions = decisions.filter((decision) => decision.auditorId === subjectId);
+    const finalizedById = new Map(reviews.filter((review) => ["APPROVED", "REJECTED"].includes(review.status)).map((review) => [review.id, review.status]));
+    const alignedDecisions = ownDecisions.filter((decision) =>
+      (decision.outcome === "APPROVE" && finalizedById.get(decision.reviewId) === "APPROVED")
+      || (decision.outcome === "REJECT" && finalizedById.get(decision.reviewId) === "REJECTED"),
+    ).length;
     const queue = reviews.filter((review) =>
       review.status === "OPEN" && Boolean(subjectId) && review.assignedAuditorIds.includes(subjectId!) && !decidedReviewIds.has(review.id),
     );
@@ -174,6 +183,7 @@ export function buildRoleDashboard(
       description: "Vote with an assigned Fabric identity; no single auditor can finalize a claim.",
       metrics: [
         { label: "Assigned votes", value: queue.length, hint: "open rounds awaiting your vote" },
+        { label: "Decision history", value: ownDecisions.length, hint: ownDecisions.length ? `${Math.round((alignedDecisions / ownDecisions.length) * 100)}% final-outcome alignment` : "observational; never quorum weight" },
         { label: "Approved", value: assets.claims.filter((item) => ["APPROVED", "SETTLEMENT_AUTHORIZED", "SETTLED"].includes(item.status)).length, hint: "positive decisions" },
         { label: "Evidence audits", value: assets.evidenceAccess.filter((item) => item.accessorRole === "auditor").length, hint: "auditor retrieval events" },
       ],
@@ -224,7 +234,8 @@ export function buildRoleDashboard(
   }
 
   const reviewQueue = assets.claims.filter((claim) =>
-    ["HOSPITAL_VERIFIED", "APPEAL_SUBMITTED", "ORACLE_FAILED", "APPROVED"].includes(claim.status),
+    ["HOSPITAL_VERIFIED", "ORACLE_FAILED", "APPROVED"].includes(claim.status)
+      || (claim.status === "APPEAL_SUBMITTED" && Boolean(claim.hospitalVerificationId)),
   );
   return {
     title: "Portfolio oversight",

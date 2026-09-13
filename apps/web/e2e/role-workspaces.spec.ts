@@ -4,6 +4,10 @@ const actors = [
   { account: "insurer-admin", workspace: "insurer", heading: "Portfolio oversight", action: "createPolicyPackage" },
   { account: "policyholder-1", workspace: "policyholder", heading: "Coverage and claims overview", action: "acquirePolicy" },
   { account: "hospital-officer", workspace: "hospital", heading: "Hospital verification desk", action: "verifyClaim" },
+  { account: "hospital-officer-2", workspace: "hospital", heading: "Hospital verification desk", action: "verifyClaim" },
+  { account: "hospital-officer-3", workspace: "hospital", heading: "Hospital verification desk", action: "verifyClaim" },
+  { account: "hospital-officer-4", workspace: "hospital", heading: "Hospital verification desk", action: "verifyClaim" },
+  { account: "hospital-officer-5", workspace: "hospital", heading: "Hospital verification desk", action: "verifyClaim" },
   { account: "auditor", workspace: "auditor", heading: "Independent claim audit", action: "recordAuditorDecision" },
   { account: "auditor-2", workspace: "auditor", heading: "Independent claim audit", action: "recordAuditorDecision" },
   { account: "auditor-3", workspace: "auditor", heading: "Independent claim audit", action: "recordAuditorDecision" },
@@ -17,6 +21,10 @@ async function signIn(page: Page, account: string) {
     "insurer-admin": "Insurer Administrator",
     "policyholder-1": "Policyholder One",
     "hospital-officer": "Hospital Officer",
+    "hospital-officer-2": "Hospital Officer Two",
+    "hospital-officer-3": "Hospital Officer Three",
+    "hospital-officer-4": "Hospital Officer Four",
+    "hospital-officer-5": "Hospital Officer Five",
     auditor: "Independent Auditor One",
     "auditor-2": "Independent Auditor Two",
     "auditor-3": "Independent Auditor Three",
@@ -31,8 +39,31 @@ test("public landing page describes the permissioned network", async ({ page }) 
   const response = await page.goto("/");
   await expect(page.getByRole("heading", { name: "Insurance coordination with proof built in." })).toBeVisible();
   await expect(page.getByText("Hyperledger Fabric · Permissioned by design")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Published coverage packages" })).toBeVisible();
   expect(response?.headers()["x-frame-options"]).toBe("DENY");
   expect(response?.headers()["x-content-type-options"]).toBe("nosniff");
+});
+
+test("liveness, dependency readiness, public catalog, and not-found behavior are explicit", async ({ page, request }) => {
+  const live = await request.get("/api/health/live");
+  expect(live.status()).toBe(200);
+  expect(await live.json()).toMatchObject({ status: "alive", service: "block-insure-web" });
+
+  const ready = await request.get("/api/health/ready");
+  const readiness = await ready.json();
+  expect(ready.status(), JSON.stringify(readiness)).toBe(200);
+  expect(readiness).toMatchObject({
+    status: "ready",
+    dependencies: { chaincode: "connected", schemaVersion: 7, oracle1: "connected", oracle2: "connected" },
+  });
+
+  const catalog = await request.get("/api/public/policies");
+  expect(catalog.status()).toBe(200);
+  expect((await catalog.json()).packages.length).toBeGreaterThan(0);
+
+  const missing = await page.goto("/this-route-does-not-exist");
+  expect(missing?.status()).toBe(404);
+  await expect(page.getByRole("heading", { name: "This Block-Insure page does not exist." })).toBeVisible();
 });
 
 for (const actor of actors) {

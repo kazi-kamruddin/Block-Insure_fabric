@@ -20,8 +20,13 @@ describe("guided workflow forms", () => {
       claimId: "claim-1", reviewId: "review-1", assignedAuditorIdsJson: '["auditor1","auditor2","auditor3","auditor4"]', approvalThreshold: "3", rejectionThreshold: "2", deadline: "2026-09-09T12:00:00Z",
     }, hashText);
     expect(review).toMatchObject({ operation: "openClaimReview", approvalThreshold: 3, rejectionThreshold: 2 });
-    const appeal = await buildWorkflowCommand("submitClaimAppeal", { appealId: "appeal-1", claimId: "claim-1", reasonText: "new medical facts", evidenceText: "" }, hashText);
-    expect(appeal).toMatchObject({ operation: "submitClaimAppeal", reasonHash: "d".repeat(64), evidenceHash: "" });
+    const appeal = await buildWorkflowCommand("submitClaimAppeal", {
+      appealId: "appeal-1", claimId: "claim-1", reasonCategory: "DOCUMENT_ERROR",
+      reasonText: "new medical facts", descriptionText: "corrected invoice", evidenceText: "",
+      proposedAmountMinor: "0", proposedIncidentDate: "", proposedDescriptionText: "",
+      proposedClinicalReferenceHash: "c".repeat(64),
+    }, hashText);
+    expect(appeal).toMatchObject({ operation: "submitClaimAppeal", reasonCategory: "DOCUMENT_ERROR", reasonHash: "d".repeat(64), descriptionHash: "d".repeat(64), evidenceHash: "", proposedClinicalReferenceHash: "c".repeat(64) });
   });
 
   it("builds a validated command and hashes private source text", async () => {
@@ -29,6 +34,7 @@ describe("guided workflow forms", () => {
     const command = await buildWorkflowCommand("submitClaim", {
       id: "claim-guided",
       policyId: "policy-guided",
+      hospitalId: "hospital-demo",
       amountBdt: "2500.50",
       incidentDate: "2026-09-05",
       descriptionText: "case-file-42",
@@ -39,6 +45,7 @@ describe("guided workflow forms", () => {
       operation: "submitClaim",
       id: "claim-guided",
       policyId: "policy-guided",
+      hospitalId: "hospital-demo",
       amountMinor: 250_050,
       incidentDate: "2026-09-05",
       descriptionHash: "a".repeat(64),

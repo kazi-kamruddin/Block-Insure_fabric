@@ -110,11 +110,11 @@ set_client_context bank BankMSP 12051 bankOfficer
 invoke ConfirmBenefitPayment "${benefit_request_id}" "${hash_d}"
 
 set_client_context insurer InsurerMSP 7051 policyholder1
-invoke SubmitClaim "${claim_id}" "${policy_id}" 250000 2026-06-15 "${hash_b}"
+invoke SubmitClaim "${claim_id}" "${policy_id}" hospital-demo 250000 2026-06-15 "${hash_b}"
 invoke AddEvidenceReference "${claim_id}" "${evidence_id}" DISCHARGE_SUMMARY "${hash_c}" "${hash_d}"
 invoke GrantEvidenceAccess "${evidence_grant_id}" "${evidence_id}" HospitalMSP hospitalOfficer '*' VERIFY "${grant_deadline}" 2
 
-set_client_context hospital HospitalMSP 8051 hospitalOfficer
+set_client_context hospital HospitalMSP 8051 hospital1
 invoke RecordGrantedEvidenceAccess "${evidence_access_id}" "${evidence_id}" "${evidence_grant_id}" VERIFY
 invoke VerifyClaim "${claim_id}" "${verification_id}" VERIFIED "${hash_a}"
 

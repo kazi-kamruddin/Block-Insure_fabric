@@ -43,8 +43,8 @@ const commandTemplates = {
     ["Authorize settlement", { operation: "authorizeSettlement", settlementId: "settlement-1", claimId: "claim-1" }],
   ],
   policyholder: [
-    ["Submit claim", { operation: "submitClaim", id: "claim-1", policyId: "policy-1", amountMinor: 250000, incidentDate: "2026-06-15", descriptionHash: hash }],
-    ["Appeal claim", { operation: "submitClaimAppeal", appealId: "appeal-1", claimId: "claim-1", reasonHash: hash, evidenceHash: "" }],
+    ["Submit claim", { operation: "submitClaim", id: "claim-1", policyId: "policy-1", hospitalId: "hospital-demo", amountMinor: 250000, incidentDate: "2026-06-15", descriptionHash: hash }],
+    ["Appeal claim", { operation: "submitClaimAppeal", appealId: "appeal-1", claimId: "claim-1", reasonCategory: "DOCUMENT_ERROR", reasonHash: hash, descriptionHash: hash, evidenceHash: "", proposedHospitalId: "", proposedAmountMinor: 0, proposedIncidentDate: "", proposedDescriptionHash: "", proposedClinicalReferenceHash: hash }],
   ],
   hospitalOfficer: [
     ["Verify claim", { operation: "verifyClaim", claimId: "claim-1", verificationId: "verification-1", outcome: "VERIFIED", clinicalReferenceHash: hash }],

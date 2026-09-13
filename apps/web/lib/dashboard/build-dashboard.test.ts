@@ -10,8 +10,8 @@ const assets: DashboardAssets = {
     { assetType: "policy", schemaVersion: 1, id: "policy-other", packageId: "package-1", packageVersion: 1, policyholderId: "other", startDate: "2026-01-01", endDate: "2026-12-31", premiumMinor: 10000, coverageLimitMinor: 1000000, termsHash: "a".repeat(64), status: "ACTIVE", createdAt: timestamp, updatedAt: timestamp },
   ],
   claims: [
-    { assetType: "claim", schemaVersion: 6, id: "claim-submitted", policyId: "policy-mine", claimantId: "policyholder1", amountMinor: 10000, incidentDate: "2026-06-01", descriptionHash: "a".repeat(64), evidenceIds: [], hospitalVerificationId: "", auditorDecisionId: "", currentReviewId: "", currentAppealId: "", currentOracleRequestId: "", oracleOutcome: "", oracleResultHash: "", version: 1, reviewRound: 0, appealCount: 0, status: "SUBMITTED", createdAt: timestamp, updatedAt: timestamp },
-    { assetType: "claim", schemaVersion: 6, id: "claim-review", policyId: "policy-other", claimantId: "other", amountMinor: 20000, incidentDate: "2026-06-02", descriptionHash: "a".repeat(64), evidenceIds: ["evidence-1"], hospitalVerificationId: "verification-1", auditorDecisionId: "", currentReviewId: "review-1", currentAppealId: "", currentOracleRequestId: "", oracleOutcome: "", oracleResultHash: "", version: 1, reviewRound: 1, appealCount: 0, status: "UNDER_REVIEW", createdAt: timestamp, updatedAt: timestamp },
+    { assetType: "claim", schemaVersion: 7, id: "claim-submitted", policyId: "policy-mine", hospitalId: "hospital-demo", claimantId: "policyholder1", amountMinor: 10000, incidentDate: "2026-06-01", descriptionHash: "a".repeat(64), evidenceIds: [], hospitalVerificationId: "", auditorDecisionId: "", currentReviewId: "", currentAppealId: "", currentOracleRequestId: "", oracleOutcome: "", oracleResultHash: "", version: 1, reviewRound: 0, appealCount: 0, status: "SUBMITTED", createdAt: timestamp, updatedAt: timestamp },
+    { assetType: "claim", schemaVersion: 7, id: "claim-review", policyId: "policy-other", hospitalId: "hospital-2", claimantId: "other", amountMinor: 20000, incidentDate: "2026-06-02", descriptionHash: "a".repeat(64), evidenceIds: ["evidence-1"], hospitalVerificationId: "verification-1", auditorDecisionId: "", currentReviewId: "review-1", currentAppealId: "", currentOracleRequestId: "", oracleOutcome: "", oracleResultHash: "", version: 1, reviewRound: 1, appealCount: 0, status: "UNDER_REVIEW", createdAt: timestamp, updatedAt: timestamp },
   ],
   evidence: [],
   settlements: [{ assetType: "settlement", schemaVersion: 1, id: "settlement-1", claimId: "claim-review", amountMinor: 20000, status: "AUTHORIZED", bankReferenceHash: "", authorizedAt: timestamp, confirmedAt: "" }],
@@ -28,7 +28,8 @@ describe("role dashboards", () => {
   });
 
   it("builds organization-specific work queues", () => {
-    expect(buildRoleDashboard("hospitalOfficer", assets).queue[0]?.id).toBe("claim-submitted");
+    expect(buildRoleDashboard("hospitalOfficer", assets, "hospital-demo").queue[0]?.id).toBe("claim-submitted");
+    expect(buildRoleDashboard("hospitalOfficer", assets, "hospital-2").queue).toEqual([]);
     expect(buildRoleDashboard("auditor", assets, "auditor1").queue[0]?.id).toBe("review-1");
     expect(buildRoleDashboard("bankOfficer", assets).queue[0]?.id).toBe("settlement-1");
   });

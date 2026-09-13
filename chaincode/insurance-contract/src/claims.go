@@ -2,12 +2,13 @@ package insurance
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/hyperledger/fabric-contract-api-go/v2/contractapi"
 )
 
-func (c *Contract) SubmitClaim(ctx contractapi.TransactionContextInterface, id, policyID string, amountMinor int64, incidentDate, descriptionHash string) (*Claim, error) {
+func (c *Contract) SubmitClaim(ctx contractapi.TransactionContextInterface, id, policyID, hospitalID string, amountMinor int64, incidentDate, descriptionHash string) (*Claim, error) {
 	if _, err := requireIdentity(ctx, "InsurerMSP", "policyholder"); err != nil {
 		return nil, err
 	}
@@ -28,6 +29,10 @@ func (c *Contract) SubmitClaim(ctx contractapi.TransactionContextInterface, id, 
 	if amountMinor <= 0 || amountMinor > policy.CoverageLimitMinor {
 		return nil, fmt.Errorf("claim amount must be positive and within the policy coverage limit")
 	}
+	hospitalID = strings.TrimSpace(hospitalID)
+	if !idPattern.MatchString(hospitalID) {
+		return nil, fmt.Errorf("hospitalId is invalid")
+	}
 	incident, err := validateDate("incidentDate", incidentDate)
 	if err != nil {
 		return nil, err
@@ -46,7 +51,7 @@ func (c *Contract) SubmitClaim(ctx contractapi.TransactionContextInterface, id, 
 	}
 	claim := &Claim{
 		AssetType: "claim", SchemaVersion: SchemaVersion, ID: id, PolicyID: policyID,
-		ClaimantID: claimantID, AmountMinor: amountMinor, IncidentDate: incidentDate,
+		ClaimantID: claimantID, HospitalID: hospitalID, AmountMinor: amountMinor, IncidentDate: incidentDate,
 		DescriptionHash: strings.ToLower(descriptionHash), EvidenceIDs: []string{},
 		Version: 1, Status: "SUBMITTED", CreatedAt: now, UpdatedAt: now,
 	}
@@ -74,11 +79,15 @@ func (c *Contract) AddEvidenceReference(ctx contractapi.TransactionContextInterf
 	if claim.ClaimantID != subject {
 		return nil, fmt.Errorf("access denied: claim %s belongs to another policyholder", claimID)
 	}
-	if claim.Status != "SUBMITTED" {
-		return nil, fmt.Errorf("evidence can only be added while claim %s is SUBMITTED", claimID)
-	}
-	if strings.TrimSpace(documentType) == "" {
+	documentType = strings.ToUpper(strings.TrimSpace(documentType))
+	if documentType == "" {
 		return nil, fmt.Errorf("documentType is required")
+	}
+	if claim.Status != "SUBMITTED" && claim.Status != "REJECTED" && claim.Status != "APPEAL_SUBMITTED" {
+		return nil, fmt.Errorf("evidence cannot be added while claim %s is %s", claimID, claim.Status)
+	}
+	if claim.Status != "SUBMITTED" && documentType != "APPEAL_DOCUMENT" {
+		return nil, fmt.Errorf("only APPEAL_DOCUMENT evidence may be added after rejection")
 	}
 	if err := validateHash("contentHash", contentHash); err != nil {
 		return nil, err
@@ -86,13 +95,22 @@ func (c *Contract) AddEvidenceReference(ctx contractapi.TransactionContextInterf
 	if err := validateHash("storageReferenceHash", storageReferenceHash); err != nil {
 		return nil, err
 	}
+	if claim.Status == "APPEAL_SUBMITTED" {
+		appeal, readErr := c.ReadClaimAppeal(ctx, claim.CurrentAppealID)
+		if readErr != nil {
+			return nil, readErr
+		}
+		if appeal.EvidenceHash == "" || !strings.EqualFold(appeal.EvidenceHash, contentHash) {
+			return nil, fmt.Errorf("appeal evidence content hash does not match the active commitment")
+		}
+	}
 	now, err := timestamp(ctx)
 	if err != nil {
 		return nil, err
 	}
 	evidence := &EvidenceReference{
 		AssetType: "evidenceReference", SchemaVersion: SchemaVersion, ID: evidenceID,
-		ClaimID: claimID, DocumentType: strings.TrimSpace(documentType),
+		ClaimID: claimID, ClaimVersion: claim.Version, DocumentType: documentType,
 		ContentHash: strings.ToLower(contentHash), StorageReferenceHash: strings.ToLower(storageReferenceHash),
 		SubmittedBy: subject, CreatedAt: now,
 	}
@@ -111,7 +129,11 @@ func (c *Contract) AddEvidenceReference(ctx contractapi.TransactionContextInterf
 }
 
 func (c *Contract) VerifyClaim(ctx contractapi.TransactionContextInterface, claimID, verificationID, outcome, clinicalReferenceHash string) (*HospitalVerification, error) {
-	hospitalID, err := requireIdentity(ctx, "HospitalMSP", "hospitalOfficer")
+	_, err := requireIdentity(ctx, "HospitalMSP", "hospitalOfficer")
+	if err != nil {
+		return nil, err
+	}
+	hospitalID, err := callerSubject(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -119,8 +141,14 @@ func (c *Contract) VerifyClaim(ctx contractapi.TransactionContextInterface, clai
 	if err != nil {
 		return nil, err
 	}
-	if claim.Status != "SUBMITTED" {
-		return nil, fmt.Errorf("claim %s must be SUBMITTED for hospital verification", claimID)
+	if claim.Status != "SUBMITTED" && claim.Status != "APPEAL_SUBMITTED" {
+		return nil, fmt.Errorf("claim %s must be SUBMITTED or APPEAL_SUBMITTED for hospital verification", claimID)
+	}
+	if claim.HospitalID != hospitalID {
+		return nil, fmt.Errorf("access denied: claim %s is assigned to hospital %s", claimID, claim.HospitalID)
+	}
+	if claim.HospitalVerificationID != "" {
+		return nil, fmt.Errorf("claim %s already has a hospital verification for version %d", claimID, claim.Version)
 	}
 	outcome = strings.ToUpper(strings.TrimSpace(outcome))
 	if outcome != "VERIFIED" && outcome != "INVALID" {
@@ -129,19 +157,62 @@ func (c *Contract) VerifyClaim(ctx contractapi.TransactionContextInterface, clai
 	if err := validateHash("clinicalReferenceHash", clinicalReferenceHash); err != nil {
 		return nil, err
 	}
+	appealID := ""
+	var appeal *ClaimAppeal
+	if claim.Status == "APPEAL_SUBMITTED" {
+		if claim.CurrentAppealID == "" {
+			return nil, fmt.Errorf("claim %s has no active appeal", claimID)
+		}
+		appeal, err = c.ReadClaimAppeal(ctx, claim.CurrentAppealID)
+		if err != nil {
+			return nil, err
+		}
+		if appeal.Status != "SUBMITTED" || appeal.ClaimVersion != claim.Version || appeal.CommitmentHash != appealCommitmentHash(appeal) {
+			return nil, fmt.Errorf("appeal %s commitment is stale or invalid", appeal.ID)
+		}
+		if !strings.EqualFold(clinicalReferenceHash, appeal.ProposedClinicalReferenceHash) {
+			return nil, fmt.Errorf("clinicalReferenceHash does not match appeal %s commitment", appeal.ID)
+		}
+		appealID = appeal.ID
+	}
 	now, err := timestamp(ctx)
 	if err != nil {
 		return nil, err
 	}
 	verification := &HospitalVerification{
 		AssetType: "hospitalVerification", SchemaVersion: SchemaVersion, ID: verificationID,
-		ClaimID: claimID, HospitalIdentity: hospitalID, Outcome: outcome,
+		ClaimID: claimID, ClaimVersion: claim.Version, AppealID: appealID,
+		HospitalIdentity: hospitalID, Outcome: outcome,
 		ClinicalReferenceHash: strings.ToLower(clinicalReferenceHash), CreatedAt: now,
 	}
+	verification.AttestationHash = canonicalProtocolHash(
+		"block-insure-fabric-hospital-attestation-v1",
+		verification.ClaimID,
+		strconv.Itoa(verification.ClaimVersion),
+		verification.AppealID,
+		verification.HospitalIdentity,
+		verification.Outcome,
+		verification.ClinicalReferenceHash,
+		strconv.FormatInt(claim.AmountMinor, 10),
+		claim.IncidentDate,
+		strings.ToLower(claim.DescriptionHash),
+	)
 	if err := putState(ctx, "hospitalVerification", verificationID, verification); err != nil {
 		return nil, err
 	}
-	if outcome == "VERIFIED" {
+	if appeal != nil {
+		appeal.HospitalVerificationID = verificationID
+		if outcome == "VERIFIED" {
+			appeal.Status = "HOSPITAL_VERIFIED"
+		} else {
+			appeal.Status = "UPHELD"
+			appeal.ResolvedAt = now
+			claim.Status = "REJECTED"
+		}
+		if err := overwriteAsset(ctx, "claimAppeal", appeal.ID, appeal); err != nil {
+			return nil, err
+		}
+	} else if outcome == "VERIFIED" {
 		claim.Status = "HOSPITAL_VERIFIED"
 	} else {
 		claim.Status = "REJECTED"

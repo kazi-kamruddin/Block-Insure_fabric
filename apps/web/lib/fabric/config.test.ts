@@ -1,6 +1,6 @@
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { loadFabricConfig, resolveAuditorProfile, resolveRoleProfile } from "./config";
+import { loadFabricConfig, resolveAuditorProfile, resolveHospitalProfile, resolveRoleProfile } from "./config";
 
 describe("Fabric configuration", () => {
   it("uses safe local defaults", () => {
@@ -15,6 +15,12 @@ describe("Fabric configuration", () => {
     const config = loadFabricConfig({ FABRIC_NETWORK_ROOT: "X:/fabric-network" } as unknown as NodeJS.ProcessEnv);
     expect(resolveAuditorProfile("auditor3", config).userMspPath).toContain("auditor3@auditor.blockinsure.test");
     expect(() => resolveAuditorProfile("arbitrary-user", config)).toThrow("Unknown server-owned auditor");
+  });
+
+  it("only resolves the five server-owned Hospital certificate profiles", () => {
+    const config = loadFabricConfig({ FABRIC_NETWORK_ROOT: "X:/fabric-network" } as unknown as NodeJS.ProcessEnv);
+    expect(resolveHospitalProfile("hospital4", config).userMspPath).toContain("hospital4@hospital.blockinsure.test");
+    expect(() => resolveHospitalProfile("arbitrary-user", config)).toThrow("Unknown server-owned hospitalOfficer");
   });
 
   it("maps each application role to its own organization identity", () => {

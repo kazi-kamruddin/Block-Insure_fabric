@@ -22,6 +22,8 @@ export async function GET(_request: Request, context: RouteContext) {
 
   try {
     const { assetType, id } = parsed.data;
+    const hospitalOwnsClaim = async (claimId: string) => session.role !== "hospitalOfficer"
+      || (await ledger.readClaim(claimId)).hospitalId === session.subjectId;
     let result: unknown;
     switch (assetType) {
       case "package":
@@ -41,6 +43,9 @@ export async function GET(_request: Request, context: RouteContext) {
         if (session.role === "policyholder" && claim.claimantId !== session.subjectId) {
           return NextResponse.json({ message: "Asset is not owned by this account" }, { status: 403 });
         }
+        if (session.role === "hospitalOfficer" && claim.hospitalId !== session.subjectId) {
+          return NextResponse.json({ message: "Claim is assigned to another hospital" }, { status: 403 });
+        }
         break;
       }
       case "oracle-snapshot":
@@ -49,30 +54,35 @@ export async function GET(_request: Request, context: RouteContext) {
       case "oracle-request": {
         const item = await ledger.readOracleRequest(id);
         if (session.role === "policyholder" && (await ledger.readClaim(item.claimId)).claimantId !== session.subjectId) return NextResponse.json({ message: "Asset is not owned by this account" }, { status: 403 });
+        if (!(await hospitalOwnsClaim(item.claimId))) return NextResponse.json({ message: "Claim is assigned to another hospital" }, { status: 403 });
         result = item;
         break;
       }
       case "oracle-commitment": {
         const item = await ledger.readOracleCommitment(id);
         if (session.role === "policyholder" && (await ledger.readClaim(item.claimId)).claimantId !== session.subjectId) return NextResponse.json({ message: "Asset is not owned by this account" }, { status: 403 });
+        if (!(await hospitalOwnsClaim(item.claimId))) return NextResponse.json({ message: "Claim is assigned to another hospital" }, { status: 403 });
         result = item;
         break;
       }
       case "oracle-result": {
         const item = await ledger.readOracleResult(id);
         if (session.role === "policyholder" && (await ledger.readClaim(item.claimId)).claimantId !== session.subjectId) return NextResponse.json({ message: "Asset is not owned by this account" }, { status: 403 });
+        if (!(await hospitalOwnsClaim(item.claimId))) return NextResponse.json({ message: "Claim is assigned to another hospital" }, { status: 403 });
         result = item;
         break;
       }
       case "oracle-history": {
         const item = await ledger.readOracleRequest(id);
         if (session.role === "policyholder" && (await ledger.readClaim(item.claimId)).claimantId !== session.subjectId) return NextResponse.json({ message: "Asset is not owned by this account" }, { status: 403 });
+        if (!(await hospitalOwnsClaim(item.claimId))) return NextResponse.json({ message: "Claim is assigned to another hospital" }, { status: 403 });
         result = await ledger.oracleRequestHistory(id);
         break;
       }
       case "evidence": {
         const evidence = await ledger.readEvidenceReference(id);
         result = evidence;
+        if (!(await hospitalOwnsClaim(evidence.claimId))) return NextResponse.json({ message: "Claim is assigned to another hospital" }, { status: 403 });
         if (session.role === "policyholder") {
           const claim = await ledger.readClaim(evidence.claimId);
           if (claim.claimantId !== session.subjectId) {
@@ -94,6 +104,9 @@ export async function GET(_request: Request, context: RouteContext) {
       case "verification": {
         const verification = await ledger.readHospitalVerification(id);
         result = verification;
+        if (session.role === "hospitalOfficer" && verification.hospitalIdentity !== session.subjectId) {
+          return NextResponse.json({ message: "Verification belongs to another hospital" }, { status: 403 });
+        }
         if (session.role === "policyholder") {
           const claim = await ledger.readClaim(verification.claimId);
           if (claim.claimantId !== session.subjectId) {
@@ -105,6 +118,7 @@ export async function GET(_request: Request, context: RouteContext) {
       case "decision": {
         const decision = await ledger.readAuditorDecision(id);
         result = decision;
+        if (!(await hospitalOwnsClaim(decision.claimId))) return NextResponse.json({ message: "Claim is assigned to another hospital" }, { status: 403 });
         if (session.role === "policyholder") {
           const claim = await ledger.readClaim(decision.claimId);
           if (claim.claimantId !== session.subjectId) {
@@ -117,24 +131,28 @@ export async function GET(_request: Request, context: RouteContext) {
         const review = await ledger.readClaimReview(id);
         if (session.role === "auditor" && !review.assignedAuditorIds.includes(session.subjectId ?? "")) return NextResponse.json({ message: "Review is not assigned to this auditor" }, { status: 403 });
         if (session.role === "policyholder" && (await ledger.readClaim(review.claimId)).claimantId !== session.subjectId) return NextResponse.json({ message: "Asset is not owned by this account" }, { status: 403 });
+        if (!(await hospitalOwnsClaim(review.claimId))) return NextResponse.json({ message: "Claim is assigned to another hospital" }, { status: 403 });
         result = review;
         break;
       }
       case "appeal": {
         const appeal = await ledger.readClaimAppeal(id);
         if (session.role === "policyholder" && appeal.claimantId !== session.subjectId) return NextResponse.json({ message: "Asset is not owned by this account" }, { status: 403 });
+        if (session.role === "hospitalOfficer" && (await ledger.readClaim(appeal.claimId)).hospitalId !== session.subjectId) return NextResponse.json({ message: "Appeal is assigned to another hospital" }, { status: 403 });
         result = appeal;
         break;
       }
       case "fraud-assessment": {
         const assessment = await ledger.readFraudAssessment(id);
         if (session.role === "policyholder" && (await ledger.readClaim(assessment.claimId)).claimantId !== session.subjectId) return NextResponse.json({ message: "Asset is not owned by this account" }, { status: 403 });
+        if (!(await hospitalOwnsClaim(assessment.claimId))) return NextResponse.json({ message: "Claim is assigned to another hospital" }, { status: 403 });
         result = assessment;
         break;
       }
       case "settlement": {
         const settlement = await ledger.readSettlement(id);
         result = settlement;
+        if (!(await hospitalOwnsClaim(settlement.claimId))) return NextResponse.json({ message: "Claim is assigned to another hospital" }, { status: 403 });
         if (session.role === "policyholder") {
           const claim = await ledger.readClaim(settlement.claimId);
           if (claim.claimantId !== session.subjectId) {
@@ -144,6 +162,7 @@ export async function GET(_request: Request, context: RouteContext) {
         break;
       }
       case "claim-history": {
+        if (!(await hospitalOwnsClaim(id))) return NextResponse.json({ message: "Claim is assigned to another hospital" }, { status: 403 });
         if (session.role === "policyholder") {
           const claim = await ledger.readClaim(id);
           if (claim.claimantId !== session.subjectId) {
@@ -210,7 +229,7 @@ export async function GET(_request: Request, context: RouteContext) {
   } catch (error) {
     console.error("Ledger query failed", error);
     return NextResponse.json(
-      { message: error instanceof Error ? error.message : "Ledger query failed" },
+      { message: "Ledger asset was not found or is unavailable" },
       { status: 404 },
     );
   }

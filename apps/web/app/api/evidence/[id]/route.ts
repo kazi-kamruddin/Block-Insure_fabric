@@ -39,7 +39,7 @@ export async function POST(request: Request, context: RouteContext) {
     const workflowAuthorized =
       session.role === "insurerAdmin" ||
       (session.role === "policyholder" && claim.claimantId === session.subjectId) ||
-      (session.role === "hospitalOfficer" && (claim.status === "SUBMITTED" || Boolean(claim.hospitalVerificationId))) ||
+      (session.role === "hospitalOfficer" && claim.hospitalId === session.subjectId && ["SUBMITTED", "APPEAL_SUBMITTED"].includes(claim.status)) ||
       (session.role === "auditor" && auditorAssigned && !["SUBMITTED", "HOSPITAL_VERIFIED"].includes(claim.status));
     let grantAuthorized = false;
     if (retrieval.data.grantId && account) {

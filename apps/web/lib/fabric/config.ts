@@ -98,8 +98,8 @@ export function loadFabricConfig(environment: NodeJS.ProcessEnv = process.env) {
 }
 
 export function resolveRoleProfile(role: FabricRole, config: FabricConfig) {
-	const definition = roleDefinitions[role];
-	const userName = definition.userName;
+  const definition = roleDefinitions[role];
+  const userName = definition.userName;
   const peerName = `peer0.${definition.organizationDomain}`;
   const organizationRoot = path.join(
     config.networkRoot,
@@ -124,20 +124,27 @@ export function resolveRoleProfile(role: FabricRole, config: FabricConfig) {
 }
 
 const auditorIdentityNames = new Set(["auditor1", "auditor2", "auditor3", "auditor4"]);
+const hospitalIdentityNames = new Set(["hospital1", "hospital2", "hospital3", "hospital4", "hospital5"]);
 
-export function resolveAuditorProfile(userName: string, config: FabricConfig) {
-  if (!auditorIdentityNames.has(userName)) {
-    throw new Error("Unknown server-owned auditor identity profile");
-  }
-  const definition = roleDefinitions.auditor;
+function resolveNamedRoleProfile(role: "auditor" | "hospitalOfficer", userName: string, allowedNames: Set<string>, config: FabricConfig) {
+  if (!allowedNames.has(userName)) throw new Error(`Unknown server-owned ${role} identity profile`);
+  const definition = roleDefinitions[role];
   const peerName = `peer0.${definition.organizationDomain}`;
   const organizationRoot = path.join(config.networkRoot, "organizations", "peerOrganizations", definition.organizationDomain);
   return {
-    role: "auditor" as const,
+    role,
     mspId: definition.mspId,
     peerEndpoint: `localhost:${definition.peerPort}`,
     peerHostAlias: peerName,
     tlsCertificatePath: path.join(organizationRoot, "peers", peerName, "tls", "ca.crt"),
     userMspPath: path.join(organizationRoot, "users", `${userName}@${definition.organizationDomain}`, "msp"),
   };
+}
+
+export function resolveAuditorProfile(userName: string, config: FabricConfig) {
+  return resolveNamedRoleProfile("auditor", userName, auditorIdentityNames, config);
+}
+
+export function resolveHospitalProfile(userName: string, config: FabricConfig) {
+  return resolveNamedRoleProfile("hospitalOfficer", userName, hospitalIdentityNames, config);
 }

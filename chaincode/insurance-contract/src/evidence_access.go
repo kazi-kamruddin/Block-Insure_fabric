@@ -146,7 +146,11 @@ func (c *Contract) authorizeWorkflowEvidence(ctx contractapi.TransactionContextI
 		subject, err := callerSubject(ctx)
 		return err == nil && subject == claim.ClaimantID && subject == evidence.SubmittedBy, err
 	case mspID == "HospitalMSP" && role == "hospitalOfficer":
-		return claim.Status == "SUBMITTED" || claim.HospitalVerificationID != "", nil
+		subject, err := callerSubject(ctx)
+		if err != nil {
+			return false, err
+		}
+		return subject == claim.HospitalID && (claim.Status == "SUBMITTED" || claim.Status == "APPEAL_SUBMITTED"), nil
 	case mspID == "AuditorMSP" && role == "auditor":
 		if claim.CurrentReviewID == "" {
 			return false, nil

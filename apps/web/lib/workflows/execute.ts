@@ -65,7 +65,7 @@ export async function executeWorkflowCommand(command: WorkflowCommand, session: 
     case "submitClaim":
       return ledger.submitClaim(command);
     case "verifyClaim":
-      return ledger.verifyClaim(command);
+      return ledger.verifyClaim(command, findDemoAccount(session.accountId)?.fabricUserName);
     case "openClaimReview":
       return ledger.openClaimReview(command);
     case "publishOracleRegistrySnapshot":

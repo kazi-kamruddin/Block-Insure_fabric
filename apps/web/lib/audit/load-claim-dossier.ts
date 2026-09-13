@@ -20,7 +20,7 @@ import type {
 } from "@/lib/fabric/types";
 
 export type ClaimAuditDossier = {
-  schemaVersion: 4;
+  schemaVersion: 5;
   exportedAt: string;
   claim: Claim;
   history: ClaimHistoryRecord[];
@@ -28,6 +28,7 @@ export type ClaimAuditDossier = {
   evidenceAccess: EvidenceAccessRecord[];
   evidenceGrants: EvidenceAccessGrant[];
   hospitalVerification: HospitalVerification | null;
+  hospitalVerifications: HospitalVerification[];
   oracleRequests: OracleRequest[];
   oracleCommitments: OracleCommitment[];
   oracleResults: OracleResult[];
@@ -59,7 +60,7 @@ export async function loadClaimAuditDossier(claimId: string): Promise<ClaimAudit
   ]);
 
   return {
-    schemaVersion: 4,
+    schemaVersion: 5,
     exportedAt: new Date().toISOString(),
     claim,
     history,
@@ -67,6 +68,7 @@ export async function loadClaimAuditDossier(claimId: string): Promise<ClaimAudit
     evidenceAccess: allAccess.filter((item) => item.claimId === claimId),
     evidenceGrants: allGrants.filter((item) => item.claimId === claimId),
     hospitalVerification: allVerifications.find((item) => item.id === claim.hospitalVerificationId) ?? null,
+    hospitalVerifications: allVerifications.filter((item) => item.claimId === claimId),
     oracleRequests: allOracleRequests.filter((item) => item.claimId === claimId),
     oracleCommitments: allOracleCommitments.filter((item) => item.claimId === claimId),
     oracleResults: allOracleResults.filter((item) => item.claimId === claimId),

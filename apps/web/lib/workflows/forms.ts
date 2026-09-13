@@ -24,7 +24,7 @@ export type WorkflowFormValues = Record<string, string>;
 export type HashText = (value: string) => Promise<string>;
 
 export const operationsByRole = {
-  insurerAdmin: ["createPolicyPackage", "publishPolicyPackage", "retirePolicyPackage", "createBenefitPlan", "publishBenefitPlan", "retireBenefitPlan", "issuePolicy", "advancePolicyLifecycle", "cancelPolicyAsInsurer", "queuePremiumCollection", "decideBenefitRequest", "markBenefitPaymentReady", "assessClaimFraud", "publishOracleRegistrySnapshot", "requestOracleVerification", "finalizeOracleTimeout", "routeOracleFailureToReview", "openClaimReview", "openAppealReview", "finalizeExpiredReview", "authorizeSettlement"],
+  insurerAdmin: ["createPolicyPackage", "publishPolicyPackage", "retirePolicyPackage", "createBenefitPlan", "publishBenefitPlan", "retireBenefitPlan", "issuePolicy", "advancePolicyLifecycle", "cancelPolicyAsInsurer", "queuePremiumCollection", "decideBenefitRequest", "markBenefitPaymentReady", "assessClaimFraud", "publishOracleRegistrySnapshot", "requestOracleVerification", "finalizeOracleTimeout", "routeOracleFailureToReview", "openClaimReview", "finalizeExpiredReview", "authorizeSettlement"],
   policyholder: ["acquirePolicy", "requestBankMandate", "cancelBankMandate", "setBeneficiaries", "submitBenefitRequest", "renewPolicy", "cancelPolicy", "submitClaim", "submitClaimAppeal", "grantEvidenceAccess", "revokeEvidenceAccess"],
   hospitalOfficer: ["verifyClaim"],
   auditor: ["recordAuditorDecision"],
@@ -198,6 +198,7 @@ export const workflowFormDefinitions: Record<WorkflowOperation, WorkflowFormDefi
     fields: [
       { name: "id", label: "Claim ID", placeholder: "claim-1001" },
       { name: "policyId", label: "Policy ID", placeholder: "policy-1001" },
+      { name: "hospitalId", label: "Assigned hospital", kind: "select", options: ["hospital-demo", "hospital-2", "hospital-3", "hospital-4", "hospital-5"], help: "Only the matching certificate-bound Hospital identity can attest this claim." },
       { name: "amountBdt", label: "Claim amount (BDT)", kind: "money", placeholder: "2500.00" },
       { name: "incidentDate", label: "Incident date", kind: "date" },
       { name: "descriptionText", label: "Claim description reference", kind: "textarea", placeholder: "Private case reference or concise incident summary", help: "Hashed in this browser; only the SHA-256 digest is sent." },
@@ -275,12 +276,19 @@ export const workflowFormDefinitions: Record<WorkflowOperation, WorkflowFormDefi
   },
   submitClaimAppeal: {
     label: "Appeal rejected claim",
-    description: "Open the single permitted appeal while preserving the original review and votes.",
+    description: "Commit corrected facts for the single appeal. A fresh Hospital attestation is required before a new Oracle cycle.",
     fields: [
       { name: "appealId", label: "Appeal ID", placeholder: "appeal-1001" },
       { name: "claimId", label: "Claim ID", placeholder: "claim-1001" },
-      { name: "reasonText", label: "Appeal reason reference", kind: "textarea", help: "Hashed locally before submission." },
+      { name: "reasonCategory", label: "Appeal category", kind: "select", options: ["DOCUMENT_ERROR", "CLINICAL_CORRECTION", "AMOUNT_CORRECTION", "OTHER"] },
+      { name: "reasonText", label: "Appeal reason", kind: "textarea", help: "Hashed locally before submission." },
+      { name: "descriptionText", label: "Appeal description", kind: "textarea", help: "A separate hash binds the complete explanation." },
       { name: "evidenceText", label: "Optional appeal evidence reference", kind: "textarea", help: "If supplied, only its hash is committed." },
+      { name: "proposedHospitalId", label: "Corrected hospital (blank keeps current)", kind: "select", options: ["", "hospital-demo", "hospital-2", "hospital-3", "hospital-4", "hospital-5"], help: "Changing this transfers the fresh attestation to that certificate-bound hospital identity." },
+      { name: "proposedAmountMinor", label: "Corrected amount (minor BDT; 0 keeps current)", placeholder: "0" },
+      { name: "proposedIncidentDate", label: "Corrected incident date (blank keeps current)", placeholder: "2026-06-15" },
+      { name: "proposedDescriptionText", label: "Corrected treatment description (blank keeps current)", kind: "textarea" },
+      { name: "proposedClinicalReferenceHash", label: "Correct registry lookup hash", placeholder: "64 hexadecimal characters", help: "The fresh Hospital attestation must use this exact registry reference." },
     ],
   },
   grantEvidenceAccess: {
@@ -394,7 +402,7 @@ export function createWorkflowFormValues(
     decideBenefitRequest: { id: "", outcome: "APPROVE", decisionText: "" },
     markBenefitPaymentReady: { id: "", fundingReferenceText: "" },
     confirmBenefitPayment: { id: "", bankReferenceText: "" },
-    submitClaim: { id: generatedId("claim", idFactory), policyId: "", amountBdt: "", incidentDate: today, descriptionText: "" },
+    submitClaim: { id: generatedId("claim", idFactory), policyId: "", hospitalId: "hospital-demo", amountBdt: "", incidentDate: today, descriptionText: "" },
     verifyClaim: { claimId: "", verificationId: generatedId("verification", idFactory), outcome: "VERIFIED", clinicalReferenceText: "" },
     assessClaimFraud: { assessmentId: generatedId("fraud", idFactory), claimId: "" },
     openClaimReview: { claimId: "", reviewId: generatedId("review", idFactory), assignedAuditorIdsJson: '["auditor1","auditor2","auditor3","auditor4"]', approvalThreshold: "3", rejectionThreshold: "2", deadline: deadlineOffset(3) },
@@ -402,7 +410,7 @@ export function createWorkflowFormValues(
     requestOracleVerification: { requestId: generatedId("oracle-request", idFactory), claimId: "", snapshotId: "registry-demo-v1", modelVersion: "model-v1", modelHash: "c".repeat(64), assignedOracleIdsJson: '["oracle1","oracle2"]', commitDeadline: new Date(Date.now() + 10 * 60_000).toISOString(), revealDeadline: new Date(Date.now() + 20 * 60_000).toISOString() },
     finalizeOracleTimeout: { requestId: "" },
     routeOracleFailureToReview: { requestId: "", reviewId: generatedId("review-oracle", idFactory), assignedAuditorIdsJson: '["auditor1","auditor2","auditor3","auditor4"]', approvalThreshold: "3", rejectionThreshold: "2", deadline: deadlineOffset(3) },
-    submitClaimAppeal: { appealId: generatedId("appeal", idFactory), claimId: "", reasonText: "", evidenceText: "" },
+    submitClaimAppeal: { appealId: generatedId("appeal", idFactory), claimId: "", reasonCategory: "DOCUMENT_ERROR", reasonText: "", descriptionText: "", evidenceText: "", proposedHospitalId: "", proposedAmountMinor: "0", proposedIncidentDate: "", proposedDescriptionText: "", proposedClinicalReferenceHash: "" },
     grantEvidenceAccess: { id: generatedId("grant", idFactory), evidenceId: "", granteeMsp: "AuditorMSP", granteeRole: "auditor", granteeSubject: "auditor1", purpose: "AUDIT", expiresAt: deadlineOffset(7), maxAccesses: "3" },
     revokeEvidenceAccess: { grantId: "" },
     openAppealReview: { appealId: "", reviewId: generatedId("review-appeal", idFactory), assignedAuditorIdsJson: '["auditor1","auditor2","auditor3","auditor4"]', approvalThreshold: "3", rejectionThreshold: "2", deadline: deadlineOffset(3) },
@@ -454,6 +462,12 @@ function required(values: WorkflowFormValues, name: string, label: string) {
 function positiveInteger(values: WorkflowFormValues, name: string, label: string) {
   const value = Number(required(values, name, label));
   if (!Number.isSafeInteger(value) || value < 1) throw new Error(`${label} must be a positive integer.`);
+  return value;
+}
+
+function nonNegativeInteger(values: WorkflowFormValues, name: string, label: string) {
+  const value = Number(required(values, name, label));
+  if (!Number.isSafeInteger(value) || value < 0) throw new Error(`${label} must be a non-negative integer.`);
   return value;
 }
 
@@ -573,6 +587,7 @@ export async function buildWorkflowCommand(
         operation,
         id: required(values, "id", "Claim ID"),
         policyId: required(values, "policyId", "Policy ID"),
+        hospitalId: required(values, "hospitalId", "Assigned hospital"),
         amountMinor: bdtToMinor(required(values, "amountBdt", "Claim amount")),
         incidentDate: required(values, "incidentDate", "Incident date"),
         descriptionHash: await digest("descriptionText", "Claim description reference"),
@@ -606,7 +621,20 @@ export async function buildWorkflowCommand(
       command = { operation, requestId: required(values, "requestId", "Oracle request ID"), reviewId: required(values, "reviewId", "Review ID"), assignedAuditorIdsJson: required(values, "assignedAuditorIdsJson", "Assigned auditor IDs"), approvalThreshold: positiveInteger(values, "approvalThreshold", "Approval threshold"), rejectionThreshold: positiveInteger(values, "rejectionThreshold", "Rejection threshold"), deadline: required(values, "deadline", "Review deadline") };
       break;
     case "submitClaimAppeal":
-      command = { operation, appealId: required(values, "appealId", "Appeal ID"), claimId: required(values, "claimId", "Claim ID"), reasonHash: await digest("reasonText", "Appeal reason"), evidenceHash: values.evidenceText?.trim() ? await hashText(values.evidenceText.trim()) : "" };
+      command = {
+        operation,
+        appealId: required(values, "appealId", "Appeal ID"),
+        claimId: required(values, "claimId", "Claim ID"),
+        reasonCategory: required(values, "reasonCategory", "Appeal category"),
+        reasonHash: await digest("reasonText", "Appeal reason"),
+        descriptionHash: await digest("descriptionText", "Appeal description"),
+        evidenceHash: values.evidenceText?.trim() ? await hashText(values.evidenceText.trim()) : "",
+        proposedHospitalId: values.proposedHospitalId?.trim() ?? "",
+        proposedAmountMinor: nonNegativeInteger(values, "proposedAmountMinor", "Corrected amount"),
+        proposedIncidentDate: values.proposedIncidentDate?.trim() ?? "",
+        proposedDescriptionHash: values.proposedDescriptionText?.trim() ? await hashText(values.proposedDescriptionText.trim()) : "",
+        proposedClinicalReferenceHash: required(values, "proposedClinicalReferenceHash", "Correct registry lookup hash"),
+      };
       break;
     case "grantEvidenceAccess":
       command = {

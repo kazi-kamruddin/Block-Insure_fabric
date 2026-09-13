@@ -6,8 +6,8 @@ network_root="$(cd -- "${script_dir}/.." && pwd -P)"
 samples_root="${network_root}/.fabric/fabric-samples"
 channel_name="insurance-channel"
 chaincode_name="${CHAINCODE_NAME:-insurance-contract}"
-expected_chaincode_version="${EXPECTED_CHAINCODE_VERSION:-0.7.1}"
-expected_schema_version="${EXPECTED_SCHEMA_VERSION:-6}"
+expected_chaincode_version="${EXPECTED_CHAINCODE_VERSION:-0.8.0}"
+expected_schema_version="${EXPECTED_SCHEMA_VERSION:-7}"
 compose_ca="${network_root}/compose/compose-ca.yaml"
 compose_network="${network_root}/compose/compose-network.yaml"
 organizations="${network_root}/organizations"
@@ -136,6 +136,7 @@ up() {
     wait_for_running ca.auditor.blockinsure.test
     wait_for_running ca.oracle.blockinsure.test
     bash "${network_root}/scripts/enroll-auditors.sh"
+    bash "${network_root}/scripts/enroll-hospitals.sh"
     bash "${network_root}/scripts/enroll-oracles.sh"
     start_runtime
     verify
@@ -286,6 +287,12 @@ EOF
         exit 1
       fi
     done
+    for index in 1 2 3 4 5; do
+      if ! compgen -G "${organizations}/peerOrganizations/hospital.blockinsure.test/users/hospital${index}@hospital.blockinsure.test/msp/signcerts/*" >/dev/null; then
+        echo "Verification failed: hospital${index} enrollment is missing." >&2
+        exit 1
+      fi
+    done
     for index in 1 2; do
       if ! compgen -G "${organizations}/peerOrganizations/oracle.blockinsure.test/users/oracle${index}@oracle.blockinsure.test/msp/signcerts/*" >/dev/null; then
         echo "Verification failed: oracle${index} enrollment is missing." >&2
@@ -295,7 +302,7 @@ EOF
   fi
 
   if [[ "${chaincode_verified}" == true ]]; then
-    echo "Verified: 17 services healthy, 6 CAs reachable, 5 CouchDBs ready, all 5 peers joined ${channel_name}, both Oracle identities enrolled, and ${chaincode_name} ${expected_chaincode_version} exposes schema ${expected_schema_version}."
+    echo "Verified: 17 services healthy, 6 CAs reachable, 5 CouchDBs ready, all 5 peers joined ${channel_name}, five Hospital and both Oracle identities enrolled, and ${chaincode_name} ${expected_chaincode_version} exposes schema ${expected_schema_version}."
   else
     echo "Verified: 17 services healthy, 6 CAs reachable, 5 CouchDBs ready, and all 5 peers joined ${channel_name}; no committed ${chaincode_name} was found."
   fi

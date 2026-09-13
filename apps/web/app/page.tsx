@@ -1,14 +1,21 @@
 import Link from "next/link";
+import { ledger } from "@/lib/fabric/ledger";
 
 const capabilities = [
   ["Insurer", "Issue policies, govern packages, and authorize settlements"],
   ["Policyholder", "Submit claims and register tamper-evident evidence references"],
   ["Hospital", "Attest clinical verification through its own organization identity"],
+  ["Oracle", "Reach two-certificate commit/reveal consensus over versioned registry facts"],
   ["Auditor", "Record independent approval or rejection decisions"],
   ["Bank", "Confirm settlement references without exposing payment secrets"],
 ];
 
-export default function Home() {
+function money(minor: number) {
+  return new Intl.NumberFormat("en-BD", { style: "currency", currency: "BDT" }).format(minor / 100);
+}
+
+export default async function Home() {
+  const packages = await ledger.listPolicyPackages().then((items) => items.filter((item) => item.status === "PUBLISHED")).catch(() => []);
   return (
     <main>
       <nav className="shell nav">
@@ -32,11 +39,28 @@ export default function Home() {
         </div>
       </section>
 
+      <section className="shell network" id="policies">
+        <div className="sectionHeading">
+          <div><span className="kicker">Public policy catalog</span><h2>Published coverage packages</h2></div>
+          <p>These package versions are read from the live Fabric ledger. Purchase and policy management remain inside the policyholder workspace.</p>
+        </div>
+        <div className="capabilityGrid">
+          {packages.length ? packages.map((item) => (
+            <article className="capability" key={item.id}>
+              <span className="index">v{item.version}</span>
+              <h3>{item.name}</h3>
+              <p>{item.description || "Published governed health coverage"}</p>
+              <p><strong>{money(item.premiumMinor)}</strong> premium · {money(item.coverageLimitMinor)} limit</p>
+            </article>
+          )) : <article className="capability"><h3>Catalog unavailable</h3><p>Start or verify the Fabric network to load published packages.</p></article>}
+        </div>
+      </section>
+
       <section className="shell network" id="network">
         <div className="sectionHeading">
           <div>
             <span className="kicker">One governed workflow</span>
-            <h2>Five identities. Clear authority.</h2>
+            <h2>Five organizations. Six operational roles.</h2>
           </div>
           <p>Private keys stay server-side. The ledger contract validates both MSP membership and certificate role attributes.</p>
         </div>

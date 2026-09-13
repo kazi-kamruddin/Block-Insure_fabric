@@ -41,7 +41,10 @@ function notificationTargets(event: IndexedFabricEvent) {
   const p = event.payload;
   switch (event.eventName) {
     case "ClaimSubmitted": return [{ role: "insurerAdmin", subject: "", title: "Claim submitted", asset: text(p, "id") }];
-    case "ClaimHospitalVerified": return [{ role: "insurerAdmin", subject: "", title: "Hospital verification recorded", asset: text(p, "claimId") }];
+    case "ClaimHospitalVerified": return [
+      { role: "insurerAdmin", subject: "", title: "Hospital verification recorded", asset: text(p, "claimId") },
+      { role: "policyholder", subject: "", title: "Hospital verification recorded", asset: text(p, "claimId") },
+    ];
     case "OracleRegistrySnapshotPublished": return [{ role: "insurerAdmin", subject: "", title: "Oracle registry snapshot published", asset: text(p, "id") }];
     case "OracleVerificationRequested": return [{ role: "insurerAdmin", subject: "", title: "Oracle verification requested", asset: text(p, "id") }];
     case "OracleCommitmentSubmitted": return [{ role: "insurerAdmin", subject: "", title: "Oracle commitment received", asset: text(p, "requestId") }];
@@ -51,7 +54,10 @@ function notificationTargets(event: IndexedFabricEvent) {
       ? p.assignedAuditorIds.filter((value): value is string => typeof value === "string").map((subject) => ({ role: "auditor", subject, title: "Review assignment received", asset: text(p, "id") }))
       : [];
     case "AuditorDecisionRecorded": return [{ role: "insurerAdmin", subject: "", title: "Auditor vote recorded", asset: text(p, "claimId") }];
-    case "ClaimAppealSubmitted": return [{ role: "insurerAdmin", subject: "", title: "Claim appeal submitted", asset: text(p, "claimId") }];
+    case "ClaimAppealSubmitted": return [
+      { role: "insurerAdmin", subject: "", title: "Claim appeal submitted", asset: text(p, "claimId") },
+      { role: "hospitalOfficer", subject: "", title: "Appeal requires fresh verification", asset: text(p, "claimId") },
+    ];
     case "SettlementAuthorized": return [{ role: "bankOfficer", subject: "", title: "Settlement ready for confirmation", asset: text(p, "id") }];
     case "PremiumCollectionQueued": return [{ role: "bankOfficer", subject: "", title: "Premium collection queued", asset: text(p, "id") }];
     case "BenefitRequested": return [{ role: "insurerAdmin", subject: "", title: "Benefit request submitted", asset: text(p, "id") }];

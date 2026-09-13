@@ -5,6 +5,7 @@ import { decryptEvidenceBytes, encryptEvidenceBytes } from "../lib/evidence/brow
 const hashA = "a".repeat(64);
 const hashB = "b".repeat(64);
 const hashC = "c".repeat(64);
+const registryRoot = "c6da6361115c611b091faa9f35836f9f5c8ee0fdbefb6bc0d8cc6fdde571ebcd";
 
 async function actor(baseURL: string, accountId: string) {
   const context = await request.newContext({ baseURL });
@@ -58,7 +59,7 @@ test("five organization sessions complete a Fabric insurance workflow", async ({
     });
     await command(insurer, { operation: "retirePolicyPackage", id: ids.package });
     await command(policyholder, {
-      operation: "submitClaim", id: ids.claim, policyId: ids.policy, amountMinor: 250_000,
+      operation: "submitClaim", id: ids.claim, policyId: ids.policy, hospitalId: "hospital-demo", amountMinor: 250_000,
       incidentDate: "2026-06-15", descriptionHash: hashB,
     });
     const evidencePlaintext = new TextEncoder().encode(`private-e2e-evidence-${suffix}`);
@@ -207,8 +208,8 @@ test("five organization sessions complete a Fabric insurance workflow", async ({
   }
 });
 
-test("rejected claim appeal preserves round one and can be overturned by a new quorum", async ({ baseURL }) => {
-  test.setTimeout(120_000);
+test("rejected claim requires a committed correction, fresh hospital attestation, and independent Oracle approval", async ({ baseURL }) => {
+  test.setTimeout(180_000);
   if (!baseURL) throw new Error("Playwright baseURL is required");
   const suffix = `appeal-${Date.now()}-${Math.floor(Math.random() * 1_000_000)}`;
   const packageId = `e2e-package-${suffix}`;
@@ -216,42 +217,78 @@ test("rejected claim appeal preserves round one and can be overturned by a new q
   const claimId = `e2e-claim-${suffix}`;
   const review1 = `e2e-review-initial-${suffix}`;
   const appealId = `e2e-appeal-${suffix}`;
-  const review2 = `e2e-review-appeal-${suffix}`;
   const deadline = new Date(Date.now() + 3 * 86_400_000).toISOString();
   const assignedAuditorIdsJson = '["auditor1","auditor2","auditor3","auditor4"]';
   const insurer = await actor(baseURL, "insurer-admin");
   const policyholder = await actor(baseURL, "policyholder-1");
   const hospital = await actor(baseURL, "hospital-officer");
+  const foreignHospital = await actor(baseURL, "hospital-officer-2");
   const auditors = await Promise.all(["auditor", "auditor-2", "auditor-3"].map((id) => actor(baseURL, id)));
 
   try {
+    const registry = await insurer.get("/api/ledger/oracle-snapshot/registry-demo-v1");
+    if (!registry.ok()) {
+      await command(insurer, { operation: "publishOracleRegistrySnapshot", id: "registry-demo-v1", version: 1, rootHash: registryRoot, rulesVersion: "rules-v1", rulesHash: hashA, recordCount: 3 });
+    }
     await command(insurer, { operation: "createPolicyPackage", id: packageId, name: "Appeal Plan", description: "Appeal regression", premiumMinor: 10_000, coverageLimitMinor: 1_000_000, termsHash: hashA });
     await command(insurer, { operation: "publishPolicyPackage", id: packageId });
     await command(insurer, { operation: "issuePolicy", id: policyId, packageId, policyholderId: "policyholder1", startDate: "2026-01-01", endDate: "2026-12-31" });
-    await command(policyholder, { operation: "submitClaim", id: claimId, policyId, amountMinor: 400_000, incidentDate: "2026-06-15", descriptionHash: hashB });
+    await command(policyholder, { operation: "submitClaim", id: claimId, policyId, hospitalId: "hospital-demo", amountMinor: 400_000, incidentDate: "2026-06-15", descriptionHash: hashB });
+    const foreignRead = await foreignHospital.get(`/api/ledger/claim/${claimId}`);
+    expect(foreignRead.status()).toBe(403);
+    const foreignVerification = await foreignHospital.post("/api/workflows", { data: { operation: "verifyClaim", claimId, verificationId: `foreign-verification-${suffix}`, outcome: "VERIFIED", clinicalReferenceHash: hashC } });
+    expect(foreignVerification.status()).toBe(409);
     await command(hospital, { operation: "verifyClaim", claimId, verificationId: `verification-${suffix}`, outcome: "VERIFIED", clinicalReferenceHash: hashC });
     await command(insurer, { operation: "openClaimReview", claimId, reviewId: review1, assignedAuditorIdsJson, approvalThreshold: 3, rejectionThreshold: 2, deadline });
     await command(auditors[0], { operation: "recordAuditorDecision", reviewId: review1, decisionId: `decision-r1-a1-${suffix}`, outcome: "REJECT", reasonHash: hashA });
     const duplicate = await auditors[0].post("/api/workflows", { data: { operation: "recordAuditorDecision", reviewId: review1, decisionId: `decision-r1-duplicate-${suffix}`, outcome: "REJECT", reasonHash: hashA } });
     expect(duplicate.status()).toBe(409);
     await command(auditors[1], { operation: "recordAuditorDecision", reviewId: review1, decisionId: `decision-r1-a2-${suffix}`, outcome: "REJECT", reasonHash: hashA });
-    await command(policyholder, { operation: "submitClaimAppeal", appealId, claimId, reasonHash: hashB, evidenceHash: hashC });
-    await command(insurer, { operation: "openAppealReview", appealId, reviewId: review2, assignedAuditorIdsJson, approvalThreshold: 3, rejectionThreshold: 2, deadline });
-    for (let index = 0; index < auditors.length; index += 1) {
-      await command(auditors[index], { operation: "recordAuditorDecision", reviewId: review2, decisionId: `decision-r2-a${index + 1}-${suffix}`, outcome: "APPROVE", reasonHash: hashB });
-    }
+    await command(policyholder, {
+      operation: "submitClaimAppeal", appealId, claimId, reasonCategory: "DOCUMENT_ERROR",
+      reasonHash: hashB, descriptionHash: hashC, evidenceHash: hashC,
+      proposedHospitalId: "", proposedAmountMinor: 50_000, proposedIncidentDate: "2026-06-15",
+      proposedDescriptionHash: hashA, proposedClinicalReferenceHash: "1".repeat(64),
+    });
+    const premature = await insurer.post("/api/workflows", { data: {
+      operation: "requestOracleVerification", requestId: `premature-${suffix}`, claimId,
+      snapshotId: "registry-demo-v1", modelVersion: "model-v1", modelHash: hashC,
+      assignedOracleIdsJson: '["oracle1","oracle2"]',
+      commitDeadline: new Date(Date.now() + 60_000).toISOString(), revealDeadline: new Date(Date.now() + 120_000).toISOString(),
+    } });
+    expect(premature.status()).toBe(409);
+    const verification2 = `verification-appeal-${suffix}`;
+    await command(hospital, { operation: "verifyClaim", claimId, verificationId: verification2, outcome: "VERIFIED", clinicalReferenceHash: "1".repeat(64) });
+    const requestId = `oracle-request-appeal-${suffix}`;
+    await command(insurer, {
+      operation: "requestOracleVerification", requestId, claimId, snapshotId: "registry-demo-v1",
+      modelVersion: "model-v1", modelHash: hashC, assignedOracleIdsJson: '["oracle1","oracle2"]',
+      commitDeadline: new Date(Date.now() + 60_000).toISOString(), revealDeadline: new Date(Date.now() + 120_000).toISOString(),
+    });
+    await expect.poll(async () => {
+      const response = await policyholder.get(`/api/ledger/claim/${claimId}`);
+      return response.ok() ? (await response.json()).result.status : `HTTP_${response.status()}`;
+    }, { timeout: 90_000, intervals: [500, 1_000, 2_000] }).toBe("APPROVED");
 
     const claim = await (await policyholder.get(`/api/ledger/claim/${claimId}`)).json();
     const appeal = await (await policyholder.get(`/api/ledger/appeal/${appealId}`)).json();
     const reviews = await (await policyholder.get("/api/ledger/review")).json();
-    expect(claim.result).toMatchObject({ status: "APPROVED", appealCount: 1, reviewRound: 2, currentAppealId: appealId });
-    expect(appeal.result).toMatchObject({ status: "OVERTURNED", reviewId: review2, round: 1 });
-    expect(reviews.result.filter((item: { claimId: string }) => item.claimId === claimId)).toEqual(expect.arrayContaining([
+    expect(claim.result).toMatchObject({ status: "APPROVED", appealCount: 1, reviewRound: 1, currentAppealId: appealId, hospitalVerificationId: verification2, oracleOutcome: "EXACT_CONSENSUS" });
+    expect(appeal.result).toMatchObject({ status: "OVERTURNED", claimVersion: 2, hospitalVerificationId: verification2, round: 1, proposedDescriptionHash: hashA, proposedClinicalReferenceHash: "1".repeat(64) });
+    expect(appeal.result.commitmentHash).toMatch(/^[a-f0-9]{64}$/);
+    expect(reviews.result.filter((item: { claimId: string }) => item.claimId === claimId)).toEqual([
       expect.objectContaining({ id: review1, status: "REJECTED", round: 1 }),
-      expect.objectContaining({ id: review2, status: "APPROVED", round: 2, kind: "APPEAL" }),
+    ]);
+    const oracleRequest = await (await insurer.get(`/api/ledger/oracle-request/${requestId}`)).json();
+    expect(oracleRequest.result).toMatchObject({ claimVersion: 2, appealId, appealCommitmentHash: appeal.result.commitmentHash, status: "CONSENSUS" });
+    const dossier = await (await insurer.get(`/api/audit/claims/${claimId}`)).json();
+    expect(dossier).toMatchObject({ schemaVersion: 5 });
+    expect(dossier.hospitalVerifications).toEqual(expect.arrayContaining([
+      expect.objectContaining({ claimVersion: 1, appealId: "" }),
+      expect.objectContaining({ claimVersion: 2, appealId, id: verification2 }),
     ]));
   } finally {
-    await Promise.all([insurer.dispose(), policyholder.dispose(), hospital.dispose(), ...auditors.map((item) => item.dispose())]);
+    await Promise.all([insurer.dispose(), policyholder.dispose(), hospital.dispose(), foreignHospital.dispose(), ...auditors.map((item) => item.dispose())]);
   }
 });
 

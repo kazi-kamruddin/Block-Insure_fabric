@@ -197,6 +197,7 @@ export type Claim = {
   id: string;
   policyId: string;
   claimantId: string;
+  hospitalId: string;
   amountMinor: number;
   incidentDate: string;
   descriptionHash: string;
@@ -236,6 +237,8 @@ export type OracleRequest = {
   claimId: string;
   claimVersion: number;
   hospitalVerificationId: string;
+  appealId: string;
+  appealCommitmentHash: string;
   queryHash: string;
   registrySnapshotId: string;
   registryVersion: number;
@@ -335,6 +338,7 @@ export type EvidenceReference = {
   schemaVersion: number;
   id: string;
   claimId: string;
+  claimVersion: number;
   documentType: string;
   contentHash: string;
   storageReferenceHash: string;
@@ -347,9 +351,12 @@ export type HospitalVerification = {
   schemaVersion: number;
   id: string;
   claimId: string;
+  claimVersion: number;
+  appealId: string;
   hospitalIdentity: string;
   outcome: "VERIFIED" | "INVALID";
   clinicalReferenceHash: string;
+  attestationHash: string;
   createdAt: LedgerTimestamp;
 };
 
@@ -393,11 +400,23 @@ export type ClaimAppeal = {
   id: string;
   claimId: string;
   claimantId: string;
+  claimVersion: number;
   round: number;
+  commitmentVersion: "block-insure-fabric-appeal-v1";
+  commitmentHash: string;
+  reasonCategory: "DOCUMENT_ERROR" | "CLINICAL_CORRECTION" | "AMOUNT_CORRECTION" | "OTHER";
   reasonHash: string;
+  descriptionHash: string;
   evidenceHash: string;
+  originalClaimHash: string;
+  proposedHospitalId: string;
+  proposedAmountMinor: number;
+  proposedIncidentDate: string;
+  proposedDescriptionHash: string;
+  proposedClinicalReferenceHash: string;
+  hospitalVerificationId: string;
   reviewId: string;
-  status: "SUBMITTED" | "UNDER_REVIEW" | "UPHELD" | "OVERTURNED";
+  status: "SUBMITTED" | "HOSPITAL_VERIFIED" | "UNDER_REVIEW" | "UPHELD" | "OVERTURNED";
   createdAt: LedgerTimestamp;
   resolvedAt: LedgerTimestamp;
 };

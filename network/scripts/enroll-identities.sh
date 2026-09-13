@@ -62,6 +62,7 @@ enroll_peer_org auditor AuditorMSP 9054 auditor
 enroll_peer_org bank BankMSP 12054 bankOfficer
 enroll_peer_org oracle OracleMSP 13054 oracle
 bash "${network_root}/scripts/enroll-auditors.sh"
+bash "${network_root}/scripts/enroll-hospitals.sh"
 bash "${network_root}/scripts/enroll-oracles.sh"
 
 enroll_orderer() {

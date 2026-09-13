@@ -17,6 +17,13 @@ export async function GET(_request: Request, context: RouteContext) {
   if (!assetType.success) return NextResponse.json({ message: "Invalid asset collection" }, { status: 400 });
 
   try {
+    const visibleClaimIds = async () => {
+      if (session.role !== "policyholder" && session.role !== "hospitalOfficer") return null;
+      const claims = await ledger.listClaims();
+      return new Set(claims.filter((claim) => session.role === "policyholder"
+        ? claim.claimantId === session.subjectId
+        : claim.hospitalId === session.subjectId).map((claim) => claim.id));
+    };
     let result: unknown[];
     switch (assetType.data) {
       case "package":
@@ -33,7 +40,9 @@ export async function GET(_request: Request, context: RouteContext) {
         const claims = await ledger.listClaims();
         result = session.role === "policyholder"
           ? claims.filter((claim) => claim.claimantId === session.subjectId)
-          : claims;
+          : session.role === "hospitalOfficer"
+            ? claims.filter((claim) => claim.hospitalId === session.subjectId)
+            : claims;
         break;
       }
       case "oracle-snapshot":
@@ -41,30 +50,26 @@ export async function GET(_request: Request, context: RouteContext) {
         break;
       case "oracle-request": {
         const requests = await ledger.listOracleRequests();
-        if (session.role !== "policyholder") { result = requests; break; }
-        const ownedClaimIds = new Set((await ledger.listClaims()).filter((claim) => claim.claimantId === session.subjectId).map((claim) => claim.id));
-        result = requests.filter((item) => ownedClaimIds.has(item.claimId));
+        const claimIds = await visibleClaimIds();
+        result = claimIds ? requests.filter((item) => claimIds.has(item.claimId)) : requests;
         break;
       }
       case "oracle-commitment": {
         const commitments = await ledger.listOracleCommitments();
-        if (session.role !== "policyholder") { result = commitments; break; }
-        const ownedClaimIds = new Set((await ledger.listClaims()).filter((claim) => claim.claimantId === session.subjectId).map((claim) => claim.id));
-        result = commitments.filter((item) => ownedClaimIds.has(item.claimId));
+        const claimIds = await visibleClaimIds();
+        result = claimIds ? commitments.filter((item) => claimIds.has(item.claimId)) : commitments;
         break;
       }
       case "oracle-result": {
         const results = await ledger.listOracleResults();
-        if (session.role !== "policyholder") { result = results; break; }
-        const ownedClaimIds = new Set((await ledger.listClaims()).filter((claim) => claim.claimantId === session.subjectId).map((claim) => claim.id));
-        result = results.filter((item) => ownedClaimIds.has(item.claimId));
+        const claimIds = await visibleClaimIds();
+        result = claimIds ? results.filter((item) => claimIds.has(item.claimId)) : results;
         break;
       }
       case "evidence": {
         const evidence = await ledger.listEvidenceReferences();
-        result = session.role === "policyholder"
-          ? evidence.filter((item) => item.submittedBy === session.subjectId)
-          : evidence;
+        const claimIds = await visibleClaimIds();
+        result = claimIds ? evidence.filter((item) => claimIds.has(item.claimId)) : evidence;
         break;
       }
       case "evidence-grant": {
@@ -78,6 +83,10 @@ export async function GET(_request: Request, context: RouteContext) {
       }
       case "verification": {
         const verifications = await ledger.listHospitalVerifications();
+        if (session.role === "hospitalOfficer") {
+          result = verifications.filter((item) => item.hospitalIdentity === session.subjectId);
+          break;
+        }
         if (session.role !== "policyholder") {
           result = verifications;
           break;
@@ -92,16 +101,8 @@ export async function GET(_request: Request, context: RouteContext) {
       }
       case "decision": {
         const decisions = await ledger.listAuditorDecisions();
-        if (session.role !== "policyholder") {
-          result = decisions;
-          break;
-        }
-        const ownedClaimIds = new Set(
-          (await ledger.listClaims())
-            .filter((claim) => claim.claimantId === session.subjectId)
-            .map((claim) => claim.id),
-        );
-        result = decisions.filter((item) => ownedClaimIds.has(item.claimId));
+        const claimIds = await visibleClaimIds();
+        result = claimIds ? decisions.filter((item) => claimIds.has(item.claimId)) : decisions;
         break;
       }
       case "review": {
@@ -110,35 +111,29 @@ export async function GET(_request: Request, context: RouteContext) {
           result = reviews.filter((item) => item.assignedAuditorIds.includes(session.subjectId ?? ""));
           break;
         }
-        if (session.role !== "policyholder") { result = reviews; break; }
-        const ownedClaimIds = new Set((await ledger.listClaims()).filter((claim) => claim.claimantId === session.subjectId).map((claim) => claim.id));
-        result = reviews.filter((item) => ownedClaimIds.has(item.claimId));
+        const claimIds = await visibleClaimIds();
+        result = claimIds ? reviews.filter((item) => claimIds.has(item.claimId)) : reviews;
         break;
       }
       case "appeal": {
         const appeals = await ledger.listClaimAppeals();
-        result = session.role === "policyholder" ? appeals.filter((item) => item.claimantId === session.subjectId) : appeals;
+        if (session.role === "policyholder") result = appeals.filter((item) => item.claimantId === session.subjectId);
+        else if (session.role === "hospitalOfficer") {
+          const assignedClaimIds = new Set((await ledger.listClaims()).filter((claim) => claim.hospitalId === session.subjectId).map((claim) => claim.id));
+          result = appeals.filter((item) => assignedClaimIds.has(item.claimId));
+        } else result = appeals;
         break;
       }
       case "fraud-assessment": {
         const assessments = await ledger.listFraudAssessments();
-        if (session.role !== "policyholder") { result = assessments; break; }
-        const ownedClaimIds = new Set((await ledger.listClaims()).filter((claim) => claim.claimantId === session.subjectId).map((claim) => claim.id));
-        result = assessments.filter((item) => ownedClaimIds.has(item.claimId));
+        const claimIds = await visibleClaimIds();
+        result = claimIds ? assessments.filter((item) => claimIds.has(item.claimId)) : assessments;
         break;
       }
       case "settlement": {
         const settlements = await ledger.listSettlements();
-        if (session.role !== "policyholder") {
-          result = settlements;
-          break;
-        }
-        const ownedClaimIds = new Set(
-          (await ledger.listClaims())
-            .filter((claim) => claim.claimantId === session.subjectId)
-            .map((claim) => claim.id),
-        );
-        result = settlements.filter((settlement) => ownedClaimIds.has(settlement.claimId));
+        const claimIds = await visibleClaimIds();
+        result = claimIds ? settlements.filter((settlement) => claimIds.has(settlement.claimId)) : settlements;
         break;
       }
       case "access":

@@ -18,16 +18,18 @@ const (
 )
 
 var oracleVerificationCodes = map[string]bool{
-	"VERIFIED":                  true,
-	"SNAPSHOT_VERSION_MISMATCH": true,
-	"REGISTRY_ROOT_MISMATCH":    true,
-	"RULES_VERSION_MISMATCH":    true,
-	"MODEL_VERSION_MISMATCH":    true,
-	"RECORD_NOT_FOUND":          true,
-	"RECORD_INVALID":            true,
-	"AMOUNT_OUT_OF_RANGE":       true,
-	"INCIDENT_DATE_MISMATCH":    true,
-	"DESCRIPTION_MISMATCH":      true,
+	"VERIFIED":                   true,
+	"SNAPSHOT_VERSION_MISMATCH":  true,
+	"REGISTRY_ROOT_MISMATCH":     true,
+	"RULES_VERSION_MISMATCH":     true,
+	"MODEL_VERSION_MISMATCH":     true,
+	"APPEAL_COMMITMENT_MISMATCH": true,
+	"RECORD_NOT_FOUND":           true,
+	"RECORD_INVALID":             true,
+	"AMOUNT_OUT_OF_RANGE":        true,
+	"INCIDENT_DATE_MISMATCH":     true,
+	"DESCRIPTION_MISMATCH":       true,
+	"HOSPITAL_MISMATCH":          true,
 }
 
 func canonicalProtocolHash(domain string, values ...string) string {
@@ -50,13 +52,17 @@ func oracleQueryHash(claim *Claim, verification *HospitalVerification) string {
 		strconv.Itoa(claim.Version),
 		claim.PolicyID,
 		claim.ClaimantID,
+		claim.HospitalID,
 		strconv.FormatInt(claim.AmountMinor, 10),
 		claim.IncidentDate,
 		strings.ToLower(claim.DescriptionHash),
 		verification.ID,
+		strconv.Itoa(verification.ClaimVersion),
+		verification.AppealID,
 		verification.HospitalIdentity,
 		verification.Outcome,
 		strings.ToLower(verification.ClinicalReferenceHash),
+		strings.ToLower(verification.AttestationHash),
 	)
 }
 
@@ -68,6 +74,8 @@ func oracleResultDigest(request *OracleRequest, verified bool, verificationCode,
 		request.QueryHash,
 		strconv.Itoa(request.ClaimVersion),
 		request.HospitalVerificationID,
+		request.AppealID,
+		strings.ToLower(request.AppealCommitmentHash),
 		request.RegistrySnapshotID,
 		strconv.Itoa(request.RegistryVersion),
 		request.RegistryRootHash,
@@ -227,12 +235,36 @@ func (c *Contract) RequestOracleVerification(
 	if claim.Status != "HOSPITAL_VERIFIED" && claim.Status != "APPEAL_SUBMITTED" {
 		return nil, fmt.Errorf("claim %s is not ready for Oracle verification", claimID)
 	}
+	if claim.HospitalVerificationID == "" {
+		return nil, fmt.Errorf("claim %s requires a current verified hospital attestation", claimID)
+	}
 	verification, err := c.ReadHospitalVerification(ctx, claim.HospitalVerificationID)
 	if err != nil {
 		return nil, err
 	}
-	if verification.Outcome != "VERIFIED" || verification.ClaimID != claimID {
+	if verification.Outcome != "VERIFIED" || verification.ClaimID != claimID || verification.ClaimVersion != claim.Version {
 		return nil, fmt.Errorf("claim %s requires a current verified hospital attestation", claimID)
+	}
+	appealID := ""
+	appealHash := ""
+	if claim.Status == "APPEAL_SUBMITTED" {
+		if claim.CurrentAppealID == "" || verification.AppealID != claim.CurrentAppealID {
+			return nil, fmt.Errorf("claim %s requires a hospital attestation bound to its active appeal", claimID)
+		}
+		appeal, readErr := c.ReadClaimAppeal(ctx, claim.CurrentAppealID)
+		if readErr != nil {
+			return nil, readErr
+		}
+		if appeal.Status != "HOSPITAL_VERIFIED" || appeal.ClaimVersion != claim.Version || appeal.HospitalVerificationID != verification.ID {
+			return nil, fmt.Errorf("appeal %s requires fresh hospital verification", appeal.ID)
+		}
+		if appeal.CommitmentHash == "" || appeal.CommitmentHash != appealCommitmentHash(appeal) {
+			return nil, fmt.Errorf("appeal %s commitment is invalid", appeal.ID)
+		}
+		appealID = appeal.ID
+		appealHash = appeal.CommitmentHash
+	} else if verification.AppealID != "" {
+		return nil, fmt.Errorf("claim %s has an appeal-bound hospital attestation in its initial cycle", claimID)
 	}
 	snapshot, err := c.ReadOracleRegistrySnapshot(ctx, snapshotID)
 	if err != nil {
@@ -259,6 +291,7 @@ func (c *Contract) RequestOracleVerification(
 	request := &OracleRequest{
 		AssetType: "oracleRequest", SchemaVersion: SchemaVersion, ID: requestID,
 		ClaimID: claimID, ClaimVersion: claim.Version, HospitalVerificationID: verification.ID,
+		AppealID: appealID, AppealCommitmentHash: appealHash,
 		QueryHash: oracleQueryHash(claim, verification), RegistrySnapshotID: snapshot.ID,
 		RegistryVersion: snapshot.Version, RegistryRootHash: snapshot.RootHash,
 		RulesVersion: snapshot.RulesVersion, RulesHash: snapshot.RulesHash,
@@ -511,7 +544,7 @@ func (c *Contract) finalizeOracleRequest(ctx contractapi.TransactionContextInter
 			if err != nil {
 				return err
 			}
-			if appeal.Status == "SUBMITTED" {
+			if appeal.Status == "HOSPITAL_VERIFIED" {
 				appeal.Status = "OVERTURNED"
 				appeal.ResolvedAt = now
 				if err := overwriteAsset(ctx, "claimAppeal", appeal.ID, appeal); err != nil {
@@ -601,7 +634,7 @@ func (c *Contract) RouteOracleFailureToReview(
 		if readErr != nil {
 			return nil, readErr
 		}
-		if appeal.Status == "SUBMITTED" {
+		if appeal.Status == "HOSPITAL_VERIFIED" {
 			appealID = appeal.ID
 			kind = "APPEAL"
 		}

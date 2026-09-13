@@ -127,9 +127,10 @@ async function processRequest(requestId) {
   let request = await evaluate("ReadOracleRequest", requestId);
   if (!request.assignedOracleIds.includes(config.oracleId)) return;
   if (request.status !== "PENDING" || await evaluateOrNull("ReadOracleResult", `${request.id}:${config.oracleId}`)) return;
-  const [claim, hospitalVerification] = await Promise.all([
+  const [claim, hospitalVerification, appeal] = await Promise.all([
     evaluate("ReadClaim", request.claimId),
     evaluate("ReadHospitalVerification", request.hospitalVerificationId),
+    request.appealId ? evaluate("ReadClaimAppeal", request.appealId) : Promise.resolve(null),
   ]);
   if (claim.version !== request.claimVersion || claim.currentOracleRequestId !== request.id) {
     await updateHealth({ status: "ONLINE", lastProcessedRequestId: request.id, lastError: `Stale request rejected for claim ${request.claimId}` });
@@ -149,6 +150,7 @@ async function processRequest(requestId) {
     request,
     claim,
     hospitalVerification,
+    appeal,
     configuredModelVersion: config.modelVersion,
     configuredModelHash: config.modelHash,
   });

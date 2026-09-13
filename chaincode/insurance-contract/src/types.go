@@ -1,6 +1,6 @@
 package insurance
 
-const SchemaVersion = 6
+const SchemaVersion = 7
 
 type PolicyPackage struct {
 	AssetType          string `json:"assetType"`
@@ -190,6 +190,7 @@ type Claim struct {
 	ID                     string   `json:"id"`
 	PolicyID               string   `json:"policyId"`
 	ClaimantID             string   `json:"claimantId"`
+	HospitalID             string   `json:"hospitalId"`
 	AmountMinor            int64    `json:"amountMinor"`
 	IncidentDate           string   `json:"incidentDate"`
 	DescriptionHash        string   `json:"descriptionHash"`
@@ -229,6 +230,8 @@ type OracleRequest struct {
 	ClaimID                string   `json:"claimId"`
 	ClaimVersion           int      `json:"claimVersion"`
 	HospitalVerificationID string   `json:"hospitalVerificationId"`
+	AppealID               string   `json:"appealId"`
+	AppealCommitmentHash   string   `json:"appealCommitmentHash"`
 	QueryHash              string   `json:"queryHash"`
 	RegistrySnapshotID     string   `json:"registrySnapshotId"`
 	RegistryVersion        int      `json:"registryVersion"`
@@ -328,6 +331,7 @@ type EvidenceReference struct {
 	SchemaVersion        int    `json:"schemaVersion"`
 	ID                   string `json:"id"`
 	ClaimID              string `json:"claimId"`
+	ClaimVersion         int    `json:"claimVersion"`
 	DocumentType         string `json:"documentType"`
 	ContentHash          string `json:"contentHash"`
 	StorageReferenceHash string `json:"storageReferenceHash"`
@@ -340,9 +344,12 @@ type HospitalVerification struct {
 	SchemaVersion         int    `json:"schemaVersion"`
 	ID                    string `json:"id"`
 	ClaimID               string `json:"claimId"`
+	ClaimVersion          int    `json:"claimVersion"`
+	AppealID              string `json:"appealId"`
 	HospitalIdentity      string `json:"hospitalIdentity"`
 	Outcome               string `json:"outcome"`
 	ClinicalReferenceHash string `json:"clinicalReferenceHash"`
+	AttestationHash       string `json:"attestationHash"`
 	CreatedAt             string `json:"createdAt"`
 }
 
@@ -381,18 +388,30 @@ type ClaimReview struct {
 }
 
 type ClaimAppeal struct {
-	AssetType     string `json:"assetType"`
-	SchemaVersion int    `json:"schemaVersion"`
-	ID            string `json:"id"`
-	ClaimID       string `json:"claimId"`
-	ClaimantID    string `json:"claimantId"`
-	Round         int    `json:"round"`
-	ReasonHash    string `json:"reasonHash"`
-	EvidenceHash  string `json:"evidenceHash"`
-	ReviewID      string `json:"reviewId"`
-	Status        string `json:"status"`
-	CreatedAt     string `json:"createdAt"`
-	ResolvedAt    string `json:"resolvedAt"`
+	AssetType                     string `json:"assetType"`
+	SchemaVersion                 int    `json:"schemaVersion"`
+	ID                            string `json:"id"`
+	ClaimID                       string `json:"claimId"`
+	ClaimantID                    string `json:"claimantId"`
+	ClaimVersion                  int    `json:"claimVersion"`
+	Round                         int    `json:"round"`
+	CommitmentVersion             string `json:"commitmentVersion"`
+	CommitmentHash                string `json:"commitmentHash"`
+	ReasonCategory                string `json:"reasonCategory"`
+	ReasonHash                    string `json:"reasonHash"`
+	DescriptionHash               string `json:"descriptionHash"`
+	EvidenceHash                  string `json:"evidenceHash"`
+	OriginalClaimHash             string `json:"originalClaimHash"`
+	ProposedHospitalID            string `json:"proposedHospitalId"`
+	ProposedAmountMinor           int64  `json:"proposedAmountMinor"`
+	ProposedIncidentDate          string `json:"proposedIncidentDate"`
+	ProposedDescriptionHash       string `json:"proposedDescriptionHash"`
+	ProposedClinicalReferenceHash string `json:"proposedClinicalReferenceHash"`
+	HospitalVerificationID        string `json:"hospitalVerificationId"`
+	ReviewID                      string `json:"reviewId"`
+	Status                        string `json:"status"`
+	CreatedAt                     string `json:"createdAt"`
+	ResolvedAt                    string `json:"resolvedAt"`
 }
 
 type FraudAssessment struct {

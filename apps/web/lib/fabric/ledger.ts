@@ -452,6 +452,7 @@ export const ledger = {
   submitClaim(input: {
     id: string;
     policyId: string;
+    hospitalId: string;
     amountMinor: number;
     incidentDate: string;
     descriptionHash: string;
@@ -461,6 +462,7 @@ export const ledger = {
       "SubmitClaim",
       input.id,
       input.policyId,
+      input.hospitalId,
       input.amountMinor,
       input.incidentDate,
       input.descriptionHash,
@@ -533,15 +535,11 @@ export const ledger = {
     verificationId: string;
     outcome: "VERIFIED" | "INVALID";
     clinicalReferenceHash: string;
-  }) {
-    return submit<HospitalVerification>(
-      "hospitalOfficer",
-      "VerifyClaim",
-      input.claimId,
-      input.verificationId,
-      input.outcome,
-      input.clinicalReferenceHash,
-    );
+  }, hospitalUserName?: string) {
+    if (!hospitalUserName) throw new Error("This Hospital account has no server-owned Fabric identity");
+    return withFabricContract("hospitalOfficer", async (contract) => decodeJson<HospitalVerification>(
+      await contract.submitTransaction("VerifyClaim", input.claimId, input.verificationId, input.outcome, input.clinicalReferenceHash),
+    ), hospitalUserName);
   },
 
   publishOracleRegistrySnapshot(input: {
@@ -589,9 +587,18 @@ export const ledger = {
     );
   },
 
-  submitClaimAppeal(input: { appealId: string; claimId: string; reasonHash: string; evidenceHash: string }) {
+  submitClaimAppeal(input: {
+    appealId: string; claimId: string;
+    reasonCategory: "DOCUMENT_ERROR" | "CLINICAL_CORRECTION" | "AMOUNT_CORRECTION" | "OTHER";
+    reasonHash: string; descriptionHash: string; evidenceHash: string; proposedHospitalId: string;
+    proposedAmountMinor: number; proposedIncidentDate: string;
+    proposedDescriptionHash: string; proposedClinicalReferenceHash: string;
+  }) {
     return submit<ClaimAppeal>(
-      "policyholder", "SubmitClaimAppeal", input.appealId, input.claimId, input.reasonHash, input.evidenceHash,
+      "policyholder", "SubmitClaimAppeal", input.appealId, input.claimId,
+      input.reasonCategory, input.reasonHash, input.descriptionHash, input.evidenceHash,
+      input.proposedHospitalId, input.proposedAmountMinor, input.proposedIncidentDate,
+      input.proposedDescriptionHash, input.proposedClinicalReferenceHash,
     );
   },
 

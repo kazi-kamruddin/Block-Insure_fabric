@@ -43,7 +43,7 @@ async function createHospitalVerifiedClaim(
   await command(insurer, { operation: "createPolicyPackage", id: packageId, name: "Oracle Demonstration Cover", description: "Two-certificate adjudication", premiumMinor: 10_000, coverageLimitMinor: 500_000, termsHash: hashA });
   await command(insurer, { operation: "publishPolicyPackage", id: packageId });
   await command(insurer, { operation: "issuePolicy", id: policyId, packageId, policyholderId: "policyholder1", startDate: "2026-01-01", endDate: "2026-12-31" });
-  await command(policyholder, { operation: "submitClaim", id: claimId, policyId, amountMinor: 50_000, incidentDate: "2026-06-15", descriptionHash });
+  await command(policyholder, { operation: "submitClaim", id: claimId, policyId, hospitalId: "hospital-demo", amountMinor: 50_000, incidentDate: "2026-06-15", descriptionHash });
   await command(hospital, { operation: "verifyClaim", claimId, verificationId: `oracle-verification-${suffix}`, outcome: "VERIFIED", clinicalReferenceHash });
   return claimId;
 }
@@ -119,7 +119,7 @@ test("two Oracle workers automatically approve an exact valid result and the ban
     await waitForClaimStatus(policyholder, claimId, "SETTLED");
 
     const dossier = await (await insurer.get(`/api/audit/claims/${claimId}`)).json();
-    expect(dossier).toMatchObject({ schemaVersion: 4, claim: { status: "SETTLED", oracleOutcome: "EXACT_CONSENSUS" }, settlement: { status: "CONFIRMED" } });
+    expect(dossier).toMatchObject({ schemaVersion: 5, claim: { status: "SETTLED", oracleOutcome: "EXACT_CONSENSUS" }, settlement: { status: "CONFIRMED" } });
     expect(dossier.oracleRequests).toEqual(expect.arrayContaining([expect.objectContaining({ id: requestId, registrySnapshotId: "registry-demo-v1", modelVersion: "model-v1" })]));
     expect(dossier.oracleCommitments).toHaveLength(2);
     expect(dossier.oracleResults).toHaveLength(2);

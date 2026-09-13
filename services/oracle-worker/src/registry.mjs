@@ -55,6 +55,45 @@ export function registryRootHash(snapshot) {
   );
 }
 
+export function appealCommitmentHash(appeal) {
+  return canonicalProtocolHash(
+    "block-insure-fabric-appeal-v1:commitment",
+    appeal.claimId,
+    Number(appeal.claimVersion),
+    appeal.reasonCategory,
+    String(appeal.reasonHash).toLowerCase(),
+    String(appeal.descriptionHash).toLowerCase(),
+    String(appeal.evidenceHash ?? "").toLowerCase(),
+    String(appeal.originalClaimHash).toLowerCase(),
+    appeal.proposedHospitalId,
+    Number(appeal.proposedAmountMinor),
+    appeal.proposedIncidentDate,
+    String(appeal.proposedDescriptionHash).toLowerCase(),
+    String(appeal.proposedClinicalReferenceHash).toLowerCase(),
+  );
+}
+
+export function validateAppealBinding({ request, claim, hospitalVerification, appeal }) {
+  if (Number(request.claimVersion) <= 1) {
+    return !request.appealId && !request.appealCommitmentHash && !hospitalVerification.appealId;
+  }
+  if (!appeal || appeal.commitmentVersion !== "block-insure-fabric-appeal-v1") return false;
+  const computed = appealCommitmentHash(appeal);
+  return appeal.id === request.appealId
+    && appeal.id === claim.currentAppealId
+    && Number(appeal.claimVersion) === Number(request.claimVersion)
+    && appeal.commitmentHash === computed
+    && request.appealCommitmentHash === computed
+    && hospitalVerification.appealId === appeal.id
+    && Number(hospitalVerification.claimVersion) === Number(request.claimVersion)
+    && appeal.hospitalVerificationId === hospitalVerification.id
+    && claim.hospitalId === appeal.proposedHospitalId
+    && Number(claim.amountMinor) === Number(appeal.proposedAmountMinor)
+    && claim.incidentDate === appeal.proposedIncidentDate
+    && String(claim.descriptionHash).toLowerCase() === String(appeal.proposedDescriptionHash).toLowerCase()
+    && String(hospitalVerification.clinicalReferenceHash).toLowerCase() === String(appeal.proposedClinicalReferenceHash).toLowerCase();
+}
+
 export function validateRegistrySnapshot(snapshot) {
   if (!snapshot || typeof snapshot !== "object" || !Array.isArray(snapshot.records)) {
     throw new Error("Oracle registry snapshot must contain a records array");
@@ -103,15 +142,17 @@ export async function loadRegistrySnapshot(filePath) {
   return validateRegistrySnapshot(JSON.parse(await fs.readFile(filePath, "utf8")));
 }
 
-export function assessRegistryRecord({ snapshot, request, claim, hospitalVerification, configuredModelVersion, configuredModelHash }) {
+export function assessRegistryRecord({ snapshot, request, claim, hospitalVerification, appeal, configuredModelVersion, configuredModelHash }) {
   const record = snapshot.recordsByLookupHash.get(String(hospitalVerification.clinicalReferenceHash).toLowerCase());
   let verificationCode = "VERIFIED";
-  if (configuredModelVersion !== undefined && (configuredModelVersion !== request.modelVersion || String(configuredModelHash).toLowerCase() !== request.modelHash)) verificationCode = "MODEL_VERSION_MISMATCH";
+  if (!validateAppealBinding({ request, claim, hospitalVerification, appeal })) verificationCode = "APPEAL_COMMITMENT_MISMATCH";
+  else if (configuredModelVersion !== undefined && (configuredModelVersion !== request.modelVersion || String(configuredModelHash).toLowerCase() !== request.modelHash)) verificationCode = "MODEL_VERSION_MISMATCH";
   else if (snapshot.snapshotId !== request.registrySnapshotId || snapshot.version !== request.registryVersion) verificationCode = "SNAPSHOT_VERSION_MISMATCH";
   else if (snapshot.rootHash !== request.registryRootHash) verificationCode = "REGISTRY_ROOT_MISMATCH";
   else if (snapshot.rulesVersion !== request.rulesVersion || snapshot.rulesHash !== request.rulesHash) verificationCode = "RULES_VERSION_MISMATCH";
   else if (!record) verificationCode = "RECORD_NOT_FOUND";
   else if (record.status !== "VALID") verificationCode = "RECORD_INVALID";
+  else if (String(claim.hospitalId) !== record.hospitalId) verificationCode = "HOSPITAL_MISMATCH";
   else if (claim.amountMinor < record.minimumAmountMinor || claim.amountMinor > record.maximumAmountMinor) verificationCode = "AMOUNT_OUT_OF_RANGE";
   else if (claim.incidentDate < record.validFrom || claim.incidentDate > record.validThrough) verificationCode = "INCIDENT_DATE_MISMATCH";
   else if (String(claim.descriptionHash).toLowerCase() !== record.descriptionHash) verificationCode = "DESCRIPTION_MISMATCH";

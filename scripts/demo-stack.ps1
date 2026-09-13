@@ -148,7 +148,8 @@ function Start-DemoStack {
     do {
         $healthy = ($records | Where-Object { Test-ManagedProcess $_ }).Count -eq $records.Count -and
             (Test-HttpHealth "http://127.0.0.1:3301/health") -and
-            ($OracleScenario -eq "Oracle2Unavailable" -or (Test-HttpHealth "http://127.0.0.1:3302/health"))
+            ($OracleScenario -eq "Oracle2Unavailable" -or (Test-HttpHealth "http://127.0.0.1:3302/health")) -and
+            ($OracleScenario -eq "Oracle2Unavailable" -or (Test-HttpHealth "http://127.0.0.1:3000/api/health/ready"))
         if (-not $healthy) { Start-Sleep -Seconds 1 }
     } until ($healthy -or [DateTimeOffset]::UtcNow -ge $deadline)
     if (-not $healthy) {
@@ -176,7 +177,7 @@ function Show-DemoStatus {
     foreach ($record in $records) {
         Write-Host ("{0,-14} PID {1,-7} {2}" -f $record.name, $record.id, $(if (Test-ManagedProcess $record) { "RUNNING" } else { "STOPPED" }))
     }
-    foreach ($url in @("http://127.0.0.1:3000/api/health", "http://127.0.0.1:3000/api/fabric/health", "http://127.0.0.1:3301/health", "http://127.0.0.1:3302/health")) {
+    foreach ($url in @("http://127.0.0.1:3000/api/health/live", "http://127.0.0.1:3000/api/health/ready", "http://127.0.0.1:3000/api/fabric/health", "http://127.0.0.1:3301/health", "http://127.0.0.1:3302/health")) {
         Write-Host ("{0,-52} {1}" -f $url, $(if (Test-HttpHealth $url) { "HEALTHY" } else { "UNAVAILABLE" }))
     }
     & docker ps --filter "network=block-insure" --format "table {{.Names}}`t{{.Status}}"

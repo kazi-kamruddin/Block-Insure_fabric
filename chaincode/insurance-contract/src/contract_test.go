@@ -146,6 +146,21 @@ func requireError(t *testing.T, err error, contains string) {
 	}
 }
 
+func TestAppealCommitmentProtocolVector(t *testing.T) {
+	appeal := &ClaimAppeal{
+		ClaimID: "claim-vector", ClaimVersion: 2, ReasonCategory: "DOCUMENT_ERROR",
+		ReasonHash: strings.Repeat("a", 64), DescriptionHash: strings.Repeat("b", 64),
+		EvidenceHash: strings.Repeat("c", 64), OriginalClaimHash: strings.Repeat("d", 64),
+		ProposedHospitalID: "hospital-2", ProposedAmountMinor: 50_000,
+		ProposedIncidentDate: "2026-06-15", ProposedDescriptionHash: strings.Repeat("e", 64),
+		ProposedClinicalReferenceHash: strings.Repeat("f", 64),
+	}
+	const expected = "6ce90e23704ce9c29a2a814804546af406c143cc497c632d2220fe025c1e97e8"
+	if actual := appealCommitmentHash(appeal); actual != expected {
+		t.Fatalf("appeal commitment protocol drifted: expected %s, got %s", expected, actual)
+	}
+}
+
 func TestPolicyToSettlementWorkflow(t *testing.T) {
 	contract := &Contract{}
 	ctx := &testContext{stub: newMemoryStub()}
@@ -166,7 +181,7 @@ func TestPolicyToSettlementWorkflow(t *testing.T) {
 	}
 
 	setIdentity(ctx, "certificate-policyholder", "InsurerMSP", "policyholder", map[string]string{"subjectId": "policyholder1"})
-	_, err = contract.SubmitClaim(ctx, "claim-001", "policy-001", 250_000, "2026-06-15", hashB)
+	_, err = contract.SubmitClaim(ctx, "claim-001", "policy-001", "hospital-officer", 250_000, "2026-06-15", hashB)
 	requireNoError(t, err)
 	_, err = contract.AddEvidenceReference(ctx, "claim-001", "evidence-001", "DISCHARGE_SUMMARY", hashC, hashD)
 	requireNoError(t, err)
@@ -225,12 +240,16 @@ func TestAuthorizationAndInvalidTransitions(t *testing.T) {
 	requireNoError(t, err)
 
 	setIdentity(ctx, "other-user", "InsurerMSP", "policyholder", map[string]string{"subjectId": "someone-else"})
-	_, err = contract.SubmitClaim(ctx, "claim-001", "policy-001", 500, "2026-06-01", hash)
+	_, err = contract.SubmitClaim(ctx, "claim-001", "policy-001", "hospital-officer", 500, "2026-06-01", hash)
 	requireError(t, err, "another policyholder")
 
 	setIdentity(ctx, "policyholder", "InsurerMSP", "policyholder", map[string]string{"subjectId": "policyholder1"})
-	_, err = contract.SubmitClaim(ctx, "claim-001", "policy-001", 500, "2026-06-01", hash)
+	_, err = contract.SubmitClaim(ctx, "claim-001", "policy-001", "hospital-officer", 500, "2026-06-01", hash)
 	requireNoError(t, err)
+
+	setIdentity(ctx, "other-hospital", "HospitalMSP", "hospitalOfficer", map[string]string{"subjectId": "hospital-2"})
+	_, err = contract.VerifyClaim(ctx, "claim-001", "verification-forged", "VERIFIED", hash)
+	requireError(t, err, "assigned to hospital hospital-officer")
 
 	setIdentity(ctx, "insurer-admin", "InsurerMSP", "insurerAdmin", nil)
 	_, err = contract.OpenClaimReview(ctx, "claim-001", "review-invalid", `["auditor1","auditor2","auditor3","auditor4"]`, 3, 2, "2026-09-08T12:00:00Z")
@@ -256,7 +275,7 @@ func TestDistributedReviewAppealAndFraudDecisionSupport(t *testing.T) {
 	requireNoError(t, err)
 
 	setIdentity(ctx, "policyholder-cert", "InsurerMSP", "policyholder", map[string]string{"subjectId": "policyholder1"})
-	_, err = contract.SubmitClaim(ctx, "claim-review", "policy-review", 50_000, "2026-06-01", hashA)
+	_, err = contract.SubmitClaim(ctx, "claim-review", "policy-review", "hospital", 50_000, "2026-06-01", hashA)
 	requireNoError(t, err)
 
 	setIdentity(ctx, "hospital", "HospitalMSP", "hospitalOfficer", nil)
@@ -296,14 +315,49 @@ func TestDistributedReviewAppealAndFraudDecisionSupport(t *testing.T) {
 	}
 
 	setIdentity(ctx, "policyholder-cert", "InsurerMSP", "policyholder", map[string]string{"subjectId": "policyholder1"})
-	appeal, err := contract.SubmitClaimAppeal(ctx, "appeal-review", "claim-review", hashA, hashB)
+	appeal, err := contract.SubmitClaimAppeal(
+		ctx, "appeal-review", "claim-review", "DOCUMENT_ERROR", hashA, hashB, hashB,
+		"hospital2", 0, "", "", hashB,
+	)
 	requireNoError(t, err)
-	if appeal.Round != 1 || appeal.Status != "SUBMITTED" {
+	if appeal.Round != 1 || appeal.Status != "SUBMITTED" || appeal.ClaimVersion != 2 || appeal.CommitmentHash == "" {
 		t.Fatalf("unexpected appeal: %+v", appeal)
 	}
 
 	setIdentity(ctx, "insurer-admin", "InsurerMSP", "insurerAdmin", nil)
 	review, err = contract.OpenAppealReview(ctx, "appeal-review", "review-appeal", assignments, 3, 2, "2026-09-08T12:00:00Z")
+	requireError(t, err, "fresh hospital and Oracle verification")
+	_, err = contract.RequestOracleVerification(
+		ctx, "request-appeal-too-early", "claim-review", "registry-appeal", "model-v1", hashA,
+		`["oracle1","oracle2"]`, "2026-09-05T12:05:00Z", "2026-09-05T12:10:00Z",
+	)
+	requireError(t, err, "current verified hospital attestation")
+
+	setIdentity(ctx, "hospital2-cert", "HospitalMSP", "hospitalOfficer", map[string]string{"subjectId": "hospital2"})
+	_, err = contract.VerifyClaim(ctx, "claim-review", "verification-appeal-mismatch", "VERIFIED", hashA)
+	requireError(t, err, "does not match appeal appeal-review commitment")
+	verification, err := contract.VerifyClaim(ctx, "claim-review", "verification-appeal", "VERIFIED", hashB)
+	requireNoError(t, err)
+	if verification.ClaimVersion != 2 || verification.AppealID != appeal.ID || verification.AttestationHash == "" {
+		t.Fatalf("appeal hospital verification was not version-bound: %+v", verification)
+	}
+
+	setIdentity(ctx, "insurer-admin", "InsurerMSP", "insurerAdmin", nil)
+	_, err = contract.PublishOracleRegistrySnapshot(ctx, "registry-appeal", 1, hashA, "rules-v1", hashB, 1)
+	requireNoError(t, err)
+	appealRequest, err := contract.RequestOracleVerification(
+		ctx, "request-appeal-review", "claim-review", "registry-appeal", "model-v1", hashA,
+		`["oracle1","oracle2"]`, "2026-09-05T12:05:00Z", "2026-09-05T12:10:00Z",
+	)
+	requireNoError(t, err)
+	resultHash := oracleResultDigest(appealRequest, false, "RECORD_INVALID", hashC)
+	commitOracleTestResult(t, contract, ctx, appealRequest, "oracle1", false, "RECORD_INVALID", hashC, strings.Repeat("1", 64))
+	commitOracleTestResult(t, contract, ctx, appealRequest, "oracle2", false, "RECORD_INVALID", hashC, strings.Repeat("2", 64))
+	revealOracleTestResult(t, contract, ctx, appealRequest, "oracle1", false, "RECORD_INVALID", hashC, resultHash, strings.Repeat("1", 64))
+	revealOracleTestResult(t, contract, ctx, appealRequest, "oracle2", false, "RECORD_INVALID", hashC, resultHash, strings.Repeat("2", 64))
+
+	setIdentity(ctx, "insurer-admin", "InsurerMSP", "insurerAdmin", nil)
+	review, err = contract.RouteOracleFailureToReview(ctx, appealRequest.ID, "review-appeal", assignments, 3, 2, "2026-09-08T12:00:00Z")
 	requireNoError(t, err)
 	if review.Round != 2 || review.Kind != "APPEAL" {
 		t.Fatalf("appeal review did not version review state: %+v", review)
@@ -322,7 +376,7 @@ func TestDistributedReviewAppealAndFraudDecisionSupport(t *testing.T) {
 	}
 
 	setIdentity(ctx, "policyholder-cert", "InsurerMSP", "policyholder", map[string]string{"subjectId": "policyholder1"})
-	_, err = contract.SubmitClaimAppeal(ctx, "appeal-second", "claim-review", hashA, "")
+	_, err = contract.SubmitClaimAppeal(ctx, "appeal-second", "claim-review", "OTHER", hashA, hashB, "", "", 0, "", "", hashB)
 	requireError(t, err, "must be REJECTED")
 
 	assessments, err := contract.ListFraudAssessments(ctx)
@@ -364,7 +418,7 @@ func TestEvidenceAccessAuthorizationAndAuditRecord(t *testing.T) {
 	requireNoError(t, err)
 
 	setIdentity(ctx, "policyholder-cert", "InsurerMSP", "policyholder", map[string]string{"subjectId": "policyholder1"})
-	_, err = contract.SubmitClaim(ctx, "claim-access", "policy-access", 500, "2026-06-01", hash)
+	_, err = contract.SubmitClaim(ctx, "claim-access", "policy-access", "hospital1", 500, "2026-06-01", hash)
 	requireNoError(t, err)
 	_, err = contract.AddEvidenceReference(ctx, "claim-access", "evidence-access", "INVOICE", hash, hash)
 	requireNoError(t, err)
@@ -385,6 +439,13 @@ func TestEvidenceAccessAuthorizationAndAuditRecord(t *testing.T) {
 	if len(records) != 1 || records[0].ID != "access-owner" {
 		t.Fatalf("unexpected evidence access records: %+v", records)
 	}
+
+	setIdentity(ctx, "other-hospital", "HospitalMSP", "hospitalOfficer", map[string]string{"subjectId": "hospital2"})
+	_, err = contract.RecordEvidenceAccess(ctx, "access-wrong-hospital", "evidence-access", "VERIFY")
+	requireError(t, err, "cannot retrieve evidence")
+	setIdentity(ctx, "assigned-hospital", "HospitalMSP", "hospitalOfficer", map[string]string{"subjectId": "hospital1"})
+	_, err = contract.RecordEvidenceAccess(ctx, "access-assigned-hospital", "evidence-access", "VERIFY")
+	requireNoError(t, err)
 }
 
 func TestGovernedEvidenceGrantLifecycle(t *testing.T) {
@@ -401,7 +462,7 @@ func TestGovernedEvidenceGrantLifecycle(t *testing.T) {
 	requireNoError(t, err)
 
 	setIdentity(ctx, "policyholder-cert", "InsurerMSP", "policyholder", map[string]string{"subjectId": "policyholder1"})
-	_, err = contract.SubmitClaim(ctx, "claim-grant", "policy-grant", 500, "2026-06-01", hash)
+	_, err = contract.SubmitClaim(ctx, "claim-grant", "policy-grant", "hospital1", 500, "2026-06-01", hash)
 	requireNoError(t, err)
 	_, err = contract.AddEvidenceReference(ctx, "claim-grant", "evidence-grant", "INVOICE", hash, hash)
 	requireNoError(t, err)
@@ -455,7 +516,7 @@ func TestDirectAuditorEvidenceAccessRequiresCurrentAssignment(t *testing.T) {
 	_, err = contract.IssuePolicy(ctx, "policy-audit-access", "package-audit-access", "policyholder1", "2026-01-01", "2026-12-31")
 	requireNoError(t, err)
 	setIdentity(ctx, "policyholder-cert", "InsurerMSP", "policyholder", map[string]string{"subjectId": "policyholder1"})
-	_, err = contract.SubmitClaim(ctx, "claim-audit-access", "policy-audit-access", 500, "2026-06-01", hash)
+	_, err = contract.SubmitClaim(ctx, "claim-audit-access", "policy-audit-access", "hospital", 500, "2026-06-01", hash)
 	requireNoError(t, err)
 	_, err = contract.AddEvidenceReference(ctx, "claim-audit-access", "evidence-audit-access", "INVOICE", hash, hash)
 	requireNoError(t, err)
@@ -632,7 +693,7 @@ func setupOracleRequest(t *testing.T, suffix string) (*Contract, *testContext, *
 	requireNoError(t, err)
 
 	setIdentity(ctx, "policyholder-cert", "InsurerMSP", "policyholder", map[string]string{"subjectId": "policyholder1"})
-	_, err = contract.SubmitClaim(ctx, "claim-oracle-"+suffix, "policy-oracle-"+suffix, 50_000, "2026-06-01", hashB)
+	_, err = contract.SubmitClaim(ctx, "claim-oracle-"+suffix, "policy-oracle-"+suffix, "hospital1", 50_000, "2026-06-01", hashB)
 	requireNoError(t, err)
 	setIdentity(ctx, "hospital-cert", "HospitalMSP", "hospitalOfficer", map[string]string{"subjectId": "hospital1"})
 	_, err = contract.VerifyClaim(ctx, "claim-oracle-"+suffix, "verification-oracle-"+suffix, "VERIFIED", hashC)
@@ -865,7 +926,10 @@ func TestOracleDeadlinesStaleVersionsAndAppealIsolation(t *testing.T) {
 		requireNoError(t, err)
 	}
 	setIdentity(ctx, "policyholder-cert", "InsurerMSP", "policyholder", map[string]string{"subjectId": "policyholder1"})
-	appeal, err := contract.SubmitClaimAppeal(ctx, "appeal-oracle-versioning", request.ClaimID, strings.Repeat("a", 64), "")
+	appeal, err := contract.SubmitClaimAppeal(
+		ctx, "appeal-oracle-versioning", request.ClaimID, "DOCUMENT_ERROR",
+		strings.Repeat("a", 64), strings.Repeat("b", 64), "", "", 0, "", "", strings.Repeat("c", 64),
+	)
 	requireNoError(t, err)
 	claim, err := contract.ReadClaim(ctx, request.ClaimID)
 	requireNoError(t, err)
@@ -881,12 +945,21 @@ func TestOracleDeadlinesStaleVersionsAndAppealIsolation(t *testing.T) {
 	requireError(t, err, "already finalized")
 
 	setIdentity(ctx, "insurer-admin", "InsurerMSP", "insurerAdmin", nil)
+	_, err = contract.RequestOracleVerification(
+		ctx, "request-oracle-appeal-too-early", claim.ID, request.RegistrySnapshotID, request.ModelVersion, request.ModelHash,
+		`["oracle1","oracle2"]`, "2026-09-05T12:05:00Z", "2026-09-05T12:10:00Z",
+	)
+	requireError(t, err, "current verified hospital attestation")
+	setIdentity(ctx, "hospital", "HospitalMSP", "hospitalOfficer", map[string]string{"subjectId": "hospital1"})
+	_, err = contract.VerifyClaim(ctx, claim.ID, "verification-oracle-appeal", "VERIFIED", strings.Repeat("c", 64))
+	requireNoError(t, err)
+	setIdentity(ctx, "insurer-admin", "InsurerMSP", "insurerAdmin", nil)
 	appealRequest, err := contract.RequestOracleVerification(
 		ctx, "request-oracle-appeal", claim.ID, request.RegistrySnapshotID, request.ModelVersion, request.ModelHash,
 		`["oracle1","oracle2"]`, "2026-09-05T12:05:00Z", "2026-09-05T12:10:00Z",
 	)
 	requireNoError(t, err)
-	if appealRequest.ClaimVersion != 2 || appealRequest.QueryHash == request.QueryHash {
+	if appealRequest.ClaimVersion != 2 || appealRequest.QueryHash == request.QueryHash || appealRequest.AppealID != appeal.ID || appealRequest.AppealCommitmentHash != appeal.CommitmentHash {
 		t.Fatalf("appeal Oracle request was not rebound to claim version 2: %+v", appealRequest)
 	}
 }
@@ -907,16 +980,17 @@ func TestOracleProtocolMatchesWorkerHashVector(t *testing.T) {
 	request := &OracleRequest{
 		ID: "request-vector-1", ClaimID: "claim-vector-1", QueryHash: strings.Repeat("1", 64),
 		ClaimVersion: 2, HospitalVerificationID: "verification-vector-1",
+		AppealID: "appeal-vector-1", AppealCommitmentHash: strings.Repeat("7", 64),
 		RegistrySnapshotID: "registry-demo-v1", RegistryVersion: 1, RegistryRootHash: strings.Repeat("2", 64),
 		RulesVersion: "rules-v1", RulesHash: strings.Repeat("3", 64),
 		ModelVersion: "model-v1", ModelHash: strings.Repeat("4", 64),
 	}
 	resultHash := oracleResultDigest(request, true, "VERIFIED", strings.Repeat("5", 64))
-	if resultHash != "310ba46f898f75725e6c041800559faf9d69f72c40749874e15c1f7b7afd89e2" {
+	if resultHash != "82f423a623598cfdcbff6239a447f9ac774eec08175ba8c2f76ae7485e131eb7" {
 		t.Fatalf("Go Oracle result hash diverged from the Node worker: %s", resultHash)
 	}
 	commitment := oracleCommitmentDigest(request, true, resultHash, strings.Repeat("6", 64))
-	if commitment != "dc82bc23fc7d06bce5a00726f88b387baf6a82acfa5d70c7e2bfe49524708d89" {
+	if commitment != "d72e0d6dc8003404d09d75d6db5d5e7eba6f48437c536784b97c6f1afcc0a942" {
 		t.Fatalf("Go Oracle commitment diverged from the Node worker: %s", commitment)
 	}
 }

@@ -19,6 +19,8 @@ export function buildResultDigest(request, { verified, verificationCode, recordH
     request.queryHash,
     request.claimVersion,
     request.hospitalVerificationId,
+    request.appealId ?? "",
+    String(request.appealCommitmentHash ?? "").toLowerCase(),
     request.registrySnapshotId,
     request.registryVersion,
     request.registryRootHash,
