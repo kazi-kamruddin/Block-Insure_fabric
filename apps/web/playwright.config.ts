@@ -25,6 +25,7 @@ const oracleServers = [
 export default defineConfig({
   testDir: "./e2e",
   fullyParallel: false,
+  workers: 2,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 1 : 0,
   reporter: [["list"]],
@@ -50,6 +51,7 @@ export default defineConfig({
         PORT: String(port),
         EVENT_WORKER_SECRET: "browser-event-worker-secret-with-32-characters",
         FABRIC_EVENT_SYNC_DEADLINE_SECONDS: "5",
+        FABRIC_EVALUATE_DEADLINE_SECONDS: "15",
       },
     },
     ...oracleServers,
