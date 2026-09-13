@@ -56,7 +56,7 @@ provenance on every use. Bank identities cannot retrieve clinical evidence.
 Claims link verifications, review rounds, decisions, appeals, fraud assessments,
 access records, and settlements for audit navigation.
 
-The current Oracle-capable definition is `insurance-contract` 0.7.1 with schema
+The current Oracle-capable definition is `insurance-contract` 0.8.0 with schema
 version 6 and an automatically resolved lifecycle sequence. A clean bootstrap
 starts at sequence 1; a non-destructive source upgrade increments the existing
 channel sequence.

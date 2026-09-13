@@ -169,7 +169,7 @@ test("five organization sessions complete a Fabric insurance workflow", async ({
     expect(dossierResponse.headers()["content-disposition"]).toContain(`${ids.claim}-audit.json`);
     const dossier = await dossierResponse.json();
     expect(dossier).toMatchObject({
-      schemaVersion: 4,
+      schemaVersion: 5,
       claim: { id: ids.claim, status: "SETTLED" },
       hospitalVerification: { id: ids.verification, outcome: "VERIFIED" },
       settlement: { id: ids.settlement, status: "CONFIRMED" },
@@ -188,7 +188,7 @@ test("five organization sessions complete a Fabric insurance workflow", async ({
     expect(research.ok(), await research.text()).toBe(true);
     expect(await research.json()).toMatchObject({
       schemaVersion: 1,
-      provenance: { ledgerSchemaVersion: 6 },
+      provenance: { ledgerSchemaVersion: 7 },
       fraudDecisionSupport: { advisoryOnly: true },
     });
     const auditorNotifications = await auditor.get("/api/operations/notifications");

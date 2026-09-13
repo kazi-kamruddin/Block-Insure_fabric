@@ -31,7 +31,9 @@ async function signIn(page: Page, account: string) {
     "auditor-4": "Independent Auditor Four",
     "bank-officer": "Bank Officer",
   };
-  await page.getByRole("button", { name: new RegExp(labels[account]) }).click();
+  const label = labels[account];
+  const selector = label === "Hospital Officer" ? /^Hospital Officer HospitalMSP$/ : new RegExp(label);
+  await page.getByRole("button", { name: selector }).click();
   await page.waitForLoadState("networkidle");
 }
 

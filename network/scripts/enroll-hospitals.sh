@@ -24,6 +24,11 @@ for index in 1 2 3 4 5; do
     echo "${user} (${subject}) is already enrolled."
     continue
   fi
+  if [ -d "${user_msp}" ]; then
+    quarantine="${user_msp}.failed-$(date -u +%Y%m%dT%H%M%SZ)"
+    mv "${user_msp}" "${quarantine}"
+    echo "Preserved incomplete ${user} enrollment at ${quarantine}."
+  fi
   fabric-ca-client register --caname ca-hospital \
     --id.name "${user}" --id.secret "${user}pw" --id.type client \
     --id.attrs "role=hospitalOfficer:ecert,subjectId=${subject}:ecert" \

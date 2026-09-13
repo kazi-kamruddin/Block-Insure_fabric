@@ -260,7 +260,7 @@ func (c *Contract) SubmitClaimAppeal(
 		ReasonCategory: reasonCategory, ReasonHash: strings.ToLower(reasonHash),
 		DescriptionHash: strings.ToLower(descriptionHash), EvidenceHash: strings.ToLower(evidenceHash),
 		OriginalClaimHash: claimFactsHash(claim), ProposedHospitalID: effectiveHospitalID,
-		ProposedAmountMinor: effectiveAmount,
+		ProposedAmountMinor:  effectiveAmount,
 		ProposedIncidentDate: effectiveIncidentDate, ProposedDescriptionHash: effectiveDescriptionHash,
 		ProposedClinicalReferenceHash: strings.ToLower(proposedClinicalReferenceHash),
 		Status:                        "SUBMITTED", CreatedAt: now,

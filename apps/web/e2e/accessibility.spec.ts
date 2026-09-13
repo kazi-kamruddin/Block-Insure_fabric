@@ -27,7 +27,8 @@ test("public and sign-in surfaces pass automated WCAG 2.1 AA checks", async ({ p
 for (const account of accounts) {
   test(`${account} workspace passes automated WCAG 2.1 AA checks`, async ({ page }) => {
     await page.goto("/workspace");
-    await page.getByRole("button", { name: new RegExp(account) }).click();
+    const selector = account === "Hospital Officer" ? /^Hospital Officer HospitalMSP$/ : new RegExp(account);
+    await page.getByRole("button", { name: selector }).click();
     await page.waitForLoadState("networkidle");
     await expect(page.getByLabel("Workflow action")).toBeVisible();
     await expectWcagAA(page, `${account} workspace`);
