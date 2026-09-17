@@ -24,14 +24,34 @@ export type WorkflowFormValues = Record<string, string>;
 export type HashText = (value: string) => Promise<string>;
 
 export const operationsByRole = {
-  insurerAdmin: ["createPolicyPackage", "publishPolicyPackage", "retirePolicyPackage", "createBenefitPlan", "publishBenefitPlan", "retireBenefitPlan", "issuePolicy", "advancePolicyLifecycle", "cancelPolicyAsInsurer", "queuePremiumCollection", "decideBenefitRequest", "markBenefitPaymentReady", "assessClaimFraud", "publishOracleRegistrySnapshot", "requestOracleVerification", "finalizeOracleTimeout", "routeOracleFailureToReview", "openClaimReview", "finalizeExpiredReview", "authorizeSettlement"],
+  insurerAdmin: ["createPartnerAgreement", "setPartnerAgreementStatus", "createPolicyPackage", "configurePolicyPackagePartners", "publishPolicyPackage", "retirePolicyPackage", "createBenefitPlan", "publishBenefitPlan", "retireBenefitPlan", "issuePolicy", "advancePolicyLifecycle", "cancelPolicyAsInsurer", "queuePremiumCollection", "decideBenefitRequest", "markBenefitPaymentReady", "crossCheckClaimInvoice", "assessClaimFraud", "publishOracleRegistrySnapshot", "requestOracleVerification", "finalizeOracleTimeout", "routeOracleFailureToReview", "openClaimReview", "finalizeExpiredReview", "authorizeSettlement"],
   policyholder: ["acquirePolicy", "requestBankMandate", "cancelBankMandate", "setBeneficiaries", "submitBenefitRequest", "renewPolicy", "cancelPolicy", "submitClaim", "submitClaimAppeal", "grantEvidenceAccess", "revokeEvidenceAccess"],
-  hospitalOfficer: ["verifyClaim"],
+  hospitalOfficer: ["createHospitalInvoice", "updateHospitalInvoice"],
   auditor: ["recordAuditorDecision"],
   bankOfficer: ["registerBankAccountReference", "reviewBankMandate", "recordPremiumPayment", "recordPremiumAdjustment", "completePremiumCollection", "failPremiumCollection", "expireBankMandate", "confirmBenefitPayment", "confirmSettlement"],
 } as const satisfies Record<FabricRole, readonly WorkflowOperation[]>;
 
 export const workflowFormDefinitions: Record<WorkflowOperation, WorkflowFormDefinition> = {
+  createPartnerAgreement: {
+    label: "Register partner agreement",
+    description: "Record an active insurer agreement with an independent Hospital or Bank.",
+    fields: [
+      { name: "id", label: "Agreement ID", placeholder: "agreement-hospital-1" },
+      { name: "partnerType", label: "Partner type", kind: "select", options: ["HOSPITAL", "BANK"] },
+      { name: "partnerId", label: "Partner subject ID", placeholder: "hospital-demo" },
+      { name: "name", label: "Organization name", placeholder: "Dhaka Central Medical Hospital" },
+      { name: "location", label: "Location", placeholder: "Dhaka" },
+      { name: "tier", label: "Network tier", placeholder: "Preferred" },
+      { name: "accessScope", label: "Permitted access scope", kind: "textarea", placeholder: "Read-only invoice verification fields" },
+      { name: "effectiveDate", label: "Effective date", kind: "date" },
+      { name: "expiryDate", label: "Expiry date", kind: "date" },
+    ],
+  },
+  setPartnerAgreementStatus: {
+    label: "Change partner agreement status",
+    description: "Activate, suspend, or end an insurer relationship without rewriting its history.",
+    fields: [{ name: "id", label: "Agreement ID" }, { name: "status", label: "Status", kind: "select", options: ["ACTIVE", "SUSPENDED", "ENDED"] }],
+  },
   createPolicyPackage: {
     label: "Create policy package",
     description: "Define a draft insurance product. Financial values are entered in BDT and converted to integer poisha before submission.",
@@ -42,6 +62,15 @@ export const workflowFormDefinitions: Record<WorkflowOperation, WorkflowFormDefi
       { name: "premiumBdt", label: "Premium (BDT)", kind: "money", placeholder: "100.00" },
       { name: "coverageLimitBdt", label: "Coverage limit (BDT)", kind: "money", placeholder: "10000.00" },
       { name: "termsText", label: "Terms reference", kind: "textarea", placeholder: "Document identifier, version, or terms summary", help: "Hashed in this browser; only the SHA-256 digest is sent." },
+    ],
+  },
+  configurePolicyPackagePartners: {
+    label: "Configure policy partner network",
+    description: "Attach active contracted Hospitals and Banks to the policy package terms.",
+    fields: [
+      { name: "id", label: "Package ID" },
+      { name: "hospitalIdsJson", label: "Hospital IDs", kind: "textarea", placeholder: '["hospital-demo","hospital-2"]' },
+      { name: "bankIdsJson", label: "Bank IDs", kind: "textarea", placeholder: '["bank-demo"]' },
     ],
   },
   publishPolicyPackage: {
@@ -192,27 +221,51 @@ export const workflowFormDefinitions: Record<WorkflowOperation, WorkflowFormDefi
     description: "Close the benefit liability against a hashed external transfer reference.",
     fields: [{ name: "id", label: "Benefit request ID" }, { name: "bankReferenceText", label: "Bank transfer reference" }],
   },
+  createHospitalInvoice: {
+    label: "Create patient invoice",
+    description: "Add an invoice to this Hospital's independent billing register. Sensitive references are hashed in the browser.",
+    fields: [
+      { name: "id", label: "Invoice ID", placeholder: "invoice-1001" },
+      { name: "patientReferenceText", label: "Patient reference", help: "Hashed locally; patient identity is not written to the shared ledger." },
+      { name: "invoiceReferenceText", label: "Invoice reference", help: "Give this reference to the patient for a future claim." },
+      { name: "treatmentText", label: "Treatment reference", kind: "textarea", help: "Hashed locally." },
+      { name: "amountBdt", label: "Invoice total (BDT)", kind: "money" },
+      { name: "admissionDate", label: "Admission date", kind: "date" },
+      { name: "dischargeDate", label: "Discharge date", kind: "date" },
+      { name: "status", label: "Invoice status", kind: "select", options: ["DRAFT", "FINALIZED"] },
+    ],
+  },
+  updateHospitalInvoice: {
+    label: "Update patient invoice",
+    description: "Update a draft, finalize it, or void an immutable finalized invoice.",
+    fields: [
+      { name: "id", label: "Invoice ID" },
+      { name: "patientReferenceText", label: "Patient reference" },
+      { name: "invoiceReferenceText", label: "Invoice reference" },
+      { name: "treatmentText", label: "Treatment reference", kind: "textarea" },
+      { name: "amountBdt", label: "Invoice total (BDT)", kind: "money" },
+      { name: "admissionDate", label: "Admission date", kind: "date" },
+      { name: "dischargeDate", label: "Discharge date", kind: "date" },
+      { name: "status", label: "Invoice status", kind: "select", options: ["DRAFT", "FINALIZED", "VOID"] },
+    ],
+  },
   submitClaim: {
     label: "Submit claim",
     description: "Open a claim against one of your active policies.",
     fields: [
       { name: "id", label: "Claim ID", placeholder: "claim-1001" },
       { name: "policyId", label: "Policy ID", placeholder: "policy-1001" },
-      { name: "hospitalId", label: "Assigned hospital", kind: "select", options: ["hospital-demo", "hospital-2", "hospital-3", "hospital-4", "hospital-5"], help: "Only the matching certificate-bound Hospital identity can attest this claim." },
+      { name: "hospitalId", label: "Contracted hospital", kind: "select", options: ["hospital-demo", "hospital-2", "hospital-3", "hospital-4", "hospital-5"], help: "The Hospital must be included in the purchased policy's provider network." },
+      { name: "hospitalInvoiceId", label: "Hospital invoice ID", placeholder: "invoice-1001", help: "The insurer can only cross-check this existing Hospital-owned invoice." },
       { name: "amountBdt", label: "Claim amount (BDT)", kind: "money", placeholder: "2500.00" },
       { name: "incidentDate", label: "Incident date", kind: "date" },
       { name: "descriptionText", label: "Claim description reference", kind: "textarea", placeholder: "Private case reference or concise incident summary", help: "Hashed in this browser; only the SHA-256 digest is sent." },
     ],
   },
-  verifyClaim: {
-    label: "Verify claim",
-    description: "Record the hospital's clinical attestation for a submitted claim.",
-    fields: [
-      { name: "claimId", label: "Claim ID", placeholder: "claim-1001" },
-      { name: "verificationId", label: "Verification ID", placeholder: "verification-1001" },
-      { name: "outcome", label: "Clinical outcome", kind: "select", options: ["VERIFIED", "INVALID"] },
-      { name: "clinicalReferenceText", label: "Clinical reference", kind: "textarea", placeholder: "Hospital record identifier or attestation summary", help: "Hashed locally; no clinical document text is written to Fabric." },
-    ],
+  crossCheckClaimInvoice: {
+    label: "Cross-check Hospital invoice",
+    description: "Compare a submitted claim with the immutable invoice maintained by its contracted Hospital. The insurer cannot edit the source record.",
+    fields: [{ name: "claimId", label: "Claim ID" }, { name: "verificationId", label: "Verification ID", placeholder: "invoice-check-1001" }],
   },
   assessClaimFraud: {
     label: "Generate fraud triage assessment",
@@ -221,7 +274,7 @@ export const workflowFormDefinitions: Record<WorkflowOperation, WorkflowFormDefi
   },
   openClaimReview: {
     label: "Open distributed review",
-    description: "Snapshot assigned auditor subjects and quorum rules for a hospital-verified claim.",
+    description: "Snapshot assigned auditor subjects and quorum rules for an invoice-cross-checked claim.",
     fields: [
       { name: "claimId", label: "Claim ID", placeholder: "claim-1001" },
       { name: "reviewId", label: "Review ID", placeholder: "review-1001" },
@@ -248,7 +301,7 @@ export const workflowFormDefinitions: Record<WorkflowOperation, WorkflowFormDefi
     description: "Snapshot the claim, registry, model, two certificate subjects, and commit/reveal deadlines.",
     fields: [
       { name: "requestId", label: "Oracle request ID", placeholder: "oracle-request-1001" },
-      { name: "claimId", label: "Hospital-verified claim ID", placeholder: "claim-1001" },
+      { name: "claimId", label: "Invoice-cross-checked claim ID", placeholder: "claim-1001" },
       { name: "snapshotId", label: "Registry snapshot ID", placeholder: "registry-demo-v1" },
       { name: "modelVersion", label: "Model version", placeholder: "model-v1" },
       { name: "modelHash", label: "Model commitment" },
@@ -276,7 +329,7 @@ export const workflowFormDefinitions: Record<WorkflowOperation, WorkflowFormDefi
   },
   submitClaimAppeal: {
     label: "Appeal rejected claim",
-    description: "Commit corrected facts for the single appeal. A fresh Hospital attestation is required before a new Oracle cycle.",
+    description: "Commit corrected facts for the single appeal. A matching finalized Hospital invoice and fresh insurer cross-check are required before a new Oracle cycle.",
     fields: [
       { name: "appealId", label: "Appeal ID", placeholder: "appeal-1001" },
       { name: "claimId", label: "Claim ID", placeholder: "claim-1001" },
@@ -284,11 +337,11 @@ export const workflowFormDefinitions: Record<WorkflowOperation, WorkflowFormDefi
       { name: "reasonText", label: "Appeal reason", kind: "textarea", help: "Hashed locally before submission." },
       { name: "descriptionText", label: "Appeal description", kind: "textarea", help: "A separate hash binds the complete explanation." },
       { name: "evidenceText", label: "Optional appeal evidence reference", kind: "textarea", help: "If supplied, only its hash is committed." },
-      { name: "proposedHospitalId", label: "Corrected hospital (blank keeps current)", kind: "select", options: ["", "hospital-demo", "hospital-2", "hospital-3", "hospital-4", "hospital-5"], help: "Changing this transfers the fresh attestation to that certificate-bound hospital identity." },
+      { name: "proposedHospitalId", label: "Corrected hospital (blank keeps current)", kind: "select", options: ["", "hospital-demo", "hospital-2", "hospital-3", "hospital-4", "hospital-5"], help: "Changing this requires a finalized invoice from that contracted Hospital." },
       { name: "proposedAmountMinor", label: "Corrected amount (minor BDT; 0 keeps current)", placeholder: "0" },
       { name: "proposedIncidentDate", label: "Corrected incident date (blank keeps current)", placeholder: "2026-06-15" },
       { name: "proposedDescriptionText", label: "Corrected treatment description (blank keeps current)", kind: "textarea" },
-      { name: "proposedClinicalReferenceHash", label: "Correct registry lookup hash", placeholder: "64 hexadecimal characters", help: "The fresh Hospital attestation must use this exact registry reference." },
+      { name: "proposedClinicalReferenceHash", label: "Correct registry lookup hash", placeholder: "64 hexadecimal characters", help: "A finalized Hospital invoice must use this exact registry reference." },
     ],
   },
   grantEvidenceAccess: {
@@ -375,7 +428,10 @@ export function createWorkflowFormValues(
 ): WorkflowFormValues {
   const today = dateOffset(0);
   const defaults: Record<WorkflowOperation, WorkflowFormValues> = {
+    createPartnerAgreement: { id: generatedId("agreement", idFactory), partnerType: "HOSPITAL", partnerId: "", name: "", location: "", tier: "Preferred", accessScope: "Read-only invoice verification fields", effectiveDate: today, expiryDate: dateOffset(3) },
+    setPartnerAgreementStatus: { id: "", status: "ACTIVE" },
     createPolicyPackage: { id: generatedId("package", idFactory), name: "", description: "", premiumBdt: "", coverageLimitBdt: "", termsText: "" },
+    configurePolicyPackagePartners: { id: "", hospitalIdsJson: '["hospital-demo","hospital-2","hospital-3","hospital-4","hospital-5"]', bankIdsJson: '["bank-demo"]' },
     publishPolicyPackage: { id: "" },
     retirePolicyPackage: { id: "" },
     createBenefitPlan: { id: generatedId("benefit-plan", idFactory), packageId: "", deathBenefitBdt: "", surrenderBenefitBdt: "", maturityBenefitBdt: "", rulesText: "" },
@@ -402,8 +458,10 @@ export function createWorkflowFormValues(
     decideBenefitRequest: { id: "", outcome: "APPROVE", decisionText: "" },
     markBenefitPaymentReady: { id: "", fundingReferenceText: "" },
     confirmBenefitPayment: { id: "", bankReferenceText: "" },
-    submitClaim: { id: generatedId("claim", idFactory), policyId: "", hospitalId: "hospital-demo", amountBdt: "", incidentDate: today, descriptionText: "" },
-    verifyClaim: { claimId: "", verificationId: generatedId("verification", idFactory), outcome: "VERIFIED", clinicalReferenceText: "" },
+    createHospitalInvoice: { id: generatedId("invoice", idFactory), patientReferenceText: "", invoiceReferenceText: "", treatmentText: "", amountBdt: "", admissionDate: today, dischargeDate: today, status: "FINALIZED" },
+    updateHospitalInvoice: { id: "", patientReferenceText: "", invoiceReferenceText: "", treatmentText: "", amountBdt: "", admissionDate: today, dischargeDate: today, status: "DRAFT" },
+    submitClaim: { id: generatedId("claim", idFactory), policyId: "", hospitalId: "hospital-demo", hospitalInvoiceId: "", amountBdt: "", incidentDate: today, descriptionText: "" },
+    crossCheckClaimInvoice: { claimId: "", verificationId: generatedId("invoice-check", idFactory) },
     assessClaimFraud: { assessmentId: generatedId("fraud", idFactory), claimId: "" },
     openClaimReview: { claimId: "", reviewId: generatedId("review", idFactory), assignedAuditorIdsJson: '["auditor1","auditor2","auditor3","auditor4"]', approvalThreshold: "3", rejectionThreshold: "2", deadline: deadlineOffset(3) },
     publishOracleRegistrySnapshot: { id: "registry-demo-v1", version: "1", rootHash: "c6da6361115c611b091faa9f35836f9f5c8ee0fdbefb6bc0d8cc6fdde571ebcd", rulesVersion: "rules-v1", rulesHash: "a".repeat(64), recordCount: "3" },
@@ -480,6 +538,18 @@ export async function buildWorkflowCommand(
   let command: unknown;
 
   switch (operation) {
+    case "createPartnerAgreement":
+      command = {
+        operation, id: required(values, "id", "Agreement ID"), partnerType: required(values, "partnerType", "Partner type"),
+        partnerId: required(values, "partnerId", "Partner subject ID"), name: required(values, "name", "Organization name"),
+        location: values.location?.trim() ?? "", tier: values.tier?.trim() ?? "",
+        accessScope: required(values, "accessScope", "Access scope"), effectiveDate: required(values, "effectiveDate", "Effective date"),
+        expiryDate: required(values, "expiryDate", "Expiry date"),
+      };
+      break;
+    case "setPartnerAgreementStatus":
+      command = { operation, id: required(values, "id", "Agreement ID"), status: required(values, "status", "Status") };
+      break;
     case "createPolicyPackage":
       command = {
         operation,
@@ -490,6 +560,9 @@ export async function buildWorkflowCommand(
         coverageLimitMinor: bdtToMinor(required(values, "coverageLimitBdt", "Coverage limit")),
         termsHash: await digest("termsText", "Terms reference"),
       };
+      break;
+    case "configurePolicyPackagePartners":
+      command = { operation, id: required(values, "id", "Package ID"), hospitalIdsJson: required(values, "hospitalIdsJson", "Hospital IDs"), bankIdsJson: required(values, "bankIdsJson", "Bank IDs") };
       break;
     case "publishPolicyPackage":
       command = { operation, id: required(values, "id", "Package ID") };
@@ -582,25 +655,33 @@ export async function buildWorkflowCommand(
     case "confirmBenefitPayment":
       command = { operation, id: required(values, "id", "Benefit request ID"), bankReferenceHash: await digest("bankReferenceText", "Bank transfer reference") };
       break;
+    case "createHospitalInvoice":
+    case "updateHospitalInvoice":
+      command = {
+        operation, id: required(values, "id", "Invoice ID"),
+        patientReferenceHash: await digest("patientReferenceText", "Patient reference"),
+        invoiceReferenceHash: await digest("invoiceReferenceText", "Invoice reference"),
+        treatmentHash: await digest("treatmentText", "Treatment reference"),
+        amountMinor: bdtToMinor(required(values, "amountBdt", "Invoice total")),
+        admissionDate: required(values, "admissionDate", "Admission date"),
+        dischargeDate: required(values, "dischargeDate", "Discharge date"),
+        status: required(values, "status", "Invoice status"),
+      };
+      break;
     case "submitClaim":
       command = {
         operation,
         id: required(values, "id", "Claim ID"),
         policyId: required(values, "policyId", "Policy ID"),
         hospitalId: required(values, "hospitalId", "Assigned hospital"),
+        hospitalInvoiceId: required(values, "hospitalInvoiceId", "Hospital invoice ID"),
         amountMinor: bdtToMinor(required(values, "amountBdt", "Claim amount")),
         incidentDate: required(values, "incidentDate", "Incident date"),
         descriptionHash: await digest("descriptionText", "Claim description reference"),
       };
       break;
-    case "verifyClaim":
-      command = {
-        operation,
-        claimId: required(values, "claimId", "Claim ID"),
-        verificationId: required(values, "verificationId", "Verification ID"),
-        outcome: required(values, "outcome", "Clinical outcome"),
-        clinicalReferenceHash: await digest("clinicalReferenceText", "Clinical reference"),
-      };
+    case "crossCheckClaimInvoice":
+      command = { operation, claimId: required(values, "claimId", "Claim ID"), verificationId: required(values, "verificationId", "Verification ID") };
       break;
     case "assessClaimFraud":
       command = { operation, assessmentId: required(values, "assessmentId", "Assessment ID"), claimId: required(values, "claimId", "Claim ID") };

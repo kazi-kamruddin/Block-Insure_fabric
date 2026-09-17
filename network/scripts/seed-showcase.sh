@@ -11,11 +11,15 @@ orderer_ca="${organizations}/ordererOrganizations/blockinsure.test/orderers/orde
 
 export PATH="${samples_root}/bin:${PATH}"
 export FABRIC_CFG_PATH="${samples_root}/config"
-export CORE_PEER_TLS_ENABLED=true
-export CORE_PEER_LOCALMSPID=InsurerMSP
-export CORE_PEER_TLS_ROOTCERT_FILE="${organizations}/peerOrganizations/insurer.blockinsure.test/peers/peer0.insurer.blockinsure.test/tls/ca.crt"
-export CORE_PEER_MSPCONFIGPATH="${organizations}/peerOrganizations/insurer.blockinsure.test/users/insurerAdmin@insurer.blockinsure.test/msp"
-export CORE_PEER_ADDRESS=localhost:7051
+set_client_context() {
+  local org="$1" msp="$2" port="$3" user="$4"
+  local domain="${org}.blockinsure.test"
+  export CORE_PEER_TLS_ENABLED=true
+  export CORE_PEER_LOCALMSPID="${msp}"
+  export CORE_PEER_TLS_ROOTCERT_FILE="${organizations}/peerOrganizations/${domain}/peers/peer0.${domain}/tls/ca.crt"
+  export CORE_PEER_MSPCONFIGPATH="${organizations}/peerOrganizations/${domain}/users/${user}@${domain}/msp"
+  export CORE_PEER_ADDRESS="localhost:${port}"
+}
 
 payload() {
   local function="$1"
@@ -49,16 +53,50 @@ package_id="showcase-health-v1"
 benefit_plan_id="showcase-benefits-v1"
 registry_id="registry-demo-v1"
 
+set_client_context insurer InsurerMSP 7051 insurerAdmin
+ensure_agreement() {
+  local id="$1"
+  shift
+  if ! exists ReadPartnerAgreement "${id}"; then
+    invoke CreatePartnerAgreement "${id}" "$@"
+  fi
+}
+
+ensure_agreement agreement-hospital-demo HOSPITAL hospital-demo "Dhaka Central Medical Hospital" Dhaka Preferred "Read-only invoice verification fields" 2026-01-01 2028-12-31
+ensure_agreement agreement-hospital-2 HOSPITAL hospital-2 "Chattogram Metropolitan Hospital" Chattogram Standard "Read-only invoice verification fields" 2026-01-01 2028-12-31
+ensure_agreement agreement-hospital-3 HOSPITAL hospital-3 "Rajshahi Community Hospital" Rajshahi Standard "Read-only invoice verification fields" 2026-01-01 2028-12-31
+ensure_agreement agreement-hospital-4 HOSPITAL hospital-4 "Khulna Riverside Hospital" Khulna Standard "Read-only invoice verification fields" 2026-01-01 2028-12-31
+ensure_agreement agreement-hospital-5 HOSPITAL hospital-5 "Sylhet Valley Hospital" Sylhet Standard "Read-only invoice verification fields" 2026-01-01 2028-12-31
+ensure_agreement agreement-bank-demo BANK bank-demo "Bangladesh Demo Commercial Bank" Dhaka Collection "Premium collection and settlement confirmation" 2026-01-01 2028-12-31
+
 if ! exists ReadPolicyPackage "${package_id}"; then
   invoke CreatePolicyPackage "${package_id}" "Supervisor Health Cover" "Demonstration inpatient coverage with certificate-bound Oracle adjudication" 10000 500000 "${hash_a}"
+  invoke ConfigurePolicyPackagePartners "${package_id}" '["hospital-demo","hospital-2","hospital-3","hospital-4","hospital-5"]' '["bank-demo"]'
   invoke CreateBenefitPlan "${benefit_plan_id}" "${package_id}" 300000 100000 200000 "${hash_b}"
   invoke PublishBenefitPlan "${benefit_plan_id}"
   invoke PublishPolicyPackage "${package_id}"
 fi
+package_json="$(peer chaincode query -C "${channel_name}" -n "${chaincode_name}" -c "$(payload ReadPolicyPackage "${package_id}")")"
+if ! jq -e '(.hospitalIds | length) > 0 and (.bankIds | length) > 0' >/dev/null <<<"${package_json}"; then
+  invoke ConfigurePolicyPackagePartners "${package_id}" '["hospital-demo","hospital-2","hospital-3","hospital-4","hospital-5"]' '["bank-demo"]'
+fi
 
+for index in 1 2 3 4 5; do
+  case "${index}" in
+    1) subject="hospital-demo" ;;
+    *) subject="hospital-${index}" ;;
+  esac
+  invoice_id="showcase-invoice-${subject}"
+  set_client_context hospital HospitalMSP 8051 "hospital${index}"
+  if ! exists ReadHospitalInvoice "${invoice_id}"; then
+    invoke CreateHospitalInvoice "${invoice_id}" "${hash_a}" "${hash_b}" "${registry_root}" "$((200000 + index * 10000))" 2026-06-10 2026-06-20 FINALIZED
+  fi
+done
+
+set_client_context insurer InsurerMSP 7051 insurerAdmin
 if ! exists ReadOracleRegistrySnapshot "${registry_id}"; then
   invoke PublishOracleRegistrySnapshot "${registry_id}" 1 "${registry_root}" rules-v1 "${hash_a}" 3
 fi
 
-echo "Showcase seed is ready: package ${package_id}, benefit plan ${benefit_plan_id}, and Oracle registry ${registry_id}."
+echo "Showcase seed is ready: six partner agreements, five Hospital invoices, package ${package_id}, benefit plan ${benefit_plan_id}, and Oracle registry ${registry_id}."
 echo "The clean seed creates no policies, claims, reviews, settlements, or Oracle requests."

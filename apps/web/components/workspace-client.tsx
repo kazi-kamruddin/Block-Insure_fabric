@@ -13,7 +13,7 @@ import type { WorkflowCommand } from "@/lib/workflows/commands";
 import { bdtToMinor } from "@/lib/workflows/forms";
 import { decryptEvidenceBytes, encryptEvidenceBytes, sha256Hex } from "@/lib/evidence/browser-crypto";
 
-type AssetType = "package" | "policy" | "claim" | "evidence" | "evidence-grant" | "verification" | "decision" | "review" | "appeal" | "fraud-assessment" | "settlement" | "access" | "claim-history" | "account" | "mandate" | "premium-payment" | "premium-adjustment" | "collection" | "benefit-plan" | "beneficiaries" | "benefit-request" | "liability" | "oracle-snapshot" | "oracle-request" | "oracle-commitment" | "oracle-result" | "oracle-history";
+type AssetType = "partner-agreement" | "hospital-invoice" | "package" | "policy" | "claim" | "evidence" | "evidence-grant" | "verification" | "decision" | "review" | "appeal" | "fraud-assessment" | "settlement" | "access" | "claim-history" | "account" | "mandate" | "premium-payment" | "premium-adjustment" | "collection" | "benefit-plan" | "beneficiaries" | "benefit-request" | "liability" | "oracle-snapshot" | "oracle-request" | "oracle-commitment" | "oracle-result" | "oracle-history";
 type NotificationItem = { id: string; title: string; message: string; assetId: string; blockNumber: string };
 type ResearchSnapshotView = {
   reproducibilityHash: string;
@@ -32,7 +32,9 @@ const hash = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 
 const commandTemplates = {
   insurerAdmin: [
+    ["Register partner", { operation: "createPartnerAgreement", id: "agreement-hospital-1", partnerType: "HOSPITAL", partnerId: "hospital-demo", name: "Dhaka Central Medical Hospital", location: "Dhaka", tier: "Preferred", accessScope: "Read-only invoice verification fields", effectiveDate: "2026-01-01", expiryDate: "2028-12-31" }],
     ["Create package", { operation: "createPolicyPackage", id: "package-1", name: "Essential Health", description: "Core inpatient coverage", premiumMinor: 10000, coverageLimitMinor: 1000000, termsHash: hash }],
+    ["Configure package network", { operation: "configurePolicyPackagePartners", id: "package-1", hospitalIdsJson: '["hospital-demo"]', bankIdsJson: '["bank-demo"]' }],
     ["Publish package", { operation: "publishPolicyPackage", id: "package-1" }],
     ["Retire package", { operation: "retirePolicyPackage", id: "package-1" }],
     ["Issue policy", { operation: "issuePolicy", id: "policy-1", packageId: "package-1", policyholderId: "policyholder1", startDate: "2026-01-01", endDate: "2026-12-31" }],
@@ -43,11 +45,11 @@ const commandTemplates = {
     ["Authorize settlement", { operation: "authorizeSettlement", settlementId: "settlement-1", claimId: "claim-1" }],
   ],
   policyholder: [
-    ["Submit claim", { operation: "submitClaim", id: "claim-1", policyId: "policy-1", hospitalId: "hospital-demo", amountMinor: 250000, incidentDate: "2026-06-15", descriptionHash: hash }],
+    ["Submit claim", { operation: "submitClaim", id: "claim-1", policyId: "policy-1", hospitalId: "hospital-demo", hospitalInvoiceId: "invoice-1", amountMinor: 250000, incidentDate: "2026-06-15", descriptionHash: hash }],
     ["Appeal claim", { operation: "submitClaimAppeal", appealId: "appeal-1", claimId: "claim-1", reasonCategory: "DOCUMENT_ERROR", reasonHash: hash, descriptionHash: hash, evidenceHash: "", proposedHospitalId: "", proposedAmountMinor: 0, proposedIncidentDate: "", proposedDescriptionHash: "", proposedClinicalReferenceHash: hash }],
   ],
   hospitalOfficer: [
-    ["Verify claim", { operation: "verifyClaim", claimId: "claim-1", verificationId: "verification-1", outcome: "VERIFIED", clinicalReferenceHash: hash }],
+    ["Create invoice", { operation: "createHospitalInvoice", id: "invoice-1", patientReferenceHash: hash, invoiceReferenceHash: hash, treatmentHash: hash, amountMinor: 250000, admissionDate: "2026-06-15", dischargeDate: "2026-06-18", status: "FINALIZED" }],
   ],
   auditor: [
     ["Approve claim", { operation: "recordAuditorDecision", reviewId: "review-1", decisionId: "decision-1", outcome: "APPROVE", reasonHash: hash }],
@@ -73,7 +75,7 @@ export function WorkspaceClient({
   const router = useRouter();
   const [account, setAccount] = useState(initialAccount);
   const [command, setCommand] = useState("");
-  const [assetType, setAssetType] = useState<AssetType>("claim");
+  const [assetType, setAssetType] = useState<AssetType>(initialAccount?.role === "hospitalOfficer" ? "hospital-invoice" : "claim");
   const [assetId, setAssetId] = useState("");
   const [evidenceClaimId, setEvidenceClaimId] = useState("");
   const [evidenceId, setEvidenceId] = useState("");
@@ -404,7 +406,7 @@ export function WorkspaceClient({
   }
 
   return (
-    <section className="shell workspace">
+    <section className={`shell workspace workspace-${account.role}`}>
       <header className="workspaceHeader">
         <div>
           <span className="kicker">{account.organization}</span>
@@ -462,7 +464,11 @@ export function WorkspaceClient({
                 )}
               </article>
 
-              <article className="recentPanel">
+              {account.role === "hospitalOfficer" ? <article className="recentPanel">
+                <span className="kicker">Organizational boundary</span>
+                <h3>Independent from Block-Insure</h3>
+                <p className="emptyState">This portal maintains Hospital invoices only. The contracted insurer can read verification fields but cannot edit these records.</p>
+              </article> : <article className="recentPanel">
                 <span className="kicker">Ledger activity</span>
                 <h3>Recently updated claims</h3>
                 {dashboard.recentClaims.length === 0 ? <p className="emptyState">No visible claims yet.</p> : (
@@ -475,7 +481,7 @@ export function WorkspaceClient({
                     ))}
                   </div>
                 )}
-              </article>
+              </article>}
             </div>
           </>
         )}
@@ -579,6 +585,13 @@ export function WorkspaceClient({
           <h2>Find ledger asset</h2>
           <label>Asset type
             <select value={assetType} onChange={(event) => setAssetType(event.target.value as AssetType)}>
+              {account.role === "hospitalOfficer" ? <>
+                <option value="hospital-invoice">Hospital invoice</option>
+                <option value="partner-agreement">Insurer agreement</option>
+                <option value="package">Connected policy packages</option>
+              </> : <>
+              {account.role === "insurerAdmin" && <option value="partner-agreement">Partner agreement</option>}
+              {account.role === "insurerAdmin" && <option value="hospital-invoice">Hospital invoice</option>}
               <option value="package">Policy package</option><option value="policy">Policy</option>
               <option value="claim">Claim</option><option value="evidence">Evidence reference</option><option value="evidence-grant">Evidence access grant</option>
               <option value="verification">Hospital verification</option><option value="decision">Auditor decision</option>
@@ -591,6 +604,7 @@ export function WorkspaceClient({
               <option value="benefit-plan">Benefit plan</option><option value="beneficiaries">Beneficiary designation</option>
               <option value="benefit-request">Benefit request</option><option value="liability">Liability</option>
               {(account.role === "insurerAdmin" || account.role === "auditor") && <option value="access">Evidence access log</option>}
+              </>}
             </select>
           </label>
           <label>Asset ID<input value={assetId} onChange={(event) => setAssetId(event.target.value)} placeholder="claim-1" /></label>
@@ -642,7 +656,7 @@ export function WorkspaceClient({
           </article>
         )}
 
-        {account.role !== "bankOfficer" && (
+        {account.role !== "bankOfficer" && account.role !== "hospitalOfficer" && (
           <article className="workCard evidenceCard">
             <span className="kicker">Authorized evidence access</span>
             <h2>Retrieve and decrypt evidence</h2>

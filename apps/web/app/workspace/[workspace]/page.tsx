@@ -22,12 +22,18 @@ export default async function RoleWorkspacePage({ params }: PageContext) {
   }
 
   const dashboard = await loadRoleDashboard(session).catch(() => null);
+  const portalName = canonicalWorkspace === "hospital"
+    ? account.displayName
+    : canonicalWorkspace === "bank"
+      ? "Bangladesh Demo Commercial Bank"
+      : "Block-Insure";
+  const portalMark = canonicalWorkspace === "hospital" ? "HC" : canonicalWorkspace === "bank" ? "DB" : "BI";
   return (
-    <main className="workspacePage">
+    <main className={`workspacePage workspacePage-${canonicalWorkspace}`}>
       <nav className="shell nav" aria-label={`${account.displayName} navigation`}>
         <Link className="brand" href="/">
-          <span className="brandMark">BI</span>
-          <span>Block-Insure</span>
+          <span className="brandMark">{portalMark}</span>
+          <span>{portalName}</span>
         </Link>
         <span className="networkPill"><i /> {canonicalWorkspace} workspace</span>
       </nav>

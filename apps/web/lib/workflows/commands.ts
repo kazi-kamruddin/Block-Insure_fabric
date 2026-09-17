@@ -8,6 +8,15 @@ const money = z.number().int().positive().safe();
 
 export const workflowCommandSchema = z.discriminatedUnion("operation", [
   z.object({
+    operation: z.literal("createPartnerAgreement"), id,
+    partnerType: z.enum(["HOSPITAL", "BANK"]), partnerId: id,
+    name: z.string().trim().min(1).max(160), location: z.string().trim().max(160),
+    tier: z.string().trim().max(80), accessScope: z.string().trim().min(1).max(500),
+    effectiveDate: date, expiryDate: date,
+  }),
+  z.object({ operation: z.literal("setPartnerAgreementStatus"), id, status: z.enum(["ACTIVE", "SUSPENDED", "ENDED"]) }),
+  z.object({ operation: z.literal("configurePolicyPackagePartners"), id, hospitalIdsJson: z.string().trim().min(2).max(2_000), bankIdsJson: z.string().trim().min(2).max(2_000) }),
+  z.object({
     operation: z.literal("createPolicyPackage"),
     id,
     name: z.string().trim().min(1).max(120),
@@ -50,21 +59,28 @@ export const workflowCommandSchema = z.discriminatedUnion("operation", [
   z.object({ operation: z.literal("markBenefitPaymentReady"), id, fundingReferenceHash: hash }),
   z.object({ operation: z.literal("confirmBenefitPayment"), id, bankReferenceHash: hash }),
   z.object({
+    operation: z.literal("createHospitalInvoice"), id,
+    patientReferenceHash: hash, invoiceReferenceHash: hash, treatmentHash: hash,
+    amountMinor: money, admissionDate: date, dischargeDate: date,
+    status: z.enum(["DRAFT", "FINALIZED"]),
+  }),
+  z.object({
+    operation: z.literal("updateHospitalInvoice"), id,
+    patientReferenceHash: hash, invoiceReferenceHash: hash, treatmentHash: hash,
+    amountMinor: money, admissionDate: date, dischargeDate: date,
+    status: z.enum(["DRAFT", "FINALIZED", "VOID"]),
+  }),
+  z.object({
     operation: z.literal("submitClaim"),
     id,
     policyId: id,
     hospitalId: id,
+    hospitalInvoiceId: id,
     amountMinor: money,
     incidentDate: date,
     descriptionHash: hash,
   }),
-  z.object({
-    operation: z.literal("verifyClaim"),
-    claimId: id,
-    verificationId: id,
-    outcome: z.enum(["VERIFIED", "INVALID"]),
-    clinicalReferenceHash: hash,
-  }),
+  z.object({ operation: z.literal("crossCheckClaimInvoice"), claimId: id, verificationId: id }),
   z.object({ operation: z.literal("openClaimReview"), claimId: id, reviewId: id, assignedAuditorIdsJson: z.string().trim().min(2).max(1_000), approvalThreshold: z.number().int().positive().max(9), rejectionThreshold: z.number().int().positive().max(9), deadline: z.string().datetime({ offset: true }) }),
   z.object({ operation: z.literal("publishOracleRegistrySnapshot"), id, version: z.number().int().positive(), rootHash: hash, rulesVersion: id, rulesHash: hash, recordCount: z.number().int().positive() }),
   z.object({ operation: z.literal("requestOracleVerification"), requestId: id, claimId: id, snapshotId: id, modelVersion: id, modelHash: hash, assignedOracleIdsJson: z.string().trim().min(2).max(500), commitDeadline: z.string().datetime({ offset: true }), revealDeadline: z.string().datetime({ offset: true }) }),
@@ -111,6 +127,9 @@ export type WorkflowCommand = z.infer<typeof workflowCommandSchema>;
 export type WorkflowOperation = WorkflowCommand["operation"];
 
 export const requiredRoleByOperation = {
+  createPartnerAgreement: "insurerAdmin",
+  setPartnerAgreementStatus: "insurerAdmin",
+  configurePolicyPackagePartners: "insurerAdmin",
   createPolicyPackage: "insurerAdmin",
   publishPolicyPackage: "insurerAdmin",
   retirePolicyPackage: "insurerAdmin",
@@ -138,8 +157,10 @@ export const requiredRoleByOperation = {
   decideBenefitRequest: "insurerAdmin",
   markBenefitPaymentReady: "insurerAdmin",
   confirmBenefitPayment: "bankOfficer",
+  createHospitalInvoice: "hospitalOfficer",
+  updateHospitalInvoice: "hospitalOfficer",
   submitClaim: "policyholder",
-  verifyClaim: "hospitalOfficer",
+  crossCheckClaimInvoice: "insurerAdmin",
   openClaimReview: "insurerAdmin",
   publishOracleRegistrySnapshot: "insurerAdmin",
   requestOracleVerification: "insurerAdmin",

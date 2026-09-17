@@ -8,8 +8,14 @@ import type { WorkflowCommand } from "./commands";
 
 export async function executeWorkflowCommand(command: WorkflowCommand, session: Session) {
   switch (command.operation) {
+    case "createPartnerAgreement":
+      return ledger.createPartnerAgreement(command);
+    case "setPartnerAgreementStatus":
+      return ledger.setPartnerAgreementStatus(command.id, command.status);
     case "createPolicyPackage":
       return ledger.createPolicyPackage(command);
+    case "configurePolicyPackagePartners":
+      return ledger.configurePolicyPackagePartners(command.id, command.hospitalIdsJson, command.bankIdsJson);
     case "publishPolicyPackage":
       return ledger.publishPolicyPackage(command.id);
     case "retirePolicyPackage":
@@ -62,10 +68,14 @@ export async function executeWorkflowCommand(command: WorkflowCommand, session: 
       return ledger.markBenefitPaymentReady(command.id, command.fundingReferenceHash);
     case "confirmBenefitPayment":
       return ledger.confirmBenefitPayment(command.id, command.bankReferenceHash);
+    case "createHospitalInvoice":
+      return ledger.createHospitalInvoice(command, findDemoAccount(session.accountId)?.fabricUserName);
+    case "updateHospitalInvoice":
+      return ledger.updateHospitalInvoice(command, findDemoAccount(session.accountId)?.fabricUserName);
     case "submitClaim":
       return ledger.submitClaim(command);
-    case "verifyClaim":
-      return ledger.verifyClaim(command, findDemoAccount(session.accountId)?.fabricUserName);
+    case "crossCheckClaimInvoice":
+      return ledger.crossCheckClaimInvoice(command.claimId, command.verificationId);
     case "openClaimReview":
       return ledger.openClaimReview(command);
     case "publishOracleRegistrySnapshot":

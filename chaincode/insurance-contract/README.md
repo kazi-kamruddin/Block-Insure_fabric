@@ -6,13 +6,16 @@ This Go chaincode owns the shared, permissioned insurance ledger for
 ## Current transaction flows
 
 1. An `InsurerMSP` identity with `role=insurerAdmin` creates and publishes a
-   policy package, then issues a policy whose terms are snapshotted.
+   policy package with active Hospital and Bank partners, then issues a policy
+   whose terms and provider network are snapshotted.
 2. The policy owner, an `InsurerMSP` identity with `role=policyholder`, submits
-   a claim and immutable evidence references. Only SHA-256 hashes and safe
+   an invoice-bound claim and immutable evidence references. Only SHA-256 hashes and safe
    metadata are placed on the shared ledger; medical documents remain
    off-chain.
-3. A `HospitalMSP` identity with `role=hospitalOfficer` verifies or invalidates
-   the claim.
+3. A `HospitalMSP` identity with `role=hospitalOfficer` independently creates
+   and updates only its own organizational invoice records. The insurer receives
+   agreement-scoped read-only access and cross-checks the claim against a
+   finalized invoice from the policy's snapshotted Hospital network.
 4. The insurer records optional advisory fraud triage and requests verification
    from exactly two assigned `OracleMSP` certificate subjects. Each independently
    commits then reveals a registry/model/version-bound result. Exact positive
@@ -47,8 +50,9 @@ policyholder ownership filter before returning collections.
 
 Successful evidence retrievals are separately committed as
 `EvidenceAccessRecord` assets. The contract permits the owning policyholder,
-the insurer administrator, a hospital officer in the claim verification path,
-and an auditor assigned to the current review. Policyholders can additionally
+the insurer administrator, and an auditor assigned to the current review.
+Hospital identities are isolated from insurer claim and clinical-evidence
+surfaces. Policyholders can additionally
 create revocable, expiring, use-limited `EvidenceAccessGrant` assets scoped to
 one organization, role, certificate subject (or explicit wildcard), evidence
 item, and purpose. Chaincode binds purposes to role semantics and records grant
@@ -56,8 +60,8 @@ provenance on every use. Bank identities cannot retrieve clinical evidence.
 Claims link verifications, review rounds, decisions, appeals, fraud assessments,
 access records, and settlements for audit navigation.
 
-The current Oracle-capable definition is `insurance-contract` 0.8.0 with schema
-version 6 and an automatically resolved lifecycle sequence. A clean bootstrap
+The current partner- and Oracle-capable definition is `insurance-contract` 0.9.0
+with schema version 8 and an automatically resolved lifecycle sequence. A clean bootstrap
 starts at sequence 1; a non-destructive source upgrade increments the existing
 channel sequence.
 

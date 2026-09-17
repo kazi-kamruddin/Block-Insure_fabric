@@ -4,10 +4,10 @@ import { ledger } from "@/lib/fabric/ledger";
 const capabilities = [
   ["Insurer", "Issue policies, govern packages, and authorize settlements"],
   ["Policyholder", "Submit claims and register tamper-evident evidence references"],
-  ["Hospital", "Attest clinical verification through its own organization identity"],
+  ["Hospital", "Maintain an independent invoice register under a contracted provider agreement"],
   ["Oracle", "Reach two-certificate commit/reveal consensus over versioned registry facts"],
   ["Auditor", "Record independent approval or rejection decisions"],
-  ["Bank", "Confirm settlement references without exposing payment secrets"],
+  ["Bank", "Operate connected mandates and payment confirmations through a distinct partner portal"],
 ];
 
 function money(minor: number) {
@@ -15,7 +15,11 @@ function money(minor: number) {
 }
 
 export default async function Home() {
-  const packages = await ledger.listPolicyPackages().then((items) => items.filter((item) => item.status === "PUBLISHED")).catch(() => []);
+  const [packages, agreements] = await Promise.all([
+    ledger.listPolicyPackages().then((items) => items.filter((item) => item.status === "PUBLISHED")).catch(() => []),
+    ledger.listPartnerAgreements().then((items) => items.filter((item) => item.status === "ACTIVE")).catch(() => []),
+  ]);
+  const partnerName = new Map(agreements.map((item) => [item.partnerId, item.name]));
   return (
     <main>
       <nav className="shell nav">
@@ -51,6 +55,8 @@ export default async function Home() {
               <h3>{item.name}</h3>
               <p>{item.description || "Published governed health coverage"}</p>
               <p><strong>{money(item.premiumMinor)}</strong> premium · {money(item.coverageLimitMinor)} limit</p>
+              <p><strong>Hospitals:</strong> {(item.hospitalIds ?? []).map((id) => partnerName.get(id) ?? id).join(", ") || "Not configured"}</p>
+              <p><strong>Banks:</strong> {(item.bankIds ?? []).map((id) => partnerName.get(id) ?? id).join(", ") || "Not configured"}</p>
             </article>
           )) : <article className="capability"><h3>Catalog unavailable</h3><p>Start or verify the Fabric network to load published packages.</p></article>}
         </div>

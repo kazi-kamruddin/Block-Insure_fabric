@@ -45,6 +45,10 @@ invoke() {
     --waitForEvent --waitForEventTimeout 90s -c "$(payload "${function}" "$@")" >/dev/null
 }
 
+exists() {
+  peer chaincode query -C "${channel_name}" -n "${chaincode_name}" -c "$(payload "$1" "$2")" >/dev/null 2>&1
+}
+
 suffix="$(date +%s)"
 package_id="smoke-package-${suffix}"
 policy_id="smoke-policy-${suffix}"
@@ -53,6 +57,7 @@ evidence_id="smoke-evidence-${suffix}"
 evidence_grant_id="smoke-evidence-grant-${suffix}"
 evidence_access_id="smoke-evidence-access-${suffix}"
 verification_id="smoke-verification-${suffix}"
+invoice_id="smoke-invoice-${suffix}"
 decision_id="smoke-decision-${suffix}"
 review_id="smoke-review-${suffix}"
 fraud_id="smoke-fraud-${suffix}"
@@ -75,7 +80,12 @@ review_deadline="$(date -u -d '+3 days' '+%Y-%m-%dT%H:%M:%SZ')"
 grant_deadline="$(date -u -d '+7 days' '+%Y-%m-%dT%H:%M:%SZ')"
 
 set_client_context insurer InsurerMSP 7051 insurerAdmin
+if ! exists ReadPartnerAgreement agreement-hospital-demo; then
+  invoke CreatePartnerAgreement agreement-hospital-demo HOSPITAL hospital-demo "Dhaka Central Medical Hospital" Dhaka Preferred "Read-only invoice verification fields" 2026-01-01 2028-12-31
+  invoke CreatePartnerAgreement agreement-bank-demo BANK bank-demo "Bangladesh Demo Commercial Bank" Dhaka Collection "Premium collection and settlement confirmation" 2026-01-01 2028-12-31
+fi
 invoke CreatePolicyPackage "${package_id}" "Smoke Health Plan" "Live Fabric workflow verification" 10000 1000000 "${hash_a}"
+invoke ConfigurePolicyPackagePartners "${package_id}" '["hospital-demo"]' '["bank-demo"]'
 invoke CreateBenefitPlan "${benefit_plan_id}" "${package_id}" 500000 100000 250000 "${hash_d}"
 invoke PublishBenefitPlan "${benefit_plan_id}"
 invoke PublishPolicyPackage "${package_id}"
@@ -109,19 +119,22 @@ invoke MarkBenefitPaymentReady "${benefit_request_id}" "${hash_c}"
 set_client_context bank BankMSP 12051 bankOfficer
 invoke ConfirmBenefitPayment "${benefit_request_id}" "${hash_d}"
 
-set_client_context insurer InsurerMSP 7051 policyholder1
-invoke SubmitClaim "${claim_id}" "${policy_id}" hospital-demo 250000 2026-06-15 "${hash_b}"
-invoke AddEvidenceReference "${claim_id}" "${evidence_id}" DISCHARGE_SUMMARY "${hash_c}" "${hash_d}"
-invoke GrantEvidenceAccess "${evidence_grant_id}" "${evidence_id}" HospitalMSP hospitalOfficer '*' VERIFY "${grant_deadline}" 2
-
 set_client_context hospital HospitalMSP 8051 hospital1
-invoke RecordGrantedEvidenceAccess "${evidence_access_id}" "${evidence_id}" "${evidence_grant_id}" VERIFY
-invoke VerifyClaim "${claim_id}" "${verification_id}" VERIFIED "${hash_a}"
+invoke CreateHospitalInvoice "${invoice_id}" "${hash_a}" "${hash_a}" "${hash_c}" 250000 2026-06-10 2026-06-20 FINALIZED
+
+set_client_context insurer InsurerMSP 7051 policyholder1
+invoke SubmitInvoiceClaim "${claim_id}" "${policy_id}" hospital-demo "${invoice_id}" 250000 2026-06-15 "${hash_b}"
+invoke AddEvidenceReference "${claim_id}" "${evidence_id}" DISCHARGE_SUMMARY "${hash_c}" "${hash_d}"
+invoke GrantEvidenceAccess "${evidence_grant_id}" "${evidence_id}" AuditorMSP auditor auditor1 AUDIT "${grant_deadline}" 2
+
+set_client_context auditor AuditorMSP 9051 auditor1
+invoke RecordGrantedEvidenceAccess "${evidence_access_id}" "${evidence_id}" "${evidence_grant_id}" AUDIT
 
 set_client_context insurer InsurerMSP 7051 policyholder1
 invoke RevokeEvidenceAccess "${evidence_grant_id}"
 
 set_client_context insurer InsurerMSP 7051 insurerAdmin
+invoke CrossCheckClaimInvoice "${claim_id}" "${verification_id}"
 invoke RecordFraudAssessment "${fraud_id}" "${claim_id}" transparent-claim-triage 1.0.0 "${hash_a}" "${hash_b}" 4300 MEDIUM '["COVERAGE_RATIO_40_PLUS","SINGLE_EVIDENCE_REFERENCE"]'
 invoke OpenClaimReview "${claim_id}" "${review_id}" '["auditor1","auditor2","auditor3","auditor4"]' 3 2 "${review_deadline}"
 

@@ -23,6 +23,9 @@ export async function POST(request: Request, context: RouteContext) {
   if (!trust.trusted) return NextResponse.json({ message: trust.reason }, { status: 403 });
   const session = await currentSession().catch(() => null);
   if (!session) return NextResponse.json({ message: "Authentication required" }, { status: 401 });
+  if (session.role === "hospitalOfficer") {
+    return NextResponse.json({ message: "Hospital users maintain invoices only; clinical evidence remains in the insurance workflow" }, { status: 403 });
+  }
 
   const id = idSchema.safeParse((await context.params).id);
   if (!id.success) return NextResponse.json({ message: "Invalid evidence ID" }, { status: 400 });
@@ -39,12 +42,11 @@ export async function POST(request: Request, context: RouteContext) {
     const workflowAuthorized =
       session.role === "insurerAdmin" ||
       (session.role === "policyholder" && claim.claimantId === session.subjectId) ||
-      (session.role === "hospitalOfficer" && claim.hospitalId === session.subjectId && ["SUBMITTED", "APPEAL_SUBMITTED"].includes(claim.status)) ||
       (session.role === "auditor" && auditorAssigned && !["SUBMITTED", "HOSPITAL_VERIFIED"].includes(claim.status));
     let grantAuthorized = false;
     if (retrieval.data.grantId && account) {
       const grant = await ledger.readEvidenceAccessGrant(retrieval.data.grantId);
-      const expectedPurpose = session.role === "hospitalOfficer" ? "VERIFY" : session.role === "auditor" ? "AUDIT" : "DOWNLOAD";
+      const expectedPurpose = session.role === "auditor" ? "AUDIT" : "DOWNLOAD";
       grantAuthorized = grant.evidenceId === evidence.id && grant.claimId === claim.id &&
         grant.status === "ACTIVE" && Date.parse(grant.expiresAt) > Date.now() &&
         grant.accessCount < grant.maxAccesses && grant.granteeMsp === account.organization &&
@@ -59,9 +61,7 @@ export async function POST(request: Request, context: RouteContext) {
     }
 
     const ciphertext = await readCiphertext(evidenceStorageRoot(), evidence.submittedBy, evidence.id);
-    const purpose = session.role === "hospitalOfficer"
-      ? "VERIFY"
-      : session.role === "auditor" ? "AUDIT" : "DOWNLOAD";
+    const purpose = session.role === "auditor" ? "AUDIT" : "DOWNLOAD";
     const accessInput = {
       id: `access-${randomUUID()}`,
       evidenceId: evidence.id,

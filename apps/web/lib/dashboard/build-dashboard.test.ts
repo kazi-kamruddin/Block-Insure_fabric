@@ -16,6 +16,8 @@ const assets: DashboardAssets = {
   evidence: [],
   settlements: [{ assetType: "settlement", schemaVersion: 1, id: "settlement-1", claimId: "claim-review", amountMinor: 20000, status: "AUTHORIZED", bankReferenceHash: "", authorizedAt: timestamp, confirmedAt: "" }],
   evidenceAccess: [],
+  partnerAgreements: [{ assetType: "partnerAgreement", schemaVersion: 8, id: "agreement-hospital-demo", partnerType: "HOSPITAL", partnerId: "hospital-demo", name: "Dhaka Central Medical Hospital", location: "Dhaka", tier: "Preferred", accessScope: "Read-only invoices", effectiveDate: "2026-01-01", expiryDate: "2028-12-31", status: "ACTIVE", createdAt: timestamp, updatedAt: timestamp }],
+  hospitalInvoices: [{ assetType: "hospitalInvoice", schemaVersion: 8, id: "invoice-draft", hospitalId: "hospital-demo", patientReferenceHash: "a".repeat(64), invoiceReferenceHash: "b".repeat(64), treatmentHash: "c".repeat(64), amountMinor: 10000, admissionDate: "2026-06-01", dischargeDate: "2026-06-02", status: "DRAFT", createdAt: timestamp, updatedAt: timestamp }],
   reviews: [{ assetType: "claimReview", schemaVersion: 4, id: "review-1", claimId: "claim-review", appealId: "", round: 1, kind: "INITIAL", assignedAuditorIds: ["auditor1", "auditor2", "auditor3", "auditor4"], approvalThreshold: 3, rejectionThreshold: 2, approvals: 0, rejections: 0, votesCast: 0, status: "OPEN", deadline: "2026-09-08T12:00:00Z", openedAt: timestamp, closedAt: "" }],
   decisions: [],
 };
@@ -28,7 +30,7 @@ describe("role dashboards", () => {
   });
 
   it("builds organization-specific work queues", () => {
-    expect(buildRoleDashboard("hospitalOfficer", assets, "hospital-demo").queue[0]?.id).toBe("claim-submitted");
+    expect(buildRoleDashboard("hospitalOfficer", assets, "hospital-demo").queue[0]?.id).toBe("invoice-draft");
     expect(buildRoleDashboard("hospitalOfficer", assets, "hospital-2").queue).toEqual([]);
     expect(buildRoleDashboard("auditor", assets, "auditor1").queue[0]?.id).toBe("review-1");
     expect(buildRoleDashboard("bankOfficer", assets).queue[0]?.id).toBe("settlement-1");

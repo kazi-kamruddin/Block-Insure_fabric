@@ -3,6 +3,7 @@ package insurance
 import (
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -249,6 +250,29 @@ func (c *Contract) SubmitClaimAppeal(
 	} else if err := validateHash("proposedDescriptionHash", effectiveDescriptionHash); err != nil {
 		return nil, err
 	}
+	effectiveInvoiceID := claim.HospitalInvoiceID
+	if claim.HospitalInvoiceID != "" {
+		if !slices.Contains(policy.HospitalIDs, effectiveHospitalID) {
+			return nil, fmt.Errorf("hospital %s is not in policy %s's contracted provider network", effectiveHospitalID, policy.ID)
+		}
+		if _, err := c.requireActivePartner(ctx, "HOSPITAL", effectiveHospitalID); err != nil {
+			return nil, err
+		}
+		invoices, err := c.ListHospitalInvoices(ctx)
+		if err != nil {
+			return nil, err
+		}
+		effectiveInvoiceID = ""
+		for _, invoice := range invoices {
+			if invoice.HospitalID == effectiveHospitalID && invoice.Status == "FINALIZED" && strings.EqualFold(invoice.InvoiceReferenceHash, proposedClinicalReferenceHash) {
+				effectiveInvoiceID = invoice.ID
+				break
+			}
+		}
+		if effectiveInvoiceID == "" {
+			return nil, fmt.Errorf("no finalized Hospital invoice matches the corrected clinical reference")
+		}
+	}
 	now, err := timestamp(ctx)
 	if err != nil {
 		return nil, err
@@ -273,6 +297,7 @@ func (c *Contract) SubmitClaimAppeal(
 	claim.CurrentAppealID = appealID
 	claim.Version = appeal.ClaimVersion
 	claim.HospitalID = effectiveHospitalID
+	claim.HospitalInvoiceID = effectiveInvoiceID
 	claim.AmountMinor = effectiveAmount
 	claim.IncidentDate = effectiveIncidentDate
 	claim.DescriptionHash = effectiveDescriptionHash

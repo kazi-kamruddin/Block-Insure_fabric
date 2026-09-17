@@ -1,5 +1,38 @@
 export type LedgerTimestamp = string;
 
+export type PartnerAgreement = {
+  assetType: "partnerAgreement";
+  schemaVersion: number;
+  id: string;
+  partnerType: "HOSPITAL" | "BANK";
+  partnerId: string;
+  name: string;
+  location: string;
+  tier: string;
+  accessScope: string;
+  effectiveDate: string;
+  expiryDate: string;
+  status: "ACTIVE" | "SUSPENDED" | "ENDED";
+  createdAt: LedgerTimestamp;
+  updatedAt: LedgerTimestamp;
+};
+
+export type HospitalInvoice = {
+  assetType: "hospitalInvoice";
+  schemaVersion: number;
+  id: string;
+  hospitalId: string;
+  patientReferenceHash: string;
+  invoiceReferenceHash: string;
+  treatmentHash: string;
+  amountMinor: number;
+  admissionDate: string;
+  dischargeDate: string;
+  status: "DRAFT" | "FINALIZED" | "VOID";
+  createdAt: LedgerTimestamp;
+  updatedAt: LedgerTimestamp;
+};
+
 export type PolicyPackage = {
   assetType: "policyPackage";
   schemaVersion: number;
@@ -10,6 +43,8 @@ export type PolicyPackage = {
   premiumMinor: number;
   coverageLimitMinor: number;
   termsHash: string;
+  hospitalIds?: string[];
+  bankIds?: string[];
   status: "DRAFT" | "PUBLISHED" | "RETIRED";
   createdAt: LedgerTimestamp;
   updatedAt: LedgerTimestamp;
@@ -27,6 +62,8 @@ export type Policy = {
   premiumMinor: number;
   coverageLimitMinor: number;
   termsHash: string;
+  hospitalIds?: string[];
+  bankIds?: string[];
   status: "PENDING_PAYMENT" | "ACTIVE" | "GRACE" | "LAPSED" | "CANCELLED" | "EXPIRED";
   premiumIntervalDays?: number;
   gracePeriodDays?: number;
@@ -198,6 +235,7 @@ export type Claim = {
   policyId: string;
   claimantId: string;
   hospitalId: string;
+  hospitalInvoiceId?: string;
   amountMinor: number;
   incidentDate: string;
   descriptionHash: string;

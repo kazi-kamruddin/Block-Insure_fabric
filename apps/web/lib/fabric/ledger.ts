@@ -18,6 +18,7 @@ import type {
   EvidenceAccessRecord,
   EvidenceAccessGrant,
   HospitalVerification,
+  HospitalInvoice,
   FraudAssessment,
   Liability,
   OracleCommitment,
@@ -27,6 +28,7 @@ import type {
   OracleResult,
   Policy,
   PolicyPackage,
+  PartnerAgreement,
   PremiumCollection,
   PremiumAdjustment,
   PremiumPayment,
@@ -76,6 +78,21 @@ async function submitAsAuditor<T>(
   );
 }
 
+async function submitAsHospital<T>(
+  hospitalUserName: string | undefined,
+  transactionName: string,
+  ...args: Array<string | number>
+) {
+  if (!hospitalUserName) throw new Error("This Hospital account has no server-owned Fabric identity");
+  return withFabricContract(
+    "hospitalOfficer",
+    async (contract) => decodeJson<T>(
+      await contract.submitTransaction(transactionName, ...stringifyArguments(args)),
+    ),
+    hospitalUserName,
+  );
+}
+
 export const ledger = {
   async schemaVersion() {
     return withFabricContract("insurerAdmin", async (contract: Contract) => {
@@ -90,6 +107,22 @@ export const ledger = {
 
   listPolicyPackages() {
     return evaluate<PolicyPackage[]>("insurerAdmin", "ListPolicyPackages");
+  },
+
+  readPartnerAgreement(id: string) {
+    return evaluate<PartnerAgreement>("insurerAdmin", "ReadPartnerAgreement", id);
+  },
+
+  listPartnerAgreements() {
+    return evaluate<PartnerAgreement[]>("insurerAdmin", "ListPartnerAgreements");
+  },
+
+  readHospitalInvoice(id: string) {
+    return evaluate<HospitalInvoice>("insurerAdmin", "ReadHospitalInvoice", id);
+  },
+
+  listHospitalInvoices() {
+    return evaluate<HospitalInvoice[]>("insurerAdmin", "ListHospitalInvoices");
   },
 
   readPolicy(id: string) {
@@ -311,6 +344,65 @@ export const ledger = {
     );
   },
 
+  createPartnerAgreement(input: {
+    id: string;
+    partnerType: "HOSPITAL" | "BANK";
+    partnerId: string;
+    name: string;
+    location: string;
+    tier: string;
+    accessScope: string;
+    effectiveDate: string;
+    expiryDate: string;
+  }) {
+    return submit<PartnerAgreement>(
+      "insurerAdmin", "CreatePartnerAgreement", input.id, input.partnerType, input.partnerId,
+      input.name, input.location, input.tier, input.accessScope, input.effectiveDate, input.expiryDate,
+    );
+  },
+
+  setPartnerAgreementStatus(id: string, status: "ACTIVE" | "SUSPENDED" | "ENDED") {
+    return submit<PartnerAgreement>("insurerAdmin", "SetPartnerAgreementStatus", id, status);
+  },
+
+  configurePolicyPackagePartners(id: string, hospitalIdsJson: string, bankIdsJson: string) {
+    return submit<PolicyPackage>("insurerAdmin", "ConfigurePolicyPackagePartners", id, hospitalIdsJson, bankIdsJson);
+  },
+
+  createHospitalInvoice(input: {
+    id: string;
+    patientReferenceHash: string;
+    invoiceReferenceHash: string;
+    treatmentHash: string;
+    amountMinor: number;
+    admissionDate: string;
+    dischargeDate: string;
+    status: "DRAFT" | "FINALIZED";
+  }, hospitalUserName?: string) {
+    return submitAsHospital<HospitalInvoice>(
+      hospitalUserName, "CreateHospitalInvoice", input.id, input.patientReferenceHash,
+      input.invoiceReferenceHash, input.treatmentHash, input.amountMinor,
+      input.admissionDate, input.dischargeDate, input.status,
+    );
+  },
+
+  updateHospitalInvoice(input: {
+    id: string;
+    patientReferenceHash: string;
+    invoiceReferenceHash: string;
+    treatmentHash: string;
+    amountMinor: number;
+    admissionDate: string;
+    dischargeDate: string;
+    status: "DRAFT" | "FINALIZED" | "VOID";
+  }, hospitalUserName?: string) {
+    return submitAsHospital<HospitalInvoice>(
+      hospitalUserName, "UpdateHospitalInvoice", input.id, input.patientReferenceHash,
+      input.invoiceReferenceHash, input.treatmentHash, input.amountMinor,
+      input.admissionDate, input.dischargeDate, input.status,
+    );
+  },
+
   publishPolicyPackage(id: string) {
     return submit<PolicyPackage>("insurerAdmin", "PublishPolicyPackage", id);
   },
@@ -453,16 +545,18 @@ export const ledger = {
     id: string;
     policyId: string;
     hospitalId: string;
+    hospitalInvoiceId: string;
     amountMinor: number;
     incidentDate: string;
     descriptionHash: string;
   }) {
     return submit<Claim>(
       "policyholder",
-      "SubmitClaim",
+      "SubmitInvoiceClaim",
       input.id,
       input.policyId,
       input.hospitalId,
+      input.hospitalInvoiceId,
       input.amountMinor,
       input.incidentDate,
       input.descriptionHash,
@@ -530,16 +624,8 @@ export const ledger = {
     return submit<EvidenceAccessGrant>("policyholder", "RevokeEvidenceAccess", grantId);
   },
 
-  verifyClaim(input: {
-    claimId: string;
-    verificationId: string;
-    outcome: "VERIFIED" | "INVALID";
-    clinicalReferenceHash: string;
-  }, hospitalUserName?: string) {
-    if (!hospitalUserName) throw new Error("This Hospital account has no server-owned Fabric identity");
-    return withFabricContract("hospitalOfficer", async (contract) => decodeJson<HospitalVerification>(
-      await contract.submitTransaction("VerifyClaim", input.claimId, input.verificationId, input.outcome, input.clinicalReferenceHash),
-    ), hospitalUserName);
+  crossCheckClaimInvoice(claimId: string, verificationId: string) {
+    return submit<HospitalVerification>("insurerAdmin", "CrossCheckClaimInvoice", claimId, verificationId);
   },
 
   publishOracleRegistrySnapshot(input: {

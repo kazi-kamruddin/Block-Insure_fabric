@@ -6,8 +6,11 @@ export const runtime = "nodejs";
 
 export async function GET() {
   try {
-    const packages = (await ledger.listPolicyPackages()).filter((item) => item.status === "PUBLISHED");
-    return NextResponse.json({ packages }, { headers: { "Cache-Control": "public, max-age=15, stale-while-revalidate=30" } });
+    const [packages, agreements] = await Promise.all([ledger.listPolicyPackages(), ledger.listPartnerAgreements()]);
+    return NextResponse.json({
+      packages: packages.filter((item) => item.status === "PUBLISHED"),
+      partners: agreements.filter((item) => item.status === "ACTIVE"),
+    }, { headers: { "Cache-Control": "public, max-age=15, stale-while-revalidate=30" } });
   } catch {
     return NextResponse.json({ message: "Policy catalog is temporarily unavailable" }, { status: 503, headers: { "Cache-Control": "no-store" } });
   }

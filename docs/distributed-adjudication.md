@@ -14,7 +14,7 @@ agreement never changes the review thresholds and fraud triage remains advisory.
 
 ## Review lifecycle
 
-An insurer administrator opens an initial `ClaimReview` for a hospital-verified
+An insurer administrator opens an initial `ClaimReview` for an invoice-cross-checked
 claim. The transaction records an immutable array of three to nine Fabric
 certificate subject IDs, separate approval and rejection thresholds, and an
 RFC 3339 deadline. Thresholds must satisfy:

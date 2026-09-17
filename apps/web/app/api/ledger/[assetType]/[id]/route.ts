@@ -5,7 +5,7 @@ import { findDemoAccount } from "@/lib/auth/accounts";
 import { ledger } from "@/lib/fabric/ledger";
 
 const routeSchema = z.object({
-  assetType: z.enum(["package", "policy", "claim", "evidence", "evidence-grant", "verification", "decision", "review", "appeal", "fraud-assessment", "settlement", "claim-history", "account", "mandate", "premium-payment", "premium-adjustment", "collection", "benefit-plan", "beneficiaries", "benefit-request", "liability", "oracle-snapshot", "oracle-request", "oracle-commitment", "oracle-result", "oracle-history"]),
+  assetType: z.enum(["partner-agreement", "hospital-invoice", "package", "policy", "claim", "evidence", "evidence-grant", "verification", "decision", "review", "appeal", "fraud-assessment", "settlement", "claim-history", "account", "mandate", "premium-payment", "premium-adjustment", "collection", "benefit-plan", "beneficiaries", "benefit-request", "liability", "oracle-snapshot", "oracle-request", "oracle-commitment", "oracle-result", "oracle-history"]),
   id: z.string().trim().min(1).max(100).regex(/^[a-zA-Z0-9._:-]+$/),
 });
 
@@ -19,6 +19,9 @@ export async function GET(_request: Request, context: RouteContext) {
 
   const parsed = routeSchema.safeParse(await context.params);
   if (!parsed.success) return NextResponse.json({ message: "Invalid asset query" }, { status: 400 });
+  if (session.role === "hospitalOfficer" && !["partner-agreement", "hospital-invoice", "package"].includes(parsed.data.assetType)) {
+    return NextResponse.json({ message: "The independent Hospital portal exposes only its agreement, invoices, and public package network" }, { status: 403 });
+  }
 
   try {
     const { assetType, id } = parsed.data;
@@ -26,6 +29,25 @@ export async function GET(_request: Request, context: RouteContext) {
       || (await ledger.readClaim(claimId)).hospitalId === session.subjectId;
     let result: unknown;
     switch (assetType) {
+      case "partner-agreement": {
+        const agreement = await ledger.readPartnerAgreement(id);
+        if (session.role === "hospitalOfficer" && (agreement.partnerType !== "HOSPITAL" || agreement.partnerId !== session.subjectId)) {
+          return NextResponse.json({ message: "Agreement belongs to another partner" }, { status: 403 });
+        }
+        result = agreement;
+        break;
+      }
+      case "hospital-invoice": {
+        if (session.role !== "hospitalOfficer" && session.role !== "insurerAdmin") {
+          return NextResponse.json({ message: "Hospital invoices are restricted to their owner and the contracted insurer" }, { status: 403 });
+        }
+        const invoice = await ledger.readHospitalInvoice(id);
+        if (session.role === "hospitalOfficer" && invoice.hospitalId !== session.subjectId) {
+          return NextResponse.json({ message: "Invoice belongs to another Hospital" }, { status: 403 });
+        }
+        result = invoice;
+        break;
+      }
       case "package":
         result = await ledger.readPolicyPackage(id);
         break;

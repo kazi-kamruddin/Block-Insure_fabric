@@ -9,9 +9,10 @@ legal organizations; a production design could split them into two MSPs.
 
 ## Version-bound protocol
 
-After HospitalMSP records a valid clinical attestation, an insurer administrator
-publishes an `OracleRegistrySnapshot` commitment and creates an `OracleRequest`.
-The request freezes the claim ID and version, hospital verification, query hash,
+After the insurer cross-checks an invoice-bound claim against the contracted
+Hospital's finalized invoice, an insurer administrator publishes an
+`OracleRegistrySnapshot` commitment and creates an `OracleRequest`.
+The request freezes the claim ID and version, insurer invoice cross-check, query hash,
 registry root/version, rules hash/version, model hash/version, exactly two Oracle
 certificate subjects, and commit/reveal deadlines.
 

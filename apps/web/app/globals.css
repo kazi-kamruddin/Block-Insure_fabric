@@ -48,6 +48,28 @@ h2 { margin: 12px 0 0; max-width: 560px; font-family: Georgia, serif; font-size:
 .button, button { font: inherit; cursor: pointer; }
 .button:disabled, button:disabled { cursor: wait; opacity: .55; }
 .workspacePage { min-height: 100vh; }
+.workspacePage-hospital {
+  --ink: #17365d;
+  --muted: #60748e;
+  --paper: #eef5fa;
+  --card: #ffffff;
+  --line: #cbdbe7;
+  --deep: #1f5c8f;
+  background: linear-gradient(135deg, rgba(92, 166, 214, .2), transparent 34rem), var(--paper);
+}
+.workspacePage-bank {
+  --ink: #17223b;
+  --muted: #697389;
+  --paper: #eef0f5;
+  --card: #ffffff;
+  --line: #ccd1dc;
+  --deep: #263f77;
+  background: linear-gradient(135deg, rgba(63, 91, 151, .18), transparent 34rem), var(--paper);
+}
+.workspacePage-hospital .brandMark { border-radius: 9px; background: #1f5c8f; }
+.workspacePage-bank .brandMark { border-radius: 5px; background: #263f77; }
+.workspacePage-hospital .kicker { color: #2b6f9f; }
+.workspacePage-bank .kicker { color: #405b94; }
 .signInPanel, .workspace { padding: 74px 0 100px; }
 .workspaceTitle { max-width: 780px; margin: 15px 0 22px; font-size: clamp(44px, 6vw, 76px); }
 .accountGrid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin: 42px 0 24px; }

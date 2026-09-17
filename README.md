@@ -2,7 +2,7 @@
 
 Block-Insure Fabric is the permissioned Hyperledger Fabric evolution of the
 Block-Insure insurance platform. It retains the insurance workflows from
-the Ethereum prototype—policies, claims, hospital verification, auditor
+the Ethereum prototype—policies, claims, clinical cross-checking, auditor
 review, banking, and evidence auditability—while using organization-issued
 identities and Fabric ledger controls.
 
@@ -10,14 +10,16 @@ identities and Fabric ledger controls.
 
 The original implementation areas and the policy/premium/benefit expansion are
 joined by a certificate-bound two-Oracle consensus subsystem. The source now
-defines a five-business-organization network, Go contract, Next.js Gateway boundary, role-specific
+defines partner agreements, policy-specific provider networks, an independent
+Hospital invoice register, insurer read-only invoice cross-checking, and a
+five-business-organization network with a Go contract, Next.js Gateway boundary, role-specific
 workflows/evidence, release verification, policy acquisition, premium collection,
 bank mandates, governed benefits, distributed adjudication, appeals, and advisory
 fraud triage, governed evidence grants, durable event projection, and
 ledger-derived research metrics, independent Oracle workers, commit/reveal
 consensus, and governed auditor fallback. The clean local deployment runs
-`insurance-contract` 0.8.0, sequence 3, schema 7 and has passed the complete
-automated and live Oracle gate. Final human presentation sign-off remains.
+`insurance-contract` 0.9.0 with schema 8. Its automated code gate and live Fabric
+workflow cover the Phase 1 partner and Hospital boundary.
 
 This is not a production deployment claim. Institutional authentication,
 durable encrypted object storage and key recovery, multi-node/orderer high
@@ -84,11 +86,15 @@ For a supervised local deployment from the repository root, use
 ledger, `Status` checks all four application services, and `Stop` retains Fabric
 volumes. `CleanBootstrap -ConfirmReset` is deliberately destructive and is only
 for an explicitly approved clean showcase; it rebuilds the topology, deploys
-chaincode 0.8.0, seeds the policy/benefit/Oracle catalog, and starts the web app,
+chaincode 0.9.0, seeds partner agreements, Hospital invoices, and the
+policy/benefit/Oracle catalog, then starts the web app,
 event worker, and both Oracle workers.
 
 See [the lifecycle design](docs/policy-premium-benefit-lifecycles.md) for policy,
 OTP, collection-worker, reconciliation, and benefit boundaries;
+[the partner and Hospital boundary](docs/partner-agreements-and-hospital-invoices.md)
+for agreement-scoped provider networks, independent invoices, and insurer
+cross-checking;
 [the local demonstration runbook](docs/local-demonstration.md) for the
 six-organization journey and [the evidence security boundary](docs/evidence-security.md)
 for the AES-GCM envelope, authorization path, and production limitations. The

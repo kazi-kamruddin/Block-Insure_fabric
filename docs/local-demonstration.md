@@ -17,7 +17,7 @@ bash network/scripts/network.sh verify
 
 The verifier should report 17 healthy services, six reachable CAs, five ready
 CouchDB instances, all five peers joined to `insurance-channel`, both Oracle
-identities enrolled, chaincode `insurance-contract` 0.8.0, and schema version 7.
+identities enrolled, chaincode `insurance-contract` 0.9.0, and schema version 8.
 
 ## 2. Start the supervised application stack
 
@@ -88,18 +88,22 @@ remain server-side throughout the demonstration.
 Use unique IDs for every rehearsal. The guided forms hash sensitive references
 inside the browser and convert BDT values to exact integer poisha.
 
-1. **Insurer Administrator** — create a package, publish it, issue a policy to
-   `policyholder1`, then optionally retire the package to prove existing policy
-   snapshots remain valid.
-2. **Policyholder One** — submit a claim against that policy. In the evidence
+1. **Insurer Administrator** — create active Hospital and Bank agreements, create
+   a package, configure its partner network, publish it, and issue a policy to
+   `policyholder1`. The issued policy snapshots those partner IDs.
+2. **Hospital Officer** — use the visually separate Hospital billing register to
+   create and finalize an invoice. This workspace does not expose insurer claims,
+   clinical evidence, Oracle operations, reviews, or settlement actions.
+3. **Policyholder One** — submit a claim against that policy and bind it to the
+   finalized Hospital invoice. In the evidence
    panel, provide the claim/evidence IDs, choose a small original document, enter
    and safely retain a passphrase, encrypt in the browser, then store the
    ciphertext reference. Create an expiring/use-limited grant for a specific
    organization, role, certificate subject, and retrieval purpose.
-3. **Hospital Officer** — open the submitted claim from the verification queue,
-   optionally retrieve/decrypt evidence with the shared demonstration passphrase,
-   then record `VERIFIED` or `INVALID`.
-4. **Insurer Administrator** — record the transparent advisory fraud assessment,
+4. **Insurer Administrator** — cross-check the claim against the contracted
+   Hospital's invoice using agreement-scoped read access. The amount, incident
+   date, Hospital, invoice status, and clinical reference must match. Then record
+   the transparent advisory fraud assessment,
    then request two-Oracle verification with `registry-demo-v1`, `model-v1`,
    assigned subjects `oracle1`/`oracle2`, and future commit/reveal deadlines.
 5. **Oracle 1 and Oracle 2 services** — independently consume the committed request,

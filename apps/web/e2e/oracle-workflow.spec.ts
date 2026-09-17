@@ -40,11 +40,14 @@ async function createHospitalVerifiedClaim(
   const packageId = `oracle-package-${suffix}`;
   const policyId = `oracle-policy-${suffix}`;
   const claimId = `oracle-claim-${suffix}`;
+  const invoiceId = `oracle-invoice-${suffix}`;
   await command(insurer, { operation: "createPolicyPackage", id: packageId, name: "Oracle Demonstration Cover", description: "Two-certificate adjudication", premiumMinor: 10_000, coverageLimitMinor: 500_000, termsHash: hashA });
+  await command(insurer, { operation: "configurePolicyPackagePartners", id: packageId, hospitalIdsJson: '["hospital-demo"]', bankIdsJson: '["bank-demo"]' });
   await command(insurer, { operation: "publishPolicyPackage", id: packageId });
   await command(insurer, { operation: "issuePolicy", id: policyId, packageId, policyholderId: "policyholder1", startDate: "2026-01-01", endDate: "2026-12-31" });
-  await command(policyholder, { operation: "submitClaim", id: claimId, policyId, hospitalId: "hospital-demo", amountMinor: 50_000, incidentDate: "2026-06-15", descriptionHash });
-  await command(hospital, { operation: "verifyClaim", claimId, verificationId: `oracle-verification-${suffix}`, outcome: "VERIFIED", clinicalReferenceHash });
+  await command(hospital, { operation: "createHospitalInvoice", id: invoiceId, patientReferenceHash: hashA, invoiceReferenceHash: clinicalReferenceHash, treatmentHash: hashB, amountMinor: 50_000, admissionDate: "2026-06-10", dischargeDate: "2026-06-20", status: "FINALIZED" });
+  await command(policyholder, { operation: "submitClaim", id: claimId, policyId, hospitalId: "hospital-demo", hospitalInvoiceId: invoiceId, amountMinor: 50_000, incidentDate: "2026-06-15", descriptionHash });
+  await command(insurer, { operation: "crossCheckClaimInvoice", claimId, verificationId: `oracle-verification-${suffix}` });
   return claimId;
 }
 

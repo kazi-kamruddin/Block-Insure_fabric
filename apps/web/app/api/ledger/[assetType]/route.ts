@@ -4,7 +4,7 @@ import { currentSession } from "@/lib/auth/current-session";
 import { findDemoAccount } from "@/lib/auth/accounts";
 import { ledger } from "@/lib/fabric/ledger";
 
-const assetTypeSchema = z.enum(["package", "policy", "claim", "evidence", "evidence-grant", "verification", "decision", "review", "appeal", "fraud-assessment", "settlement", "access", "account", "mandate", "premium-payment", "premium-adjustment", "collection", "benefit-plan", "beneficiaries", "benefit-request", "liability", "oracle-snapshot", "oracle-request", "oracle-commitment", "oracle-result"]);
+const assetTypeSchema = z.enum(["partner-agreement", "hospital-invoice", "package", "policy", "claim", "evidence", "evidence-grant", "verification", "decision", "review", "appeal", "fraud-assessment", "settlement", "access", "account", "mandate", "premium-payment", "premium-adjustment", "collection", "benefit-plan", "beneficiaries", "benefit-request", "liability", "oracle-snapshot", "oracle-request", "oracle-commitment", "oracle-result"]);
 type RouteContext = { params: Promise<{ assetType: string }> };
 
 export const runtime = "nodejs";
@@ -15,6 +15,9 @@ export async function GET(_request: Request, context: RouteContext) {
 
   const assetType = assetTypeSchema.safeParse((await context.params).assetType);
   if (!assetType.success) return NextResponse.json({ message: "Invalid asset collection" }, { status: 400 });
+  if (session.role === "hospitalOfficer" && !["partner-agreement", "hospital-invoice", "package"].includes(assetType.data)) {
+    return NextResponse.json({ message: "The independent Hospital portal exposes only its agreement, invoices, and public package network" }, { status: 403 });
+  }
 
   try {
     const visibleClaimIds = async () => {
@@ -26,6 +29,21 @@ export async function GET(_request: Request, context: RouteContext) {
     };
     let result: unknown[];
     switch (assetType.data) {
+      case "partner-agreement": {
+        const agreements = await ledger.listPartnerAgreements();
+        result = session.role === "hospitalOfficer"
+          ? agreements.filter((item) => item.partnerType === "HOSPITAL" && item.partnerId === session.subjectId)
+          : agreements;
+        break;
+      }
+      case "hospital-invoice": {
+        if (session.role !== "hospitalOfficer" && session.role !== "insurerAdmin") {
+          return NextResponse.json({ message: "Hospital invoices are restricted to their owner and the contracted insurer" }, { status: 403 });
+        }
+        const invoices = await ledger.listHospitalInvoices();
+        result = session.role === "hospitalOfficer" ? invoices.filter((item) => item.hospitalId === session.subjectId) : invoices;
+        break;
+      }
       case "package":
         result = await ledger.listPolicyPackages();
         break;

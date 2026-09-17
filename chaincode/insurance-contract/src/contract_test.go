@@ -404,6 +404,72 @@ func TestListQueriesUseDeterministicCompositeKeyOrder(t *testing.T) {
 	}
 }
 
+func TestPartnerNetworkAndIndependentHospitalInvoiceCrossCheck(t *testing.T) {
+	contract := &Contract{}
+	ctx := &testContext{stub: newMemoryStub()}
+	hashA := strings.Repeat("a", 64)
+	hashB := strings.Repeat("b", 64)
+	hashC := strings.Repeat("c", 64)
+	hashD := strings.Repeat("d", 64)
+
+	setIdentity(ctx, "insurer-admin", "InsurerMSP", "insurerAdmin", nil)
+	_, err := contract.CreatePartnerAgreement(ctx, "agreement-hospital-1", "HOSPITAL", "hospital1", "Dhaka Central Medical Hospital", "Dhaka", "Preferred", "Read-only invoice verification fields", "2026-01-01", "2028-12-31")
+	requireNoError(t, err)
+	_, err = contract.CreatePartnerAgreement(ctx, "agreement-bank-1", "BANK", "bank-demo", "Bangladesh Demo Commercial Bank", "Dhaka", "Collection", "Premium mandates and settlement confirmation", "2026-01-01", "2028-12-31")
+	requireNoError(t, err)
+	_, err = contract.CreatePartnerAgreement(ctx, "agreement-duplicate", "HOSPITAL", "hospital1", "Duplicate", "", "", "Read-only invoices", "2026-01-01", "2028-12-31")
+	requireError(t, err, "already exists")
+
+	_, err = contract.CreatePolicyPackage(ctx, "package-partners", "Partner Cover", "Contracted provider coverage", 10_000, 1_000_000, hashA)
+	requireNoError(t, err)
+	packageWithPartners, err := contract.ConfigurePolicyPackagePartners(ctx, "package-partners", `["hospital1"]`, `["bank-demo"]`)
+	requireNoError(t, err)
+	if packageWithPartners.Version != 2 || len(packageWithPartners.HospitalIDs) != 1 || len(packageWithPartners.BankIDs) != 1 {
+		t.Fatalf("partner network was not versioned: %+v", packageWithPartners)
+	}
+	_, err = contract.PublishPolicyPackage(ctx, "package-partners")
+	requireNoError(t, err)
+	policy, err := contract.IssuePolicy(ctx, "policy-partners", "package-partners", "policyholder1", "2026-01-01", "2026-12-31")
+	requireNoError(t, err)
+	if len(policy.HospitalIDs) != 1 || policy.HospitalIDs[0] != "hospital1" || policy.BankIDs[0] != "bank-demo" {
+		t.Fatalf("policy did not snapshot its partner network: %+v", policy)
+	}
+
+	setIdentity(ctx, "hospital1-cert", "HospitalMSP", "hospitalOfficer", map[string]string{"subjectId": "hospital1"})
+	invoice, err := contract.CreateHospitalInvoice(ctx, "invoice-1001", hashA, hashB, hashC, 250_000, "2026-06-10", "2026-06-20", "FINALIZED")
+	requireNoError(t, err)
+	if invoice.HospitalID != "hospital1" || invoice.Status != "FINALIZED" {
+		t.Fatalf("Hospital invoice ownership was not captured: %+v", invoice)
+	}
+
+	setIdentity(ctx, "hospital2-cert", "HospitalMSP", "hospitalOfficer", map[string]string{"subjectId": "hospital2"})
+	_, err = contract.UpdateHospitalInvoice(ctx, invoice.ID, hashA, hashB, hashC, 250_000, "2026-06-10", "2026-06-20", "VOID")
+	requireError(t, err, "no active insurer agreement")
+
+	setIdentity(ctx, "policyholder-cert", "InsurerMSP", "policyholder", map[string]string{"subjectId": "policyholder1"})
+	claim, err := contract.SubmitInvoiceClaim(ctx, "claim-partners", policy.ID, "hospital1", invoice.ID, 200_000, "2026-06-15", hashD)
+	requireNoError(t, err)
+	if claim.HospitalInvoiceID != invoice.ID {
+		t.Fatalf("claim was not bound to its Hospital invoice: %+v", claim)
+	}
+
+	setIdentity(ctx, "hospital1-cert", "HospitalMSP", "hospitalOfficer", map[string]string{"subjectId": "hospital1"})
+	_, err = contract.VerifyClaim(ctx, claim.ID, "legacy-verification", "VERIFIED", hashB)
+	requireError(t, err, "Hospital users only maintain invoices")
+
+	setIdentity(ctx, "insurer-admin", "InsurerMSP", "insurerAdmin", nil)
+	verification, err := contract.CrossCheckClaimInvoice(ctx, claim.ID, "invoice-check-1001")
+	requireNoError(t, err)
+	if verification.Outcome != "VERIFIED" || verification.HospitalIdentity != "hospital1" || verification.ClinicalReferenceHash != hashB {
+		t.Fatalf("insurer invoice cross-check did not retain Hospital provenance: %+v", verification)
+	}
+	claim, err = contract.ReadClaim(ctx, claim.ID)
+	requireNoError(t, err)
+	if claim.Status != "HOSPITAL_VERIFIED" {
+		t.Fatalf("verified invoice did not advance the claim: %+v", claim)
+	}
+}
+
 func TestEvidenceAccessAuthorizationAndAuditRecord(t *testing.T) {
 	contract := &Contract{}
 	ctx := &testContext{stub: newMemoryStub()}

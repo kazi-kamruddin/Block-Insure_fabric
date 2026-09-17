@@ -27,6 +27,7 @@ test("five organization sessions complete a Fabric insurance workflow", async ({
   const suffix = `${Date.now()}-${Math.floor(Math.random() * 1_000_000)}`;
   const ids = {
     package: `e2e-package-${suffix}`,
+    invoice: `e2e-invoice-${suffix}`,
     policy: `e2e-policy-${suffix}`,
     claim: `e2e-claim-${suffix}`,
     evidence: `e2e-evidence-${suffix}`,
@@ -52,14 +53,16 @@ test("five organization sessions complete a Fabric insurance workflow", async ({
       description: "Playwright multi-organization workflow", premiumMinor: 10_000,
       coverageLimitMinor: 1_000_000, termsHash: hashA,
     });
+    await command(insurer, { operation: "configurePolicyPackagePartners", id: ids.package, hospitalIdsJson: '["hospital-demo"]', bankIdsJson: '["bank-demo"]' });
     await command(insurer, { operation: "publishPolicyPackage", id: ids.package });
     await command(insurer, {
       operation: "issuePolicy", id: ids.policy, packageId: ids.package,
       policyholderId: "policyholder1", startDate: "2026-01-01", endDate: "2026-12-31",
     });
     await command(insurer, { operation: "retirePolicyPackage", id: ids.package });
+    await command(hospital, { operation: "createHospitalInvoice", id: ids.invoice, patientReferenceHash: hashA, invoiceReferenceHash: hashC, treatmentHash: hashB, amountMinor: 250_000, admissionDate: "2026-06-10", dischargeDate: "2026-06-20", status: "FINALIZED" });
     await command(policyholder, {
-      operation: "submitClaim", id: ids.claim, policyId: ids.policy, hospitalId: "hospital-demo", amountMinor: 250_000,
+      operation: "submitClaim", id: ids.claim, policyId: ids.policy, hospitalId: "hospital-demo", hospitalInvoiceId: ids.invoice, amountMinor: 250_000,
       incidentDate: "2026-06-15", descriptionHash: hashB,
     });
     const evidencePlaintext = new TextEncoder().encode(`private-e2e-evidence-${suffix}`);
@@ -84,8 +87,8 @@ test("five organization sessions complete a Fabric insurance workflow", async ({
     expect(evidenceUpload.ok(), await evidenceUpload.text()).toBe(true);
     await command(policyholder, {
       operation: "grantEvidenceAccess", id: ids.grant, evidenceId: ids.evidence,
-      granteeMsp: "HospitalMSP", granteeRole: "hospitalOfficer", granteeSubject: "*",
-      purpose: "VERIFY", expiresAt: new Date(Date.now() + 7 * 86_400_000).toISOString(), maxAccesses: 2,
+      granteeMsp: "AuditorMSP", granteeRole: "auditor", granteeSubject: "auditor1",
+      purpose: "AUDIT", expiresAt: new Date(Date.now() + 7 * 86_400_000).toISOString(), maxAccesses: 2,
     });
 
     const bankEvidence = await bank.post(`/api/evidence/${ids.evidence}`);
@@ -102,7 +105,7 @@ test("five organization sessions complete a Fabric insurance workflow", async ({
     );
     expect(new TextDecoder().decode(downloadedPlaintext)).toBe(`private-e2e-evidence-${suffix}`);
 
-    const sharedEvidence = await hospital.post(`/api/evidence/${ids.evidence}`, { data: { grantId: ids.grant } });
+    const sharedEvidence = await auditor.post(`/api/evidence/${ids.evidence}`, { data: { grantId: ids.grant } });
     expect(sharedEvidence.ok(), await sharedEvidence.text()).toBe(true);
     expect(sharedEvidence.headers()["x-content-sha256"]).toBe(encryptedEvidence.contentHash);
     await command(policyholder, { operation: "revokeEvidenceAccess", grantId: ids.grant });
@@ -115,12 +118,12 @@ test("five organization sessions complete a Fabric insurance workflow", async ({
       item.evidenceId === ids.evidence && item.accessorRole === "policyholder",
     )).toBe(true);
 
-    const hospitalBefore = await hospital.get("/api/dashboard");
-    expect((await hospitalBefore.json()).dashboard.queue.some((item: { id: string }) => item.id === ids.claim)).toBe(true);
-    await command(hospital, {
-      operation: "verifyClaim", claimId: ids.claim, verificationId: ids.verification,
-      outcome: "VERIFIED", clinicalReferenceHash: hashC,
-    });
+    const hospitalInvoice = await hospital.get(`/api/ledger/hospital-invoice/${ids.invoice}`);
+    expect(hospitalInvoice.ok(), await hospitalInvoice.text()).toBe(true);
+    expect((await hospitalInvoice.json()).result).toMatchObject({ hospitalId: "hospital-demo", status: "FINALIZED" });
+    const hospitalClaimAccess = await hospital.get(`/api/ledger/claim/${ids.claim}`);
+    expect(hospitalClaimAccess.status()).toBe(403);
+    await command(insurer, { operation: "crossCheckClaimInvoice", claimId: ids.claim, verificationId: ids.verification });
     const verification = await policyholder.get(`/api/ledger/verification/${ids.verification}`);
     expect(verification.ok(), await verification.text()).toBe(true);
     expect((await verification.json()).result).toMatchObject({ id: ids.verification, claimId: ids.claim, outcome: "VERIFIED" });
@@ -188,7 +191,7 @@ test("five organization sessions complete a Fabric insurance workflow", async ({
     expect(research.ok(), await research.text()).toBe(true);
     expect(await research.json()).toMatchObject({
       schemaVersion: 1,
-      provenance: { ledgerSchemaVersion: 7 },
+      provenance: { ledgerSchemaVersion: 8 },
       fraudDecisionSupport: { advisoryOnly: true },
     });
     const auditorNotifications = await auditor.get("/api/operations/notifications");
@@ -208,13 +211,15 @@ test("five organization sessions complete a Fabric insurance workflow", async ({
   }
 });
 
-test("rejected claim requires a committed correction, fresh hospital attestation, and independent Oracle approval", async ({ baseURL }) => {
+test("rejected claim requires a committed correction, matching Hospital invoice, fresh cross-check, and independent Oracle approval", async ({ baseURL }) => {
   test.setTimeout(180_000);
   if (!baseURL) throw new Error("Playwright baseURL is required");
   const suffix = `appeal-${Date.now()}-${Math.floor(Math.random() * 1_000_000)}`;
   const packageId = `e2e-package-${suffix}`;
   const policyId = `e2e-policy-${suffix}`;
   const claimId = `e2e-claim-${suffix}`;
+  const invoiceId = `e2e-invoice-${suffix}`;
+  const correctedInvoiceId = `e2e-invoice-corrected-${suffix}`;
   const review1 = `e2e-review-initial-${suffix}`;
   const appealId = `e2e-appeal-${suffix}`;
   const deadline = new Date(Date.now() + 3 * 86_400_000).toISOString();
@@ -231,19 +236,22 @@ test("rejected claim requires a committed correction, fresh hospital attestation
       await command(insurer, { operation: "publishOracleRegistrySnapshot", id: "registry-demo-v1", version: 1, rootHash: registryRoot, rulesVersion: "rules-v1", rulesHash: hashA, recordCount: 3 });
     }
     await command(insurer, { operation: "createPolicyPackage", id: packageId, name: "Appeal Plan", description: "Appeal regression", premiumMinor: 10_000, coverageLimitMinor: 1_000_000, termsHash: hashA });
+    await command(insurer, { operation: "configurePolicyPackagePartners", id: packageId, hospitalIdsJson: '["hospital-demo"]', bankIdsJson: '["bank-demo"]' });
     await command(insurer, { operation: "publishPolicyPackage", id: packageId });
     await command(insurer, { operation: "issuePolicy", id: policyId, packageId, policyholderId: "policyholder1", startDate: "2026-01-01", endDate: "2026-12-31" });
-    await command(policyholder, { operation: "submitClaim", id: claimId, policyId, hospitalId: "hospital-demo", amountMinor: 400_000, incidentDate: "2026-06-15", descriptionHash: hashB });
+    await command(hospital, { operation: "createHospitalInvoice", id: invoiceId, patientReferenceHash: hashA, invoiceReferenceHash: hashC, treatmentHash: hashB, amountMinor: 400_000, admissionDate: "2026-06-10", dischargeDate: "2026-06-20", status: "FINALIZED" });
+    await command(policyholder, { operation: "submitClaim", id: claimId, policyId, hospitalId: "hospital-demo", hospitalInvoiceId: invoiceId, amountMinor: 400_000, incidentDate: "2026-06-15", descriptionHash: hashB });
     const foreignRead = await foreignHospital.get(`/api/ledger/claim/${claimId}`);
     expect(foreignRead.status()).toBe(403);
-    const foreignVerification = await foreignHospital.post("/api/workflows", { data: { operation: "verifyClaim", claimId, verificationId: `foreign-verification-${suffix}`, outcome: "VERIFIED", clinicalReferenceHash: hashC } });
-    expect(foreignVerification.status()).toBe(409);
-    await command(hospital, { operation: "verifyClaim", claimId, verificationId: `verification-${suffix}`, outcome: "VERIFIED", clinicalReferenceHash: hashC });
+    const foreignInvoice = await foreignHospital.get(`/api/ledger/hospital-invoice/${invoiceId}`);
+    expect(foreignInvoice.status()).toBe(403);
+    await command(insurer, { operation: "crossCheckClaimInvoice", claimId, verificationId: `verification-${suffix}` });
     await command(insurer, { operation: "openClaimReview", claimId, reviewId: review1, assignedAuditorIdsJson, approvalThreshold: 3, rejectionThreshold: 2, deadline });
     await command(auditors[0], { operation: "recordAuditorDecision", reviewId: review1, decisionId: `decision-r1-a1-${suffix}`, outcome: "REJECT", reasonHash: hashA });
     const duplicate = await auditors[0].post("/api/workflows", { data: { operation: "recordAuditorDecision", reviewId: review1, decisionId: `decision-r1-duplicate-${suffix}`, outcome: "REJECT", reasonHash: hashA } });
     expect(duplicate.status()).toBe(409);
     await command(auditors[1], { operation: "recordAuditorDecision", reviewId: review1, decisionId: `decision-r1-a2-${suffix}`, outcome: "REJECT", reasonHash: hashA });
+    await command(hospital, { operation: "createHospitalInvoice", id: correctedInvoiceId, patientReferenceHash: hashA, invoiceReferenceHash: "1".repeat(64), treatmentHash: hashB, amountMinor: 50_000, admissionDate: "2026-06-10", dischargeDate: "2026-06-20", status: "FINALIZED" });
     await command(policyholder, {
       operation: "submitClaimAppeal", appealId, claimId, reasonCategory: "DOCUMENT_ERROR",
       reasonHash: hashB, descriptionHash: hashC, evidenceHash: hashC,
@@ -258,7 +266,7 @@ test("rejected claim requires a committed correction, fresh hospital attestation
     } });
     expect(premature.status()).toBe(409);
     const verification2 = `verification-appeal-${suffix}`;
-    await command(hospital, { operation: "verifyClaim", claimId, verificationId: verification2, outcome: "VERIFIED", clinicalReferenceHash: "1".repeat(64) });
+    await command(insurer, { operation: "crossCheckClaimInvoice", claimId, verificationId: verification2 });
     const requestId = `oracle-request-appeal-${suffix}`;
     await command(insurer, {
       operation: "requestOracleVerification", requestId, claimId, snapshotId: "registry-demo-v1",
@@ -310,6 +318,7 @@ test("policy, premium, mandate, benefit, and banking lifecycles complete across 
   const bank = await actor(baseURL, "bank-officer");
   try {
     await command(insurer, { operation: "createPolicyPackage", id: ids.package, name: "Lifecycle Plan", description: "Issue 8 browser workflow", premiumMinor: 10_000, coverageLimitMinor: 1_000_000, termsHash: digest("terms") });
+    await command(insurer, { operation: "configurePolicyPackagePartners", id: ids.package, hospitalIdsJson: '["hospital-demo"]', bankIdsJson: '["bank-demo"]' });
     await command(insurer, { operation: "createBenefitPlan", id: ids.benefitPlan, packageId: ids.package, deathBenefitMinor: 500_000, surrenderBenefitMinor: 100_000, maturityBenefitMinor: 250_000, rulesHash: digest("benefit-rules") });
     await command(insurer, { operation: "publishBenefitPlan", id: ids.benefitPlan });
     await command(insurer, { operation: "publishPolicyPackage", id: ids.package });

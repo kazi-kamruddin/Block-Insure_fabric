@@ -15,6 +15,8 @@ import type {
   PremiumPayment,
   Liability,
   OracleRequest,
+  PartnerAgreement,
+  HospitalInvoice,
   Settlement,
 } from "@/lib/fabric/types";
 
@@ -55,6 +57,8 @@ export type DashboardAssets = {
   decisions?: AuditorDecision[];
   fraudAssessments?: FraudAssessment[];
   oracleRequests?: OracleRequest[];
+  partnerAgreements?: PartnerAgreement[];
+  hospitalInvoices?: HospitalInvoice[];
 };
 
 const terminalClaimStatuses = new Set(["REJECTED", "SETTLED"]);
@@ -87,6 +91,8 @@ export function buildRoleDashboard(
   const decisions = assets.decisions ?? [];
   const fraudAssessments = assets.fraudAssessments ?? [];
   const oracleRequests = assets.oracleRequests ?? [];
+  const partnerAgreements = assets.partnerAgreements ?? [];
+  const hospitalInvoices = assets.hospitalInvoices ?? [];
   const ownedPolicies = role === "policyholder"
     ? assets.policies.filter((policy) => policy.policyholderId === subjectId)
     : assets.policies;
@@ -127,7 +133,7 @@ export function buildRoleDashboard(
         commandLabel: policy.status === "ACTIVE" ? "Prepare claim" : "Manage coverage",
         command: policy.status === "ACTIVE" ? {
           operation: "submitClaim", id: `claim-${Date.now()}`, policyId: policy.id, hospitalId: "hospital-demo",
-          amountMinor: 250000, incidentDate: new Date().toISOString().slice(0, 10), descriptionHash: "a".repeat(64),
+          hospitalInvoiceId: "", amountMinor: 250000, incidentDate: new Date().toISOString().slice(0, 10), descriptionHash: "a".repeat(64),
         } : { operation: "requestBankMandate", policyId: policy.id },
         })),
       ],
@@ -136,34 +142,35 @@ export function buildRoleDashboard(
   }
 
   if (role === "hospitalOfficer") {
-    const hospitalClaims = assets.claims.filter((claim) => claim.hospitalId === subjectId);
-    const queue = hospitalClaims.filter((claim) =>
-      claim.status === "SUBMITTED" || (claim.status === "APPEAL_SUBMITTED" && !claim.hospitalVerificationId),
-    );
+    const ownInvoices = hospitalInvoices.filter((invoice) => invoice.hospitalId === subjectId);
+    const agreement = partnerAgreements.find((item) => item.partnerType === "HOSPITAL" && item.partnerId === subjectId && item.status !== "ENDED");
+    const drafts = ownInvoices.filter((invoice) => invoice.status === "DRAFT");
     return {
-      title: "Hospital verification desk",
-      description: "Claims awaiting an independent clinical attestation from HospitalMSP.",
+      title: "Independent Hospital billing register",
+      description: "Maintain this Hospital's patient invoices independently. Block-Insure receives agreement-scoped, read-only verification access.",
       metrics: [
-        { label: "Awaiting verification", value: queue.length, hint: "new and corrected claim versions" },
-        { label: "Verified", value: hospitalClaims.filter((item) => item.status !== "SUBMITTED" && Boolean(item.hospitalVerificationId)).length, hint: "assigned claims past hospital review" },
-        { label: "Evidence access", value: assets.evidenceAccess.length, hint: "auditable retrieval events" },
+        { label: "Patient invoices", value: ownInvoices.length, hint: "records owned by this Hospital" },
+        { label: "Draft invoices", value: drafts.length, hint: "still editable before finalization" },
+        { label: "Finalized invoices", value: ownInvoices.filter((item) => item.status === "FINALIZED").length, hint: "available for insurer cross-check" },
+        { label: "Agreement active", value: agreement?.status === "ACTIVE" ? 1 : 0, hint: agreement ? `${agreement.name} · ${agreement.tier || "network partner"}` : "no active insurer agreement" },
       ],
-      queueTitle: "Verification requests",
-      queue: queue.map((claim) => ({
-        id: claim.id,
-        title: claim.id,
-        detail: `${money(claim.amountMinor)} · incident ${claim.incidentDate}`,
-        status: claim.status,
-        commandLabel: "Prepare verification",
+      queueTitle: "Draft invoice work",
+      queue: drafts.map((invoice) => ({
+        id: invoice.id,
+        title: invoice.id,
+        detail: `${money(invoice.amountMinor)} · ${invoice.admissionDate} to ${invoice.dischargeDate}`,
+        status: invoice.status,
+        commandLabel: "Update invoice",
         command: {
-          operation: "verifyClaim",
-          claimId: claim.id,
-          verificationId: `verification-${Date.now()}-${claim.id}`,
-          outcome: "VERIFIED",
-          clinicalReferenceHash: "a".repeat(64),
+          operation: "updateHospitalInvoice",
+          id: invoice.id,
+          amountMinor: invoice.amountMinor,
+          admissionDate: invoice.admissionDate,
+          dischargeDate: invoice.dischargeDate,
+          status: invoice.status,
         },
       })),
-      recentClaims: newestClaims(hospitalClaims),
+      recentClaims: [],
     };
   }
 
@@ -234,7 +241,7 @@ export function buildRoleDashboard(
   }
 
   const reviewQueue = assets.claims.filter((claim) =>
-    ["HOSPITAL_VERIFIED", "ORACLE_FAILED", "APPROVED"].includes(claim.status)
+    ["SUBMITTED", "HOSPITAL_VERIFIED", "ORACLE_FAILED", "APPROVED"].includes(claim.status)
       || (claim.status === "APPEAL_SUBMITTED" && Boolean(claim.hospitalVerificationId)),
   );
   return {
@@ -242,6 +249,7 @@ export function buildRoleDashboard(
     description: "Govern packages, monitor claims, initiate audit review, and authorize settlements.",
     metrics: [
       { label: "Published packages", value: assets.packages.filter((item) => item.status === "PUBLISHED").length, hint: "available product definitions" },
+      { label: "Active partners", value: partnerAgreements.filter((item) => item.status === "ACTIVE").length, hint: "contracted Hospitals and Banks" },
       { label: "Active policies", value: assets.policies.filter((item) => item.status === "ACTIVE").length, hint: "issued coverage records" },
       { label: "Open claims", value: assets.claims.filter((item) => !terminalClaimStatuses.has(item.status)).length, hint: "portfolio work in progress" },
       { label: "Oracle consensus", value: oracleRequests.filter((item) => item.finalizationCode === "EXACT_CONSENSUS").length, hint: "two exact certificate-bound results" },
@@ -259,16 +267,19 @@ export function buildRoleDashboard(
       ...reviewQueue.map((claim) => {
       const approved = claim.status === "APPROVED";
       const oracleFailed = claim.status === "ORACLE_FAILED";
+      const needsInvoiceCheck = claim.status === "SUBMITTED";
       return {
         id: claim.id,
         title: claim.id,
         detail: `${money(claim.amountMinor)} · policy ${claim.policyId}`,
         status: claim.status,
-        commandLabel: approved ? "Prepare settlement" : oracleFailed ? "Prepare auditor fallback" : "Prepare Oracle request",
+        commandLabel: approved ? "Prepare settlement" : oracleFailed ? "Prepare auditor fallback" : needsInvoiceCheck ? "Cross-check invoice" : "Prepare Oracle request",
         command: approved
           ? { operation: "authorizeSettlement", settlementId: `settlement-${Date.now()}-${claim.id}`, claimId: claim.id }
           : oracleFailed
             ? { operation: "routeOracleFailureToReview", requestId: claim.currentOracleRequestId, reviewId: `review-oracle-${Date.now()}-${claim.id}` }
+            : needsInvoiceCheck
+              ? { operation: "crossCheckClaimInvoice", claimId: claim.id, verificationId: `invoice-check-${Date.now()}-${claim.id}` }
             : { operation: "requestOracleVerification", requestId: `oracle-request-${Date.now()}-${claim.id}`, claimId: claim.id, snapshotId: "registry-demo-v1" },
       };
       }),

@@ -5,7 +5,7 @@ import type { Session } from "@/lib/auth/session-token";
 import { buildRoleDashboard } from "./build-dashboard";
 
 export async function loadRoleDashboard(session: Session) {
-  const [packages, policies, claims, evidence, settlements, evidenceAccess, mandates, premiumPayments, premiumCollections, benefitRequests, liabilities, reviews, appeals, decisions, fraudAssessments, oracleRequests] = await Promise.all([
+  const [packages, policies, claims, evidence, settlements, evidenceAccess, mandates, premiumPayments, premiumCollections, benefitRequests, liabilities, reviews, appeals, decisions, fraudAssessments, oracleRequests, partnerAgreements, hospitalInvoices] = await Promise.all([
     ledger.listPolicyPackages(),
     ledger.listPolicies(),
     ledger.listClaims(),
@@ -22,11 +22,13 @@ export async function loadRoleDashboard(session: Session) {
     ledger.listAuditorDecisions(),
     ledger.listFraudAssessments(),
     ledger.listOracleRequests(),
+    ledger.listPartnerAgreements(),
+    ledger.listHospitalInvoices(),
   ]);
 
   return buildRoleDashboard(
     session.role,
-    { packages, policies, claims, evidence, settlements, evidenceAccess, mandates, premiumPayments, premiumCollections, benefitRequests, liabilities, reviews, appeals, decisions, fraudAssessments, oracleRequests },
+    { packages, policies, claims, evidence, settlements, evidenceAccess, mandates, premiumPayments, premiumCollections, benefitRequests, liabilities, reviews, appeals, decisions, fraudAssessments, oracleRequests, partnerAgreements, hospitalInvoices },
     session.subjectId,
   );
 }

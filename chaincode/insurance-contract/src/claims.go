@@ -2,13 +2,24 @@ package insurance
 
 import (
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 
 	"github.com/hyperledger/fabric-contract-api-go/v2/contractapi"
 )
 
+// SubmitClaim remains for schema-7 ledger compatibility. New application flows use
+// SubmitInvoiceClaim so every new claim is bound to a Hospital-owned invoice.
 func (c *Contract) SubmitClaim(ctx contractapi.TransactionContextInterface, id, policyID, hospitalID string, amountMinor int64, incidentDate, descriptionHash string) (*Claim, error) {
+	return c.submitClaim(ctx, id, policyID, hospitalID, "", amountMinor, incidentDate, descriptionHash)
+}
+
+func (c *Contract) SubmitInvoiceClaim(ctx contractapi.TransactionContextInterface, id, policyID, hospitalID, hospitalInvoiceID string, amountMinor int64, incidentDate, descriptionHash string) (*Claim, error) {
+	return c.submitClaim(ctx, id, policyID, hospitalID, hospitalInvoiceID, amountMinor, incidentDate, descriptionHash)
+}
+
+func (c *Contract) submitClaim(ctx contractapi.TransactionContextInterface, id, policyID, hospitalID, hospitalInvoiceID string, amountMinor int64, incidentDate, descriptionHash string) (*Claim, error) {
 	if _, err := requireIdentity(ctx, "InsurerMSP", "policyholder"); err != nil {
 		return nil, err
 	}
@@ -33,6 +44,24 @@ func (c *Contract) SubmitClaim(ctx contractapi.TransactionContextInterface, id, 
 	if !idPattern.MatchString(hospitalID) {
 		return nil, fmt.Errorf("hospitalId is invalid")
 	}
+	if hospitalInvoiceID != "" {
+		if !slices.Contains(policy.HospitalIDs, hospitalID) {
+			return nil, fmt.Errorf("hospital %s is not in policy %s's contracted provider network", hospitalID, policyID)
+		}
+		if _, err := c.requireActivePartner(ctx, "HOSPITAL", hospitalID); err != nil {
+			return nil, err
+		}
+		if !idPattern.MatchString(strings.TrimSpace(hospitalInvoiceID)) {
+			return nil, fmt.Errorf("hospitalInvoiceId is invalid")
+		}
+		invoice, err := c.ReadHospitalInvoice(ctx, hospitalInvoiceID)
+		if err != nil {
+			return nil, err
+		}
+		if invoice.HospitalID != hospitalID {
+			return nil, fmt.Errorf("hospital invoice %s belongs to hospital %s", hospitalInvoiceID, invoice.HospitalID)
+		}
+	}
 	incident, err := validateDate("incidentDate", incidentDate)
 	if err != nil {
 		return nil, err
@@ -51,7 +80,8 @@ func (c *Contract) SubmitClaim(ctx contractapi.TransactionContextInterface, id, 
 	}
 	claim := &Claim{
 		AssetType: "claim", SchemaVersion: SchemaVersion, ID: id, PolicyID: policyID,
-		ClaimantID: claimantID, HospitalID: hospitalID, AmountMinor: amountMinor, IncidentDate: incidentDate,
+		ClaimantID: claimantID, HospitalID: hospitalID, HospitalInvoiceID: hospitalInvoiceID,
+		AmountMinor: amountMinor, IncidentDate: incidentDate,
 		DescriptionHash: strings.ToLower(descriptionHash), EvidenceIDs: []string{},
 		Version: 1, Status: "SUBMITTED", CreatedAt: now, UpdatedAt: now,
 	}
@@ -147,6 +177,9 @@ func (c *Contract) VerifyClaim(ctx contractapi.TransactionContextInterface, clai
 	if claim.HospitalID != hospitalID {
 		return nil, fmt.Errorf("access denied: claim %s is assigned to hospital %s", claimID, claim.HospitalID)
 	}
+	if claim.HospitalInvoiceID != "" {
+		return nil, fmt.Errorf("invoice-bound claim %s must be cross-checked by the insurer; Hospital users only maintain invoices", claimID)
+	}
 	if claim.HospitalVerificationID != "" {
 		return nil, fmt.Errorf("claim %s already has a hospital verification for version %d", claimID, claim.Version)
 	}
@@ -157,11 +190,20 @@ func (c *Contract) VerifyClaim(ctx contractapi.TransactionContextInterface, clai
 	if err := validateHash("clinicalReferenceHash", clinicalReferenceHash); err != nil {
 		return nil, err
 	}
+	return c.recordClaimVerification(ctx, claim, verificationID, outcome, clinicalReferenceHash, hospitalID)
+}
+
+func (c *Contract) recordClaimVerification(
+	ctx contractapi.TransactionContextInterface,
+	claim *Claim,
+	verificationID, outcome, clinicalReferenceHash, hospitalID string,
+) (*HospitalVerification, error) {
 	appealID := ""
 	var appeal *ClaimAppeal
+	var err error
 	if claim.Status == "APPEAL_SUBMITTED" {
 		if claim.CurrentAppealID == "" {
-			return nil, fmt.Errorf("claim %s has no active appeal", claimID)
+			return nil, fmt.Errorf("claim %s has no active appeal", claim.ID)
 		}
 		appeal, err = c.ReadClaimAppeal(ctx, claim.CurrentAppealID)
 		if err != nil {
@@ -181,7 +223,7 @@ func (c *Contract) VerifyClaim(ctx contractapi.TransactionContextInterface, clai
 	}
 	verification := &HospitalVerification{
 		AssetType: "hospitalVerification", SchemaVersion: SchemaVersion, ID: verificationID,
-		ClaimID: claimID, ClaimVersion: claim.Version, AppealID: appealID,
+		ClaimID: claim.ID, ClaimVersion: claim.Version, AppealID: appealID,
 		HospitalIdentity: hospitalID, Outcome: outcome,
 		ClinicalReferenceHash: strings.ToLower(clinicalReferenceHash), CreatedAt: now,
 	}
@@ -219,7 +261,7 @@ func (c *Contract) VerifyClaim(ctx contractapi.TransactionContextInterface, clai
 	}
 	claim.HospitalVerificationID = verificationID
 	claim.UpdatedAt = now
-	if err := overwriteAsset(ctx, "claim", claimID, claim); err != nil {
+	if err := overwriteAsset(ctx, "claim", claim.ID, claim); err != nil {
 		return nil, err
 	}
 	if err := emit(ctx, "ClaimHospitalVerified", verification); err != nil {

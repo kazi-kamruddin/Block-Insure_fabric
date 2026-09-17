@@ -1,49 +1,86 @@
 package insurance
 
-const SchemaVersion = 7
+const SchemaVersion = 8
+
+type PartnerAgreement struct {
+	AssetType     string `json:"assetType"`
+	SchemaVersion int    `json:"schemaVersion"`
+	ID            string `json:"id"`
+	PartnerType   string `json:"partnerType"`
+	PartnerID     string `json:"partnerId"`
+	Name          string `json:"name"`
+	Location      string `json:"location"`
+	Tier          string `json:"tier"`
+	AccessScope   string `json:"accessScope"`
+	EffectiveDate string `json:"effectiveDate"`
+	ExpiryDate    string `json:"expiryDate"`
+	Status        string `json:"status"`
+	CreatedAt     string `json:"createdAt"`
+	UpdatedAt     string `json:"updatedAt"`
+}
+
+type HospitalInvoice struct {
+	AssetType            string `json:"assetType"`
+	SchemaVersion        int    `json:"schemaVersion"`
+	ID                   string `json:"id"`
+	HospitalID           string `json:"hospitalId"`
+	PatientReferenceHash string `json:"patientReferenceHash"`
+	InvoiceReferenceHash string `json:"invoiceReferenceHash"`
+	TreatmentHash        string `json:"treatmentHash"`
+	AmountMinor          int64  `json:"amountMinor"`
+	AdmissionDate        string `json:"admissionDate"`
+	DischargeDate        string `json:"dischargeDate"`
+	Status               string `json:"status"`
+	CreatedAt            string `json:"createdAt"`
+	UpdatedAt            string `json:"updatedAt"`
+}
 
 type PolicyPackage struct {
-	AssetType          string `json:"assetType"`
-	SchemaVersion      int    `json:"schemaVersion"`
-	ID                 string `json:"id"`
-	Version            int    `json:"version"`
-	Name               string `json:"name"`
-	Description        string `json:"description"`
-	PremiumMinor       int64  `json:"premiumMinor"`
-	CoverageLimitMinor int64  `json:"coverageLimitMinor"`
-	TermsHash          string `json:"termsHash"`
-	Status             string `json:"status"`
-	CreatedAt          string `json:"createdAt"`
-	UpdatedAt          string `json:"updatedAt"`
+	AssetType          string   `json:"assetType"`
+	SchemaVersion      int      `json:"schemaVersion"`
+	ID                 string   `json:"id"`
+	Version            int      `json:"version"`
+	Name               string   `json:"name"`
+	Description        string   `json:"description"`
+	PremiumMinor       int64    `json:"premiumMinor"`
+	CoverageLimitMinor int64    `json:"coverageLimitMinor"`
+	TermsHash          string   `json:"termsHash"`
+	HospitalIDs        []string `json:"hospitalIds"`
+	BankIDs            []string `json:"bankIds"`
+	Status             string   `json:"status"`
+	CreatedAt          string   `json:"createdAt"`
+	UpdatedAt          string   `json:"updatedAt"`
 }
 
 type Policy struct {
-	AssetType              string `json:"assetType"`
-	SchemaVersion          int    `json:"schemaVersion"`
-	ID                     string `json:"id"`
-	PackageID              string `json:"packageId"`
-	PackageVersion         int    `json:"packageVersion"`
-	PolicyholderID         string `json:"policyholderId"`
-	StartDate              string `json:"startDate"`
-	EndDate                string `json:"endDate"`
-	PremiumMinor           int64  `json:"premiumMinor"`
-	CoverageLimitMinor     int64  `json:"coverageLimitMinor"`
-	TermsHash              string `json:"termsHash"`
-	Status                 string `json:"status"`
-	PremiumIntervalDays    int    `json:"premiumIntervalDays"`
-	GracePeriodDays        int    `json:"gracePeriodDays"`
-	PaidThroughDate        string `json:"paidThroughDate"`
-	NextPremiumDueDate     string `json:"nextPremiumDueDate"`
-	RenewedFromPolicyID    string `json:"renewedFromPolicyId"`
-	CancellationReasonHash string `json:"cancellationReasonHash"`
-	BenefitPlanID          string `json:"benefitPlanId"`
-	BenefitPlanVersion     int    `json:"benefitPlanVersion"`
-	DeathBenefitMinor      int64  `json:"deathBenefitMinor"`
-	SurrenderBenefitMinor  int64  `json:"surrenderBenefitMinor"`
-	MaturityBenefitMinor   int64  `json:"maturityBenefitMinor"`
-	BenefitRulesHash       string `json:"benefitRulesHash"`
-	CreatedAt              string `json:"createdAt"`
-	UpdatedAt              string `json:"updatedAt"`
+	AssetType              string   `json:"assetType"`
+	SchemaVersion          int      `json:"schemaVersion"`
+	ID                     string   `json:"id"`
+	PackageID              string   `json:"packageId"`
+	PackageVersion         int      `json:"packageVersion"`
+	PolicyholderID         string   `json:"policyholderId"`
+	StartDate              string   `json:"startDate"`
+	EndDate                string   `json:"endDate"`
+	PremiumMinor           int64    `json:"premiumMinor"`
+	CoverageLimitMinor     int64    `json:"coverageLimitMinor"`
+	TermsHash              string   `json:"termsHash"`
+	HospitalIDs            []string `json:"hospitalIds"`
+	BankIDs                []string `json:"bankIds"`
+	Status                 string   `json:"status"`
+	PremiumIntervalDays    int      `json:"premiumIntervalDays"`
+	GracePeriodDays        int      `json:"gracePeriodDays"`
+	PaidThroughDate        string   `json:"paidThroughDate"`
+	NextPremiumDueDate     string   `json:"nextPremiumDueDate"`
+	RenewedFromPolicyID    string   `json:"renewedFromPolicyId"`
+	CancellationReasonHash string   `json:"cancellationReasonHash"`
+	BenefitPlanID          string   `json:"benefitPlanId"`
+	BenefitPlanVersion     int      `json:"benefitPlanVersion"`
+	DeathBenefitMinor      int64    `json:"deathBenefitMinor"`
+	SurrenderBenefitMinor  int64    `json:"surrenderBenefitMinor"`
+	MaturityBenefitMinor   int64    `json:"maturityBenefitMinor"`
+	BenefitRulesHash       string   `json:"benefitRulesHash"`
+	CreatedAt              string   `json:"createdAt"`
+	UpdatedAt              string   `json:"updatedAt"`
 }
 
 type BankAccountReference struct {
@@ -191,6 +228,7 @@ type Claim struct {
 	PolicyID               string   `json:"policyId"`
 	ClaimantID             string   `json:"claimantId"`
 	HospitalID             string   `json:"hospitalId"`
+	HospitalInvoiceID      string   `json:"hospitalInvoiceId"`
 	AmountMinor            int64    `json:"amountMinor"`
 	IncidentDate           string   `json:"incidentDate"`
 	DescriptionHash        string   `json:"descriptionHash"`

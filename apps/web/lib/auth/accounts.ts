@@ -27,7 +27,7 @@ export const demoAccounts = {
   },
   "hospital-officer": {
     id: "hospital-officer",
-    displayName: "Hospital Officer",
+    displayName: "Dhaka Central Medical Hospital",
     organization: "HospitalMSP",
     role: "hospitalOfficer",
     subjectId: "hospital-demo",
@@ -35,7 +35,7 @@ export const demoAccounts = {
   },
   "hospital-officer-2": {
     id: "hospital-officer-2",
-    displayName: "Hospital Officer Two",
+    displayName: "Chattogram Metropolitan Hospital",
     organization: "HospitalMSP",
     role: "hospitalOfficer",
     subjectId: "hospital-2",
@@ -43,7 +43,7 @@ export const demoAccounts = {
   },
   "hospital-officer-3": {
     id: "hospital-officer-3",
-    displayName: "Hospital Officer Three",
+    displayName: "Rajshahi Community Hospital",
     organization: "HospitalMSP",
     role: "hospitalOfficer",
     subjectId: "hospital-3",
@@ -51,7 +51,7 @@ export const demoAccounts = {
   },
   "hospital-officer-4": {
     id: "hospital-officer-4",
-    displayName: "Hospital Officer Four",
+    displayName: "Khulna Riverside Hospital",
     organization: "HospitalMSP",
     role: "hospitalOfficer",
     subjectId: "hospital-4",
@@ -59,7 +59,7 @@ export const demoAccounts = {
   },
   "hospital-officer-5": {
     id: "hospital-officer-5",
-    displayName: "Hospital Officer Five",
+    displayName: "Sylhet Valley Hospital",
     organization: "HospitalMSP",
     role: "hospitalOfficer",
     subjectId: "hospital-5",
@@ -99,7 +99,7 @@ export const demoAccounts = {
   },
   "bank-officer": {
     id: "bank-officer",
-    displayName: "Bank Officer",
+    displayName: "Bangladesh Demo Commercial Bank",
     organization: "BankMSP",
     role: "bankOfficer",
   },
