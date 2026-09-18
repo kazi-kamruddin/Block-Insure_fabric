@@ -2,10 +2,10 @@ import { describe, expect, it } from "vitest";
 import { OtpChallengeStore } from "./otp";
 
 const secret = "test-secret-that-is-longer-than-thirty-two-characters";
-const binding = { policyId: "policy-1", mandateId: "mandate-1", subjectId: "policyholder1" };
+const binding = { policyId: "policy-1", sourceAccountId: "account-1", subjectId: "policyholder1" };
 
 describe("manual premium OTP challenges", () => {
-  it("binds a one-time challenge to its policyholder, policy, and mandate", () => {
+  it("binds a one-time challenge to its policyholder, policy, and source account", () => {
     const store = new OtpChallengeStore();
     const challenge = store.issue(binding, secret, 60, 1_000, { id: "challenge-1", code: "123456" });
     expect(() => store.consume(challenge.challengeId, "123456", binding, secret, 2_000)).not.toThrow();

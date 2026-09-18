@@ -630,15 +630,27 @@ func TestPolicyPremiumMandateAndCollectionLifecycle(t *testing.T) {
 	hashA := strings.Repeat("a", 64)
 	hashB := strings.Repeat("b", 64)
 	hashC := strings.Repeat("c", 64)
+	hashD := strings.Repeat("d", 64)
+	hashE := strings.Repeat("e", 64)
+	hashF := strings.Repeat("f", 64)
+	hash9 := strings.Repeat("9", 64)
 
 	setIdentity(ctx, "insurer-admin", "InsurerMSP", "insurerAdmin", nil)
-	_, err := contract.CreatePolicyPackage(ctx, "package-lifecycle", "Lifecycle", "", 10_000, 1_000_000, hashA)
+	_, err := contract.CreatePartnerAgreement(ctx, "agreement-bank-lifecycle", "BANK", "bank-demo", "Demo Bank", "Dhaka", "Preferred", "Premium payments", "2026-01-01", "2028-12-31")
+	requireNoError(t, err)
+	_, err = contract.CreatePartnerAgreement(ctx, "agreement-hospital-lifecycle", "HOSPITAL", "hospital-demo", "Demo Hospital", "Dhaka", "Preferred", "Read-only invoice verification", "2026-01-01", "2028-12-31")
+	requireNoError(t, err)
+	_, err = contract.CreatePolicyPackage(ctx, "package-lifecycle", "Lifecycle", "", 10_000, 1_000_000, hashA)
+	requireNoError(t, err)
+	_, err = contract.ConfigurePolicyPackagePartners(ctx, "package-lifecycle", `["hospital-demo"]`, `["bank-demo"]`)
 	requireNoError(t, err)
 	_, err = contract.PublishPolicyPackage(ctx, "package-lifecycle")
 	requireNoError(t, err)
 
 	setIdentity(ctx, "bank-officer", "BankMSP", "bankOfficer", nil)
-	_, err = contract.RegisterBankAccountReference(ctx, "account-token-1", "policyholder1", hashA)
+	_, err = contract.OpenBankAccount(ctx, "account-token-1", "bank-demo", "policyholder1", "CUSTOMER", hashA, 30_000)
+	requireNoError(t, err)
+	_, err = contract.OpenBankAccount(ctx, "account-insurer-1", "bank-demo", "insurer", "INSURER", hashB, 0)
 	requireNoError(t, err)
 
 	setIdentity(ctx, "policyholder", "InsurerMSP", "policyholder", map[string]string{"subjectId": "policyholder1"})
@@ -656,25 +668,30 @@ func TestPolicyPremiumMandateAndCollectionLifecycle(t *testing.T) {
 	setIdentity(ctx, "bank-officer", "BankMSP", "bankOfficer", nil)
 	_, err = contract.ReviewBankMandate(ctx, "mandate-1", "APPROVE", hashB)
 	requireNoError(t, err)
-	payment, err := contract.RecordPremiumPayment(ctx, "payment-1", policy.ID, "mandate-1", "2026-01-01", "2026-01-30", 10_000, hashA, "OTP")
+	transfer, err := contract.ExecuteManualPremiumPayment(ctx, "transfer-1", "payment-1", policy.ID, "account-token-1", "account-insurer-1", "2026-01-01", "2026-01-30", 10_000, hashC, hashD)
+	requireNoError(t, err)
+	if transfer.Status != "SETTLED" || transfer.Method != "OTP" {
+		t.Fatalf("expected settled OTP transfer, got %+v", transfer)
+	}
+	payment, err := contract.ReadPremiumPayment(ctx, "payment-1")
 	requireNoError(t, err)
 	if payment.Method != "OTP" {
 		t.Fatalf("expected OTP payment, got %s", payment.Method)
 	}
-	adjustment, err := contract.RecordPremiumAdjustment(ctx, "adjustment-1", payment.ID, 2_500, hashB, hashC)
+	adjustment, err := contract.RecordPremiumAdjustment(ctx, "adjustment-1", payment.ID, 2_500, hashD, hashE)
 	requireNoError(t, err)
-	if adjustment.Type != "REVERSAL" || adjustment.AmountMinor != 2_500 {
+	if adjustment.Type != "REVERSAL" || adjustment.AmountMinor != 2_500 || adjustment.TransferID == "" {
 		t.Fatalf("unexpected premium adjustment: %+v", adjustment)
 	}
-	_, err = contract.RecordPremiumAdjustment(ctx, "adjustment-too-large", payment.ID, 8_000, strings.Repeat("d", 64), hashC)
+	_, err = contract.RecordPremiumAdjustment(ctx, "adjustment-too-large", payment.ID, 8_000, hashE, hashF)
 	requireError(t, err, "cannot exceed")
 	policy, err = contract.ReadPolicy(ctx, policy.ID)
 	requireNoError(t, err)
 	if policy.Status != "ACTIVE" || policy.PaidThroughDate != "2026-01-30" || policy.NextPremiumDueDate != "2026-01-31" {
 		t.Fatalf("premium did not activate and advance policy: %+v", policy)
 	}
-	_, err = contract.RecordPremiumPayment(ctx, "payment-replay", policy.ID, "mandate-1", "2026-01-31", "2026-03-01", 10_000, hashA, "OTP")
-	requireError(t, err, "external payment reference has already been recorded")
+	_, err = contract.ExecuteManualPremiumPayment(ctx, "transfer-replay", "payment-replay", policy.ID, "account-token-1", "account-insurer-1", "2026-01-31", "2026-03-01", 10_000, hashC, hashD)
+	requireError(t, err, "external bank transfer reference has already been recorded")
 
 	setIdentity(ctx, "insurer-admin", "InsurerMSP", "insurerAdmin", nil)
 	collection, err := contract.QueuePremiumCollection(ctx, "collection-1", "mandate-1", "2026-01-31")
@@ -684,10 +701,22 @@ func TestPolicyPremiumMandateAndCollectionLifecycle(t *testing.T) {
 	}
 
 	setIdentity(ctx, "bank-officer", "BankMSP", "bankOfficer", nil)
-	collection, err = contract.CompletePremiumCollection(ctx, "collection-1", "payment-2", "2026-03-01", hashC)
+	collection, err = contract.ProcessPremiumCollection(ctx, "collection-1", "payment-2", "transfer-2", "account-insurer-1", "2026-03-01", hashF)
 	requireNoError(t, err)
-	if collection.Status != "COMPLETED" || collection.PaymentID != "payment-2" {
+	if collection.Status != "COMPLETED" || collection.PaymentID != "payment-2" || collection.TransferID != "transfer-2" {
 		t.Fatalf("unexpected completed collection: %+v", collection)
+	}
+	_, err = contract.AdjustBankAccountBalance(ctx, "balance-debit-1", "account-token-1", "DEBIT", 5_000, hash9)
+	requireNoError(t, err)
+
+	setIdentity(ctx, "insurer-admin", "InsurerMSP", "insurerAdmin", nil)
+	collection, err = contract.QueuePremiumCollection(ctx, "collection-bounce", "mandate-1", "2026-03-02")
+	requireNoError(t, err)
+	setIdentity(ctx, "bank-officer", "BankMSP", "bankOfficer", nil)
+	collection, err = contract.ProcessPremiumCollection(ctx, "collection-bounce", "payment-bounce", "transfer-bounce", "account-insurer-1", "2026-03-31", strings.Repeat("8", 64))
+	requireNoError(t, err)
+	if collection.Status != "BOUNCED" || collection.FailureCode != "INSUFFICIENT_FUNDS" || collection.PaymentID != "" {
+		t.Fatalf("unexpected bounced collection: %+v", collection)
 	}
 
 	setIdentity(ctx, "insurer-admin", "InsurerMSP", "insurerAdmin", nil)

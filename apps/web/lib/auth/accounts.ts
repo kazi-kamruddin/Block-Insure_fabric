@@ -9,6 +9,7 @@ export type DemoAccount = {
   role: FabricRole;
   subjectId?: string;
   fabricUserName?: string;
+  email?: string;
 };
 
 export const demoAccounts = {
@@ -24,6 +25,7 @@ export const demoAccounts = {
     organization: "InsurerMSP",
     role: "policyholder",
     subjectId: "policyholder1",
+    email: "policyholder1@block-insure.demo",
   },
   "hospital-officer": {
     id: "hospital-officer",

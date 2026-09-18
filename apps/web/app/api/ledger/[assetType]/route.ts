@@ -4,7 +4,7 @@ import { currentSession } from "@/lib/auth/current-session";
 import { findDemoAccount } from "@/lib/auth/accounts";
 import { ledger } from "@/lib/fabric/ledger";
 
-const assetTypeSchema = z.enum(["partner-agreement", "hospital-invoice", "package", "policy", "claim", "evidence", "evidence-grant", "verification", "decision", "review", "appeal", "fraud-assessment", "settlement", "access", "account", "mandate", "premium-payment", "premium-adjustment", "collection", "benefit-plan", "beneficiaries", "benefit-request", "liability", "oracle-snapshot", "oracle-request", "oracle-commitment", "oracle-result"]);
+const assetTypeSchema = z.enum(["partner-agreement", "hospital-invoice", "package", "policy", "claim", "evidence", "evidence-grant", "verification", "decision", "review", "appeal", "fraud-assessment", "settlement", "access", "account", "bank-transfer", "mandate", "premium-payment", "premium-adjustment", "collection", "benefit-plan", "beneficiaries", "benefit-request", "liability", "oracle-snapshot", "oracle-request", "oracle-commitment", "oracle-result"]);
 type RouteContext = { params: Promise<{ assetType: string }> };
 
 export const runtime = "nodejs";
@@ -163,6 +163,13 @@ export async function GET(_request: Request, context: RouteContext) {
       case "account": {
         const accounts = await ledger.listBankAccountReferences();
         result = session.role === "policyholder" ? accounts.filter((item) => item.ownerId === session.subjectId) : accounts;
+        break;
+      }
+      case "bank-transfer": {
+        const transfers = await ledger.listBankTransfers();
+        if (session.role !== "policyholder") { result = transfers; break; }
+        const ownedPolicyIds = new Set((await ledger.listPolicies()).filter((item) => item.policyholderId === session.subjectId).map((item) => item.id));
+        result = transfers.filter((item) => ownedPolicyIds.has(item.policyId));
         break;
       }
       case "mandate": {

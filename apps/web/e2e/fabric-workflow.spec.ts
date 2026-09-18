@@ -308,7 +308,8 @@ test("policy, premium, mandate, benefit, and banking lifecycles complete across 
   const ids = {
     package: `lifecycle-package-${suffix}`, benefitPlan: `lifecycle-plan-${suffix}`,
     policy: `lifecycle-policy-${suffix}`, renewal: `lifecycle-renewal-${suffix}`,
-    account: `lifecycle-account-${suffix}`, mandate: `lifecycle-mandate-${suffix}`,
+    account: `lifecycle-account-${suffix}`, insurerAccount: `lifecycle-insurer-account-${suffix}`, mandate: `lifecycle-mandate-${suffix}`,
+    transfer1: `lifecycle-transfer-1-${suffix}`, transfer2: `lifecycle-transfer-2-${suffix}`, transfer3: `lifecycle-transfer-3-${suffix}`,
     payment1: `lifecycle-payment-1-${suffix}`, payment2: `lifecycle-payment-2-${suffix}`,
     payment3: `lifecycle-payment-3-${suffix}`, adjustment: `lifecycle-adjustment-${suffix}`,
     collection: `lifecycle-collection-${suffix}`, benefit: `lifecycle-benefit-${suffix}`,
@@ -322,31 +323,32 @@ test("policy, premium, mandate, benefit, and banking lifecycles complete across 
     await command(insurer, { operation: "createBenefitPlan", id: ids.benefitPlan, packageId: ids.package, deathBenefitMinor: 500_000, surrenderBenefitMinor: 100_000, maturityBenefitMinor: 250_000, rulesHash: digest("benefit-rules") });
     await command(insurer, { operation: "publishBenefitPlan", id: ids.benefitPlan });
     await command(insurer, { operation: "publishPolicyPackage", id: ids.package });
-    await command(bank, { operation: "registerBankAccountReference", id: ids.account, ownerId: "policyholder1", accountTokenHash: digest("vault-token") });
+    await command(bank, { operation: "openBankAccount", id: ids.account, bankId: "bank-demo", ownerId: "policyholder1", accountType: "CUSTOMER", accountTokenHash: digest("vault-token"), openingBalanceMinor: 40_000 });
+    await command(bank, { operation: "openBankAccount", id: ids.insurerAccount, bankId: "bank-demo", ownerId: "insurer", accountType: "INSURER", accountTokenHash: digest("insurer-vault-token"), openingBalanceMinor: 0 });
     await command(policyholder, { operation: "acquirePolicy", id: ids.policy, packageId: ids.package, startDate: "2026-01-01", endDate: "2026-12-31" });
     await command(policyholder, { operation: "setBeneficiaries", policyId: ids.policy, allocationsJson: JSON.stringify([{ beneficiaryId: "beneficiary-primary", shareBps: 7000 }, { beneficiaryId: "beneficiary-secondary", shareBps: 3000 }]) });
     await command(policyholder, { operation: "requestBankMandate", id: ids.mandate, policyId: ids.policy, accountReferenceId: ids.account, expiryDate: "2026-12-31" });
     await command(bank, { operation: "reviewBankMandate", id: ids.mandate, outcome: "APPROVE", decisionHash: digest("mandate-approval") });
 
-    const otpResponse = await policyholder.post("/api/banking/otp", { data: { policyId: ids.policy, mandateId: ids.mandate } });
+    const otpResponse = await policyholder.post("/api/banking/otp", { data: { policyId: ids.policy, sourceAccountId: ids.account } });
     expect(otpResponse.ok(), await otpResponse.text()).toBe(true);
     const otp = await otpResponse.json();
     expect(otp.demoCode).toMatch(/^\d{6}$/);
     const manualPayment = await policyholder.post("/api/banking/premium-payment", { data: {
-      challengeId: otp.challengeId, otp: otp.demoCode, id: ids.payment1,
-      policyId: ids.policy, mandateId: ids.mandate, periodStartDate: "2026-01-01",
+      challengeId: otp.challengeId, otp: otp.demoCode, transferId: ids.transfer1, paymentId: ids.payment1,
+      policyId: ids.policy, sourceAccountId: ids.account, destinationAccountId: ids.insurerAccount, periodStartDate: "2026-01-01",
       periodEndDate: "2026-01-30", amountMinor: 10_000, externalReferenceHash: digest("manual-receipt"),
     } });
     expect(manualPayment.ok(), await manualPayment.text()).toBe(true);
     const otpReplay = await policyholder.post("/api/banking/premium-payment", { data: {
-      challengeId: otp.challengeId, otp: otp.demoCode, id: `replay-${ids.payment1}`,
-      policyId: ids.policy, mandateId: ids.mandate, periodStartDate: "2026-01-31",
+      challengeId: otp.challengeId, otp: otp.demoCode, transferId: `replay-${ids.transfer1}`, paymentId: `replay-${ids.payment1}`,
+      policyId: ids.policy, sourceAccountId: ids.account, destinationAccountId: ids.insurerAccount, periodStartDate: "2026-01-31",
       periodEndDate: "2026-03-01", amountMinor: 10_000, externalReferenceHash: digest("manual-replay"),
     } });
     expect(otpReplay.status()).toBe(409);
 
     await command(insurer, { operation: "queuePremiumCollection", id: ids.collection, mandateId: ids.mandate, dueDate: "2026-01-31" });
-    await command(bank, { operation: "completePremiumCollection", collectionId: ids.collection, paymentId: ids.payment2, periodEndDate: "2026-03-01", externalReferenceHash: digest("autodebit-receipt") });
+    await command(bank, { operation: "processPremiumCollection", collectionId: ids.collection, paymentId: ids.payment2, transferId: ids.transfer2, destinationAccountId: ids.insurerAccount, periodEndDate: "2026-03-01", externalReferenceHash: digest("eft-receipt") });
     await command(bank, { operation: "recordPremiumAdjustment", id: ids.adjustment, paymentId: ids.payment2, amountMinor: 2_000, externalReferenceHash: digest("reversal"), reasonHash: digest("reversal-reason") });
 
     await command(policyholder, { operation: "submitBenefitRequest", id: ids.benefit, policyId: ids.policy, benefitType: "DEATH", eventDate: "2026-06-15", evidenceHash: digest("benefit-evidence") });
@@ -356,7 +358,15 @@ test("policy, premium, mandate, benefit, and banking lifecycles complete across 
 
     await command(insurer, { operation: "advancePolicyLifecycle", id: ids.policy, asOfDate: "2026-03-03" });
     await command(insurer, { operation: "advancePolicyLifecycle", id: ids.policy, asOfDate: "2026-03-20" });
-    await command(bank, { operation: "recordPremiumPayment", id: ids.payment3, policyId: ids.policy, mandateId: ids.mandate, periodStartDate: "2026-03-02", periodEndDate: "2026-03-31", amountMinor: 10_000, externalReferenceHash: digest("reinstatement-receipt"), method: "OTP" });
+    const reinstatementOtpResponse = await policyholder.post("/api/banking/otp", { data: { policyId: ids.policy, sourceAccountId: ids.account } });
+    expect(reinstatementOtpResponse.ok(), await reinstatementOtpResponse.text()).toBe(true);
+    const reinstatementOtp = await reinstatementOtpResponse.json();
+    const reinstatementPayment = await policyholder.post("/api/banking/premium-payment", { data: {
+      challengeId: reinstatementOtp.challengeId, otp: reinstatementOtp.demoCode, transferId: ids.transfer3, paymentId: ids.payment3,
+      policyId: ids.policy, sourceAccountId: ids.account, destinationAccountId: ids.insurerAccount,
+      periodStartDate: "2026-03-02", periodEndDate: "2026-03-31", amountMinor: 10_000, externalReferenceHash: digest("reinstatement-receipt"),
+    } });
+    expect(reinstatementPayment.ok(), await reinstatementPayment.text()).toBe(true);
     await command(insurer, { operation: "advancePolicyLifecycle", id: ids.policy, asOfDate: "2026-12-31" });
     await command(policyholder, { operation: "renewPolicy", newId: ids.renewal, existingId: ids.policy, newEndDate: "2027-12-31" });
     await command(policyholder, { operation: "cancelPolicy", id: ids.renewal, reasonHash: digest("renewal-cancel") });
@@ -372,6 +382,10 @@ test("policy, premium, mandate, benefit, and banking lifecycles complete across 
     const statementResponse = await policyholder.get(`/api/policies/${ids.policy}/statement`);
     expect(statementResponse.ok(), await statementResponse.text()).toBe(true);
     expect((await statementResponse.json()).summary).toMatchObject({ grossPremiumMinor: 30_000, adjustedPremiumMinor: 2_000, netPremiumMinor: 28_000 });
+    const customerAccount = await (await policyholder.get(`/api/ledger/account/${ids.account}`)).json();
+    const insurerAccount = await (await bank.get(`/api/ledger/account/${ids.insurerAccount}`)).json();
+    expect(customerAccount.result.balanceMinor).toBe(12_000);
+    expect(insurerAccount.result.balanceMinor).toBe(28_000);
   } finally {
     await Promise.all([insurer.dispose(), policyholder.dispose(), bank.dispose()]);
   }

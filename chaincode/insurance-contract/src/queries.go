@@ -68,6 +68,10 @@ func (c *Contract) ListBankAccountReferences(ctx contractapi.TransactionContextI
 	return listState[BankAccountReference](ctx, "bankAccountReference")
 }
 
+func (c *Contract) ListBankTransfers(ctx contractapi.TransactionContextInterface) ([]BankTransfer, error) {
+	return listState[BankTransfer](ctx, "bankTransfer")
+}
+
 func (c *Contract) ListBankMandates(ctx contractapi.TransactionContextInterface) ([]BankMandate, error) {
 	return listState[BankMandate](ctx, "bankMandate")
 }

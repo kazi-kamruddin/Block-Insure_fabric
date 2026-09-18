@@ -3,6 +3,7 @@ package insurance
 import (
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -61,6 +62,15 @@ func (c *Contract) RequestBankMandate(ctx contractapi.TransactionContextInterfac
 	}
 	if account.OwnerID != ownerID || account.Status != "VERIFIED" {
 		return nil, fmt.Errorf("bank account reference is not verified for this policyholder")
+	}
+	if account.BankID == "" || account.AccountType != "CUSTOMER" {
+		return nil, fmt.Errorf("bank account reference is not a Phase 2 customer account")
+	}
+	if !slices.Contains(policy.BankIDs, account.BankID) {
+		return nil, fmt.Errorf("bank %s is not in policy %s's partner network", account.BankID, policyID)
+	}
+	if _, err := c.requireActivePartner(ctx, "BANK", account.BankID); err != nil {
+		return nil, err
 	}
 	expiry, err := validateDate("expiryDate", expiryDate)
 	if err != nil {
@@ -321,7 +331,7 @@ func (c *Contract) RecordPremiumPayment(ctx contractapi.TransactionContextInterf
 	if _, err := requireIdentity(ctx, "BankMSP", "bankOfficer"); err != nil {
 		return nil, err
 	}
-	return c.recordPremiumPayment(ctx, id, policyID, mandateID, periodStartDate, periodEndDate, amountMinor, externalReferenceHash, method)
+	return nil, fmt.Errorf("direct premium receipt recording is disabled; use ExecuteManualPremiumPayment or ProcessPremiumCollection")
 }
 
 func (c *Contract) RecordPremiumAdjustment(ctx contractapi.TransactionContextInterface, id, paymentID string, amountMinor int64, externalReferenceHash, reasonHash string) (*PremiumAdjustment, error) {
@@ -373,6 +383,48 @@ func (c *Contract) RecordPremiumAdjustment(ctx contractapi.TransactionContextInt
 		ExternalReferenceHash: strings.ToLower(externalReferenceHash), ReasonHash: strings.ToLower(reasonHash),
 		Type: "REVERSAL", RecordedAt: now,
 	}
+	if payment.TransferID != "" {
+		originalTransfer, err := c.ReadBankTransfer(ctx, payment.TransferID)
+		if err != nil {
+			return nil, err
+		}
+		source, err := c.ReadBankAccountReference(ctx, originalTransfer.SourceAccountID)
+		if err != nil {
+			return nil, err
+		}
+		destination, err := c.ReadBankAccountReference(ctx, originalTransfer.DestinationAccountID)
+		if err != nil {
+			return nil, err
+		}
+		if destination.BalanceMinor < amountMinor {
+			return nil, fmt.Errorf("insurer account %s has insufficient funds for reversal", destination.ID)
+		}
+		transferID := "bank-transfer-reversal-" + id
+		transfer := &BankTransfer{
+			AssetType: "bankTransfer", SchemaVersion: SchemaVersion, ID: transferID,
+			BankID: originalTransfer.BankID, SourceAccountID: destination.ID, DestinationAccountID: source.ID,
+			PolicyID: payment.PolicyID, PaymentID: payment.ID, AmountMinor: amountMinor, Currency: "BDT",
+			Method: "REVERSAL", Status: "SETTLED", ExternalReferenceHash: strings.ToLower(externalReferenceHash),
+			AuthorizationHash: strings.ToLower(reasonHash), CreatedAt: now,
+		}
+		destination.BalanceMinor -= amountMinor
+		source.BalanceMinor += amountMinor
+		destination.UpdatedAt = now
+		source.UpdatedAt = now
+		if err := overwriteAsset(ctx, "bankAccountReference", destination.ID, destination); err != nil {
+			return nil, err
+		}
+		if err := overwriteAsset(ctx, "bankAccountReference", source.ID, source); err != nil {
+			return nil, err
+		}
+		if err := putState(ctx, "bankTransfer", transfer.ID, transfer); err != nil {
+			return nil, err
+		}
+		adjustment.TransferID = transfer.ID
+		if err := emit(ctx, "BankTransferProcessed", transfer); err != nil {
+			return nil, err
+		}
+	}
 	if err := putState(ctx, "premiumAdjustment", id, adjustment); err != nil {
 		return nil, err
 	}
@@ -399,6 +451,15 @@ func (c *Contract) QueuePremiumCollection(ctx contractapi.TransactionContextInte
 	if _, err := validateDate("dueDate", dueDate); err != nil {
 		return nil, err
 	}
+	collections, err := c.ListPremiumCollections(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, existing := range collections {
+		if existing.MandateID == mandateID && existing.DueDate == dueDate {
+			return nil, fmt.Errorf("premium collection already exists for mandate %s on %s", mandateID, dueDate)
+		}
+	}
 	now, err := timestamp(ctx)
 	if err != nil {
 		return nil, err
@@ -421,64 +482,14 @@ func (c *Contract) CompletePremiumCollection(ctx contractapi.TransactionContextI
 	if _, err := requireIdentity(ctx, "BankMSP", "bankOfficer"); err != nil {
 		return nil, err
 	}
-	collection, err := c.ReadPremiumCollection(ctx, collectionID)
-	if err != nil {
-		return nil, err
-	}
-	if collection.Status != "DUE" && collection.Status != "RETRY" {
-		return nil, fmt.Errorf("premium collection %s is not due", collectionID)
-	}
-	if _, err := c.recordPremiumPayment(ctx, paymentID, collection.PolicyID, collection.MandateID, collection.DueDate, periodEndDate, collection.AmountMinor, externalReferenceHash, "AUTODEBIT"); err != nil {
-		return nil, err
-	}
-	collection.Status = "COMPLETED"
-	collection.PaymentID = paymentID
-	collection.AttemptCount++
-	collection.UpdatedAt, err = timestamp(ctx)
-	if err != nil {
-		return nil, err
-	}
-	if err := overwriteAsset(ctx, "premiumCollection", collectionID, collection); err != nil {
-		return nil, err
-	}
-	if err := emit(ctx, "PremiumCollectionCompleted", collection); err != nil {
-		return nil, err
-	}
-	return collection, nil
+	return nil, fmt.Errorf("manual collection completion is disabled; use ProcessPremiumCollection")
 }
 
 func (c *Contract) FailPremiumCollection(ctx contractapi.TransactionContextInterface, collectionID, failureHash string) (*PremiumCollection, error) {
 	if _, err := requireIdentity(ctx, "BankMSP", "bankOfficer"); err != nil {
 		return nil, err
 	}
-	if err := validateHash("failureHash", failureHash); err != nil {
-		return nil, err
-	}
-	collection, err := c.ReadPremiumCollection(ctx, collectionID)
-	if err != nil {
-		return nil, err
-	}
-	if collection.Status != "DUE" && collection.Status != "RETRY" {
-		return nil, fmt.Errorf("premium collection %s is not due", collectionID)
-	}
-	collection.AttemptCount++
-	collection.FailureHash = strings.ToLower(failureHash)
-	if collection.AttemptCount >= 3 {
-		collection.Status = "FAILED"
-	} else {
-		collection.Status = "RETRY"
-	}
-	collection.UpdatedAt, err = timestamp(ctx)
-	if err != nil {
-		return nil, err
-	}
-	if err := overwriteAsset(ctx, "premiumCollection", collectionID, collection); err != nil {
-		return nil, err
-	}
-	if err := emit(ctx, "PremiumCollectionFailed", collection); err != nil {
-		return nil, err
-	}
-	return collection, nil
+	return nil, fmt.Errorf("manual collection failure is disabled; ProcessPremiumCollection derives the outcome from the account balance")
 }
 
 func (c *Contract) ReadBankAccountReference(ctx contractapi.TransactionContextInterface, id string) (*BankAccountReference, error) {

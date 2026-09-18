@@ -7,6 +7,7 @@ import type {
   AuditorDecision,
   BankAccountReference,
   BankMandate,
+  BankTransfer,
   BeneficiaryDesignation,
   BenefitPlan,
   BenefitRequest,
@@ -139,6 +140,14 @@ export const ledger = {
 
   listBankAccountReferences() {
     return evaluate<BankAccountReference[]>("bankOfficer", "ListBankAccountReferences");
+  },
+
+  readBankTransfer(id: string) {
+    return evaluate<BankTransfer>("bankOfficer", "ReadBankTransfer", id);
+  },
+
+  listBankTransfers() {
+    return evaluate<BankTransfer[]>("bankOfficer", "ListBankTransfers");
   },
 
   readBankMandate(id: string) {
@@ -447,9 +456,17 @@ export const ledger = {
     return submit<Policy>("policyholder", "RenewPolicy", newId, existingId, newEndDate);
   },
 
-  registerBankAccountReference(input: { id: string; ownerId: string; accountTokenHash: string }) {
+  openBankAccount(input: { id: string; bankId: string; ownerId: string; accountType: "CUSTOMER" | "INSURER"; accountTokenHash: string; openingBalanceMinor: number }) {
     return submit<BankAccountReference>(
-      "bankOfficer", "RegisterBankAccountReference", input.id, input.ownerId, input.accountTokenHash,
+      "bankOfficer", "OpenBankAccount", input.id, input.bankId, input.ownerId, input.accountType,
+      input.accountTokenHash, input.openingBalanceMinor,
+    );
+  },
+
+  adjustBankAccountBalance(input: { transferId: string; accountId: string; direction: "CREDIT" | "DEBIT"; amountMinor: number; externalReferenceHash: string }) {
+    return submit<BankTransfer>(
+      "bankOfficer", "AdjustBankAccountBalance", input.transferId, input.accountId,
+      input.direction, input.amountMinor, input.externalReferenceHash,
     );
   },
 
@@ -471,13 +488,14 @@ export const ledger = {
     return submit<BankMandate>("bankOfficer", "ExpireBankMandate", id, asOfDate);
   },
 
-  recordPremiumPayment(input: {
-    id: string; policyId: string; mandateId: string; periodStartDate: string;
-    periodEndDate: string; amountMinor: number; externalReferenceHash: string; method: "OTP" | "AUTODEBIT";
+  executeManualPremiumPayment(input: {
+    transferId: string; paymentId: string; policyId: string; sourceAccountId: string; destinationAccountId: string;
+    periodStartDate: string; periodEndDate: string; amountMinor: number; externalReferenceHash: string; authorizationHash: string;
   }) {
-    return submit<PremiumPayment>(
-      "bankOfficer", "RecordPremiumPayment", input.id, input.policyId, input.mandateId,
-      input.periodStartDate, input.periodEndDate, input.amountMinor, input.externalReferenceHash, input.method,
+    return submit<BankTransfer>(
+      "bankOfficer", "ExecuteManualPremiumPayment", input.transferId, input.paymentId, input.policyId,
+      input.sourceAccountId, input.destinationAccountId, input.periodStartDate, input.periodEndDate,
+      input.amountMinor, input.externalReferenceHash, input.authorizationHash,
     );
   },
 
@@ -491,14 +509,11 @@ export const ledger = {
     return submit<PremiumCollection>("insurerAdmin", "QueuePremiumCollection", id, mandateId, dueDate);
   },
 
-  completePremiumCollection(collectionId: string, paymentId: string, periodEndDate: string, externalReferenceHash: string) {
+  processPremiumCollection(input: { collectionId: string; paymentId: string; transferId: string; destinationAccountId: string; periodEndDate: string; externalReferenceHash: string }) {
     return submit<PremiumCollection>(
-      "bankOfficer", "CompletePremiumCollection", collectionId, paymentId, periodEndDate, externalReferenceHash,
+      "bankOfficer", "ProcessPremiumCollection", input.collectionId, input.paymentId, input.transferId,
+      input.destinationAccountId, input.periodEndDate, input.externalReferenceHash,
     );
-  },
-
-  failPremiumCollection(collectionId: string, failureHash: string) {
-    return submit<PremiumCollection>("bankOfficer", "FailPremiumCollection", collectionId, failureHash);
   },
 
   createBenefitPlan(input: {

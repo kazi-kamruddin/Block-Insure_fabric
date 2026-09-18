@@ -85,11 +85,36 @@ export type BankAccountReference = {
   assetType: "bankAccountReference";
   schemaVersion: number;
   id: string;
+  bankId: string;
   ownerId: string;
+  accountType: "CUSTOMER" | "INSURER";
   accountTokenHash: string;
+  currency: "BDT";
+  balanceMinor: number;
   status: "VERIFIED" | "DISABLED";
   createdAt: LedgerTimestamp;
   updatedAt: LedgerTimestamp;
+};
+
+export type BankTransfer = {
+  assetType: "bankTransfer";
+  schemaVersion: number;
+  id: string;
+  bankId: string;
+  sourceAccountId: string;
+  destinationAccountId: string;
+  policyId: string;
+  mandateId: string;
+  collectionId: string;
+  paymentId: string;
+  amountMinor: number;
+  currency: "BDT";
+  method: "OTP" | "EFT" | "REVERSAL" | "ADJUSTMENT_CREDIT" | "ADJUSTMENT_DEBIT";
+  status: "SETTLED" | "BOUNCED";
+  failureCode: string;
+  externalReferenceHash: string;
+  authorizationHash: string;
+  createdAt: LedgerTimestamp;
 };
 
 export type BankMandate = {
@@ -115,11 +140,14 @@ export type PremiumPayment = {
   id: string;
   policyId: string;
   mandateId: string;
+  transferId: string;
+  sourceAccountId: string;
+  destinationAccountId: string;
   periodStartDate: string;
   periodEndDate: string;
   amountMinor: number;
   externalReferenceHash: string;
-  method: "OTP" | "AUTODEBIT";
+  method: "OTP" | "EFT";
   recordedAt: LedgerTimestamp;
 };
 
@@ -129,6 +157,7 @@ export type PremiumAdjustment = {
   id: string;
   paymentId: string;
   policyId: string;
+  transferId: string;
   amountMinor: number;
   externalReferenceHash: string;
   reasonHash: string;
@@ -144,9 +173,11 @@ export type PremiumCollection = {
   mandateId: string;
   dueDate: string;
   amountMinor: number;
-  status: "DUE" | "RETRY" | "COMPLETED" | "FAILED";
+  status: "DUE" | "RETRY" | "COMPLETED" | "FAILED" | "BOUNCED";
   paymentId: string;
+  transferId: string;
   failureHash: string;
+  failureCode: string;
   attemptCount: number;
   createdAt: LedgerTimestamp;
   updatedAt: LedgerTimestamp;

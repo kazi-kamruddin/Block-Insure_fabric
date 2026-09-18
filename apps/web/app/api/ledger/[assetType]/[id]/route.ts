@@ -5,7 +5,7 @@ import { findDemoAccount } from "@/lib/auth/accounts";
 import { ledger } from "@/lib/fabric/ledger";
 
 const routeSchema = z.object({
-  assetType: z.enum(["partner-agreement", "hospital-invoice", "package", "policy", "claim", "evidence", "evidence-grant", "verification", "decision", "review", "appeal", "fraud-assessment", "settlement", "claim-history", "account", "mandate", "premium-payment", "premium-adjustment", "collection", "benefit-plan", "beneficiaries", "benefit-request", "liability", "oracle-snapshot", "oracle-request", "oracle-commitment", "oracle-result", "oracle-history"]),
+  assetType: z.enum(["partner-agreement", "hospital-invoice", "package", "policy", "claim", "evidence", "evidence-grant", "verification", "decision", "review", "appeal", "fraud-assessment", "settlement", "claim-history", "account", "bank-transfer", "mandate", "premium-payment", "premium-adjustment", "collection", "benefit-plan", "beneficiaries", "benefit-request", "liability", "oracle-snapshot", "oracle-request", "oracle-commitment", "oracle-result", "oracle-history"]),
   id: z.string().trim().min(1).max(100).regex(/^[a-zA-Z0-9._:-]+$/),
 });
 
@@ -198,6 +198,12 @@ export async function GET(_request: Request, context: RouteContext) {
         const account = await ledger.readBankAccountReference(id);
         if (session.role === "policyholder" && account.ownerId !== session.subjectId) return NextResponse.json({ message: "Asset is not owned by this account" }, { status: 403 });
         result = account;
+        break;
+      }
+      case "bank-transfer": {
+        const transfer = await ledger.readBankTransfer(id);
+        if (session.role === "policyholder" && (!transfer.policyId || (await ledger.readPolicy(transfer.policyId)).policyholderId !== session.subjectId)) return NextResponse.json({ message: "Asset is not owned by this account" }, { status: 403 });
+        result = transfer;
         break;
       }
       case "mandate": {

@@ -38,8 +38,10 @@ export async function executeWorkflowCommand(command: WorkflowCommand, session: 
       return ledger.cancelPolicy(command.id, command.reasonHash, "insurerAdmin");
     case "renewPolicy":
       return ledger.renewPolicy(command.newId, command.existingId, command.newEndDate);
-    case "registerBankAccountReference":
-      return ledger.registerBankAccountReference(command);
+    case "openBankAccount":
+      return ledger.openBankAccount(command);
+    case "adjustBankAccountBalance":
+      return ledger.adjustBankAccountBalance(command);
     case "requestBankMandate":
       return ledger.requestBankMandate(command);
     case "reviewBankMandate":
@@ -48,16 +50,12 @@ export async function executeWorkflowCommand(command: WorkflowCommand, session: 
       return ledger.cancelBankMandate(command.id);
     case "expireBankMandate":
       return ledger.expireBankMandate(command.id, command.asOfDate);
-    case "recordPremiumPayment":
-      return ledger.recordPremiumPayment(command);
     case "recordPremiumAdjustment":
       return ledger.recordPremiumAdjustment(command);
     case "queuePremiumCollection":
       return ledger.queuePremiumCollection(command.id, command.mandateId, command.dueDate);
-    case "completePremiumCollection":
-      return ledger.completePremiumCollection(command.collectionId, command.paymentId, command.periodEndDate, command.externalReferenceHash);
-    case "failPremiumCollection":
-      return ledger.failPremiumCollection(command.collectionId, command.failureHash);
+    case "processPremiumCollection":
+      return ledger.processPremiumCollection(command);
     case "setBeneficiaries":
       return ledger.setBeneficiaries(command.policyId, command.allocationsJson);
     case "submitBenefitRequest":

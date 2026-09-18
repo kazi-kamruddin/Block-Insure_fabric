@@ -3,8 +3,8 @@
 Issue `#8` extends the original claim-focused vertical slice into governed
 coverage acquisition and external-fiat reconciliation. Hyperledger Fabric is
 the shared authority for obligations, approvals, state transitions, immutable
-receipts, and safe references. It does not transfer BDT, store bank-account
-numbers, deliver production OTPs, or replace a bank core.
+receipts, and safe references. Its balance ledger is a deterministic Bank demo;
+it does not transfer real BDT, store bank-account numbers, or replace a bank core.
 
 ## Policy lifecycle
 
@@ -30,49 +30,56 @@ and liabilities. Policyholder sessions may export only an owned policy.
 
 ## Bank references, mandates, and premiums
 
-BankMSP registers an irreversible SHA-256 token representing an account held in
-an external bank vault. The shared ledger never receives an account or routing
-number. A policyholder can request a mandate only for an owned policy and an
-owned verified token. BankMSP approves or rejects it; the owner can cancel it,
-and BankMSP can expire it after its expiry date.
+BankMSP opens typed `CUSTOMER` and `INSURER` demo accounts with integer-poisha
+balances and irreversible SHA-256 vault tokens. The shared ledger never receives
+an account or routing number. The Bank may record auditable demo funding changes.
+A policyholder can request an EFT mandate only for an owned policy and owned
+customer account at a Bank listed in the policy snapshot. BankMSP approves or
+rejects it; the owner can cancel it, and BankMSP can expire it.
 
 Premium receipts contain integer poisha, their covered date range, collection
 method, and a hash of the external receipt. An external-reference composite key
 prevents replay under another payment ID. Repeating the same payment ID and
 receipt is idempotent; changing its details is rejected. Append-only
-`PremiumAdjustment` assets model reversals and cannot cumulatively exceed the
-original receipt. They never erase history or silently roll coverage backward.
+`PremiumAdjustment` assets model reversals, cannot cumulatively exceed the
+original receipt, and create the inverse insurer-to-customer transfer. They never
+erase history or silently roll coverage backward.
 
 ## Manual OTP boundary
 
 The policyholder workspace provides a manual-premium card:
 
-1. `POST /api/banking/otp` verifies policy and active-mandate ownership.
+1. `POST /api/banking/otp` verifies policy and customer-account ownership; a
+   recurring EFT mandate is intentionally not required.
 2. The server creates a cryptographically random six-digit challenge bound to
-   the session subject, policy, and mandate.
+   the session subject, policy, and source account.
 3. The challenge expires after five minutes, locks after five failures, and is
-   consumed exactly once.
+   consumed exactly once; the configured email gateway delivers it.
 4. `POST /api/banking/premium-payment` consumes the challenge and submits the
-   bank-confirmed receipt with the fixed BankMSP service identity.
+   Bank transaction with the fixed BankMSP service identity. Chaincode atomically
+   debits the customer and credits the insurer, or records a bounced transfer.
 
 `ENABLE_DEMO_AUTH=true` returns the code to the local UI so the thesis workflow
-is demonstrable. A deployment must replace that response with a bank/SMS
-delivery adapter and use a separate long random `OTP_SECRET`. Neither OTP values
+is demonstrable. Outside demo mode `EMAIL_GATEWAY_URL` is mandatory and the code
+is never returned to the browser. Deployments use a separate long random
+`OTP_SECRET`. Neither OTP values
 nor external receipt plaintext is written to Fabric.
 
 ## Durable scheduled collection
 
-`QueuePremiumCollection` creates an on-ledger `DUE` work item for the mandate's
-exact next due date. Bank processing either completes it and atomically creates
-an `AUTODEBIT` receipt, or records a hashed failure. Failed work becomes `RETRY`
-for two attempts and `FAILED` on the third, preserving every attempt count.
+`QueuePremiumCollection` creates one on-ledger `DUE` work item for the mandate's
+exact next due date. `ProcessPremiumCollection` inspects the mandate account's
+current balance. Sufficient funds atomically create an `EFT` transfer/payment,
+debit the customer, credit the insurer, and advance the due date. Insufficient
+funds leave both balances and policy dates unchanged and record `BOUNCED` with
+the deterministic `INSUFFICIENT_FUNDS` code.
 
 The integration boundary is `POST /api/internal/banking/collections`, protected
 by `BANKING_WORKER_SECRET`. Its commands are:
 
-- `listDue` with an `asOfDate` to obtain `DUE`/`RETRY` ledger work;
-- `complete` with an external receipt hash; or
-- `fail` with a private failure-reference hash.
+- `listDue` with an `asOfDate` to obtain `DUE`/`RETRY` ledger work; or
+- `process` with payment/transfer IDs, insurer destination account, covered
+  period end, and an external processing-reference hash.
 
 The durable queue is Fabric state, so an application restart cannot lose the
 collection obligation. A production scheduler/bank adapter calls this API and
@@ -101,8 +108,9 @@ audit evidence; actual BDT allocation and movement remain in the external bank.
 
 ## Verification
 
-The Go suite covers authorization, invalid allocation totals, payment replay,
-reversal limits, policy grace/lapse/reinstatement, mandate/collection state, and
+The Go suite covers authorization, invalid allocation totals, balanced manual
+and EFT transfers, insufficient-funds bounce, payment replay, reversal limits,
+policy grace/lapse/reinstatement, mandate/collection state, and
 benefit/liability closure. The CLI smoke workflow and Playwright regression both
 execute the multi-organization lifecycle against the live channel. Run all gates
 with `./scripts/verify-all.ps1` from Windows PowerShell.

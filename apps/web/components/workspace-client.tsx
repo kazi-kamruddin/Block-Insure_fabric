@@ -13,7 +13,7 @@ import type { WorkflowCommand } from "@/lib/workflows/commands";
 import { bdtToMinor } from "@/lib/workflows/forms";
 import { decryptEvidenceBytes, encryptEvidenceBytes, sha256Hex } from "@/lib/evidence/browser-crypto";
 
-type AssetType = "partner-agreement" | "hospital-invoice" | "package" | "policy" | "claim" | "evidence" | "evidence-grant" | "verification" | "decision" | "review" | "appeal" | "fraud-assessment" | "settlement" | "access" | "claim-history" | "account" | "mandate" | "premium-payment" | "premium-adjustment" | "collection" | "benefit-plan" | "beneficiaries" | "benefit-request" | "liability" | "oracle-snapshot" | "oracle-request" | "oracle-commitment" | "oracle-result" | "oracle-history";
+type AssetType = "partner-agreement" | "hospital-invoice" | "package" | "policy" | "claim" | "evidence" | "evidence-grant" | "verification" | "decision" | "review" | "appeal" | "fraud-assessment" | "settlement" | "access" | "claim-history" | "account" | "bank-transfer" | "mandate" | "premium-payment" | "premium-adjustment" | "collection" | "benefit-plan" | "beneficiaries" | "benefit-request" | "liability" | "oracle-snapshot" | "oracle-request" | "oracle-commitment" | "oracle-result" | "oracle-history";
 type NotificationItem = { id: string; title: string; message: string; assetId: string; blockNumber: string };
 type ResearchSnapshotView = {
   reproducibilityHash: string;
@@ -92,7 +92,7 @@ export function WorkspaceClient({
   const [retrieving, setRetrieving] = useState(false);
   const [decryptedEvidence, setDecryptedEvidence] = useState<{ url: string; name: string } | null>(null);
   const [auditClaimId, setAuditClaimId] = useState("");
-  const [manualPayment, setManualPayment] = useState({ policyId: "", mandateId: "", paymentId: "", periodStartDate: "", periodEndDate: "", amountBdt: "", externalReference: "", challengeId: "", otp: "", demoCode: "" });
+  const [manualPayment, setManualPayment] = useState({ policyId: "", sourceAccountId: "", destinationAccountId: "bank-insurer-premium", transferId: "", paymentId: "", periodStartDate: "", periodEndDate: "", amountBdt: "", externalReference: "", challengeId: "", otp: "", demoCode: "" });
   const [statementPolicyId, setStatementPolicyId] = useState("");
   const [output, setOutput] = useState("Ready.");
   const [busy, setBusy] = useState(false);
@@ -259,7 +259,7 @@ export function WorkspaceClient({
     try {
       const body = await responseJson(await fetch("/api/banking/otp", {
         method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ policyId: manualPayment.policyId, mandateId: manualPayment.mandateId }),
+        body: JSON.stringify({ policyId: manualPayment.policyId, sourceAccountId: manualPayment.sourceAccountId }),
       }));
       setManualPayment((current) => ({ ...current, challengeId: body.challengeId, demoCode: body.demoCode ?? "", otp: body.demoCode ?? "" }));
       setOutput(body.demoCode ? `Demo OTP ${body.demoCode} expires at ${body.expiresAt}.` : `OTP challenge created and delivered by the configured adapter; expires at ${body.expiresAt}.`);
@@ -279,7 +279,8 @@ export function WorkspaceClient({
         method: "POST", headers: { "content-type": "application/json" },
         body: JSON.stringify({
           challengeId: manualPayment.challengeId, otp: manualPayment.otp,
-          id: manualPayment.paymentId, policyId: manualPayment.policyId, mandateId: manualPayment.mandateId,
+          transferId: manualPayment.transferId, paymentId: manualPayment.paymentId, policyId: manualPayment.policyId,
+          sourceAccountId: manualPayment.sourceAccountId, destinationAccountId: manualPayment.destinationAccountId,
           periodStartDate: manualPayment.periodStartDate, periodEndDate: manualPayment.periodEndDate,
           amountMinor: bdtToMinor(manualPayment.amountBdt), externalReferenceHash,
         }),
@@ -551,10 +552,12 @@ export function WorkspaceClient({
           <article className="workCard evidenceCard">
             <span className="kicker">Manual premium</span>
             <h2>Pay with one-time authorization</h2>
-            <p className="cardNote">The OTP is bound to you, this policy, and this active mandate. Fabric stores the bank-confirmed receipt hash—never the OTP or account number.</p>
+            <p className="cardNote">The connected Bank emails an OTP bound to you, this policy, and the selected account. A valid code triggers one atomic customer debit and insurer credit; no EFT mandate is required.</p>
             <div className="evidenceFields">
               <label>Policy ID<input value={manualPayment.policyId} onChange={(event) => updateManualPayment("policyId", event.target.value)} /></label>
-              <label>Mandate ID<input value={manualPayment.mandateId} onChange={(event) => updateManualPayment("mandateId", event.target.value)} /></label>
+              <label>Customer account ID<input value={manualPayment.sourceAccountId} onChange={(event) => updateManualPayment("sourceAccountId", event.target.value)} /></label>
+              <label>Insurer account ID<input value={manualPayment.destinationAccountId} onChange={(event) => updateManualPayment("destinationAccountId", event.target.value)} /></label>
+              <label>Transfer ID<input value={manualPayment.transferId} onChange={(event) => updateManualPayment("transferId", event.target.value)} /></label>
               <label>Payment ID<input value={manualPayment.paymentId} onChange={(event) => updateManualPayment("paymentId", event.target.value)} /></label>
               <label>Period starts<input type="date" value={manualPayment.periodStartDate} onChange={(event) => updateManualPayment("periodStartDate", event.target.value)} /></label>
               <label>Period ends<input type="date" value={manualPayment.periodEndDate} onChange={(event) => updateManualPayment("periodEndDate", event.target.value)} /></label>
@@ -564,7 +567,7 @@ export function WorkspaceClient({
             </div>
             {manualPayment.demoCode && <p className="evidenceWarning">Local demo delivery code: <strong>{manualPayment.demoCode}</strong></p>}
             <div className="evidenceActions">
-              <button className="secondary button" disabled={busy || !manualPayment.policyId || !manualPayment.mandateId} onClick={requestPremiumOtp}>Request OTP</button>
+              <button className="secondary button" disabled={busy || !manualPayment.policyId || !manualPayment.sourceAccountId} onClick={requestPremiumOtp}>Email OTP</button>
               <button className="primary button" disabled={busy || !manualPayment.challengeId || manualPayment.otp.length !== 6} onClick={submitManualPremium}>Authorize premium</button>
             </div>
           </article>
@@ -599,7 +602,7 @@ export function WorkspaceClient({
               <option value="settlement">Settlement</option><option value="claim-history">Claim history</option>
               <option value="oracle-snapshot">Oracle registry snapshot</option><option value="oracle-request">Oracle request</option>
               <option value="oracle-commitment">Oracle commitment</option><option value="oracle-result">Oracle revealed result</option><option value="oracle-history">Oracle request history</option>
-              <option value="account">Bank account token</option><option value="mandate">Debit mandate</option>
+              <option value="account">Bank account</option><option value="bank-transfer">Bank transfer</option><option value="mandate">Debit mandate</option>
               <option value="premium-payment">Premium payment</option><option value="premium-adjustment">Premium reversal</option><option value="collection">Premium collection</option>
               <option value="benefit-plan">Benefit plan</option><option value="beneficiaries">Beneficiary designation</option>
               <option value="benefit-request">Benefit request</option><option value="liability">Liability</option>

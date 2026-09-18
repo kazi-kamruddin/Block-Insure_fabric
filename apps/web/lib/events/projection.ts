@@ -62,6 +62,11 @@ function notificationTargets(event: IndexedFabricEvent) {
     ];
     case "SettlementAuthorized": return [{ role: "bankOfficer", subject: "", title: "Settlement ready for confirmation", asset: text(p, "id") }];
     case "PremiumCollectionQueued": return [{ role: "bankOfficer", subject: "", title: "Premium collection queued", asset: text(p, "id") }];
+    case "BankTransferProcessed": return [
+      { role: "bankOfficer", subject: "", title: `Bank transfer ${text(p, "status").toLowerCase()}`, asset: text(p, "id") },
+      ...(text(p, "policyId") ? [{ role: "policyholder", subject: "", title: `Premium transfer ${text(p, "status").toLowerCase()}`, asset: text(p, "policyId") }] : []),
+    ];
+    case "PremiumCollectionProcessed": return [{ role: "insurerAdmin", subject: "", title: `Premium collection ${text(p, "status").toLowerCase()}`, asset: text(p, "id") }];
     case "BenefitRequested": return [{ role: "insurerAdmin", subject: "", title: "Benefit request submitted", asset: text(p, "id") }];
     case "BenefitPaymentReady": return [{ role: "bankOfficer", subject: "", title: "Benefit payment ready", asset: text(p, "id") }];
     case "EvidenceAccessGranted": return [{ role: text(p, "granteeRole"), subject: text(p, "granteeSubject"), title: "Evidence access granted", asset: text(p, "id") }];

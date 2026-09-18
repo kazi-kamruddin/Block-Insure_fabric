@@ -1,6 +1,8 @@
 import type { FabricRole } from "@/lib/fabric/config";
 import type {
   BankMandate,
+  BankAccountReference,
+  BankTransfer,
   AuditorDecision,
   BenefitRequest,
   Claim,
@@ -48,6 +50,8 @@ export type DashboardAssets = {
   settlements: Settlement[];
   evidenceAccess: EvidenceAccessRecord[];
   mandates?: BankMandate[];
+  bankAccounts?: BankAccountReference[];
+  bankTransfers?: BankTransfer[];
   premiumPayments?: PremiumPayment[];
   premiumCollections?: PremiumCollection[];
   benefitRequests?: BenefitRequest[];
@@ -83,10 +87,11 @@ export function buildRoleDashboard(
   subjectId?: string,
 ): RoleDashboard {
   const mandates = assets.mandates ?? [];
+  const bankAccounts = assets.bankAccounts ?? [];
+  const bankTransfers = assets.bankTransfers ?? [];
   const premiumPayments = assets.premiumPayments ?? [];
   const premiumCollections = assets.premiumCollections ?? [];
   const benefitRequests = assets.benefitRequests ?? [];
-  const liabilities = assets.liabilities ?? [];
   const reviews = assets.reviews ?? [];
   const decisions = assets.decisions ?? [];
   const fraudAssessments = assets.fraudAssessments ?? [];
@@ -220,17 +225,17 @@ export function buildRoleDashboard(
     const readySettlements = assets.settlements.filter((item) => item.status === "AUTHORIZED");
     const queue: DashboardItem[] = [
       ...pendingMandates.map((mandate) => ({ id: mandate.id, title: mandate.id, detail: `${money(mandate.amountMinor)} · policy ${mandate.policyId}`, status: mandate.status, commandLabel: "Review mandate", command: { operation: "reviewBankMandate", id: mandate.id, outcome: "APPROVE" } })),
-      ...dueCollections.map((collection) => ({ id: collection.id, title: collection.id, detail: `${money(collection.amountMinor)} · due ${collection.dueDate}`, status: collection.status, commandLabel: "Reconcile collection", command: { operation: "completePremiumCollection", collectionId: collection.id } })),
+      ...dueCollections.map((collection) => ({ id: collection.id, title: collection.id, detail: `${money(collection.amountMinor)} · due ${collection.dueDate}`, status: collection.status, commandLabel: "Process EFT", command: { operation: "processPremiumCollection", collectionId: collection.id, destinationAccountId: "bank-insurer-premium" } })),
       ...readyBenefits.map((benefit) => ({ id: benefit.id, title: benefit.id, detail: `${money(benefit.amountMinor)} · ${benefit.benefitType.toLowerCase()} benefit`, status: benefit.status, commandLabel: "Confirm payout", command: { operation: "confirmBenefitPayment", id: benefit.id } })),
       ...readySettlements.map((settlement) => ({ id: settlement.id, title: settlement.id, detail: `${money(settlement.amountMinor)} · claim ${settlement.claimId}`, status: settlement.status, commandLabel: "Prepare confirmation", command: { operation: "confirmSettlement", settlementId: settlement.id } })),
     ];
     return {
       title: "Banking operations desk",
-      description: "Review debit mandates, reconcile premium collections, and confirm claim and benefit payouts.",
+      description: "Operate the connected Bank simulation: maintain balances, approve EFT mandates, and process deterministic premium debits.",
       metrics: [
         { label: "Bank action queue", value: queue.length, hint: "mandates, collections, and payouts" },
-        { label: "Premium receipts", value: premiumPayments.length, hint: "replay-protected confirmations" },
-        { label: "Paid liabilities", value: liabilities.filter((item) => item.status === "PAID").length, hint: "external transfers reconciled" },
+        { label: "Customer balances", value: bankAccounts.filter((item) => item.accountType === "CUSTOMER").reduce((sum, item) => sum + item.balanceMinor, 0) / 100, hint: "BDT across verified demo accounts" },
+        { label: "Settled / bounced", value: bankTransfers.filter((item) => item.status === "SETTLED").length, hint: `${bankTransfers.filter((item) => item.status === "BOUNCED").length} bounced for insufficient funds` },
       ],
       queueTitle: "Mandates, collections, and payouts",
       queue,

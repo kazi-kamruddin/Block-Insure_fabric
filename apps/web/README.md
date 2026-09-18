@@ -40,8 +40,9 @@ material exists under `../../network/organizations`. Check application health at
   inbox records and auditable indexed events.
 - `/research` and `/api/research/snapshot` provide a role-restricted,
   ledger-derived thesis dashboard and reproducibility-hashed JSON artifact.
-- `/api/banking/otp` and `/api/banking/premium-payment` provide policy-bound,
-  single-use manual premium authorization for policyholders.
+- `/api/banking/otp` sends a policy/account-bound code through the configured
+  email gateway; `/api/banking/premium-payment` consumes it once and atomically
+  debits the customer account while crediting the insurer account.
 
 ## Supervised event worker
 
@@ -60,8 +61,8 @@ bounded exponential backoff and produce structured JSON logs. It accepts HTTP
 only for a loopback URL; remote endpoints must use HTTPS. Process supervision
 (for example a container restart policy or service manager) remains a deployment
 responsibility.
-- `/api/internal/banking/collections` is the bearer-protected durable collection
-  worker boundary for due/retry discovery and bank reconciliation.
+- `/api/internal/banking/collections` is the bearer-protected EFT worker boundary;
+  each due debit settles or bounces deterministically from the ledger balance.
 - `/api/policies/[id]/statement` exports an ownership-filtered policy, premium,
   mandate, claim, benefit, and liability statement.
 - `/workspace/<role>` provides canonical organization dashboards, guided

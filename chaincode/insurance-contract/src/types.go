@@ -1,6 +1,6 @@
 package insurance
 
-const SchemaVersion = 8
+const SchemaVersion = 9
 
 type PartnerAgreement struct {
 	AssetType     string `json:"assetType"`
@@ -87,11 +87,36 @@ type BankAccountReference struct {
 	AssetType        string `json:"assetType"`
 	SchemaVersion    int    `json:"schemaVersion"`
 	ID               string `json:"id"`
+	BankID           string `json:"bankId"`
 	OwnerID          string `json:"ownerId"`
+	AccountType      string `json:"accountType"`
 	AccountTokenHash string `json:"accountTokenHash"`
+	Currency         string `json:"currency"`
+	BalanceMinor     int64  `json:"balanceMinor"`
 	Status           string `json:"status"`
 	CreatedAt        string `json:"createdAt"`
 	UpdatedAt        string `json:"updatedAt"`
+}
+
+type BankTransfer struct {
+	AssetType             string `json:"assetType"`
+	SchemaVersion         int    `json:"schemaVersion"`
+	ID                    string `json:"id"`
+	BankID                string `json:"bankId"`
+	SourceAccountID       string `json:"sourceAccountId"`
+	DestinationAccountID  string `json:"destinationAccountId"`
+	PolicyID              string `json:"policyId"`
+	MandateID             string `json:"mandateId"`
+	CollectionID          string `json:"collectionId"`
+	PaymentID             string `json:"paymentId"`
+	AmountMinor           int64  `json:"amountMinor"`
+	Currency              string `json:"currency"`
+	Method                string `json:"method"`
+	Status                string `json:"status"`
+	FailureCode           string `json:"failureCode"`
+	ExternalReferenceHash string `json:"externalReferenceHash"`
+	AuthorizationHash     string `json:"authorizationHash"`
+	CreatedAt             string `json:"createdAt"`
 }
 
 type BankMandate struct {
@@ -117,6 +142,9 @@ type PremiumPayment struct {
 	ID                    string `json:"id"`
 	PolicyID              string `json:"policyId"`
 	MandateID             string `json:"mandateId"`
+	TransferID            string `json:"transferId"`
+	SourceAccountID       string `json:"sourceAccountId"`
+	DestinationAccountID  string `json:"destinationAccountId"`
 	PeriodStartDate       string `json:"periodStartDate"`
 	PeriodEndDate         string `json:"periodEndDate"`
 	AmountMinor           int64  `json:"amountMinor"`
@@ -131,6 +159,7 @@ type PremiumAdjustment struct {
 	ID                    string `json:"id"`
 	PaymentID             string `json:"paymentId"`
 	PolicyID              string `json:"policyId"`
+	TransferID            string `json:"transferId"`
 	AmountMinor           int64  `json:"amountMinor"`
 	ExternalReferenceHash string `json:"externalReferenceHash"`
 	ReasonHash            string `json:"reasonHash"`
@@ -148,7 +177,9 @@ type PremiumCollection struct {
 	AmountMinor   int64  `json:"amountMinor"`
 	Status        string `json:"status"`
 	PaymentID     string `json:"paymentId"`
+	TransferID    string `json:"transferId"`
 	FailureHash   string `json:"failureHash"`
+	FailureCode   string `json:"failureCode"`
 	AttemptCount  int    `json:"attemptCount"`
 	CreatedAt     string `json:"createdAt"`
 	UpdatedAt     string `json:"updatedAt"`

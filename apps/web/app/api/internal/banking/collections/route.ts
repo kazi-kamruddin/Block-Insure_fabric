@@ -3,11 +3,14 @@ import { z } from "zod";
 import { ledger } from "@/lib/fabric/ledger";
 import { verifyBearerToken } from "@/lib/security/bearer-token";
 
-const hash = z.string().regex(/^[a-fA-F0-9]{64}$/).transform((value) => value.toLowerCase());
 const commandSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("listDue"), asOfDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) }),
-  z.object({ action: z.literal("complete"), collectionId: z.string().min(3), paymentId: z.string().min(3), periodEndDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), externalReferenceHash: hash }),
-  z.object({ action: z.literal("fail"), collectionId: z.string().min(3), failureHash: hash }),
+  z.object({
+    action: z.literal("process"), collectionId: z.string().min(3), paymentId: z.string().min(3),
+    transferId: z.string().min(3), destinationAccountId: z.string().min(3),
+    periodEndDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    externalReferenceHash: z.string().regex(/^[a-fA-F0-9]{64}$/).transform((value) => value.toLowerCase()),
+  }),
 ]);
 
 export const runtime = "nodejs";
@@ -26,10 +29,7 @@ export async function POST(request: Request) {
       const collections = await ledger.listPremiumCollections();
       return NextResponse.json({ result: collections.filter((item) => ["DUE", "RETRY"].includes(item.status) && item.dueDate <= asOfDate) });
     }
-    if (parsed.data.action === "complete") {
-      return NextResponse.json({ result: await ledger.completePremiumCollection(parsed.data.collectionId, parsed.data.paymentId, parsed.data.periodEndDate, parsed.data.externalReferenceHash) });
-    }
-    return NextResponse.json({ result: await ledger.failPremiumCollection(parsed.data.collectionId, parsed.data.failureHash) });
+    return NextResponse.json({ result: await ledger.processPremiumCollection(parsed.data) });
   } catch (error) {
     return NextResponse.json({ message: error instanceof Error ? error.message : "Collection worker failed" }, { status: 409 });
   }

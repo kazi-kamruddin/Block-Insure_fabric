@@ -12,7 +12,7 @@ const actors = [
   { account: "auditor-2", workspace: "auditor", heading: "Independent claim audit", action: "recordAuditorDecision" },
   { account: "auditor-3", workspace: "auditor", heading: "Independent claim audit", action: "recordAuditorDecision" },
   { account: "auditor-4", workspace: "auditor", heading: "Independent claim audit", action: "recordAuditorDecision" },
-  { account: "bank-officer", workspace: "bank", heading: "Banking operations desk", action: "registerBankAccountReference" },
+  { account: "bank-officer", workspace: "bank", heading: "Banking operations desk", action: "openBankAccount" },
 ] as const;
 
 async function signIn(page: Page, account: string) {
@@ -55,7 +55,7 @@ test("liveness, dependency readiness, public catalog, and not-found behavior are
   expect(ready.status(), JSON.stringify(readiness)).toBe(200);
   expect(readiness).toMatchObject({
     status: "ready",
-    dependencies: { chaincode: "connected", schemaVersion: 8, oracle1: "connected", oracle2: "connected" },
+    dependencies: { chaincode: "connected", schemaVersion: 9, oracle1: "connected", oracle2: "connected" },
   });
 
   const catalog = await request.get("/api/public/policies");

@@ -66,8 +66,11 @@ account_id="smoke-account-${suffix}"
 mandate_id="smoke-mandate-${suffix}"
 acquired_policy_id="smoke-acquired-policy-${suffix}"
 payment_id="smoke-payment-${suffix}"
+payment_transfer_id="smoke-transfer-${suffix}"
 collection_id="smoke-collection-${suffix}"
 collection_payment_id="smoke-collection-payment-${suffix}"
+collection_transfer_id="smoke-collection-transfer-${suffix}"
+insurer_account_id="smoke-insurer-account-${suffix}"
 benefit_plan_id="smoke-benefit-plan-${suffix}"
 benefit_request_id="smoke-benefit-request-${suffix}"
 hash_a="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
@@ -92,7 +95,8 @@ invoke PublishPolicyPackage "${package_id}"
 invoke IssuePolicy "${policy_id}" "${package_id}" policyholder1 2026-01-01 2026-12-31
 
 set_client_context bank BankMSP 12051 bankOfficer
-invoke RegisterBankAccountReference "${account_id}" policyholder1 "${hash_a}"
+invoke OpenBankAccount "${account_id}" bank-demo policyholder1 CUSTOMER "${hash_a}" 100000
+invoke OpenBankAccount "${insurer_account_id}" bank-demo insurer INSURER "${hash_b}" 0
 
 set_client_context insurer InsurerMSP 7051 policyholder1
 invoke AcquirePolicy "${acquired_policy_id}" "${package_id}" 2026-01-01 2026-12-31
@@ -101,13 +105,13 @@ invoke RequestBankMandate "${mandate_id}" "${acquired_policy_id}" "${account_id}
 
 set_client_context bank BankMSP 12051 bankOfficer
 invoke ReviewBankMandate "${mandate_id}" APPROVE "${hash_b}"
-invoke RecordPremiumPayment "${payment_id}" "${acquired_policy_id}" "${mandate_id}" 2026-01-01 2026-01-30 10000 "${premium_receipt_hash}" OTP
+invoke ExecuteManualPremiumPayment "${payment_transfer_id}" "${payment_id}" "${acquired_policy_id}" "${account_id}" "${insurer_account_id}" 2026-01-01 2026-01-30 10000 "${premium_receipt_hash}" "${hash_c}"
 
 set_client_context insurer InsurerMSP 7051 insurerAdmin
 invoke QueuePremiumCollection "${collection_id}" "${mandate_id}" 2026-01-31
 
 set_client_context bank BankMSP 12051 bankOfficer
-invoke CompletePremiumCollection "${collection_id}" "${collection_payment_id}" 2026-03-01 "${collection_receipt_hash}"
+invoke ProcessPremiumCollection "${collection_id}" "${collection_payment_id}" "${collection_transfer_id}" "${insurer_account_id}" 2026-03-01 "${collection_receipt_hash}"
 
 set_client_context insurer InsurerMSP 7051 policyholder1
 invoke SubmitBenefitRequest "${benefit_request_id}" "${acquired_policy_id}" DEATH 2026-06-15 "${hash_a}"
@@ -158,6 +162,8 @@ liability_json="$(peer chaincode query -C "${channel_name}" -n "${chaincode_name
 review_json="$(peer chaincode query -C "${channel_name}" -n "${chaincode_name}" -c "$(payload ReadClaimReview "${review_id}")")"
 fraud_json="$(peer chaincode query -C "${channel_name}" -n "${chaincode_name}" -c "$(payload ReadFraudAssessment "${fraud_id}")")"
 grant_json="$(peer chaincode query -C "${channel_name}" -n "${chaincode_name}" -c "$(payload ReadEvidenceAccessGrant "${evidence_grant_id}")")"
+customer_account_json="$(peer chaincode query -C "${channel_name}" -n "${chaincode_name}" -c "$(payload ReadBankAccountReference "${account_id}")")"
+insurer_account_json="$(peer chaincode query -C "${channel_name}" -n "${chaincode_name}" -c "$(payload ReadBankAccountReference "${insurer_account_id}")")"
 
 test "$(jq -r '.status' <<<"${claim_json}")" = "SETTLED"
 test "$(jq -r '.status' <<<"${settlement_json}")" = "CONFIRMED"
@@ -172,5 +178,7 @@ test "$(jq -r '.votesCast' <<<"${review_json}")" = "3"
 test "$(jq -r '.advisory' <<<"${fraud_json}")" = "true"
 test "$(jq -r '.status' <<<"${grant_json}")" = "REVOKED"
 test "$(jq -r '.accessCount' <<<"${grant_json}")" = "1"
+test "$(jq -r '.balanceMinor' <<<"${customer_account_json}")" = "80000"
+test "$(jq -r '.balanceMinor' <<<"${insurer_account_json}")" = "20000"
 
-echo "Verified live workflows: governed evidence grant used and revoked; claim ${claim_id} SETTLED by 3-of-4 review quorum; fraud triage remained advisory; policy ${acquired_policy_id} ACTIVE; collection COMPLETED; benefit PAID."
+echo "Verified live workflows: balanced OTP and EFT transfers moved 20000 minor units customer-to-insurer; claim ${claim_id} SETTLED by 3-of-4 review quorum; evidence governance, fraud triage, collection, and benefit workflows passed."

@@ -2,14 +2,14 @@ import { createHmac, randomInt, randomUUID, timingSafeEqual } from "node:crypto"
 
 type Challenge = {
   policyId: string;
-  mandateId: string;
+  sourceAccountId: string;
   subjectId: string;
   digest: string;
   expiresAt: number;
   attempts: number;
 };
 
-export type OtpBinding = Pick<Challenge, "policyId" | "mandateId" | "subjectId">;
+export type OtpBinding = Pick<Challenge, "policyId" | "sourceAccountId" | "subjectId">;
 
 function digest(challengeId: string, code: string, secret: string) {
   return createHmac("sha256", secret).update(`${challengeId}:${code}`).digest();
@@ -51,7 +51,7 @@ export class OtpChallengeStore {
     const expected = Buffer.from(challenge.digest, "hex");
     const supplied = digest(challengeId, code, secret);
     const bindingMatches = challenge.policyId === binding.policyId
-      && challenge.mandateId === binding.mandateId
+      && challenge.sourceAccountId === binding.sourceAccountId
       && challenge.subjectId === binding.subjectId;
     if (!bindingMatches || expected.length !== supplied.length || !timingSafeEqual(expected, supplied)) {
       if (challenge.attempts >= 5) this.challenges.delete(challengeId);

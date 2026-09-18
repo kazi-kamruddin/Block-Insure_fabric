@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { createHmac } from "node:crypto";
 import { z } from "zod";
 import { currentSession, sessionSecret } from "@/lib/auth/current-session";
 import { ledger } from "@/lib/fabric/ledger";
@@ -8,7 +9,8 @@ import { checkMutationOrigin } from "@/lib/security/request-origin";
 const hash = z.string().regex(/^[a-fA-F0-9]{64}$/).transform((value) => value.toLowerCase());
 const requestSchema = z.object({
   challengeId: z.string().uuid(), otp: z.string().regex(/^\d{6}$/),
-  id: z.string().min(3).max(128), policyId: z.string().min(3).max(128), mandateId: z.string().min(3).max(128),
+  transferId: z.string().min(3).max(128), paymentId: z.string().min(3).max(128), policyId: z.string().min(3).max(128),
+  sourceAccountId: z.string().min(3).max(128), destinationAccountId: z.string().min(3).max(128),
   periodStartDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), periodEndDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   amountMinor: z.number().int().positive().safe(), externalReferenceHash: hash,
 });
@@ -31,9 +33,10 @@ export async function POST(request: Request) {
   try {
     const { challengeId, otp, ...payment } = parsed.data;
     otpChallenges.consume(challengeId, otp, {
-      policyId: payment.policyId, mandateId: payment.mandateId, subjectId: session.subjectId,
+      policyId: payment.policyId, sourceAccountId: payment.sourceAccountId, subjectId: session.subjectId,
     }, otpSecret());
-    return NextResponse.json({ result: await ledger.recordPremiumPayment({ ...payment, method: "OTP" }) });
+    const authorizationHash = createHmac("sha256", otpSecret()).update(`${challengeId}:${session.subjectId}:consumed`).digest("hex");
+    return NextResponse.json({ result: await ledger.executeManualPremiumPayment({ ...payment, authorizationHash }) });
   } catch (error) {
     return NextResponse.json({ message: error instanceof Error ? error.message : "Premium payment failed" }, { status: 409 });
   }

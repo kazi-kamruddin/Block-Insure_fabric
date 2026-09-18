@@ -69,6 +69,15 @@ ensure_agreement agreement-hospital-4 HOSPITAL hospital-4 "Khulna Riverside Hosp
 ensure_agreement agreement-hospital-5 HOSPITAL hospital-5 "Sylhet Valley Hospital" Sylhet Standard "Read-only invoice verification fields" 2026-01-01 2028-12-31
 ensure_agreement agreement-bank-demo BANK bank-demo "Bangladesh Demo Commercial Bank" Dhaka Collection "Premium collection and settlement confirmation" 2026-01-01 2028-12-31
 
+set_client_context bank BankMSP 12051 bankOfficer
+if ! exists ReadBankAccountReference showcase-customer-account; then
+  invoke OpenBankAccount showcase-customer-account bank-demo policyholder1 CUSTOMER "${hash_a}" 100000
+fi
+if ! exists ReadBankAccountReference bank-insurer-premium; then
+  invoke OpenBankAccount bank-insurer-premium bank-demo insurer INSURER "${hash_b}" 500000
+fi
+
+set_client_context insurer InsurerMSP 7051 insurerAdmin
 if ! exists ReadPolicyPackage "${package_id}"; then
   invoke CreatePolicyPackage "${package_id}" "Supervisor Health Cover" "Demonstration inpatient coverage with certificate-bound Oracle adjudication" 10000 500000 "${hash_a}"
   invoke ConfigurePolicyPackagePartners "${package_id}" '["hospital-demo","hospital-2","hospital-3","hospital-4","hospital-5"]' '["bank-demo"]'
@@ -98,5 +107,5 @@ if ! exists ReadOracleRegistrySnapshot "${registry_id}"; then
   invoke PublishOracleRegistrySnapshot "${registry_id}" 1 "${registry_root}" rules-v1 "${hash_a}" 3
 fi
 
-echo "Showcase seed is ready: six partner agreements, five Hospital invoices, package ${package_id}, benefit plan ${benefit_plan_id}, and Oracle registry ${registry_id}."
+echo "Showcase seed is ready: six partner agreements, two balance-bearing Bank accounts, five Hospital invoices, package ${package_id}, benefit plan ${benefit_plan_id}, and Oracle registry ${registry_id}."
 echo "The clean seed creates no policies, claims, reviews, settlements, or Oracle requests."
