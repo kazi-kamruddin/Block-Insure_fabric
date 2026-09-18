@@ -2,6 +2,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  experimental: { cpus: 1 },
   serverExternalPackages: ["@grpc/grpc-js", "@hyperledger/fabric-gateway"],
   async headers() {
     return [
