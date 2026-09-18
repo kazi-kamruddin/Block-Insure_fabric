@@ -18,7 +18,7 @@ export default async function WorkspacePage() {
           <span className="brandMark">BI</span>
           <span>Block-Insure</span>
         </Link>
-        <span className="networkPill"><i /> role workspace</span>
+        <Link className="networkPill" href="/showcase"><i /> presentation board</Link>
       </nav>
       <WorkspaceClient initialAccount={null} initialDashboard={null} />
     </main>

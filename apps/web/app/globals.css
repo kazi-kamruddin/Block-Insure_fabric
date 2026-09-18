@@ -72,6 +72,7 @@ h2 { margin: 12px 0 0; max-width: 560px; font-family: Georgia, serif; font-size:
 .workspacePage-bank .kicker { color: #405b94; }
 .signInPanel, .workspace { padding: 74px 0 100px; }
 .workspaceTitle { max-width: 780px; margin: 15px 0 22px; font-size: clamp(44px, 6vw, 76px); }
+.presentationOrder { width: fit-content; padding: 12px 15px; margin: 26px 0 0; color: var(--muted); background: var(--card); border-left: 3px solid var(--deep); font-size: 12px; line-height: 1.5; }
 .accountGrid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin: 42px 0 24px; }
 .accountGrid button { min-height: 150px; padding: 20px; text-align: left; color: var(--ink); background: var(--card); border: 1px solid var(--line); border-radius: 4px; transition: transform .18s ease, border-color .18s ease; }
 .accountGrid button:hover { transform: translateY(-3px); border-color: var(--deep); }
@@ -80,6 +81,24 @@ h2 { margin: 12px 0 0; max-width: 560px; font-family: Georgia, serif; font-size:
 .accountGrid span { color: var(--muted); font: 11px monospace; }
 .workspaceHeader { display: flex; align-items: end; justify-content: space-between; gap: 30px; margin-bottom: 50px; }
 .workspaceHeader p { color: var(--muted); }
+.workspaceHeaderActions { display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: 10px; }
+.presentationGuide { padding: 28px; margin-bottom: 42px; color: var(--ink); background: color-mix(in srgb, var(--card) 82%, transparent); border: 1px solid var(--line); border-radius: 5px; }
+.presentationGuideHeading { display: flex; align-items: end; justify-content: space-between; gap: 30px; }
+.presentationGuideHeading h2 { margin-top: 8px; font-size: clamp(30px, 4vw, 46px); }
+.presentationJumps { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 7px; }
+.presentationJumps a { padding: 8px 10px; color: var(--deep); background: var(--paper); border: 1px solid var(--line); border-radius: 999px; font-size: 11px; font-weight: 750; }
+.presentationJumps a:hover { border-color: var(--deep); }
+.presentationJourney { display: grid; grid-template-columns: repeat(7, 1fr); padding: 0; margin: 28px 0; list-style: none; }
+.presentationJourney li { position: relative; min-width: 0; padding: 13px 9px; color: var(--muted); border-top: 2px solid var(--line); }
+.presentationJourney li span, .presentationJourney li strong { display: block; }
+.presentationJourney li span { margin-bottom: 7px; font: 10px monospace; }
+.presentationJourney li strong { font-size: 11px; line-height: 1.35; }
+.presentationJourney li.isCurrent { color: var(--ink); border-color: var(--deep); background: color-mix(in srgb, var(--mint) 18%, transparent); }
+.presenterBrief { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; overflow: hidden; background: var(--line); border: 1px solid var(--line); border-radius: 4px; }
+.presenterBrief > div { min-height: 150px; padding: 18px; background: var(--card); }
+.presenterBrief span { color: var(--deep); font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.presenterBrief p { margin: 12px 0 0; color: var(--muted); font-size: 13px; line-height: 1.55; }
+.presenterBrief small { display: block; margin-top: 14px; color: var(--ink); font: 10px/1.4 monospace; }
 .roleDashboard { padding-bottom: 70px; }
 .dashboardIntro { display: grid; grid-template-columns: 1.2fr .8fr; align-items: end; gap: 40px; padding: 42px 0 30px; border-top: 1px solid var(--line); }
 .dashboardIntro h2 { margin-top: 10px; font-size: clamp(34px, 4vw, 54px); }
@@ -145,6 +164,26 @@ h2 { margin: 12px 0 0; max-width: 560px; font-family: Georgia, serif; font-size:
 .console { min-height: 220px; overflow: auto; padding: 22px; margin: 0; color: #d5f5e6; background: #102a2e; border-radius: 4px; font: 12px/1.6 monospace; white-space: pre-wrap; }
 .console.compact { min-height: 64px; }
 
+.showcasePage { min-height: 100vh; }
+.showcaseHero { padding: 86px 0 62px; border-bottom: 1px solid var(--line); }
+.showcaseHero h1 { max-width: 960px; font-size: clamp(52px, 7vw, 88px); }
+.showcaseSection { padding: 70px 0; border-bottom: 1px solid var(--line); }
+.organizationBoard { display: grid; grid-template-columns: repeat(5, 1fr); margin-top: 38px; border-top: 1px solid var(--line); border-left: 1px solid var(--line); }
+.organizationBoard article { min-height: 255px; padding: 20px; background: rgba(251, 250, 246, .5); border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.organizationBoard article span { color: var(--muted); font: 11px monospace; }
+.organizationBoard article h3 { margin: 45px 0 12px; font-size: 18px; }
+.organizationBoard article p { margin: 0 0 12px; color: var(--muted); font-size: 13px; line-height: 1.55; }
+.organizationBoard article small { display: block; padding-top: 12px; border-top: 1px solid var(--line); font-size: 10px; line-height: 1.45; }
+.storyGrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 38px; }
+.storyGrid article { min-height: 250px; padding: 26px; background: var(--card); border: 1px solid var(--line); border-radius: 5px; }
+.storyIndex { display: inline-grid; place-items: center; width: 34px; height: 34px; color: white; background: var(--deep); border-radius: 50%; font: 11px monospace; }
+.storyGrid h3 { margin: 42px 0 12px; font-family: Georgia, serif; font-size: 27px; font-weight: 500; }
+.storyGrid p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.65; }
+.presenterChecklist { display: grid; grid-template-columns: .75fr 1.25fr; gap: 70px; align-items: start; }
+.presenterChecklist ol { padding: 0; margin: 0; list-style: none; counter-reset: checklist; border-top: 1px solid var(--line); }
+.presenterChecklist li { display: grid; grid-template-columns: 35px 1fr; gap: 12px; padding: 18px 0; color: var(--muted); border-bottom: 1px solid var(--line); line-height: 1.5; counter-increment: checklist; }
+.presenterChecklist li::before { content: "0" counter(checklist); color: var(--deep); font: 11px monospace; }
+
 @media (max-width: 850px) {
   .sectionHeading { grid-template-columns: 1fr; gap: 25px; }
   .capabilityGrid { grid-template-columns: repeat(2, 1fr); }
@@ -157,6 +196,14 @@ h2 { margin: 12px 0 0; max-width: 560px; font-family: Georgia, serif; font-size:
   .guidedForm { grid-template-columns: 1fr; }
   .guidedForm .wideField, .guidedSubmit, .formError { grid-column: auto; }
   .auditExport { grid-template-columns: 1fr; align-items: start; }
+  .presentationGuideHeading { align-items: start; flex-direction: column; }
+  .presentationJumps { justify-content: flex-start; }
+  .presentationJourney { grid-template-columns: repeat(4, 1fr); }
+  .presenterBrief { grid-template-columns: 1fr; }
+  .presenterBrief > div { min-height: 0; }
+  .organizationBoard { grid-template-columns: repeat(2, 1fr); }
+  .storyGrid { grid-template-columns: 1fr; }
+  .presenterChecklist { grid-template-columns: 1fr; gap: 30px; }
   .hero { min-height: auto; padding: 80px 0; }
 }
 @media (max-width: 520px) {
@@ -166,6 +213,10 @@ h2 { margin: 12px 0 0; max-width: 560px; font-family: Georgia, serif; font-size:
   .accountGrid { grid-template-columns: 1fr; }
   .metricGrid { grid-template-columns: 1fr; }
   .workspaceHeader { align-items: start; flex-direction: column; }
+  .workspaceHeaderActions { justify-content: flex-start; }
+  .presentationGuide { padding: 20px; }
+  .presentationJourney { grid-template-columns: 1fr 1fr; }
+  .organizationBoard { grid-template-columns: 1fr; }
   .capability { min-height: 190px; }
   .capability h3 { margin-top: 38px; }
   .footer { flex-direction: column; gap: 8px; }

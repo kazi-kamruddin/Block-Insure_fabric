@@ -9,6 +9,7 @@ import {
 } from "@/lib/auth/accounts";
 import type { RoleDashboard } from "@/lib/dashboard/build-dashboard";
 import { GuidedWorkflowForm, type PreparedWorkflow } from "@/components/guided-workflow-form";
+import { PresentationGuide } from "@/components/presentation-guide";
 import type { WorkflowCommand } from "@/lib/workflows/commands";
 import { bdtToMinor } from "@/lib/workflows/forms";
 import { decryptEvidenceBytes, encryptEvidenceBytes, sha256Hex } from "@/lib/evidence/browser-crypto";
@@ -393,6 +394,7 @@ export function WorkspaceClient({
         <span className="kicker">Local demonstration access</span>
         <h1 className="workspaceTitle">Choose an organization account.</h1>
         <p className="lede">The selected account ID is mapped to a role on the server. Fabric certificates and keys never enter the browser.</p>
+        <p className="presentationOrder"><strong>Suggested handoff:</strong> Insurer → Hospital → Policyholder → Bank → Insurer &amp; Oracles → Auditor → Bank</p>
         <div className="accountGrid">
           {Object.values(demoAccounts).map((candidate) => (
             <button disabled={busy} key={candidate.id} onClick={() => login(candidate.id)}>
@@ -414,10 +416,15 @@ export function WorkspaceClient({
           <h1 className="workspaceTitle">{account.displayName}</h1>
           <p>Application role: <code>{account.role}</code></p>
         </div>
-        <button className="secondary button" onClick={logout}>Sign out</button>
+        <div className="workspaceHeaderActions">
+          <a className="secondary button" href="/showcase">Presentation board</a>
+          <button className="secondary button" onClick={logout}>Sign out</button>
+        </div>
       </header>
 
-      <section className="roleDashboard" aria-busy={dashboardLoading}>
+      <PresentationGuide role={account.role} />
+
+      <section className="roleDashboard" id="overview" aria-busy={dashboardLoading}>
         <div className="dashboardIntro">
           <div>
             <span className="kicker">Organization-scoped overview</span>
@@ -488,7 +495,7 @@ export function WorkspaceClient({
         )}
       </section>
 
-      <div className="workGrid">
+      <div className="workGrid" id="operations">
         <article className="workCard">
           <span className="kicker">Event-driven operations</span>
           <h2>Fabric activity inbox</h2>
@@ -583,7 +590,7 @@ export function WorkspaceClient({
           </article>
         )}
 
-        <article className="workCard">
+        <article className="workCard" id="ledger-tools">
           <span className="kicker">Evaluate transaction</span>
           <h2>Find ledger asset</h2>
           <label>Asset type
@@ -694,7 +701,7 @@ export function WorkspaceClient({
         )}
       </div>
 
-      <div className="resultHeading"><span className="kicker">Gateway response</span><span>{busy ? "Working…" : "Ready"}</span></div>
+      <div className="resultHeading" id="gateway-proof"><span className="kicker">Gateway response</span><span>{busy ? "Working…" : "Ready"}</span></div>
       <pre className="console">{output}</pre>
     </section>
   );

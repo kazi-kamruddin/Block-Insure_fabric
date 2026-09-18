@@ -35,7 +35,7 @@ export default async function RoleWorkspacePage({ params }: PageContext) {
           <span className="brandMark">{portalMark}</span>
           <span>{portalName}</span>
         </Link>
-        <span className="networkPill"><i /> {canonicalWorkspace} workspace</span>
+        <Link className="networkPill" href="/showcase"><i /> {canonicalWorkspace} · presentation</Link>
       </nav>
       <WorkspaceClient initialAccount={account} initialDashboard={dashboard} />
     </main>

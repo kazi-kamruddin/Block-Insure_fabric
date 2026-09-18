@@ -76,7 +76,8 @@ with `npm run events:sync`; `-- --once` performs a bounded complete catch-up and
 exits. It uses `EVENT_WORKER_SECRET` and never receives a Fabric private key.
 
 The application provides process and live-ledger health routes, signed local
-demo sessions, role-specific dashboards and guided transactions, ledger queries,
+demo sessions, a `/showcase` presentation board, role-aware presenter guides,
+role-specific dashboards and guided transactions, ledger queries,
 and browser-encrypted evidence storage with on-ledger integrity/access records. Demo authentication and
 local filesystem storage are development adapters, not production identity or
 object-storage implementations.

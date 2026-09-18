@@ -83,6 +83,32 @@ npm run start
 Open `http://localhost:3000/workspace`. Fabric certificates and private keys
 remain server-side throughout the demonstration.
 
+## Presentation board and presenter route
+
+Open `http://localhost:3000/showcase` before entering a role workspace. The board
+summarizes the five institutional boundaries and the three proof stories that
+anchor the demonstration. Every workspace then provides a presenter guide with
+the current authority, intended proof, next handoff, and direct jumps to its
+overview, operations, transaction, and ledger-evidence sections.
+
+Use this compact presenter route:
+
+1. **Insurer** — establish the partner network, package, and policy.
+2. **Hospital** — create and finalize an invoice in the independent register.
+3. **Policyholder and Bank** — demonstrate OTP or EFT premium execution, including
+   the insufficient-funds bounce boundary when useful.
+4. **Policyholder, Insurer, and Oracles** — submit the claim, cross-check the
+   Hospital invoice, and show the exact commit/reveal outcome.
+5. **Auditors** — use the fixed-quorum path only for negative, conflicting, or
+   timed-out Oracle results.
+6. **Insurer and Bank** — authorize the resulting liability and confirm payment,
+   then close on the linked ledger asset or exported statement.
+
+For a short overview, remain on the presentation board and explain identity,
+organizational authority, failure behavior, and audit proof. For the full
+demonstration, follow the role handoff above and use each workspace's highlighted
+journey stages as the speaking cue.
+
 ## 3. Complete the governed journey
 
 Use unique IDs for every rehearsal. The guided forms hash sensitive references

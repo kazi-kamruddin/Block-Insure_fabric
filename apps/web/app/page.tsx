@@ -39,6 +39,7 @@ export default async function Home() {
         </p>
         <div className="actions">
           <Link className="primary" href="/workspace">Open role workspace</Link>
+          <Link className="secondary" href="/showcase">Open presentation board</Link>
           <a className="secondary" href="/api/fabric/health">Check ledger connection</a>
         </div>
       </section>
