@@ -19,7 +19,7 @@ export default function ShowcasePage() {
     <main className="showcasePage">
       <nav className="shell nav">
         <Link className="brand" href="/"><span className="brandMark">BI</span><span>Block-Insure</span></Link>
-        <span className="networkPill"><i /> presentation board</span>
+        <div className="navLinks"><Link href="/">Home</Link><Link href="/workspace">Workspaces</Link><span className="networkPill"><i /> presentation board</span></div>
       </nav>
 
       <section className="shell showcaseHero">
@@ -65,6 +65,7 @@ export default function ShowcasePage() {
           <li><strong>Audit:</strong> finish with the linked ledger asset, policy statement, claim dossier, or reproducibility snapshot.</li>
         </ol>
       </section>
+      <footer className="shell footer"><span>Block-Insure Fabric</span><span>Identity · Boundary · Failure · Proof</span></footer>
     </main>
   );
 }

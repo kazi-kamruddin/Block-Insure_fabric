@@ -6,6 +6,7 @@ import {
   demoAccounts,
   workspaceForAccount,
   type DemoAccount,
+  type DemoAccountId,
 } from "@/lib/auth/accounts";
 import type { RoleDashboard } from "@/lib/dashboard/build-dashboard";
 import { GuidedWorkflowForm, type PreparedWorkflow } from "@/components/guided-workflow-form";
@@ -30,6 +31,25 @@ type OracleOperationsView = {
 };
 
 const hash = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+
+const accountGroups: ReadonlyArray<{
+  label: string;
+  description: string;
+  accountIds: readonly DemoAccountId[];
+}> = [
+  { label: "Insurance", description: "Coverage ownership and insurer governance", accountIds: ["insurer-admin", "policyholder-1"] },
+  { label: "Hospital network", description: "Independent institutional invoice registers", accountIds: ["hospital-officer", "hospital-officer-2", "hospital-officer-3", "hospital-officer-4", "hospital-officer-5"] },
+  { label: "Independent review", description: "Certificate-bound fixed-quorum decisions", accountIds: ["auditor", "auditor-2", "auditor-3", "auditor-4"] },
+  { label: "Banking", description: "External payment execution and reconciliation", accountIds: ["bank-officer"] },
+];
+
+const roleLabels: Record<DemoAccount["role"], string> = {
+  insurerAdmin: "Administrator",
+  policyholder: "Policyholder",
+  hospitalOfficer: "Hospital officer",
+  auditor: "Auditor",
+  bankOfficer: "Bank officer",
+};
 
 const commandTemplates = {
   insurerAdmin: [
@@ -395,15 +415,22 @@ export function WorkspaceClient({
         <h1 className="workspaceTitle">Choose an organization account.</h1>
         <p className="lede">The selected account ID is mapped to a role on the server. Fabric certificates and keys never enter the browser.</p>
         <p className="presentationOrder"><strong>Suggested handoff:</strong> Insurer → Hospital → Policyholder → Bank → Insurer &amp; Oracles → Auditor → Bank</p>
-        <div className="accountGrid">
-          {Object.values(demoAccounts).map((candidate) => (
-            <button disabled={busy} key={candidate.id} onClick={() => login(candidate.id)}>
-              <strong>{candidate.displayName}</strong>
-              <span>{candidate.organization}</span>
-            </button>
-          ))}
+        <div className="accountGroups">
+          {accountGroups.map((group) => <section className="accountGroup" key={group.label}>
+            <header className="accountGroupHeader"><div><span className="kicker">{group.label}</span><p>{group.description}</p></div><small>{group.accountIds.length} {group.accountIds.length === 1 ? "identity" : "identities"}</small></header>
+            <div className="accountGrid">
+              {group.accountIds.map((accountId) => {
+                const candidate = demoAccounts[accountId];
+                return <button aria-label={`Sign in as ${candidate.displayName}`} disabled={busy} key={candidate.id} onClick={() => login(candidate.id)}>
+                  <span className="accountCardTop"><em>{roleLabels[candidate.role]}</em><b aria-hidden="true">↗</b></span>
+                  <strong>{candidate.displayName}</strong>
+                  <span className="accountIdentity">{candidate.organization}{"subjectId" in candidate ? ` · ${candidate.subjectId}` : ""}</span>
+                </button>;
+              })}
+            </div>
+          </section>)}
         </div>
-        <pre className="console compact">{output}</pre>
+        <pre aria-live="polite" className="console compact">{output}</pre>
       </section>
     );
   }

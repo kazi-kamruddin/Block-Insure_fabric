@@ -27,7 +27,11 @@ export default async function Home() {
           <span className="brandMark">BI</span>
           <span>Block-Insure</span>
         </a>
-        <span className="networkPill"><i /> insurance-channel</span>
+        <div className="navLinks">
+          <Link href="/showcase">Presentation</Link>
+          <Link href="/workspace">Workspaces</Link>
+          <span className="networkPill"><i /> insurance-channel</span>
+        </div>
       </nav>
 
       <section className="shell hero" id="top">
