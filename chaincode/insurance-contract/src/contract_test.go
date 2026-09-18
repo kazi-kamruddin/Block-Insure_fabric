@@ -161,6 +161,29 @@ func TestAppealCommitmentProtocolVector(t *testing.T) {
 	}
 }
 
+func TestLegacyPolicyPartnerArraysAreNormalized(t *testing.T) {
+	contract := &Contract{}
+	ctx := &testContext{stub: newMemoryStub()}
+	packageKey, err := ctx.stub.CreateCompositeKey("policyPackage", []string{"legacy-package"})
+	requireNoError(t, err)
+	requireNoError(t, ctx.stub.PutState(packageKey, []byte(`{"assetType":"policyPackage","schemaVersion":7,"id":"legacy-package","version":1,"name":"Legacy","description":"","premiumMinor":100,"coverageLimitMinor":1000,"termsHash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","status":"PUBLISHED","createdAt":"2026-01-01T00:00:00Z","updatedAt":"2026-01-01T00:00:00Z"}`)))
+	policyKey, err := ctx.stub.CreateCompositeKey("policy", []string{"legacy-policy"})
+	requireNoError(t, err)
+	requireNoError(t, ctx.stub.PutState(policyKey, []byte(`{"assetType":"policy","schemaVersion":7,"id":"legacy-policy","packageId":"legacy-package","packageVersion":1,"policyholderId":"policyholder1","startDate":"2026-01-01","endDate":"2026-12-31","premiumMinor":100,"coverageLimitMinor":1000,"termsHash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","status":"ACTIVE","createdAt":"2026-01-01T00:00:00Z","updatedAt":"2026-01-01T00:00:00Z"}`)))
+
+	policyPackage, err := contract.ReadPolicyPackage(ctx, "legacy-package")
+	requireNoError(t, err)
+	policy, err := contract.ReadPolicy(ctx, "legacy-policy")
+	requireNoError(t, err)
+	packages, err := contract.ListPolicyPackages(ctx)
+	requireNoError(t, err)
+	policies, err := contract.ListPolicies(ctx)
+	requireNoError(t, err)
+	if policyPackage.HospitalIDs == nil || policyPackage.BankIDs == nil || policy.HospitalIDs == nil || policy.BankIDs == nil || packages[0].HospitalIDs == nil || policies[0].BankIDs == nil {
+		t.Fatal("legacy partner arrays must serialize as empty arrays, not null")
+	}
+}
+
 func TestPolicyToSettlementWorkflow(t *testing.T) {
 	contract := &Contract{}
 	ctx := &testContext{stub: newMemoryStub()}

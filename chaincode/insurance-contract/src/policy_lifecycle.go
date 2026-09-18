@@ -18,7 +18,7 @@ func policyFromPackage(id string, policyPackage *PolicyPackage, ownerID, startDa
 		PackageID: policyPackage.ID, PackageVersion: policyPackage.Version, PolicyholderID: ownerID,
 		StartDate: startDate, EndDate: endDate, PremiumMinor: policyPackage.PremiumMinor,
 		CoverageLimitMinor: policyPackage.CoverageLimitMinor, TermsHash: policyPackage.TermsHash,
-		HospitalIDs: append([]string(nil), policyPackage.HospitalIDs...), BankIDs: append([]string(nil), policyPackage.BankIDs...),
+		HospitalIDs: append([]string{}, policyPackage.HospitalIDs...), BankIDs: append([]string{}, policyPackage.BankIDs...),
 		Status: status, PremiumIntervalDays: defaultPremiumIntervalDays, GracePeriodDays: defaultGracePeriodDays,
 		NextPremiumDueDate: start.Format("2006-01-02"), RenewedFromPolicyID: renewedFrom,
 		CreatedAt: now, UpdatedAt: now,

@@ -18,7 +18,7 @@ bank mandates, governed benefits, distributed adjudication, appeals, and advisor
 fraud triage, governed evidence grants, durable event projection, and
 ledger-derived research metrics, independent Oracle workers, commit/reveal
 consensus, and governed auditor fallback. The clean local deployment runs
-`insurance-contract` 0.9.0 with schema 8. Its automated code gate and live Fabric
+`insurance-contract` 0.9.1 with schema 8. Its automated code gate and live Fabric
 workflow cover the Phase 1 partner and Hospital boundary.
 
 This is not a production deployment claim. Institutional authentication,
@@ -86,7 +86,7 @@ For a supervised local deployment from the repository root, use
 ledger, `Status` checks all four application services, and `Stop` retains Fabric
 volumes. `CleanBootstrap -ConfirmReset` is deliberately destructive and is only
 for an explicitly approved clean showcase; it rebuilds the topology, deploys
-chaincode 0.9.0, seeds partner agreements, Hospital invoices, and the
+chaincode 0.9.1, seeds partner agreements, Hospital invoices, and the
 policy/benefit/Oracle catalog, then starts the web app,
 event worker, and both Oracle workers.
 

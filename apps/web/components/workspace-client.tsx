@@ -594,7 +594,7 @@ export function WorkspaceClient({
               {account.role === "insurerAdmin" && <option value="hospital-invoice">Hospital invoice</option>}
               <option value="package">Policy package</option><option value="policy">Policy</option>
               <option value="claim">Claim</option><option value="evidence">Evidence reference</option><option value="evidence-grant">Evidence access grant</option>
-              <option value="verification">Hospital verification</option><option value="decision">Auditor decision</option>
+              <option value="verification">Invoice cross-check</option><option value="decision">Auditor decision</option>
               <option value="review">Claim review round</option><option value="appeal">Claim appeal</option><option value="fraud-assessment">Fraud assessment</option>
               <option value="settlement">Settlement</option><option value="claim-history">Claim history</option>
               <option value="oracle-snapshot">Oracle registry snapshot</option><option value="oracle-request">Oracle request</option>

@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
 const actors = [
-  { account: "insurer-admin", workspace: "insurer", heading: "Portfolio oversight", action: "createPolicyPackage" },
+  { account: "insurer-admin", workspace: "insurer", heading: "Portfolio oversight", action: "createPartnerAgreement" },
   { account: "policyholder-1", workspace: "policyholder", heading: "Coverage and claims overview", action: "acquirePolicy" },
   { account: "hospital-officer", workspace: "hospital", heading: "Independent Hospital billing register", action: "createHospitalInvoice" },
   { account: "hospital-officer-2", workspace: "hospital", heading: "Independent Hospital billing register", action: "createHospitalInvoice" },
@@ -113,6 +113,7 @@ test("research metrics are role-restricted and reproducibly identified", async (
 
 test("guided financial forms reject fractional poisha before submission", async ({ page }) => {
   await signIn(page, "insurer-admin");
+  await page.getByLabel("Workflow action").selectOption("createPolicyPackage");
   await page.getByLabel("Package name").fill("Validation-only package");
   await page.getByLabel("Public description").fill("No ledger transaction should be submitted");
   await page.getByLabel("Premium (BDT)").fill("10.005");

@@ -3,11 +3,25 @@ package insurance
 import "github.com/hyperledger/fabric-contract-api-go/v2/contractapi"
 
 func (c *Contract) ListPolicyPackages(ctx contractapi.TransactionContextInterface) ([]PolicyPackage, error) {
-	return listState[PolicyPackage](ctx, "policyPackage")
+	values, err := listState[PolicyPackage](ctx, "policyPackage")
+	if err != nil {
+		return nil, err
+	}
+	for index := range values {
+		normalizePolicyPackagePartners(&values[index])
+	}
+	return values, nil
 }
 
 func (c *Contract) ListPolicies(ctx contractapi.TransactionContextInterface) ([]Policy, error) {
-	return listState[Policy](ctx, "policy")
+	values, err := listState[Policy](ctx, "policy")
+	if err != nil {
+		return nil, err
+	}
+	for index := range values {
+		normalizePolicyPartners(&values[index])
+	}
+	return values, nil
 }
 
 func (c *Contract) ListClaims(ctx contractapi.TransactionContextInterface) ([]Claim, error) {

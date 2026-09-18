@@ -11,7 +11,7 @@ chaincode_root="${project_root}/chaincode/insurance-contract"
 
 channel_name="${CHANNEL_NAME:-insurance-channel}"
 chaincode_name="${CHAINCODE_NAME:-insurance-contract}"
-chaincode_version="${CHAINCODE_VERSION:-0.9.0}"
+chaincode_version="${CHAINCODE_VERSION:-0.9.1}"
 chaincode_sequence="${CHAINCODE_SEQUENCE:-}"
 chaincode_label="${chaincode_name}_${chaincode_version}"
 package_file="${artifacts}/${chaincode_label}.tar.gz"
