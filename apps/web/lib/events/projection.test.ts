@@ -33,4 +33,15 @@ describe("Fabric event projection", () => {
     expect(finalized.countsByName.OracleRequestFinalized).toBe(1);
     expect(notificationsFor(finalized, "insurerAdmin").at(-1)?.title).toBe("Oracle exact consensus");
   });
+
+  it("creates one replay-safe email communication for a committed Bank transfer", () => {
+    const event = {
+      id: "12:tx-6:BankTransferProcessed", blockNumber: "12", transactionId: "tx-6", eventName: "BankTransferProcessed",
+      payload: { id: "transfer-1", policyId: "policy-1", method: "EFT", status: "BOUNCED", failureCode: "INSUFFICIENT_FUNDS", amountMinor: 10_000, currency: "BDT" },
+    };
+    const once = applyFabricEvent(emptyEventProjection(), event, "2026-09-06T12:02:00Z");
+    const replayed = applyFabricEvent(once, event, "2026-09-06T12:03:00Z");
+    expect(replayed.communications).toHaveLength(1);
+    expect(replayed.communications[0]).toMatchObject({ template: "bank-transaction-status", status: "PENDING", policyId: "policy-1" });
+  });
 });

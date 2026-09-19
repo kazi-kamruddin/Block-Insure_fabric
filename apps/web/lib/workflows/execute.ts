@@ -5,6 +5,7 @@ import { findDemoAccount } from "@/lib/auth/accounts";
 import type { Session } from "@/lib/auth/session-token";
 import { assessClaimFraud } from "@/lib/fraud/assess-claim";
 import type { WorkflowCommand } from "./commands";
+import { refreshHospitalRegistrySnapshot } from "@/lib/oracle/hospital-registry";
 
 export async function executeWorkflowCommand(command: WorkflowCommand, session: Session) {
   switch (command.operation) {
@@ -66,10 +67,16 @@ export async function executeWorkflowCommand(command: WorkflowCommand, session: 
       return ledger.markBenefitPaymentReady(command.id, command.fundingReferenceHash);
     case "confirmBenefitPayment":
       return ledger.confirmBenefitPayment(command.id, command.bankReferenceHash);
-    case "createHospitalInvoice":
-      return ledger.createHospitalInvoice(command, findDemoAccount(session.accountId)?.fabricUserName);
-    case "updateHospitalInvoice":
-      return ledger.updateHospitalInvoice(command, findDemoAccount(session.accountId)?.fabricUserName);
+    case "createHospitalInvoice": {
+      const invoice = await ledger.createHospitalInvoice(command, findDemoAccount(session.accountId)?.fabricUserName);
+      const oracleRegistry = command.status === "FINALIZED" ? await refreshHospitalRegistrySnapshot() : null;
+      return { invoice, oracleRegistry };
+    }
+    case "updateHospitalInvoice": {
+      const invoice = await ledger.updateHospitalInvoice(command, findDemoAccount(session.accountId)?.fabricUserName);
+      const oracleRegistry = await refreshHospitalRegistrySnapshot();
+      return { invoice, oracleRegistry };
+    }
     case "submitClaim":
       return ledger.submitClaim(command);
     case "crossCheckClaimInvoice":

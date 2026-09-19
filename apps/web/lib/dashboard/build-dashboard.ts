@@ -17,6 +17,7 @@ import type {
   PremiumPayment,
   Liability,
   OracleRequest,
+  OracleRegistrySnapshot,
   PartnerAgreement,
   HospitalInvoice,
   Settlement,
@@ -62,6 +63,7 @@ export type DashboardAssets = {
   decisions?: AuditorDecision[];
   fraudAssessments?: FraudAssessment[];
   oracleRequests?: OracleRequest[];
+  oracleSnapshots?: OracleRegistrySnapshot[];
   partnerAgreements?: PartnerAgreement[];
   hospitalInvoices?: HospitalInvoice[];
 };
@@ -97,6 +99,8 @@ export function buildRoleDashboard(
   const decisions = assets.decisions ?? [];
   const fraudAssessments = assets.fraudAssessments ?? [];
   const oracleRequests = assets.oracleRequests ?? [];
+  const oracleSnapshots = assets.oracleSnapshots ?? [];
+  const appeals = assets.appeals ?? [];
   const partnerAgreements = assets.partnerAgreements ?? [];
   const hospitalInvoices = assets.hospitalInvoices ?? [];
   const ownedPolicies = role === "policyholder"
@@ -123,6 +127,16 @@ export function buildRoleDashboard(
       ],
       queueTitle: "Your active coverage",
       queue: [
+        ...appeals.filter((appeal) => appeal.claimantId === subjectId && ["SUBMITTED", "HOSPITAL_VERIFIED", "UNDER_REVIEW"].includes(appeal.status)).map((appeal) => ({
+          id: appeal.id,
+          title: appeal.claimId,
+          detail: appeal.status === "SUBMITTED"
+            ? "Corrected Hospital invoice submitted; awaiting insurer cross-check"
+            : appeal.status === "HOSPITAL_VERIFIED"
+              ? "Corrected invoice verified; awaiting fresh Oracle consensus"
+              : "Oracle fallback is with the assigned independent auditors",
+          status: appeal.status,
+        })),
         ...ownedClaims.filter((claim) => claim.status === "REJECTED" && claim.appealCount < 1).map((claim) => ({
           id: claim.id,
           title: claim.id,
@@ -247,9 +261,12 @@ export function buildRoleDashboard(
   }
 
   const reviewQueue = assets.claims.filter((claim) =>
-    ["SUBMITTED", "HOSPITAL_VERIFIED", "ORACLE_FAILED", "APPROVED"].includes(claim.status)
-      || (claim.status === "APPEAL_SUBMITTED" && Boolean(claim.hospitalVerificationId)),
+    ["SUBMITTED", "APPEAL_SUBMITTED", "HOSPITAL_VERIFIED", "ORACLE_FAILED", "APPROVED"].includes(claim.status),
   );
+  const latestHospitalSnapshot = [...oracleSnapshots]
+    .filter((snapshot) => snapshot.id.startsWith("registry-hospital-v"))
+    .sort((left, right) => right.version - left.version)[0]
+    ?? [...oracleSnapshots].sort((left, right) => right.version - left.version)[0];
   return {
     title: "Portfolio oversight",
     description: "Govern packages, monitor claims, initiate audit review, and authorize settlements.",
@@ -273,11 +290,11 @@ export function buildRoleDashboard(
       ...reviewQueue.map((claim) => {
       const approved = claim.status === "APPROVED";
       const oracleFailed = claim.status === "ORACLE_FAILED";
-      const needsInvoiceCheck = claim.status === "SUBMITTED";
+      const needsInvoiceCheck = claim.status === "SUBMITTED" || claim.status === "APPEAL_SUBMITTED";
       return {
         id: claim.id,
         title: claim.id,
-        detail: `${money(claim.amountMinor)} · policy ${claim.policyId}`,
+        detail: `${money(claim.amountMinor)} · policy ${claim.policyId}${claim.currentAppealId ? " · appeal correction" : ""}`,
         status: claim.status,
         commandLabel: approved ? "Prepare settlement" : oracleFailed ? "Prepare auditor fallback" : needsInvoiceCheck ? "Cross-check invoice" : "Prepare Oracle request",
         command: approved
@@ -286,7 +303,7 @@ export function buildRoleDashboard(
             ? { operation: "routeOracleFailureToReview", requestId: claim.currentOracleRequestId, reviewId: `review-oracle-${Date.now()}-${claim.id}` }
             : needsInvoiceCheck
               ? { operation: "crossCheckClaimInvoice", claimId: claim.id, verificationId: `invoice-check-${Date.now()}-${claim.id}` }
-            : { operation: "requestOracleVerification", requestId: `oracle-request-${Date.now()}-${claim.id}`, claimId: claim.id, snapshotId: "registry-demo-v1" },
+            : { operation: "requestOracleVerification", requestId: `oracle-request-${Date.now()}-${claim.id}`, claimId: claim.id, snapshotId: latestHospitalSnapshot?.id ?? "registry-demo-v1" },
       };
       }),
     ],

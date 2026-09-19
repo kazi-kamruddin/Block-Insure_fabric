@@ -17,6 +17,7 @@ import { decryptEvidenceBytes, encryptEvidenceBytes, sha256Hex } from "@/lib/evi
 
 type AssetType = "partner-agreement" | "hospital-invoice" | "package" | "policy" | "claim" | "evidence" | "evidence-grant" | "verification" | "decision" | "review" | "appeal" | "fraud-assessment" | "settlement" | "access" | "claim-history" | "account" | "bank-transfer" | "mandate" | "premium-payment" | "premium-adjustment" | "collection" | "benefit-plan" | "beneficiaries" | "benefit-request" | "liability" | "oracle-snapshot" | "oracle-request" | "oracle-commitment" | "oracle-result" | "oracle-history";
 type NotificationItem = { id: string; title: string; message: string; assetId: string; blockNumber: string };
+type BankCommunicationItem = { id: string; title: string; assetId: string; amountMinor: number; currency: string; status: string; adapter: string; recipient: string; deliveredAt: string; error: string };
 type ResearchSnapshotView = {
   reproducibilityHash: string;
   provenance: { ledgerSchemaVersion: number; indexedEvents: number; retainedEvents: number; checkpoint: { blockNumber: string } | null };
@@ -121,6 +122,7 @@ export function WorkspaceClient({
   const [dashboardLoading, setDashboardLoading] = useState(Boolean(initialAccount && !initialDashboard));
   const [preparedWorkflow, setPreparedWorkflow] = useState<PreparedWorkflow | null>(null);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [bankCommunications, setBankCommunications] = useState<BankCommunicationItem[]>([]);
   const [eventCheckpoint, setEventCheckpoint] = useState<string>("Not synchronized");
   const [researchSnapshot, setResearchSnapshot] = useState<ResearchSnapshotView | null>(null);
   const [oracleOperations, setOracleOperations] = useState<OracleOperationsView | null>(null);
@@ -140,12 +142,22 @@ export function WorkspaceClient({
     }
   }, []);
 
+  const refreshBankCommunications = useCallback(async () => {
+    try {
+      const body = await responseJson(await fetch("/api/operations/banking/communications", { cache: "no-store" }));
+      setBankCommunications(body.communications ?? []);
+    } catch {
+      setBankCommunications([]);
+    }
+  }, []);
+
   async function synchronizeEvents() {
     setBusy(true);
     try {
       const body = await responseJson(await fetch("/api/internal/events/sync", { method: "POST" }));
       setOutput(`Indexed ${body.processed} new Fabric events; projection now contains ${body.totalEvents}.`);
       await refreshNotifications();
+      if (account?.role === "bankOfficer") await refreshBankCommunications();
     } catch (error) {
       setOutput(error instanceof Error ? error.message : "Event synchronization failed");
     } finally {
@@ -200,6 +212,7 @@ export function WorkspaceClient({
       setAccount(signedInAccount);
       setOutput(`Signed in as ${body.account.displayName}.`);
       await refreshNotifications();
+      if (signedInAccount.role === "bankOfficer") await refreshBankCommunications();
       router.push(`/workspace/${workspaceForAccount(signedInAccount)}`);
     } catch (error) {
       setOutput(error instanceof Error ? error.message : "Sign-in failed");
@@ -555,6 +568,21 @@ export function WorkspaceClient({
           )}
         </article>
 
+        {account.role === "bankOfficer" && <article className="workCard">
+          <span className="kicker">Bank communications</span>
+          <h2>Customer delivery monitor</h2>
+          <p className="cardNote">Committed transfers, mandate decisions, and benefit payouts create replay-safe email deliveries. This screen exposes delivery metadata, never OTP codes.</p>
+          <button className="textButton" disabled={busy} onClick={refreshBankCommunications}>Refresh deliveries</button>
+          {bankCommunications.length === 0 ? <p className="emptyState">No transaction communications have been projected yet.</p> : (
+            <div className="recentList">{bankCommunications.slice(0, 12).map((item) => (
+              <div className="queueItem" key={item.id}>
+                <div><strong>{item.title}</strong><p>{item.assetId} · {new Intl.NumberFormat("en-BD", { style: "currency", currency: item.currency || "BDT" }).format(item.amountMinor / 100)}</p><small>{item.recipient || "recipient pending"}{item.error ? ` · ${item.error}` : ""}</small></div>
+                <span className={`status status-${item.status.toLowerCase()}`}>{item.status}{item.adapter ? ` · ${item.adapter}` : ""}</span>
+              </div>
+            ))}</div>
+          )}
+        </article>}
+
         {(account.role === "insurerAdmin" || account.role === "auditor") && <article className="workCard">
           <span className="kicker">Research dashboard</span>
           <h2>Ledger-derived thesis snapshot</h2>
@@ -576,7 +604,7 @@ export function WorkspaceClient({
         {(account.role === "insurerAdmin" || account.role === "auditor") && <article className="workCard">
           <span className="kicker">Certificate-bound services</span>
           <h2>Oracle operations and consensus</h2>
-          <p className="cardNote">Each worker uses a different OracleMSP certificate and independent registry source. Unrevealed results are never displayed.</p>
+          <p className="cardNote">Each worker uses a different OracleMSP certificate and independently validates the exact committed registry snapshot. Unrevealed results are never displayed.</p>
           <button className="primary button" disabled={busy} onClick={refreshOracleOperations}>Refresh Oracle health</button>
           {oracleOperations && <>
             <div className="metricGrid">

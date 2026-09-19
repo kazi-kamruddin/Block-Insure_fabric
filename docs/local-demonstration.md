@@ -131,7 +131,9 @@ inside the browser and convert BDT values to exact integer poisha.
    `policyholder1`. The issued policy snapshots those partner IDs.
 2. **Hospital Officer** — use the visually separate Hospital billing register to
    create and finalize an invoice. This workspace does not expose insurer claims,
-   clinical evidence, Oracle operations, reviews, or settlement actions.
+   clinical evidence, Oracle operations, reviews, or settlement actions. Each
+   finalized register change publishes an immutable `registry-hospital-vN`
+   Oracle snapshot containing hash-only verification records.
 3. **Policyholder One** — submit a claim against that policy and bind it to the
    finalized Hospital invoice. In the evidence
    panel, provide the claim/evidence IDs, choose a small original document, enter
@@ -142,7 +144,8 @@ inside the browser and convert BDT values to exact integer poisha.
    Hospital's invoice using agreement-scoped read access. The amount, incident
    date, Hospital, invoice status, and clinical reference must match. Then record
    the transparent advisory fraud assessment,
-   then request two-Oracle verification with `registry-demo-v1`, `model-v1`,
+   then request two-Oracle verification with the newest `registry-hospital-vN`
+   snapshot prepared by the dashboard, `model-v1`,
    assigned subjects `oracle1`/`oracle2`, and future commit/reveal deadlines.
 5. **Oracle 1 and Oracle 2 services** — independently consume the committed request,
    query their own registry snapshots, submit salted commitments, and reveal only
@@ -159,8 +162,10 @@ inside the browser and convert BDT values to exact integer poisha.
    and cast certificate-bound `APPROVE` or `REJECT` votes. Three approvals or two
    rejections finalize the default 3-of-4 review; duplicate votes are rejected.
 9. **Policyholder One** — if the manual review rejects the claim, submit the
-   single permitted appeal. The insurer opens a new round and a fresh quorum can
-   overturn or uphold the decision without erasing round-one votes.
+   single permitted appeal after the Hospital finalizes the corrected invoice.
+   The insurer cross-checks that invoice and requests fresh, version-bound Oracle
+   verification. Only Oracle failure goes to a new auditor quorum; prior votes
+   are never erased.
 10. **Insurer Administrator** — authorize a settlement for an approved claim.
 11. **Bank Officer** — confirm the authorized settlement using an external payment
    reference; only its browser-generated hash is written to the ledger.
@@ -171,6 +176,11 @@ inside the browser and convert BDT values to exact integer poisha.
 14. **Insurer Administrator** — synchronize committed Fabric events. Show the
     transaction-aware checkpoint and role inbox, then open the thesis dashboard
     and download its reproducibility-hashed JSON snapshot.
+
+After synchronization, open the Bank portal's **Customer delivery monitor**.
+Each committed transfer result, mandate decision, and benefit payment has one
+replay-safe communication record with `DEMO`, `DELIVERED`, or `FAILED` state.
+Production delivery uses `EMAIL_GATEWAY_URL`; OTP values never appear here.
 
 Each account is redirected to its canonical role workspace and cannot navigate
 into another role's route. Chaincode independently rechecks MSP and certificate

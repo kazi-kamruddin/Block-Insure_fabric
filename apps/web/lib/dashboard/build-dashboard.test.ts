@@ -35,4 +35,10 @@ describe("role dashboards", () => {
     expect(buildRoleDashboard("auditor", assets, "auditor1").queue[0]?.id).toBe("review-1");
     expect(buildRoleDashboard("bankOfficer", assets).queue[0]?.id).toBe("settlement-1");
   });
+
+  it("hands a submitted appeal to corrected-invoice cross-check before fresh Oracle work", () => {
+    const appealedClaim = { ...assets.claims[0], id: "claim-appeal", status: "APPEAL_SUBMITTED" as const, currentAppealId: "appeal-1", appealCount: 1, version: 2 };
+    const dashboard = buildRoleDashboard("insurerAdmin", { ...assets, claims: [appealedClaim] });
+    expect(dashboard.queue[0]).toMatchObject({ id: "claim-appeal", commandLabel: "Cross-check invoice", command: { operation: "crossCheckClaimInvoice" } });
+  });
 });

@@ -59,6 +59,13 @@ The policyholder workspace provides a manual-premium card:
    Bank transaction with the fixed BankMSP service identity. Chaincode atomically
    debits the customer and credits the insurer, or records a bounced transfer.
 
+Committed transfer results, mandate decisions, and benefit-payment confirmations
+also enter a replay-safe email outbox in the Fabric event projection. The event
+worker delivers each entry through the configured email gateway and records its
+gateway message ID or failure. Demo mode records `DEMO` delivery without sending
+externally. The Bank-only communication monitor exposes delivery state, never OTP
+values.
+
 `ENABLE_DEMO_AUTH=true` returns the code to the local UI so the thesis workflow
 is demonstrable. Outside demo mode `EMAIL_GATEWAY_URL` is mandatory and the code
 is never returned to the browser. Deployments use a separate long random

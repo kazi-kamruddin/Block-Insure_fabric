@@ -2,7 +2,7 @@
 
 Block-Insure uses one thesis-scale `OracleMSP` with two separately enrolled,
 certificate-bound service identities: `oracle1` and `oracle2`. Each worker owns
-its Fabric signing identity, registry source, cursor, retry loop, and health
+its Fabric signing identity, registry loader, cursor, retry loop, and health
 record. One certificate subject cannot fill both positions. This demonstrates
 operational independence without claiming that the two services are separate
 legal organizations; a production design could split them into two MSPs.
@@ -16,8 +16,12 @@ The request freezes the claim ID and version, insurer invoice cross-check, query
 registry root/version, rules hash/version, model hash/version, exactly two Oracle
 certificate subjects, and commit/reveal deadlines.
 
-Each assigned worker independently loads its configured registry file, resolves
-the hospital record, and computes a deterministic result containing the complete
+Each assigned worker loads the exact snapshot named by the request. Tracked
+synthetic fixtures remain available for controlled baseline/conflict experiments;
+normal Hospital workflows generate immutable `registry-hospital-vN` snapshots
+from finalized invoice-register records and publish their canonical roots on
+Fabric. Workers fetch those hash-only snapshots by ID, resolve the Hospital
+record, and compute a deterministic result containing the complete
 verdict, verification code, canonical record hash, and every snapshotted version.
 It first submits a salted commitment. Reveal begins after both commitments arrive
 or the commit deadline passes. Chaincode recomputes both the result hash and the
@@ -60,9 +64,11 @@ otherwise identical.
 The supervised launcher selects these without source editing through
 `-OracleScenario Baseline`, `Conflict`, or `Oracle2Unavailable`.
 
-These fixtures are synthetic demonstration data, not a hospital, government, or
-national-health integration. The root, rules, and model commitments make that
-provenance explicit on the ledger.
+The dynamic snapshots are also synthetic demonstration data: their source is the
+project's Fabric Hospital invoice register, not a live hospital, government, or
+national-health integration. They contain reference/treatment hashes, Hospital
+IDs, exact demo amounts, and service-date bounds—not patient names or clinical
+documents. The root, rules, and model commitments make that provenance explicit.
 
 ## Operations and verification
 

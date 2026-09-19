@@ -24,7 +24,10 @@ reveals or transports an AES passphrase; it governs ciphertext retrieval only.
 chaincode events. It resumes from the last committed Fabric block and transaction
 ID, writes a bounded local projection, and deduplicates events by block,
 transaction, and event name. Replaying the same delivery therefore does not
-duplicate counts or inbox items. The route accepts an insurer demo session or an
+duplicate counts, inbox items, or Bank email outbox entries. Transaction,
+mandate, and benefit events create deterministic communication IDs; delivery
+state and gateway message IDs are persisted beside the checkpoint. The route
+accepts an insurer demo session or an
 external scheduler bearer token in `EVENT_WORKER_SECRET`.
 
 The ignored `data/events/projection.json` file is a local development adapter.
@@ -55,6 +58,8 @@ The operational APIs are:
   committed events;
 - `/api/operations/events` — insurer/auditor event inspection with event, asset,
   block, and limit filters;
+- `/api/operations/banking/communications` — Bank-only transaction email
+  delivery monitor without OTP or message-body disclosure;
 - `/api/internal/events/sync` — idempotent projection catch-up.
 - `/api/operations/oracles` — insurer/auditor view of both service identities,
   registry/model provenance, cursor progress, counts, errors, and ledger-derived

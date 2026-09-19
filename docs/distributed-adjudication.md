@@ -38,10 +38,17 @@ mutation: an authorized transaction explicitly finalizes an expired open review.
 ## Appeal lifecycle
 
 A policyholder may submit one appeal for an initially rejected owned claim. The
-appeal stores only a reason hash. An insurer administrator opens a new review
-round with an independently recorded assignment, threshold, and deadline.
-Approval marks the appeal `OVERTURNED` and the claim `APPROVED`; rejection or
-timeout marks it `UPHELD`. The initial review and all earlier votes remain intact.
+appeal stores reason/evidence hashes and a versioned commitment to the proposed
+Hospital, amount, incident date, description, and corrected clinical reference.
+That reference must already identify a finalized invoice in the contracted
+Hospital's independent register. The insurer dashboard then hands the appeal
+through a fresh invoice cross-check and a new Oracle request bound to the
+incremented claim version and newest Hospital-derived registry snapshot. Exact
+positive Oracle consensus marks the appeal `OVERTURNED` and the claim `APPROVED`.
+A negative, conflicting, or timed-out result may be routed to a newly assigned
+auditor round, which can overturn or uphold the appeal. `OpenAppealReview` is
+intentionally not a shortcut around the fresh Hospital and Oracle checks. The
+initial review and all earlier votes remain intact.
 
 ## Fraud assessment boundary
 
@@ -60,7 +67,7 @@ The Go suite covers assignment and threshold validation, unassigned and duplicat
 vote rejection, quorum closure, timeout, appeal limits, cross-round history, and
 fraud non-authority. The live CLI smoke completes a 3-of-4 approval and confirms
 the assessment remains advisory. The Playwright suite also completes a rejected
-round, one appeal, and a three-vote overturn through distinct signed application
-sessions and Fabric identities.
+round, corrected-invoice appeal, fresh Hospital cross-check, and version-bound
+Oracle adjudication through distinct signed application sessions and identities.
 The Oracle suite additionally proves automatic exact-result approval and manual
 fallback without granting either Oracle settlement authority.

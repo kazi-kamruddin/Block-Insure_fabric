@@ -4,7 +4,7 @@ import { environmentFileArgument, loadEnvironmentFile } from "./environment.mjs"
 
 loadEnvironmentFile(environmentFileArgument());
 
-const [{ loadOracleConfig }, { connectOracleGateway }, { loadRegistrySnapshot, assessRegistryRecord }, protocol, cursorModule, retryModule, healthModule] = await Promise.all([
+const [{ loadOracleConfig }, { connectOracleGateway }, { loadRegistrySnapshot, validateRegistrySnapshot, assessRegistryRecord }, protocol, cursorModule, retryModule, healthModule] = await Promise.all([
   import("./config.mjs"),
   import("./gateway.mjs"),
   import("./registry.mjs"),
@@ -54,6 +54,19 @@ async function evaluateOrNull(transactionName, ...arguments_) {
 
 async function submit(transactionName, ...arguments_) {
   return decodeJson(await runtime.contract.submitTransaction(transactionName, ...arguments_.map(String)));
+}
+
+async function registryForRequest(request) {
+  if (request.registrySnapshotId === registry.snapshotId) return registry;
+  if (!config.registryApiUrl) return registry;
+  const response = await fetch(`${config.registryApiUrl}/${encodeURIComponent(request.registrySnapshotId)}`, {
+    headers: { accept: "application/json" },
+    signal: AbortSignal.timeout(config.registryRequestTimeoutMs),
+  });
+  if (!response.ok) throw new Error(`Hospital registry API returned ${response.status} for ${request.registrySnapshotId}`);
+  const snapshot = validateRegistrySnapshot(await response.json());
+  if (snapshot.snapshotId !== request.registrySnapshotId) throw new Error(`Hospital registry API returned snapshot ${snapshot.snapshotId}`);
+  return snapshot;
 }
 
 function retry(operation) {
@@ -132,6 +145,7 @@ async function processRequest(requestId) {
     evaluate("ReadHospitalVerification", request.hospitalVerificationId),
     request.appealId ? evaluate("ReadClaimAppeal", request.appealId) : Promise.resolve(null),
   ]);
+  const requestRegistry = await registryForRequest(request);
   if (claim.version !== request.claimVersion || claim.currentOracleRequestId !== request.id) {
     await updateHealth({ status: "ONLINE", lastProcessedRequestId: request.id, lastError: `Stale request rejected for claim ${request.claimId}` });
     return;
@@ -146,7 +160,7 @@ async function processRequest(requestId) {
     return;
   }
   const assessment = assessRegistryRecord({
-    snapshot: registry,
+    snapshot: requestRegistry,
     request,
     claim,
     hospitalVerification,
@@ -160,6 +174,10 @@ async function processRequest(requestId) {
   const health = healthState.snapshot();
   await updateHealth({
     status: "PROCESSING",
+    registrySource: requestRegistry.sourceId,
+    registrySnapshotId: requestRegistry.snapshotId,
+    registryVersion: requestRegistry.version,
+    registryRootHash: requestRegistry.rootHash,
     lastProcessedRequestId: request.id,
     lastError: null,
     counts: { requests: health.counts.requests + 1 },

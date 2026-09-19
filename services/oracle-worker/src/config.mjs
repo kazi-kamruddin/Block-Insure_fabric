@@ -40,9 +40,11 @@ export function loadOracleConfig(environment = process.env) {
     oracleId,
     label: String(environment.ORACLE_LABEL ?? oracleId),
     registryPath: resolveFromService(required(environment, "ORACLE_REGISTRY_PATH")),
+    registryApiUrl: String(environment.ORACLE_REGISTRY_API_URL ?? "").trim().replace(/\/$/, ""),
     stateRoot: resolveFromService(environment.ORACLE_STATE_ROOT ?? "../../data/oracle"),
     healthPort: boundedInteger(environment, "ORACLE_HEALTH_PORT", oracleId === "oracle1" ? 3301 : 3302, 1024, 65535),
     pollIntervalMs: boundedInteger(environment, "ORACLE_POLL_INTERVAL_MS", 1_000, 100, 60_000),
+    registryRequestTimeoutMs: boundedInteger(environment, "ORACLE_REGISTRY_REQUEST_TIMEOUT_MS", 5_000, 100, 60_000),
     retry: {
       attempts: boundedInteger(environment, "ORACLE_MAX_RETRY_ATTEMPTS", 4, 1, 10),
       baseDelayMs: boundedInteger(environment, "ORACLE_RETRY_BASE_MS", 500, 0, 60_000),

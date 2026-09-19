@@ -4,6 +4,7 @@ import { status } from "@grpc/grpc-js";
 import { loadFabricConfig } from "@/lib/fabric/config";
 import { withFabricContract } from "@/lib/fabric/gateway";
 import { appendProjectedEvent, readEventProjection } from "./store";
+import { deliverPendingBankCommunications } from "./deliver-communications";
 
 const decoder = new TextDecoder();
 let activeSynchronization: Promise<EventSyncResult> | null = null;
@@ -46,12 +47,14 @@ async function performFabricEventSync(maxEvents: number) {
     }
   });
   const projection = await readEventProjection();
+  const communications = await deliverPendingBankCommunications();
   return {
     processed,
     limitReached: processed >= maxEvents,
     checkpoint: projection.checkpoint,
     totalEvents: projection.events.length,
     countsByName: projection.countsByName,
+    communications,
   };
 }
 

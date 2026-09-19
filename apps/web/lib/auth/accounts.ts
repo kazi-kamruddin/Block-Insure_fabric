@@ -112,6 +112,10 @@ export function findDemoAccount(id: string): DemoAccount | undefined {
   return demoAccounts[id as DemoAccountId] as DemoAccount | undefined;
 }
 
+export function findDemoAccountBySubject(subjectId: string): DemoAccount | undefined {
+  return Object.values(demoAccounts).find((account) => "subjectId" in account && account.subjectId === subjectId) as DemoAccount | undefined;
+}
+
 export const workspaceByRole: Record<FabricRole, string> = {
   insurerAdmin: "insurer",
   policyholder: "policyholder",
