@@ -10,3 +10,12 @@ Run these after deploying schema 14 and building the web application:
 ./benchmarks/caliper/run.ps1
 ./benchmarks/oracle-faults/run-matrix.ps1
 ```
+
+`comparative/run-experiment.mjs` is a controlled protocol microbenchmark. It compares centralized verification, 1-of-1, 2-of-2, 2-of-3, and privacy-bound 2-of-3 verification over 30 balanced repetitions. It reports mean, median, P95, 95% confidence intervals, throughput, CPU time, and memory deltas as JSON, CSV, and Markdown. It deliberately excludes Fabric network/storage latency; use Caliper for that layer.
+
+`security-evaluation/run-evaluation.mjs` executes the structured STRIDE-informed threat model. Every threat is linked to an attack simulation, an exact chaincode enforcement test, or both, and produces machine-readable coverage and safe-outcome metrics.
+
+```powershell
+node ./benchmarks/comparative/run-experiment.mjs
+node ./benchmarks/security-evaluation/run-evaluation.mjs
+```

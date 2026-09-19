@@ -14,6 +14,8 @@ coverage/
 /benchmarks/caliper/generated/
 /benchmarks/caliper/reports/
 /benchmarks/oracle-faults/reports/
+/benchmarks/comparative/reports/
+/benchmarks/security-evaluation/reports/
 /formal/insurance-workflow/reports/
 /formal/insurance-workflow/.cache/
 /formal/insurance-workflow/states/
