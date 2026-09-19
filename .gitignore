@@ -4,6 +4,13 @@ node_modules/
 dist/
 coverage/
 /data/evidence/
+/data/events/
+/data/oracle/
+/data/demo-stack/
+/apps/web/data/
+/apps/web/test-results/
+/apps/web/playwright-report/
+/verification-results/*.json
 
 # Local configuration and credentials
 .env

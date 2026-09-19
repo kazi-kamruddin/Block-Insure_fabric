@@ -11,11 +11,13 @@ chaincode_root="${project_root}/chaincode/insurance-contract"
 
 channel_name="${CHANNEL_NAME:-insurance-channel}"
 chaincode_name="${CHAINCODE_NAME:-insurance-contract}"
-chaincode_version="${CHAINCODE_VERSION:-0.2.0}"
+chaincode_version="${CHAINCODE_VERSION:-1.2.2}"
 chaincode_sequence="${CHAINCODE_SEQUENCE:-}"
 chaincode_label="${chaincode_name}_${chaincode_version}"
 package_file="${artifacts}/${chaincode_label}.tar.gz"
 orderer_ca="${organizations}/ordererOrganizations/blockinsure.test/orderers/orderer.blockinsure.test/tls/ca.crt"
+collections_config="${network_root}/config/collections_config.json"
+endorsement_policy="OutOf(2, 'InsurerMSP.peer','HospitalMSP.peer','AuditorMSP.peer','BankMSP.peer','OracleMSP.peer')"
 
 export PATH="${samples_root}/bin:${PATH}"
 export FABRIC_CFG_PATH="${samples_root}/config"
@@ -29,16 +31,26 @@ package_chaincode() {
 
   local docker_command="" chaincode_mount="${chaincode_root}" artifacts_mount="${artifacts}"
   local bin_mount="${samples_root}/bin" config_mount="${samples_root}/config"
-  if command -v docker >/dev/null && docker info >/dev/null 2>&1; then
-    docker_command="docker"
-  elif command -v docker.exe >/dev/null && docker.exe info >/dev/null 2>&1; then
-    docker_command="docker.exe"
-    chaincode_mount="$(wslpath -w "${chaincode_root}")"
-    artifacts_mount="$(wslpath -w "${artifacts}")"
-    bin_mount="$(wslpath -w "${samples_root}/bin")"
-    config_mount="$(wslpath -w "${samples_root}/config")"
-  else
-    echo "Go is unavailable and Docker Desktop cannot provide the isolated Go packager." >&2
+  local attempt
+  for attempt in {1..10}; do
+    if command -v docker >/dev/null && docker info >/dev/null 2>&1; then
+      docker_command="docker"
+      break
+    elif command -v docker.exe >/dev/null && docker.exe info >/dev/null 2>&1; then
+      docker_command="docker.exe"
+      chaincode_mount="$(wslpath -w "${chaincode_root}")"
+      artifacts_mount="$(wslpath -w "${artifacts}")"
+      bin_mount="$(wslpath -w "${samples_root}/bin")"
+      config_mount="$(wslpath -w "${samples_root}/config")"
+      break
+    fi
+    if [ "${attempt}" -lt 10 ]; then
+      echo "Docker is not ready (attempt ${attempt}/10); retrying in 2 seconds..." >&2
+      sleep 2
+    fi
+  done
+  if [ -z "${docker_command}" ]; then
+    echo "Go is unavailable and Docker Desktop cannot provide the isolated Go packager after 10 attempts." >&2
     exit 1
   fi
 
@@ -71,7 +83,8 @@ approve_for_org() {
     -o localhost:7050 --ordererTLSHostnameOverride orderer.blockinsure.test \
     --channelID "${channel_name}" --name "${chaincode_name}" \
     --version "${chaincode_version}" --package-id "${package_id}" \
-    --sequence "${chaincode_sequence}" --tls --cafile "${orderer_ca}"
+    --sequence "${chaincode_sequence}" --collections-config "${collections_config}" \
+    --signature-policy "${endorsement_policy}" --tls --cafile "${orderer_ca}"
 }
 
 resolve_chaincode_sequence() {
@@ -111,22 +124,26 @@ insurer InsurerMSP 7051
 hospital HospitalMSP 8051
 auditor AuditorMSP 9051
 bank BankMSP 12051
+oracle OracleMSP 13051
 EOF
 
 approve_for_org insurer InsurerMSP 7051
 approve_for_org hospital HospitalMSP 8051
 approve_for_org auditor AuditorMSP 9051
 approve_for_org bank BankMSP 12051
+approve_for_org oracle OracleMSP 13051
 
 set_peer_context insurer InsurerMSP 7051
 peer lifecycle chaincode checkcommitreadiness \
   --channelID "${channel_name}" --name "${chaincode_name}" \
-  --version "${chaincode_version}" --sequence "${chaincode_sequence}" --output json
+  --version "${chaincode_version}" --sequence "${chaincode_sequence}" \
+  --collections-config "${collections_config}" --signature-policy "${endorsement_policy}" --output json
 
 peer lifecycle chaincode commit \
   -o localhost:7050 --ordererTLSHostnameOverride orderer.blockinsure.test \
   --channelID "${channel_name}" --name "${chaincode_name}" \
   --version "${chaincode_version}" --sequence "${chaincode_sequence}" \
+  --collections-config "${collections_config}" --signature-policy "${endorsement_policy}" \
   --tls --cafile "${orderer_ca}" \
   --peerAddresses localhost:7051 \
   --tlsRootCertFiles "${organizations}/peerOrganizations/insurer.blockinsure.test/peers/peer0.insurer.blockinsure.test/tls/ca.crt" \
@@ -135,7 +152,9 @@ peer lifecycle chaincode commit \
   --peerAddresses localhost:9051 \
   --tlsRootCertFiles "${organizations}/peerOrganizations/auditor.blockinsure.test/peers/peer0.auditor.blockinsure.test/tls/ca.crt" \
   --peerAddresses localhost:12051 \
-  --tlsRootCertFiles "${organizations}/peerOrganizations/bank.blockinsure.test/peers/peer0.bank.blockinsure.test/tls/ca.crt"
+  --tlsRootCertFiles "${organizations}/peerOrganizations/bank.blockinsure.test/peers/peer0.bank.blockinsure.test/tls/ca.crt" \
+  --peerAddresses localhost:13051 \
+  --tlsRootCertFiles "${organizations}/peerOrganizations/oracle.blockinsure.test/peers/peer0.oracle.blockinsure.test/tls/ca.crt"
 
 while read -r org msp port; do
   set_peer_context "${org}" "${msp}" "${port}"
@@ -145,6 +164,7 @@ insurer InsurerMSP 7051
 hospital HospitalMSP 8051
 auditor AuditorMSP 9051
 bank BankMSP 12051
+oracle OracleMSP 13051
 EOF
 
 echo "Committed ${chaincode_name} ${chaincode_version} (sequence ${chaincode_sequence}) to ${channel_name}."

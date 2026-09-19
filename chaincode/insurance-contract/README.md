@@ -3,30 +3,74 @@
 This Go chaincode owns the shared, permissioned insurance ledger for
 `insurance-channel`.
 
-## Current transaction flow
+## Current transaction flows
 
 1. An `InsurerMSP` identity with `role=insurerAdmin` creates and publishes a
-   policy package, then issues a policy whose terms are snapshotted.
+   policy package with active Hospital and Bank partners, then issues a policy
+   whose terms and provider network are snapshotted.
 2. The policy owner, an `InsurerMSP` identity with `role=policyholder`, submits
-   a claim and immutable evidence references. Only SHA-256 hashes and safe
+   an invoice-bound claim and immutable evidence references. The insurer may
+   anchor sorted evidence batches with SHA-256 Merkle roots and portable
+   inclusion proofs. Only hashes and safe
    metadata are placed on the shared ledger; medical documents remain
    off-chain.
-3. A `HospitalMSP` identity with `role=hospitalOfficer` verifies or invalidates
-   the claim.
-4. The insurer starts review and an `AuditorMSP` identity with `role=auditor`
-   records the decision.
+3. A `HospitalMSP` identity with `role=hospitalOfficer` independently creates
+   and updates only its own organizational invoice records. The insurer receives
+   agreement-scoped read-only access and cross-checks the claim against a
+   finalized invoice from the policy's snapshotted Hospital network.
+4. The insurer records optional advisory fraud triage and requests verification
+   from exactly two assigned `OracleMSP` certificate subjects. Each independently
+   commits then reveals a registry/model/version-bound result. Exact positive
+   consensus approves the claim; negative, conflict, or timeout routes through an
+   explicit transaction into a review round with immutable auditor assignments,
+   thresholds, and a deadline. Four distinct
+   `AuditorMSP` certificate subjects support the default 3-of-4 approval / 2-of-4
+   rejection quorum. A rejected claimant may submit one appeal, which creates a
+   new review round without replacing the original votes.
 5. The insurer authorizes settlement and a `BankMSP` identity with
    `role=bankOfficer` confirms the bank reference.
 
-The initial review model deliberately uses one auditor decision per claim. A
-multi-auditor quorum can be introduced later without weakening this state
-machine.
+The policyholder can also acquire published coverage in `PENDING_PAYMENT`,
+designate beneficiaries, request a bank mandate, authorize a manual OTP payment,
+and request configured death/surrender/maturity benefits. Bank-confirmed premiums
+activate or reinstate coverage; insurer lifecycle processing applies grace,
+lapse, expiry, cancellation, and renewal rules. Scheduled collections, receipt
+replay markers, append-only reversals, explicit funding gates, and claim/benefit
+liabilities preserve the external-fiat audit trail. Masked account metadata is
+public; token hashes and simulated balances are stored only in the targeted
+BankMSP–InsurerMSP private-data collection.
+
+Fraud assessments are explainable, versioned, and strictly advisory: there is no
+transaction path from a fraud score to a claim decision. Review votes are unique
+per auditor subject and round; timeout finalization and appeal processing retain
+the complete adjudication history.
 
 Money is represented as signed 64-bit integer minor units. Dates use
 `YYYY-MM-DD`; ledger timestamps come from the Fabric transaction timestamp.
-Deterministic composite-key list queries are available for packages, policies,
-claims, evidence references, and settlements; the application applies its
+Deterministic composite-key list queries are available for every policy, banking,
+benefit, claim, evidence, and liability asset; the application applies its
 policyholder ownership filter before returning collections.
+
+Successful evidence retrievals are separately committed as
+`EvidenceAccessRecord` assets. The contract permits the owning policyholder,
+the insurer administrator, and an auditor assigned to the current review.
+Hospital identities are isolated from insurer claim and clinical-evidence
+surfaces. Policyholders can additionally
+create revocable, expiring, use-limited `EvidenceAccessGrant` assets scoped to
+one organization, role, certificate subject (or explicit wildcard), evidence
+item, and purpose. Chaincode binds purposes to role semantics and records grant
+provenance on every use. Bank identities cannot retrieve clinical evidence.
+Claims link verifications, review rounds, decisions, appeals, fraud assessments,
+access records, and settlements for audit navigation.
+
+The current evidence-Merkle and private-banking definition is `insurance-contract` 1.2.2
+with schema version 12 and an automatically resolved lifecycle sequence. A clean bootstrap
+starts at sequence 1; a non-destructive source upgrade increments the existing
+channel sequence.
+
+Schema 11 adds evidence Merkle batches and chaincode inclusion verification.
+Schema 12 moves account-token hashes and balances into `bankInsurerPrivateData`,
+uses transient opening input, and disables sensitive public-argument registration.
 
 ## Test
 
@@ -47,6 +91,6 @@ With the local network running:
 bash network/scripts/deploy-chaincode.sh
 ```
 
-The lifecycle script packages and installs the contract on all four peers,
-collects all four organization approvals, commits it to `insurance-channel`,
+The lifecycle script packages and installs the contract on all five peers,
+collects all five organization approvals, commits it to `insurance-channel`,
 and queries the committed definition from each peer.

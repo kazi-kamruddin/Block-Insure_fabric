@@ -1,6 +1,6 @@
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { loadFabricConfig, resolveRoleProfile } from "./config";
+import { loadFabricConfig, resolveAuditorProfile, resolveHospitalProfile, resolveRoleProfile } from "./config";
 
 describe("Fabric configuration", () => {
   it("uses safe local defaults", () => {
@@ -9,6 +9,18 @@ describe("Fabric configuration", () => {
     expect(config.channelName).toBe("insurance-channel");
     expect(config.chaincodeName).toBe("insurance-contract");
     expect(config.networkRoot).toBe(path.resolve(process.cwd(), "../../network"));
+  });
+
+  it("only resolves the four server-owned auditor certificate profiles", () => {
+    const config = loadFabricConfig({ FABRIC_NETWORK_ROOT: "X:/fabric-network" } as unknown as NodeJS.ProcessEnv);
+    expect(resolveAuditorProfile("auditor3", config).userMspPath).toContain("auditor3@auditor.blockinsure.test");
+    expect(() => resolveAuditorProfile("arbitrary-user", config)).toThrow("Unknown server-owned auditor");
+  });
+
+  it("only resolves the five server-owned Hospital certificate profiles", () => {
+    const config = loadFabricConfig({ FABRIC_NETWORK_ROOT: "X:/fabric-network" } as unknown as NodeJS.ProcessEnv);
+    expect(resolveHospitalProfile("hospital4", config).userMspPath).toContain("hospital4@hospital.blockinsure.test");
+    expect(() => resolveHospitalProfile("arbitrary-user", config)).toThrow("Unknown server-owned hospitalOfficer");
   });
 
   it("maps each application role to its own organization identity", () => {
@@ -22,5 +34,10 @@ describe("Fabric configuration", () => {
     expect(hospital.userMspPath).toContain("hospitalOfficer@hospital.blockinsure.test");
     expect(bank.mspId).toBe("BankMSP");
     expect(bank.peerEndpoint).toBe("localhost:12051");
+  });
+
+  it("honors an explicit network root for packaged deployments", () => {
+    const config = loadFabricConfig({ FABRIC_NETWORK_ROOT: "X:/fabric-network" } as unknown as NodeJS.ProcessEnv);
+    expect(config.networkRoot).toBe(path.resolve(process.cwd(), "X:/fabric-network"));
   });
 });

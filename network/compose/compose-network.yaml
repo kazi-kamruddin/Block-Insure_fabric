@@ -10,6 +10,7 @@ volumes:
   peer0.hospital.blockinsure.test:
   peer0.auditor.blockinsure.test:
   peer0.bank.blockinsure.test:
+  peer0.oracle.blockinsure.test:
 
 x-peer-environment: &peer-environment
   FABRIC_CFG_PATH: /etc/hyperledger/peercfg
@@ -102,6 +103,10 @@ services:
     <<: *couchdb-defaults
     container_name: couchdb.bank.blockinsure.test
     ports: ["8984:5984"]
+  couchdb-oracle:
+    <<: *couchdb-defaults
+    container_name: couchdb.oracle.blockinsure.test
+    ports: ["10084:5984"]
 
   peer-insurer:
     <<: *peer-defaults
@@ -178,3 +183,22 @@ services:
       - peer0.bank.blockinsure.test:/var/hyperledger/production
     ports: ["12051:7051", "9447:9444"]
     depends_on: [couchdb-bank]
+
+  peer-oracle:
+    <<: *peer-defaults
+    container_name: peer0.oracle.blockinsure.test
+    environment:
+      <<: *peer-environment
+      CORE_PEER_ID: peer0.oracle.blockinsure.test
+      CORE_PEER_ADDRESS: peer0.oracle.blockinsure.test:7051
+      CORE_PEER_GOSSIP_BOOTSTRAP: peer0.oracle.blockinsure.test:7051
+      CORE_PEER_GOSSIP_EXTERNALENDPOINT: peer0.oracle.blockinsure.test:7051
+      CORE_PEER_LOCALMSPID: OracleMSP
+      CORE_LEDGER_STATE_COUCHDBCONFIG_COUCHDBADDRESS: couchdb-oracle:5984
+    volumes:
+      - ../organizations/peerOrganizations/oracle.blockinsure.test/peers/peer0.oracle.blockinsure.test:/etc/hyperledger/fabric
+      - ../.fabric/fabric-samples/config/core.yaml:/etc/hyperledger/peercfg/core.yaml:ro
+      - /var/run:/host/var/run
+      - peer0.oracle.blockinsure.test:/var/hyperledger/production
+    ports: ["13051:7051", "9448:9444"]
+    depends_on: [couchdb-oracle]

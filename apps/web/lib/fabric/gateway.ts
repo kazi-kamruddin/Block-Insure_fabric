@@ -11,7 +11,7 @@ import {
   type Gateway,
   type Identity,
 } from "@hyperledger/fabric-gateway";
-import { loadFabricConfig, resolveRoleProfile, type FabricRole } from "./config";
+import { loadFabricConfig, resolveAuditorProfile, resolveHospitalProfile, resolveRoleProfile, type FabricRole } from "./config";
 import { loadRoleCredentials } from "./credentials";
 
 function deadlineAfter(seconds: number) {
@@ -21,9 +21,14 @@ function deadlineAfter(seconds: number) {
 export async function withFabricContract<T>(
   role: FabricRole,
   action: (contract: Contract, gateway: Gateway) => Promise<T>,
+  profileUserName?: string,
 ): Promise<T> {
   const config = loadFabricConfig();
-  const profile = resolveRoleProfile(role, config);
+  const profile = role === "auditor" && profileUserName
+    ? resolveAuditorProfile(profileUserName, config)
+    : role === "hospitalOfficer" && profileUserName
+      ? resolveHospitalProfile(profileUserName, config)
+      : resolveRoleProfile(role, config);
   const [{ certificate, privateKey }, tlsRootCertificate] = await Promise.all([
     loadRoleCredentials(profile.userMspPath),
     fs.readFile(profile.tlsCertificatePath),
@@ -48,6 +53,7 @@ export async function withFabricContract<T>(
     endorseOptions: () => ({ deadline: deadlineAfter(config.deadlines.endorse)() }),
     submitOptions: () => ({ deadline: deadlineAfter(config.deadlines.submit)() }),
     commitStatusOptions: () => ({ deadline: deadlineAfter(config.deadlines.commitStatus)() }),
+    chaincodeEventsOptions: () => ({ deadline: deadlineAfter(config.deadlines.eventSync)() }),
   });
 
   try {

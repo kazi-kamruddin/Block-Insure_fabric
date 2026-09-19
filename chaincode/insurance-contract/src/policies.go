@@ -28,7 +28,8 @@ func (c *Contract) CreatePolicyPackage(ctx contractapi.TransactionContextInterfa
 		AssetType: "policyPackage", SchemaVersion: SchemaVersion, ID: id, Version: 1,
 		Name: strings.TrimSpace(name), Description: strings.TrimSpace(description),
 		PremiumMinor: premiumMinor, CoverageLimitMinor: coverageLimitMinor,
-		TermsHash: strings.ToLower(termsHash), Status: "DRAFT", CreatedAt: now, UpdatedAt: now,
+		TermsHash: strings.ToLower(termsHash), HospitalIDs: []string{}, BankIDs: []string{},
+		Status: "DRAFT", CreatedAt: now, UpdatedAt: now,
 	}
 	if err := putState(ctx, "policyPackage", id, policyPackage); err != nil {
 		return nil, err
@@ -125,7 +126,13 @@ func (c *Contract) IssuePolicy(ctx contractapi.TransactionContextInterface, id, 
 		PackageID: packageID, PackageVersion: policyPackage.Version, PolicyholderID: policyholderID,
 		StartDate: startDate, EndDate: endDate, PremiumMinor: policyPackage.PremiumMinor,
 		CoverageLimitMinor: policyPackage.CoverageLimitMinor, TermsHash: policyPackage.TermsHash,
-		Status: "ACTIVE", CreatedAt: now, UpdatedAt: now,
+		HospitalIDs: append([]string{}, policyPackage.HospitalIDs...), BankIDs: append([]string{}, policyPackage.BankIDs...),
+		Status: "ACTIVE", PremiumIntervalDays: 30, GracePeriodDays: 15,
+		PaidThroughDate: startDate, NextPremiumDueDate: start.AddDate(0, 0, 30).Format("2006-01-02"),
+		CreatedAt: now, UpdatedAt: now,
+	}
+	if err := c.snapshotBenefitPlan(ctx, policy); err != nil {
+		return nil, err
 	}
 	if err := putState(ctx, "policy", id, policy); err != nil {
 		return nil, err
@@ -137,9 +144,37 @@ func (c *Contract) IssuePolicy(ctx contractapi.TransactionContextInterface, id, 
 }
 
 func (c *Contract) ReadPolicyPackage(ctx contractapi.TransactionContextInterface, id string) (*PolicyPackage, error) {
-	return getState[PolicyPackage](ctx, "policyPackage", id)
+	policyPackage, err := getState[PolicyPackage](ctx, "policyPackage", id)
+	if err != nil {
+		return nil, err
+	}
+	normalizePolicyPackagePartners(policyPackage)
+	return policyPackage, nil
 }
 
 func (c *Contract) ReadPolicy(ctx contractapi.TransactionContextInterface, id string) (*Policy, error) {
-	return getState[Policy](ctx, "policy", id)
+	policy, err := getState[Policy](ctx, "policy", id)
+	if err != nil {
+		return nil, err
+	}
+	normalizePolicyPartners(policy)
+	return policy, nil
+}
+
+func normalizePolicyPackagePartners(policyPackage *PolicyPackage) {
+	if policyPackage.HospitalIDs == nil {
+		policyPackage.HospitalIDs = []string{}
+	}
+	if policyPackage.BankIDs == nil {
+		policyPackage.BankIDs = []string{}
+	}
+}
+
+func normalizePolicyPartners(policy *Policy) {
+	if policy.HospitalIDs == nil {
+		policy.HospitalIDs = []string{}
+	}
+	if policy.BankIDs == nil {
+		policy.BankIDs = []string{}
+	}
 }

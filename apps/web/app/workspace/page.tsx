@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { findDemoAccount } from "@/lib/auth/accounts";
+import { redirect } from "next/navigation";
+import { findDemoAccount, workspaceForAccount } from "@/lib/auth/accounts";
 import { currentSession } from "@/lib/auth/current-session";
 import { WorkspaceClient } from "@/components/workspace-client";
 
@@ -8,6 +9,7 @@ export const dynamic = "force-dynamic";
 export default async function WorkspacePage() {
   const session = await currentSession().catch(() => null);
   const account = session ? findDemoAccount(session.accountId) ?? null : null;
+  if (account) redirect(`/workspace/${workspaceForAccount(account)}`);
 
   return (
     <main className="workspacePage">
@@ -16,9 +18,9 @@ export default async function WorkspacePage() {
           <span className="brandMark">BI</span>
           <span>Block-Insure</span>
         </Link>
-        <span className="networkPill"><i /> role workspace</span>
+        <Link className="networkPill" href="/showcase"><i /> presentation board</Link>
       </nav>
-      <WorkspaceClient initialAccount={account} />
+      <WorkspaceClient initialAccount={null} initialDashboard={null} />
     </main>
   );
 }

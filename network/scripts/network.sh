@@ -5,6 +5,9 @@ script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 network_root="$(cd -- "${script_dir}/.." && pwd -P)"
 samples_root="${network_root}/.fabric/fabric-samples"
 channel_name="insurance-channel"
+chaincode_name="${CHAINCODE_NAME:-insurance-contract}"
+expected_chaincode_version="${EXPECTED_CHAINCODE_VERSION:-1.2.2}"
+expected_schema_version="${EXPECTED_SCHEMA_VERSION:-12}"
 compose_ca="${network_root}/compose/compose-ca.yaml"
 compose_network="${network_root}/compose/compose-network.yaml"
 organizations="${network_root}/organizations"
@@ -16,14 +19,22 @@ require_tool() { command -v "$1" >/dev/null || { echo "Missing required tool: $1
 docker_command=""
 
 select_docker() {
-  if command -v docker >/dev/null && docker info >/dev/null 2>&1; then
-    docker_command="docker"
-  elif command -v docker.exe >/dev/null && docker.exe info >/dev/null 2>&1; then
-    docker_command="docker.exe"
-  else
-    echo "Docker Desktop is not reachable from this shell." >&2
-    exit 1
-  fi
+  local attempt
+  for attempt in {1..10}; do
+    if command -v docker >/dev/null && docker info >/dev/null 2>&1; then
+      docker_command="docker"
+      return
+    elif command -v docker.exe >/dev/null && docker.exe info >/dev/null 2>&1; then
+      docker_command="docker.exe"
+      return
+    fi
+    if [ "${attempt}" -lt 10 ]; then
+      echo "Docker is not ready (attempt ${attempt}/10); retrying in 2 seconds..." >&2
+      sleep 2
+    fi
+  done
+  echo "Docker Desktop is not reachable after 10 attempts." >&2
+  exit 1
 }
 
 docker_cli() { "${docker_command}" "$@"; }
@@ -45,6 +56,20 @@ wait_for_running() {
     fi
     sleep 2
   done
+}
+
+container_is_running() {
+  local container="$1" attempt state
+  for attempt in {1..5}; do
+    state="$(docker_cli inspect -f '{{.State.Running}}' "${container}" 2>/dev/null || true)"
+    if [ "${state}" = "true" ]; then
+      return 0
+    fi
+    if [ "${attempt}" -lt 5 ]; then
+      sleep 1
+    fi
+  done
+  return 1
 }
 
 set_peer_context() {
@@ -75,15 +100,18 @@ join_peer() {
 start_runtime() {
   compose up -d orderer
   compose up -d couchdb-insurer couchdb-hospital couchdb-auditor couchdb-bank
+  compose up -d couchdb-oracle
   compose up -d peer-insurer
   compose up -d peer-hospital
   compose up -d peer-auditor
   compose up -d peer-bank
+  compose up -d peer-oracle
   wait_for_running orderer.blockinsure.test
   wait_for_running peer0.insurer.blockinsure.test
   wait_for_running peer0.hospital.blockinsure.test
   wait_for_running peer0.auditor.blockinsure.test
   wait_for_running peer0.bank.blockinsure.test
+  wait_for_running peer0.oracle.blockinsure.test
 }
 
 up() {
@@ -94,11 +122,22 @@ up() {
   if [ -f "${artifacts}/${channel_name}.block" ] && \
      [ -d "${organizations}/ordererOrganizations/blockinsure.test" ] && \
      [ -d "${organizations}/peerOrganizations/bank.blockinsure.test" ]; then
+    if [ ! -d "${organizations}/peerOrganizations/oracle.blockinsure.test" ]; then
+      echo "Existing channel artifacts predate OracleMSP. A clean Oracle topology bootstrap is required; ordinary startup will not reset the ledger." >&2
+      echo "After explicit approval, run: bash network/scripts/network.sh reset && bash network/scripts/network.sh up" >&2
+      exit 1
+    fi
     compose up -d ca-insurer
     compose up -d ca-hospital
     compose up -d ca-auditor
     compose up -d ca-bank
+    compose up -d ca-oracle
     compose up -d ca-orderer
+    wait_for_running ca.auditor.blockinsure.test
+    wait_for_running ca.oracle.blockinsure.test
+    bash "${network_root}/scripts/enroll-auditors.sh"
+    bash "${network_root}/scripts/enroll-hospitals.sh"
+    bash "${network_root}/scripts/enroll-oracles.sh"
     start_runtime
     verify
     return
@@ -107,11 +146,13 @@ up() {
   compose up -d ca-hospital
   compose up -d ca-auditor
   compose up -d ca-bank
+  compose up -d ca-oracle
   compose up -d ca-orderer
   wait_for_running ca.insurer.blockinsure.test
   wait_for_running ca.hospital.blockinsure.test
   wait_for_running ca.auditor.blockinsure.test
   wait_for_running ca.bank.blockinsure.test
+  wait_for_running ca.oracle.blockinsure.test
   wait_for_running ca.orderer.blockinsure.test
   bash "${network_root}/scripts/enroll-identities.sh"
   mkdir -p "${artifacts}"
@@ -122,6 +163,7 @@ up() {
   join_peer hospital HospitalMSP 8051
   join_peer auditor AuditorMSP 9051
   join_peer bank BankMSP 12051
+  join_peer oracle OracleMSP 13051
   verify
 }
 
@@ -147,26 +189,31 @@ status() {
   peer channel list
   set_peer_context bank BankMSP 12051
   peer channel list
+  set_peer_context oracle OracleMSP 13051
+  peer channel list
 }
 
 verify() {
   local containers=(
     ca.insurer.blockinsure.test ca.hospital.blockinsure.test
     ca.auditor.blockinsure.test ca.bank.blockinsure.test
+    ca.oracle.blockinsure.test
     ca.orderer.blockinsure.test orderer.blockinsure.test
     couchdb.insurer.blockinsure.test couchdb.hospital.blockinsure.test
     couchdb.auditor.blockinsure.test couchdb.bank.blockinsure.test
+    couchdb.oracle.blockinsure.test
     peer0.insurer.blockinsure.test peer0.hospital.blockinsure.test
     peer0.auditor.blockinsure.test peer0.bank.blockinsure.test
+    peer0.oracle.blockinsure.test
   )
-  local container port org ca_name
+  local container port org ca_name definition schema chaincode_verified=false
   require_tool curl
   require_tool fabric-ca-client
   require_tool osnadmin
   require_tool peer
 
   for container in "${containers[@]}"; do
-    if [ "$(docker_cli inspect -f '{{.State.Running}}' "${container}" 2>/dev/null || true)" != "true" ]; then
+    if ! container_is_running "${container}"; then
       echo "Verification failed: ${container} is not running." >&2
       exit 1
     fi
@@ -181,10 +228,11 @@ insurer 7054 ca-insurer
 hospital 8054 ca-hospital
 auditor 9054 ca-auditor
 bank 12054 ca-bank
+oracle 13054 ca-oracle
 orderer 11054 ca-orderer
 EOF
 
-  for port in 5984 6984 7984 8984; do
+  for port in 5984 6984 7984 8984 10084; do
     curl --fail --silent --show-error --user admin:adminpw "http://localhost:${port}/_up" | grep -q '"status":"ok"'
   done
 
@@ -202,9 +250,62 @@ insurer InsurerMSP 7051
 hospital HospitalMSP 8051
 auditor AuditorMSP 9051
 bank BankMSP 12051
+oracle OracleMSP 13051
 EOF
 
-  echo "Verified: 14 services healthy, 5 CAs reachable, 4 CouchDBs ready, and all 4 peers joined ${channel_name}."
+  set_peer_context insurer InsurerMSP 7051
+  definition="$(peer lifecycle chaincode querycommitted \
+    --channelID "${channel_name}" --name "${chaincode_name}" 2>/dev/null || true)"
+  if [[ -n "${definition}" ]]; then
+    while read -r org msp port; do
+      set_peer_context "${org}" "${msp}" "${port}"
+      definition="$(peer lifecycle chaincode querycommitted \
+        --channelID "${channel_name}" --name "${chaincode_name}")"
+      if ! grep -q "Version: ${expected_chaincode_version}," <<<"${definition}"; then
+        echo "Verification failed: ${org} peer does not report ${chaincode_name} ${expected_chaincode_version}." >&2
+        exit 1
+      fi
+    done <<'EOF'
+insurer InsurerMSP 7051
+hospital HospitalMSP 8051
+auditor AuditorMSP 9051
+bank BankMSP 12051
+oracle OracleMSP 13051
+EOF
+
+    set_peer_context insurer InsurerMSP 7051
+    schema="$(peer chaincode query -C "${channel_name}" -n "${chaincode_name}" \
+      -c '{"function":"GetSchemaVersion","Args":[]}')"
+    if [[ "${schema}" != "${expected_schema_version}" ]]; then
+      echo "Verification failed: expected chaincode schema ${expected_schema_version}, received ${schema}." >&2
+      exit 1
+    fi
+    chaincode_verified=true
+    for index in 1 2 3 4; do
+      if ! compgen -G "${organizations}/peerOrganizations/auditor.blockinsure.test/users/auditor${index}@auditor.blockinsure.test/msp/signcerts/*" >/dev/null; then
+        echo "Verification failed: auditor${index} enrollment is missing." >&2
+        exit 1
+      fi
+    done
+    for index in 1 2 3 4 5; do
+      if ! compgen -G "${organizations}/peerOrganizations/hospital.blockinsure.test/users/hospital${index}@hospital.blockinsure.test/msp/signcerts/*" >/dev/null; then
+        echo "Verification failed: hospital${index} enrollment is missing." >&2
+        exit 1
+      fi
+    done
+    for index in 1 2; do
+      if ! compgen -G "${organizations}/peerOrganizations/oracle.blockinsure.test/users/oracle${index}@oracle.blockinsure.test/msp/signcerts/*" >/dev/null; then
+        echo "Verification failed: oracle${index} enrollment is missing." >&2
+        exit 1
+      fi
+    done
+  fi
+
+  if [[ "${chaincode_verified}" == true ]]; then
+    echo "Verified: 17 services healthy, 6 CAs reachable, 5 CouchDBs ready, all 5 peers joined ${channel_name}, five Hospital and both Oracle identities enrolled, and ${chaincode_name} ${expected_chaincode_version} exposes schema ${expected_schema_version}."
+  else
+    echo "Verified: 17 services healthy, 6 CAs reachable, 5 CouchDBs ready, and all 5 peers joined ${channel_name}; no committed ${chaincode_name} was found."
+  fi
 }
 
 select_docker

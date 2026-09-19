@@ -2,10 +2,14 @@ import { NextResponse } from "next/server";
 import { currentSession } from "@/lib/auth/current-session";
 import { canExecute, workflowCommandSchema } from "@/lib/workflows/commands";
 import { executeWorkflowCommand } from "@/lib/workflows/execute";
+import { checkMutationOrigin } from "@/lib/security/request-origin";
 
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
+  const trust = checkMutationOrigin(request);
+  if (!trust.trusted) return NextResponse.json({ message: trust.reason }, { status: 403 });
+
   const session = await currentSession().catch(() => null);
   if (!session) return NextResponse.json({ message: "Authentication required" }, { status: 401 });
 
@@ -21,7 +25,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const result = await executeWorkflowCommand(parsed.data);
+    const result = await executeWorkflowCommand(parsed.data, session);
     return NextResponse.json({ result });
   } catch (error) {
     console.error("Workflow command failed", error);

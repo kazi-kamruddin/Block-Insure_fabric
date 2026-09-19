@@ -7,6 +7,7 @@ import {
   storeCiphertext,
 } from "@/lib/evidence/storage";
 import { ledger } from "@/lib/fabric/ledger";
+import { checkMutationOrigin } from "@/lib/security/request-origin";
 
 const metadataSchema = z.object({
   claimId: z.string().trim().min(1).max(100).regex(/^[a-zA-Z0-9._:-]+$/),
@@ -18,6 +19,9 @@ const metadataSchema = z.object({
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
+  const trust = checkMutationOrigin(request);
+  if (!trust.trusted) return NextResponse.json({ message: trust.reason }, { status: 403 });
+
   const session = await currentSession().catch(() => null);
   if (!session) return NextResponse.json({ message: "Authentication required" }, { status: 401 });
   if (session.role !== "policyholder" || !session.subjectId) {

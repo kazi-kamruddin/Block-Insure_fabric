@@ -5,14 +5,20 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start",
+    "postbuild": "node scripts/prepare-standalone.mjs",
+    "start": "node scripts/start-standalone.mjs",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit --incremental false",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:e2e": "playwright test",
+    "check:worker": "node --check scripts/load-environment.mjs && node --check scripts/start-standalone.mjs && node --check scripts/sync-events.mjs && node --check scripts/process-premium-collections.mjs",
+    "events:sync": "node scripts/sync-events.mjs",
+    "banking:collect": "node scripts/process-premium-collections.mjs"
   },
   "dependencies": {
     "@grpc/grpc-js": "1.14.4",
     "@hyperledger/fabric-gateway": "1.12.1",
+    "@next/env": "16.3.4",
     "next": "16.3.4",
     "react": "19.2.8",
     "react-dom": "19.2.8",
@@ -20,13 +26,15 @@
     "zod": "4.5.4"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
+    "@playwright/test": "1.63.0",
     "@types/node": "26.4.1",
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.7",
     "eslint": "^9.0.0",
     "eslint-config-next": "16.3.4",
     "typescript": "^5.9.0",
-    "vitest": "3.2.7"
+    "vitest": "^5.0.0"
   },
   "engines": {
     "node": ">=20.9.0"

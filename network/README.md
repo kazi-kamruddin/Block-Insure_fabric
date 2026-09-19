@@ -6,8 +6,8 @@ application and chaincode source.
 
 ## Development topology
 
-The initial local topology contains a dedicated ordering organization and four
-business organizations:
+The local topology contains a dedicated ordering organization and five business
+organizations:
 
 | Organization | MSP ID | Responsibility |
 |---|---|---|
@@ -16,6 +16,7 @@ business organizations:
 | Hospital | `HospitalMSP` | Hospital claim verification |
 | Auditor | `AuditorMSP` | Manual-review decisions |
 | Bank | `BankMSP` | Settlement/EFT status confirmation |
+| Oracle | `OracleMSP` | Two certificate-bound registry-verification services |
 
 Each business organization starts with one peer, one Fabric CA, and one
 CouchDB state database. The shared application channel is
@@ -53,8 +54,10 @@ bash network/scripts/network.sh reset
 - `up` bootstraps a missing network or restarts an existing stopped network
   without replacing its ledger state.
 - `status` lists containers and each peer's joined channels.
-- `verify` checks all 14 containers, five CAs, four CouchDB instances, the
-  orderer channel, and each peer ledger.
+- `verify` checks all 17 containers, six CAs, five CouchDB instances, the
+  orderer channel, and each peer ledger. When chaincode is committed, it also
+  checks version `1.2.2` on all five peers, evaluates schema version `12`, and
+  confirms both Oracle service enrollments.
 - `down` stops and removes containers while retaining identities, channel
   artifacts, and Docker ledger volumes.
 - `reset` is destructive: it removes this network's containers, ledger
@@ -63,9 +66,9 @@ bash network/scripts/network.sh reset
 The launcher uses the Linux Docker CLI when its WSL socket is available and
 falls back to Docker Desktop's `docker.exe` integration when necessary.
 
-Host ports are `7051`, `8051`, `9051`, and `12051` for the four peers;
-`7054`, `8054`, `9054`, `12054`, and `11054` for the CAs; and `5984`, `6984`,
-`7984`, and `8984` for CouchDB. Credentials embedded in Compose are strictly
+Host ports are `7051`, `8051`, `9051`, `12051`, and `13051` for the five peers;
+`7054`, `8054`, `9054`, `12054`, `13054`, and `11054` for the CAs; and `5984`, `6984`,
+`7984`, `8984`, and `10084` for CouchDB. Credentials embedded in Compose are strictly
 local development defaults and must not be reused outside this disposable
 network.
 
@@ -81,10 +84,19 @@ bash network/scripts/deploy-chaincode.sh
 bash network/scripts/smoke-workflow.sh
 ```
 
-The deployment script installs and approves the package for all four business
-organizations before committing the definition. The smoke script uses each
-role identity in turn and asserts a final `SETTLED` claim and `CONFIRMED`
-settlement. Bump `CHAINCODE_VERSION` whenever source changes. The script uses
+The deployment script installs the package and obtains all five organizations'
+approval of the definition, including its collection configuration, before
+commit. Membership in `bankInsurerPrivateData` itself remains limited to
+BankMSP and InsurerMSP. Four separately enrolled auditor
+identities exercise a 3-of-4 approval quorum. The smoke script asserts a final
+`SETTLED` claim, an advisory fraud assessment that cannot decide the claim,
+an active premium-funded policy, a completed collection, a paid benefit
+liability, Bank/Insurer PDC isolation and balance movement, and a chaincode-
+verified evidence Merkle proof. Bump `CHAINCODE_VERSION` whenever source changes. The script uses
 sequence 1 on a clean channel, detects an already-committed version, and chooses
 the next sequence for a new version; `CHAINCODE_SEQUENCE` remains an explicit
 override for controlled recovery.
+
+`bash network/scripts/seed-showcase.sh` idempotently creates one published policy
+package, its benefit plan, and the canonical Oracle registry commitment. On a
+clean ledger it creates no policies, claims, reviews, or Oracle requests.
