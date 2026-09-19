@@ -9,12 +9,12 @@ export async function GET() {
   const session = await currentSession().catch(() => null);
   if (!session) return NextResponse.json({ message: "Authentication required" }, { status: 401 });
   if (session.role !== "insurerAdmin" && session.role !== "auditor") return NextResponse.json({ message: "Oracle operations are visible to insurer and auditor roles" }, { status: 403 });
-  const [oracle1, oracle2, requests] = await Promise.all([
-    readOracleWorkerHealth("oracle1"), readOracleWorkerHealth("oracle2"), ledger.listOracleRequests(),
+  const [oracle1, oracle2, oracle3, requests] = await Promise.all([
+    readOracleWorkerHealth("oracle1"), readOracleWorkerHealth("oracle2"), readOracleWorkerHealth("oracle3"), ledger.listOracleRequests(),
   ]);
   const finalized = requests.filter((item) => item.status !== "PENDING");
   return NextResponse.json({
-    workers: [oracle1, oracle2],
+    workers: [oracle1, oracle2, oracle3],
     metrics: {
       requests: requests.length,
       pending: requests.filter((item) => item.status === "PENDING").length,

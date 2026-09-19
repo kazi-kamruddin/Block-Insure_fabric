@@ -13,8 +13,9 @@ import (
 )
 
 const (
-	oracleProtocolVersion       = "block-insure-oracle-v1"
-	oracleRequiredConfirmations = 2
+	oracleProtocolVersion  = "block-insure-oracle-v1"
+	oracleMinimumAssignees = 1
+	oracleMaximumAssignees = 9
 )
 
 var oracleVerificationCodes = map[string]bool{
@@ -119,13 +120,19 @@ func requireOracleIdentity(ctx contractapi.TransactionContextInterface) (string,
 	return identity, subject, nil
 }
 
-func parseTwoOracleAssignments(raw string) ([]string, error) {
+func parseOracleAssignments(raw string, requiredConfirmations int) ([]string, error) {
 	var assignments []string
 	if err := json.Unmarshal([]byte(raw), &assignments); err != nil {
 		return nil, fmt.Errorf("assignedOracleIds must be a JSON string array")
 	}
-	if len(assignments) != oracleRequiredConfirmations {
-		return nil, fmt.Errorf("exactly two Oracle certificate subjects must be assigned")
+	if len(assignments) < oracleMinimumAssignees || len(assignments) > oracleMaximumAssignees {
+		return nil, fmt.Errorf("assigned Oracle count must be between %d and %d", oracleMinimumAssignees, oracleMaximumAssignees)
+	}
+	if requiredConfirmations < 1 || requiredConfirmations > len(assignments) {
+		return nil, fmt.Errorf("requiredConfirmations must be between 1 and the assigned Oracle count")
+	}
+	if requiredConfirmations <= len(assignments)/2 {
+		return nil, fmt.Errorf("requiredConfirmations must be a strict majority of assigned Oracles")
 	}
 	seen := make(map[string]bool, len(assignments))
 	for index, value := range assignments {
@@ -223,7 +230,9 @@ func (c *Contract) PublishOracleRegistrySnapshot(
 
 func (c *Contract) RequestOracleVerification(
 	ctx contractapi.TransactionContextInterface,
-	requestID, claimID, snapshotID, modelVersion, modelHash, assignedOracleIDsJSON, commitDeadline, revealDeadline string,
+	requestID, claimID, snapshotID, modelVersion, modelHash, assignedOracleIDsJSON string,
+	requiredConfirmations int,
+	commitDeadline, revealDeadline string,
 ) (*OracleRequest, error) {
 	if _, err := requireIdentity(ctx, "InsurerMSP", "insurerAdmin"); err != nil {
 		return nil, err
@@ -276,7 +285,7 @@ func (c *Contract) RequestOracleVerification(
 	if err := validateHash("modelHash", modelHash); err != nil {
 		return nil, err
 	}
-	assignments, err := parseTwoOracleAssignments(assignedOracleIDsJSON)
+	assignments, err := parseOracleAssignments(assignedOracleIDsJSON, requiredConfirmations)
 	if err != nil {
 		return nil, err
 	}
@@ -296,7 +305,7 @@ func (c *Contract) RequestOracleVerification(
 		RegistryVersion: snapshot.Version, RegistryRootHash: snapshot.RootHash,
 		RulesVersion: snapshot.RulesVersion, RulesHash: snapshot.RulesHash,
 		ModelVersion: strings.TrimSpace(modelVersion), ModelHash: strings.ToLower(modelHash),
-		AssignedOracleIDs: assignments, RequiredConfirmations: oracleRequiredConfirmations,
+		AssignedOracleIDs: assignments, RequiredConfirmations: requiredConfirmations,
 		ExpectedResponses: len(assignments), Status: "PENDING", CommitDeadline: commitDeadline,
 		RevealDeadline: revealDeadline, RequestedAt: now,
 	}
@@ -470,7 +479,7 @@ func (c *Contract) RevealOracleResult(
 	}
 	request.RevealCount++
 	// Fabric range queries do not guarantee that an asset written earlier in the
-	// same simulation is visible. Count this reveal explicitly and read only the
+	// same simulation is visible. Count this reveal explicitly and read each
 	// other assigned Oracle's deterministic result key from world state.
 	matching := 1
 	for _, assignedOracleID := range request.AssignedOracleIDs {

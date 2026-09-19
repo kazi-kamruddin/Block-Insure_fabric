@@ -3,7 +3,7 @@ param(
     [Parameter(Position = 0)]
     [ValidateSet("Preflight", "Start", "Status", "Stop", "CleanBootstrap")]
     [string]$Action = "Status",
-    [ValidateSet("Baseline", "Conflict", "Oracle2Unavailable")]
+    [ValidateSet("Baseline", "Conflict", "Oracle2Unavailable", "QuorumUnavailable")]
     [string]$OracleScenario = "Baseline",
     [switch]$ConfirmReset,
     [switch]$Development,
@@ -115,10 +115,14 @@ function Start-DemoStack {
     }
     New-Item -ItemType Directory -Path $logRoot -Force | Out-Null
     $webArguments = if ($Development) { @("node_modules/next/dist/bin/next", "dev") } else { @("scripts/start-standalone.mjs") }
-    if ($OracleScenario -eq "Oracle2Unavailable" -and (Test-HttpHealth "http://127.0.0.1:3302/health")) {
+    if ($OracleScenario -in "Oracle2Unavailable", "QuorumUnavailable" -and (Test-HttpHealth "http://127.0.0.1:3302/health")) {
         throw "Oracle 2 is already running outside this managed stack. Stop it before demonstrating unavailability."
     }
+    if ($OracleScenario -eq "QuorumUnavailable" -and (Test-HttpHealth "http://127.0.0.1:3303/health")) {
+        throw "Oracle 3 is already running outside this managed stack. Stop it before demonstrating quorum loss."
+    }
     $oracle2Environment = if ($OracleScenario -eq "Conflict") { ".env.oracle2-conflict.example" } else { ".env.oracle2.example" }
+    $oracle3Environment = if ($OracleScenario -eq "Conflict") { ".env.oracle3-model-mismatch.example" } else { ".env.oracle3.example" }
     $records = @(
         Start-ManagedProcess "web" $webRoot $webArguments
     )
@@ -140,8 +144,11 @@ function Start-DemoStack {
     $records += Start-ManagedProcess "event-worker" $webRoot @("scripts/sync-events.mjs")
     $records += Start-ManagedProcess "banking-collection-worker" $webRoot @("scripts/process-premium-collections.mjs")
     $records += Start-ManagedProcess "oracle1" $oracleRoot @("src/index.mjs", "--env=.env.oracle1.example")
-    if ($OracleScenario -ne "Oracle2Unavailable") {
+    if ($OracleScenario -notin "Oracle2Unavailable", "QuorumUnavailable") {
         $records += Start-ManagedProcess "oracle2" $oracleRoot @("src/index.mjs", "--env=$oracle2Environment")
+    }
+    if ($OracleScenario -ne "QuorumUnavailable") {
+        $records += Start-ManagedProcess "oracle3" $oracleRoot @("src/index.mjs", "--env=$oracle3Environment")
     }
     $records | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $processPath -Encoding utf8
 
@@ -149,8 +156,9 @@ function Start-DemoStack {
     do {
         $healthy = ($records | Where-Object { Test-ManagedProcess $_ }).Count -eq $records.Count -and
             (Test-HttpHealth "http://127.0.0.1:3301/health") -and
-            ($OracleScenario -eq "Oracle2Unavailable" -or (Test-HttpHealth "http://127.0.0.1:3302/health")) -and
-            ($OracleScenario -eq "Oracle2Unavailable" -or (Test-HttpHealth "http://127.0.0.1:3000/api/health/ready"))
+            ($OracleScenario -in "Oracle2Unavailable", "QuorumUnavailable" -or (Test-HttpHealth "http://127.0.0.1:3302/health")) -and
+            ($OracleScenario -eq "QuorumUnavailable" -or (Test-HttpHealth "http://127.0.0.1:3303/health")) -and
+            ($OracleScenario -in "Oracle2Unavailable", "QuorumUnavailable" -or (Test-HttpHealth "http://127.0.0.1:3000/api/health/ready"))
         if (-not $healthy) { Start-Sleep -Seconds 1 }
     } until ($healthy -or [DateTimeOffset]::UtcNow -ge $deadline)
     if (-not $healthy) {
@@ -178,7 +186,7 @@ function Show-DemoStatus {
     foreach ($record in $records) {
         Write-Host ("{0,-14} PID {1,-7} {2}" -f $record.name, $record.id, $(if (Test-ManagedProcess $record) { "RUNNING" } else { "STOPPED" }))
     }
-    foreach ($url in @("http://127.0.0.1:3000/api/health/live", "http://127.0.0.1:3000/api/health/ready", "http://127.0.0.1:3000/api/fabric/health", "http://127.0.0.1:3301/health", "http://127.0.0.1:3302/health")) {
+    foreach ($url in @("http://127.0.0.1:3000/api/health/live", "http://127.0.0.1:3000/api/health/ready", "http://127.0.0.1:3000/api/fabric/health", "http://127.0.0.1:3301/health", "http://127.0.0.1:3302/health", "http://127.0.0.1:3303/health")) {
         Write-Host ("{0,-52} {1}" -f $url, $(if (Test-HttpHealth $url) { "HEALTHY" } else { "UNAVAILABLE" }))
     }
     & docker ps --filter "network=block-insure" --format "table {{.Names}}`t{{.Status}}"

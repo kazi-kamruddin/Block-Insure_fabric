@@ -6,6 +6,9 @@ const oracleScenario = process.env.ORACLE_E2E_SCENARIO ?? "baseline";
 const oracle2Environment = oracleScenario === "conflict"
   ? "../../services/oracle-worker/.env.oracle2-conflict.example"
   : "../../services/oracle-worker/.env.oracle2.example";
+const oracle3Environment = oracleScenario === "conflict"
+  ? "../../services/oracle-worker/.env.oracle3-model-mismatch.example"
+  : "../../services/oracle-worker/.env.oracle3.example";
 
 const oracleServers = [
   {
@@ -17,6 +20,12 @@ const oracleServers = [
   ...(oracleScenario === "timeout" ? [] : [{
     command: `node ../../services/oracle-worker/src/index.mjs --env=${oracle2Environment}`,
     url: "http://127.0.0.1:3302/health",
+    reuseExistingServer: true,
+    timeout: 30_000,
+  }]),
+  ...(oracleScenario === "timeout" || oracleScenario === "one-unavailable" ? [] : [{
+    command: `node ../../services/oracle-worker/src/index.mjs --env=${oracle3Environment}`,
+    url: "http://127.0.0.1:3303/health",
     reuseExistingServer: true,
     timeout: 30_000,
   }]),

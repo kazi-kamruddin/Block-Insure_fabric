@@ -300,15 +300,16 @@ export const workflowFormDefinitions: Record<WorkflowOperation, WorkflowFormDefi
     ],
   },
   requestOracleVerification: {
-    label: "Request two-Oracle verification",
-    description: "Snapshot the claim, registry, model, two certificate subjects, and commit/reveal deadlines.",
+    label: "Request threshold Oracle verification",
+    description: "Bind the claim, registry, model, assigned certificate subjects, quorum, and commit/reveal deadlines.",
     fields: [
       { name: "requestId", label: "Oracle request ID", placeholder: "oracle-request-1001" },
       { name: "claimId", label: "Invoice-cross-checked claim ID", placeholder: "claim-1001" },
       { name: "snapshotId", label: "Registry snapshot ID", placeholder: "registry-demo-v1" },
       { name: "modelVersion", label: "Model version", placeholder: "model-v1" },
       { name: "modelHash", label: "Model commitment" },
-      { name: "assignedOracleIdsJson", label: "Assigned Oracle certificate subjects", kind: "textarea", placeholder: '["oracle1","oracle2"]' },
+      { name: "assignedOracleIdsJson", label: "Assigned Oracle certificate subjects", kind: "textarea", placeholder: '["oracle1","oracle2","oracle3"]' },
+      { name: "requiredConfirmations", label: "Required matching confirmations", placeholder: "2" },
       { name: "commitDeadline", label: "Commit deadline (RFC3339)" },
       { name: "revealDeadline", label: "Reveal deadline (RFC3339)" },
     ],
@@ -471,7 +472,7 @@ export function createWorkflowFormValues(
     assessClaimFraud: { assessmentId: generatedId("fraud", idFactory), claimId: "" },
     openClaimReview: { claimId: "", reviewId: generatedId("review", idFactory), assignedAuditorIdsJson: '["auditor1","auditor2","auditor3","auditor4"]', approvalThreshold: "3", rejectionThreshold: "2", deadline: deadlineOffset(3) },
     publishOracleRegistrySnapshot: { id: "registry-demo-v1", version: "1", rootHash: "c6da6361115c611b091faa9f35836f9f5c8ee0fdbefb6bc0d8cc6fdde571ebcd", rulesVersion: "rules-v1", rulesHash: "a".repeat(64), recordCount: "3" },
-    requestOracleVerification: { requestId: generatedId("oracle-request", idFactory), claimId: "", snapshotId: "registry-demo-v1", modelVersion: "model-v1", modelHash: "c".repeat(64), assignedOracleIdsJson: '["oracle1","oracle2"]', commitDeadline: new Date(Date.now() + 10 * 60_000).toISOString(), revealDeadline: new Date(Date.now() + 20 * 60_000).toISOString() },
+    requestOracleVerification: { requestId: generatedId("oracle-request", idFactory), claimId: "", snapshotId: "registry-demo-v1", modelVersion: "model-v1", modelHash: "c".repeat(64), assignedOracleIdsJson: '["oracle1","oracle2","oracle3"]', requiredConfirmations: "2", commitDeadline: new Date(Date.now() + 10 * 60_000).toISOString(), revealDeadline: new Date(Date.now() + 20 * 60_000).toISOString() },
     finalizeOracleTimeout: { requestId: "" },
     routeOracleFailureToReview: { requestId: "", reviewId: generatedId("review-oracle", idFactory), assignedAuditorIdsJson: '["auditor1","auditor2","auditor3","auditor4"]', approvalThreshold: "3", rejectionThreshold: "2", deadline: deadlineOffset(3) },
     submitClaimAppeal: { appealId: generatedId("appeal", idFactory), claimId: "", reasonCategory: "DOCUMENT_ERROR", reasonText: "", descriptionText: "", evidenceText: "", proposedHospitalId: "", proposedAmountMinor: "0", proposedIncidentDate: "", proposedDescriptionText: "", proposedClinicalReferenceHash: "" },
@@ -704,7 +705,7 @@ export async function buildWorkflowCommand(
       command = { operation, id: required(values, "id", "Snapshot ID"), version: positiveInteger(values, "version", "Snapshot version"), rootHash: required(values, "rootHash", "Canonical registry root"), rulesVersion: required(values, "rulesVersion", "Rules version"), rulesHash: required(values, "rulesHash", "Rules commitment"), recordCount: positiveInteger(values, "recordCount", "Registry record count") };
       break;
     case "requestOracleVerification":
-      command = { operation, requestId: required(values, "requestId", "Oracle request ID"), claimId: required(values, "claimId", "Claim ID"), snapshotId: required(values, "snapshotId", "Snapshot ID"), modelVersion: required(values, "modelVersion", "Model version"), modelHash: required(values, "modelHash", "Model commitment"), assignedOracleIdsJson: required(values, "assignedOracleIdsJson", "Assigned Oracle IDs"), commitDeadline: required(values, "commitDeadline", "Commit deadline"), revealDeadline: required(values, "revealDeadline", "Reveal deadline") };
+      command = { operation, requestId: required(values, "requestId", "Oracle request ID"), claimId: required(values, "claimId", "Claim ID"), snapshotId: required(values, "snapshotId", "Snapshot ID"), modelVersion: required(values, "modelVersion", "Model version"), modelHash: required(values, "modelHash", "Model commitment"), assignedOracleIdsJson: required(values, "assignedOracleIdsJson", "Assigned Oracle IDs"), requiredConfirmations: positiveInteger(values, "requiredConfirmations", "Required confirmations"), commitDeadline: required(values, "commitDeadline", "Commit deadline"), revealDeadline: required(values, "revealDeadline", "Reveal deadline") };
       break;
     case "finalizeOracleTimeout":
       command = { operation, requestId: required(values, "requestId", "Oracle request ID") };

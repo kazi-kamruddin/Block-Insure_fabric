@@ -30,7 +30,7 @@ function resolveFromService(value) {
 
 export function loadOracleConfig(environment = process.env) {
   const oracleId = required(environment, "ORACLE_ID");
-  if (!/^oracle[12]$/.test(oracleId)) throw new Error("ORACLE_ID must be oracle1 or oracle2");
+  if (!/^oracle[123]$/.test(oracleId)) throw new Error("ORACLE_ID must be oracle1, oracle2, or oracle3");
   const networkRoot = environment.FABRIC_NETWORK_ROOT
     ? resolveFromService(environment.FABRIC_NETWORK_ROOT)
     : path.join(projectRoot, "network");
@@ -42,7 +42,7 @@ export function loadOracleConfig(environment = process.env) {
     registryPath: resolveFromService(required(environment, "ORACLE_REGISTRY_PATH")),
     registryApiUrl: String(environment.ORACLE_REGISTRY_API_URL ?? "").trim().replace(/\/$/, ""),
     stateRoot: resolveFromService(environment.ORACLE_STATE_ROOT ?? "../../data/oracle"),
-    healthPort: boundedInteger(environment, "ORACLE_HEALTH_PORT", oracleId === "oracle1" ? 3301 : 3302, 1024, 65535),
+    healthPort: boundedInteger(environment, "ORACLE_HEALTH_PORT", 3300 + Number(oracleId.at(-1)), 1024, 65535),
     pollIntervalMs: boundedInteger(environment, "ORACLE_POLL_INTERVAL_MS", 1_000, 100, 60_000),
     registryRequestTimeoutMs: boundedInteger(environment, "ORACLE_REGISTRY_REQUEST_TIMEOUT_MS", 5_000, 100, 60_000),
     retry: {

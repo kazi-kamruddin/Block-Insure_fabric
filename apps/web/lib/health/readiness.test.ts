@@ -4,14 +4,15 @@ import { buildReadinessPayload } from "./readiness";
 const okOracle = async () => ({ ok: true });
 
 describe("dependency readiness", () => {
-  it("is ready only for the expected live Fabric schema and both Oracles", async () => {
+  it("is ready only for the expected live Fabric schema and all three Oracles", async () => {
     const payload = await buildReadinessPayload({
-      fabricProbe: async () => ({ ok: true, schemaVersion: 12 }),
+      fabricProbe: async () => ({ ok: true, schemaVersion: 13 }),
       oracle1Probe: okOracle,
       oracle2Probe: okOracle,
+      oracle3Probe: okOracle,
       now: () => "2026-09-13T12:00:00.000Z",
     });
-    expect(payload).toMatchObject({ status: "ready", dependencies: { fabric: "connected", chaincode: "connected", oracle1: "connected", oracle2: "connected" } });
+    expect(payload).toMatchObject({ status: "ready", dependencies: { fabric: "connected", chaincode: "connected", oracle1: "connected", oracle2: "connected", oracle3: "connected" } });
   });
 
   it("fails closed without exposing dependency errors", async () => {
@@ -19,6 +20,7 @@ describe("dependency readiness", () => {
       fabricProbe: async () => { throw new Error("secret peer detail"); },
       oracle1Probe: okOracle,
       oracle2Probe: async () => ({ ok: false }),
+      oracle3Probe: okOracle,
     });
     expect(payload.status).toBe("not_ready");
     expect(payload.dependencies).toMatchObject({ fabric: "unavailable", chaincode: "unavailable", oracle2: "unavailable" });
@@ -30,7 +32,8 @@ describe("dependency readiness", () => {
       fabricProbe: async () => ({ ok: true, schemaVersion: 6 }),
       oracle1Probe: okOracle,
       oracle2Probe: okOracle,
+      oracle3Probe: okOracle,
     });
-    expect(payload).toMatchObject({ status: "not_ready", dependencies: { fabric: "connected", chaincode: "incompatible", schemaVersion: 6, expectedSchemaVersion: 12 } });
+    expect(payload).toMatchObject({ status: "not_ready", dependencies: { fabric: "connected", chaincode: "incompatible", schemaVersion: 6, expectedSchemaVersion: 13 } });
   });
 });

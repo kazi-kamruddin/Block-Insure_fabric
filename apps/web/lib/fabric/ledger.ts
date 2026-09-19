@@ -689,12 +689,13 @@ export const ledger = {
 
   requestOracleVerification(input: {
     requestId: string; claimId: string; snapshotId: string; modelVersion: string;
-    modelHash: string; assignedOracleIdsJson: string; commitDeadline: string; revealDeadline: string;
+    modelHash: string; assignedOracleIdsJson: string; requiredConfirmations: number;
+    commitDeadline: string; revealDeadline: string;
   }) {
     return submit<OracleRequest>(
       "insurerAdmin", "RequestOracleVerification", input.requestId, input.claimId,
       input.snapshotId, input.modelVersion, input.modelHash, input.assignedOracleIdsJson,
-      input.commitDeadline, input.revealDeadline,
+      input.requiredConfirmations, input.commitDeadline, input.revealDeadline,
     );
   },
 

@@ -7,6 +7,7 @@ import { loadOracleConfig } from "../src/config.mjs";
 import { emptyCursor, loadCursor, persistCursor } from "../src/cursor.mjs";
 import { buildCommitmentDigest, buildDeterministicSalt, buildResultDigest, oracleRequestPhase } from "../src/protocol.mjs";
 import { createHealthState, loadPersistedHealth, persistHealth } from "../src/health.mjs";
+import { buildHybridRegistryReplicas, hybridDescriptionHash, hybridRecordToRegistryRecord } from "../src/hybrid-adapter.mjs";
 import { appealCommitmentHash, assessRegistryRecord, loadRegistrySnapshot, validateAppealBinding, validateRegistrySnapshot } from "../src/registry.mjs";
 import { withBoundedRetry } from "../src/retry.mjs";
 
@@ -46,15 +47,17 @@ test("canonical result and commitment digests bind every adjudication version", 
   );
 });
 
-test("independent baseline snapshots have distinct sources but identical canonical roots", async () => {
+test("three baseline snapshots have distinct replica sources but identical canonical roots", async () => {
   const root = path.resolve(import.meta.dirname, "..");
-  const [oracle1, oracle2, conflict] = await Promise.all([
+  const [oracle1, oracle2, oracle3, conflict] = await Promise.all([
     loadRegistrySnapshot(path.join(root, "registry", "oracle1-v1.json")),
     loadRegistrySnapshot(path.join(root, "registry", "oracle2-v1.json")),
+    loadRegistrySnapshot(path.join(root, "registry", "oracle3-v1.json")),
     loadRegistrySnapshot(path.join(root, "registry", "oracle2-conflict-v1.json")),
   ]);
   assert.notEqual(oracle1.sourceId, oracle2.sourceId);
   assert.equal(oracle1.rootHash, oracle2.rootHash);
+  assert.equal(oracle1.rootHash, oracle3.rootHash);
   assert.notEqual(oracle1.rootHash, conflict.rootHash);
 
   const oracleRequest = {
@@ -75,6 +78,35 @@ test("independent baseline snapshots have distinct sources but identical canonic
     assessRegistryRecord({ snapshot: conflict, request: oracleRequest, claim, hospitalVerification }).verificationCode,
     "REGISTRY_ROOT_MISMATCH",
   );
+});
+
+test("Kaggle-derived JSONL creates three provenance-bound replicas and a controlled corrupt profile", async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "block-insure-hybrid-registry-"));
+  const inputPath = path.join(directory, "hybrid.jsonl");
+  const outputDirectory = path.join(directory, "output");
+  const record = {
+    recordId: "hybrid-CLM1", hospitalId: "PRV-TEST001", treatmentType: "DIAGNOSTIC", diagnosisCode: "D001",
+    sourceProcedureCode: "P001", admissionDate: "2009-01-01T00:00:00.000Z", dischargeDate: "2009-01-02T00:00:00.000Z",
+    invoiceHash: `0x${"1".repeat(64)}`, recordStatus: "VALID", invoiceStatus: "VALID", licenseStatus: "ACTIVE",
+    sourceClaimAmountUsd: 100, expectedBillMin: "0.0050", expectedBillMax: "0.0150", amountNormalizationDivisor: 10_000,
+  };
+  try {
+    await fs.writeFile(inputPath, `${JSON.stringify(record)}\n`);
+    const manifest = await buildHybridRegistryReplicas({ inputPath, outputDirectory, snapshotId: "registry-hybrid-test" });
+    assert.equal(manifest.recordCount, 1);
+    assert.equal(new Set(Object.values(manifest.replicaRoots)).size, 1);
+    assert.notEqual(manifest.baselineRootHash, manifest.corruptRootHash);
+    const [first, second, third] = await Promise.all(["oracle1", "oracle2", "oracle3"].map((id) => loadRegistrySnapshot(path.join(outputDirectory, `${id}-hybrid-v1.json`))));
+    assert.deepEqual([first.rootHash, second.rootHash, third.rootHash], [manifest.baselineRootHash, manifest.baselineRootHash, manifest.baselineRootHash]);
+    assert.equal(first.provenance.inputSha256, manifest.inputSha256);
+    assert.deepEqual(hybridRecordToRegistryRecord(record), {
+      lookupHash: "1".repeat(64), hospitalId: "PRV-TEST001", treatmentCode: "DIAGNOSTIC",
+      minimumAmountMinor: 5_000, maximumAmountMinor: 15_000, validFrom: "2009-01-01", validThrough: "2009-01-02",
+      descriptionHash: hybridDescriptionHash(record), status: "VALID",
+    });
+  } finally {
+    await fs.rm(directory, { recursive: true, force: true });
+  }
 });
 
 test("matching snapshots independently return the same negative record result", async () => {
@@ -194,10 +226,13 @@ test("oracle process configurations select independent identity and health profi
   };
   const first = loadOracleConfig({ ...common, ORACLE_ID: "oracle1" });
   const second = loadOracleConfig({ ...common, ORACLE_ID: "oracle2", ORACLE_HEALTH_PORT: "3302" });
+  const third = loadOracleConfig({ ...common, ORACLE_ID: "oracle3" });
   assert.equal(first.fabric.mspId, "OracleMSP");
   assert.notEqual(first.oracleId, second.oracleId);
   assert.notEqual(first.healthPort, second.healthPort);
   assert.notEqual(first.fabric.userMspPath, second.fabric.userMspPath);
+  assert.equal(third.healthPort, 3303);
+  assert.notEqual(second.fabric.userMspPath, third.fabric.userMspPath);
   assert.throws(() => loadOracleConfig({ ...common, ORACLE_ID: "oracle1", ORACLE_MODEL_HASH: "not-a-hash" }), /64-character hexadecimal hash/);
 });
 

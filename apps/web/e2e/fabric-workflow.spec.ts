@@ -200,7 +200,7 @@ test("five organization sessions complete a Fabric insurance workflow", async ({
     expect(research.ok(), await research.text()).toBe(true);
     expect(await research.json()).toMatchObject({
       schemaVersion: 1,
-      provenance: { ledgerSchemaVersion: 12 },
+      provenance: { ledgerSchemaVersion: 13 },
       fraudDecisionSupport: { advisoryOnly: true },
     });
     const auditorNotifications = await auditor.get("/api/operations/notifications");
@@ -270,7 +270,7 @@ test("rejected claim requires a committed correction, matching Hospital invoice,
     const premature = await insurer.post("/api/workflows", { data: {
       operation: "requestOracleVerification", requestId: `premature-${suffix}`, claimId,
       snapshotId: "registry-demo-v1", modelVersion: "model-v1", modelHash: hashC,
-      assignedOracleIdsJson: '["oracle1","oracle2"]',
+      assignedOracleIdsJson: '["oracle1","oracle2","oracle3"]', requiredConfirmations: 2,
       commitDeadline: new Date(Date.now() + 60_000).toISOString(), revealDeadline: new Date(Date.now() + 120_000).toISOString(),
     } });
     expect(premature.status()).toBe(409);
@@ -279,7 +279,7 @@ test("rejected claim requires a committed correction, matching Hospital invoice,
     const requestId = `oracle-request-appeal-${suffix}`;
     await command(insurer, {
       operation: "requestOracleVerification", requestId, claimId, snapshotId: "registry-demo-v1",
-      modelVersion: "model-v1", modelHash: hashC, assignedOracleIdsJson: '["oracle1","oracle2"]',
+      modelVersion: "model-v1", modelHash: hashC, assignedOracleIdsJson: '["oracle1","oracle2","oracle3"]', requiredConfirmations: 2,
       commitDeadline: new Date(Date.now() + 60_000).toISOString(), revealDeadline: new Date(Date.now() + 120_000).toISOString(),
     });
     await expect.poll(async () => {

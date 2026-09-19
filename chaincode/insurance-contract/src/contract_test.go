@@ -480,7 +480,7 @@ func TestDistributedReviewAppealAndFraudDecisionSupport(t *testing.T) {
 	requireError(t, err, "fresh hospital and Oracle verification")
 	_, err = contract.RequestOracleVerification(
 		ctx, "request-appeal-too-early", "claim-review", "registry-appeal", "model-v1", hashA,
-		`["oracle1","oracle2"]`, "2026-09-05T12:05:00Z", "2026-09-05T12:10:00Z",
+		`["oracle1","oracle2"]`, 2, "2026-09-05T12:05:00Z", "2026-09-05T12:10:00Z",
 	)
 	requireError(t, err, "current verified hospital attestation")
 
@@ -498,7 +498,7 @@ func TestDistributedReviewAppealAndFraudDecisionSupport(t *testing.T) {
 	requireNoError(t, err)
 	appealRequest, err := contract.RequestOracleVerification(
 		ctx, "request-appeal-review", "claim-review", "registry-appeal", "model-v1", hashA,
-		`["oracle1","oracle2"]`, "2026-09-05T12:05:00Z", "2026-09-05T12:10:00Z",
+		`["oracle1","oracle2"]`, 2, "2026-09-05T12:05:00Z", "2026-09-05T12:10:00Z",
 	)
 	requireNoError(t, err)
 	resultHash := oracleResultDigest(appealRequest, false, "RECORD_INVALID", hashC)
@@ -948,6 +948,10 @@ func TestBenefitsBeneficiariesAndLiabilityLifecycle(t *testing.T) {
 }
 
 func setupOracleRequest(t *testing.T, suffix string) (*Contract, *testContext, *OracleRequest) {
+	return setupOracleRequestWithProfile(t, suffix, `["oracle1","oracle2"]`, 2)
+}
+
+func setupOracleRequestWithProfile(t *testing.T, suffix, assignedOracleIDsJSON string, requiredConfirmations int) (*Contract, *testContext, *OracleRequest) {
 	t.Helper()
 	contract := &Contract{}
 	ctx := &testContext{stub: newMemoryStub()}
@@ -991,7 +995,8 @@ func setupOracleRequest(t *testing.T, suffix string) (*Contract, *testContext, *
 		"registry-oracle-"+suffix,
 		"model-v1",
 		hashC,
-		`["oracle1","oracle2"]`,
+		assignedOracleIDsJSON,
+		requiredConfirmations,
 		"2026-09-05T12:05:00Z",
 		"2026-09-05T12:10:00Z",
 	)
@@ -1084,6 +1089,56 @@ func TestOracleAuthorizationCommitRevealAndExactSuccess(t *testing.T) {
 	setIdentity(ctx, "insurer-admin", "InsurerMSP", "insurerAdmin", nil)
 	_, err = contract.AuthorizeSettlement(ctx, "settlement-oracle-success", claim.ID, "account-insurer-oracle-success", "account-customer-oracle-success")
 	requireNoError(t, err)
+}
+
+func TestOracleTwoOfThreeThresholdConsensus(t *testing.T) {
+	t.Run("one divergent result is tolerated", func(t *testing.T) {
+		contract, ctx, request := setupOracleRequestWithProfile(t, "threshold-majority", `["oracle1","oracle2","oracle3"]`, 2)
+		if request.ExpectedResponses != 3 || request.RequiredConfirmations != 2 {
+			t.Fatalf("unexpected threshold profile: %+v", request)
+		}
+		validRecord := strings.Repeat("d", 64)
+		divergentRecord := strings.Repeat("e", 64)
+		validResult := commitOracleTestResult(t, contract, ctx, request, "oracle1", true, "VERIFIED", validRecord, strings.Repeat("1", 64))
+		divergentResult := commitOracleTestResult(t, contract, ctx, request, "oracle2", false, "REGISTRY_ROOT_MISMATCH", divergentRecord, strings.Repeat("2", 64))
+		commitOracleTestResult(t, contract, ctx, request, "oracle3", true, "VERIFIED", validRecord, strings.Repeat("3", 64))
+
+		revealOracleTestResult(t, contract, ctx, request, "oracle2", false, "REGISTRY_ROOT_MISMATCH", divergentRecord, divergentResult, strings.Repeat("2", 64))
+		revealOracleTestResult(t, contract, ctx, request, "oracle1", true, "VERIFIED", validRecord, validResult, strings.Repeat("1", 64))
+		revealOracleTestResult(t, contract, ctx, request, "oracle3", true, "VERIFIED", validRecord, validResult, strings.Repeat("3", 64))
+
+		claim, err := contract.ReadClaim(ctx, request.ClaimID)
+		requireNoError(t, err)
+		finalRequest, err := contract.ReadOracleRequest(ctx, request.ID)
+		requireNoError(t, err)
+		if claim.Status != "APPROVED" || finalRequest.Status != "CONSENSUS" || finalRequest.RevealCount != 3 {
+			t.Fatalf("2-of-3 majority did not approve the claim: request=%+v claim=%+v", finalRequest, claim)
+		}
+	})
+
+	t.Run("one unavailable Oracle is tolerated after commit deadline", func(t *testing.T) {
+		contract, ctx, request := setupOracleRequestWithProfile(t, "threshold-unavailable", `["oracle1","oracle2","oracle3"]`, 2)
+		recordHash := strings.Repeat("d", 64)
+		resultHash := commitOracleTestResult(t, contract, ctx, request, "oracle1", true, "VERIFIED", recordHash, strings.Repeat("1", 64))
+		commitOracleTestResult(t, contract, ctx, request, "oracle2", true, "VERIFIED", recordHash, strings.Repeat("2", 64))
+		ctx.stub.timestamp = timestamppb.New(time.Date(2026, time.September, 5, 12, 6, 0, 0, time.UTC))
+		revealOracleTestResult(t, contract, ctx, request, "oracle1", true, "VERIFIED", recordHash, resultHash, strings.Repeat("1", 64))
+		revealOracleTestResult(t, contract, ctx, request, "oracle2", true, "VERIFIED", recordHash, resultHash, strings.Repeat("2", 64))
+		finalRequest, err := contract.ReadOracleRequest(ctx, request.ID)
+		requireNoError(t, err)
+		if finalRequest.Status != "CONSENSUS" || finalRequest.CommitmentCount != 2 || finalRequest.RevealCount != 2 {
+			t.Fatalf("available majority did not finalize after the commit deadline: %+v", finalRequest)
+		}
+	})
+
+	t.Run("unsafe thresholds are rejected", func(t *testing.T) {
+		if _, err := parseOracleAssignments(`["oracle1","oracle2","oracle3"]`, 1); err == nil || !strings.Contains(err.Error(), "strict majority") {
+			t.Fatalf("expected non-majority threshold rejection, got %v", err)
+		}
+		if _, err := parseOracleAssignments(`["oracle1","oracle1","oracle3"]`, 2); err == nil || !strings.Contains(err.Error(), "duplicated") {
+			t.Fatalf("expected duplicate assignment rejection, got %v", err)
+		}
+	})
 }
 
 func TestOracleNegativeConflictTimeoutAndFallback(t *testing.T) {
@@ -1229,7 +1284,7 @@ func TestOracleDeadlinesStaleVersionsAndAppealIsolation(t *testing.T) {
 	setIdentity(ctx, "insurer-admin", "InsurerMSP", "insurerAdmin", nil)
 	_, err = contract.RequestOracleVerification(
 		ctx, "request-oracle-appeal-too-early", claim.ID, request.RegistrySnapshotID, request.ModelVersion, request.ModelHash,
-		`["oracle1","oracle2"]`, "2026-09-05T12:05:00Z", "2026-09-05T12:10:00Z",
+		`["oracle1","oracle2"]`, 2, "2026-09-05T12:05:00Z", "2026-09-05T12:10:00Z",
 	)
 	requireError(t, err, "current verified hospital attestation")
 	setIdentity(ctx, "hospital", "HospitalMSP", "hospitalOfficer", map[string]string{"subjectId": "hospital1"})
@@ -1238,7 +1293,7 @@ func TestOracleDeadlinesStaleVersionsAndAppealIsolation(t *testing.T) {
 	setIdentity(ctx, "insurer-admin", "InsurerMSP", "insurerAdmin", nil)
 	appealRequest, err := contract.RequestOracleVerification(
 		ctx, "request-oracle-appeal", claim.ID, request.RegistrySnapshotID, request.ModelVersion, request.ModelHash,
-		`["oracle1","oracle2"]`, "2026-09-05T12:05:00Z", "2026-09-05T12:10:00Z",
+		`["oracle1","oracle2"]`, 2, "2026-09-05T12:05:00Z", "2026-09-05T12:10:00Z",
 	)
 	requireNoError(t, err)
 	if appealRequest.ClaimVersion != 2 || appealRequest.QueryHash == request.QueryHash || appealRequest.AppealID != appeal.ID || appealRequest.AppealCommitmentHash != appeal.CommitmentHash {

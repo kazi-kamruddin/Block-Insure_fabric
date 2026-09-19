@@ -6,8 +6,8 @@ network_root="$(cd -- "${script_dir}/.." && pwd -P)"
 samples_root="${network_root}/.fabric/fabric-samples"
 channel_name="insurance-channel"
 chaincode_name="${CHAINCODE_NAME:-insurance-contract}"
-expected_chaincode_version="${EXPECTED_CHAINCODE_VERSION:-1.2.2}"
-expected_schema_version="${EXPECTED_SCHEMA_VERSION:-12}"
+expected_chaincode_version="${EXPECTED_CHAINCODE_VERSION:-1.3.0}"
+expected_schema_version="${EXPECTED_SCHEMA_VERSION:-13}"
 compose_ca="${network_root}/compose/compose-ca.yaml"
 compose_network="${network_root}/compose/compose-network.yaml"
 organizations="${network_root}/organizations"
@@ -293,7 +293,7 @@ EOF
         exit 1
       fi
     done
-    for index in 1 2; do
+    for index in 1 2 3; do
       if ! compgen -G "${organizations}/peerOrganizations/oracle.blockinsure.test/users/oracle${index}@oracle.blockinsure.test/msp/signcerts/*" >/dev/null; then
         echo "Verification failed: oracle${index} enrollment is missing." >&2
         exit 1

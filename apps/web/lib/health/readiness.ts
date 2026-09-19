@@ -11,6 +11,7 @@ export type ReadinessPayload = {
     expectedSchemaVersion: number;
     oracle1: DependencyState;
     oracle2: DependencyState;
+    oracle3: DependencyState;
   };
 };
 
@@ -20,12 +21,14 @@ export async function buildReadinessPayload({
   fabricProbe,
   oracle1Probe,
   oracle2Probe,
-  expectedSchemaVersion = 12,
+  oracle3Probe,
+  expectedSchemaVersion = 13,
   now = () => new Date().toISOString(),
 }: {
   fabricProbe: Probe;
   oracle1Probe: Probe;
   oracle2Probe: Probe;
+  oracle3Probe: Probe;
   expectedSchemaVersion?: number;
   now?: () => string;
 }): Promise<ReadinessPayload> {
@@ -36,12 +39,12 @@ export async function buildReadinessPayload({
       return { ok: false };
     }
   };
-  const [fabric, oracle1, oracle2] = await Promise.all([
-    safeProbe(fabricProbe), safeProbe(oracle1Probe), safeProbe(oracle2Probe),
+  const [fabric, oracle1, oracle2, oracle3] = await Promise.all([
+    safeProbe(fabricProbe), safeProbe(oracle1Probe), safeProbe(oracle2Probe), safeProbe(oracle3Probe),
   ]);
   const schemaVersion = Number.isInteger(fabric.schemaVersion) ? fabric.schemaVersion! : null;
   const compatible = fabric.ok && schemaVersion === expectedSchemaVersion;
-  const ready = compatible && oracle1.ok && oracle2.ok;
+  const ready = compatible && oracle1.ok && oracle2.ok && oracle3.ok;
   return {
     status: ready ? "ready" : "not_ready",
     service: "block-insure-web",
@@ -53,6 +56,7 @@ export async function buildReadinessPayload({
       expectedSchemaVersion,
       oracle1: oracle1.ok ? "connected" : "unavailable",
       oracle2: oracle2.ok ? "connected" : "unavailable",
+      oracle3: oracle3.ok ? "connected" : "unavailable",
     },
   };
 }

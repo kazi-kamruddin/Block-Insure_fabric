@@ -42,7 +42,7 @@ async function createHospitalVerifiedClaim(
   const policyId = `oracle-policy-${suffix}`;
   const claimId = `oracle-claim-${suffix}`;
   const invoiceId = `oracle-invoice-${suffix}`;
-  await command(insurer, { operation: "createPolicyPackage", id: packageId, name: "Oracle Demonstration Cover", description: "Two-certificate adjudication", premiumMinor: 10_000, coverageLimitMinor: 500_000, termsHash: hashA });
+  await command(insurer, { operation: "createPolicyPackage", id: packageId, name: "Oracle Demonstration Cover", description: "Threshold Oracle adjudication", premiumMinor: 10_000, coverageLimitMinor: 500_000, termsHash: hashA });
   await command(insurer, { operation: "configurePolicyPackagePartners", id: packageId, hospitalIdsJson: '["hospital-demo"]', bankIdsJson: '["bank-demo"]' });
   await command(insurer, { operation: "publishPolicyPackage", id: packageId });
   await command(insurer, { operation: "issuePolicy", id: policyId, packageId, policyholderId: "policyholder1", startDate: "2026-01-01", endDate: "2026-12-31" });
@@ -56,7 +56,7 @@ async function requestOracle(insurer: APIRequestContext, claimId: string, suffix
   const requestId = `oracle-request-${suffix}`;
   await command(insurer, {
     operation: "requestOracleVerification", requestId, claimId, snapshotId: "registry-demo-v1",
-    modelVersion: "model-v1", modelHash: hashC, assignedOracleIdsJson: '["oracle1","oracle2"]',
+    modelVersion: "model-v1", modelHash: hashC, assignedOracleIdsJson: '["oracle1","oracle2","oracle3"]', requiredConfirmations: 2,
     commitDeadline: new Date(Date.now() + 60_000).toISOString(),
     revealDeadline: new Date(Date.now() + 120_000).toISOString(),
   });
@@ -106,7 +106,7 @@ async function settleThroughAuditorFallback(
   return reviewId;
 }
 
-test("two Oracle workers automatically approve an exact valid result and the bank settles it", async ({ baseURL }) => {
+test("a 2-of-3 Oracle quorum automatically approves an exact valid result and the bank settles it", async ({ baseURL }) => {
   test.setTimeout(180_000);
   if (!baseURL) throw new Error("Playwright baseURL is required");
   const suffix = `success-${Date.now()}-${Math.floor(Math.random() * 1_000_000)}`;
@@ -121,14 +121,15 @@ test("two Oracle workers automatically approve an exact valid result and the ban
     await waitForClaimStatus(policyholder, claimId, "APPROVED");
 
     const oracleRequest = await (await insurer.get(`/api/ledger/oracle-request/${requestId}`)).json();
-    expect(oracleRequest.result).toMatchObject({ status: "CONSENSUS", finalizationCode: "EXACT_CONSENSUS", verifiedResult: true, commitmentCount: 2, revealCount: 2, assignedOracleIds: ["oracle1", "oracle2"] });
+    expect(oracleRequest.result).toMatchObject({ status: "CONSENSUS", finalizationCode: "EXACT_CONSENSUS", verifiedResult: true, assignedOracleIds: ["oracle1", "oracle2", "oracle3"], requiredConfirmations: 2 });
+    expect(oracleRequest.result.commitmentCount).toBeGreaterThanOrEqual(2);
+    expect(oracleRequest.result.revealCount).toBeGreaterThanOrEqual(2);
     const commitments = await (await insurer.get("/api/ledger/oracle-commitment")).json();
     const results = await (await insurer.get("/api/ledger/oracle-result")).json();
-    expect(commitments.result.filter((item: { requestId: string }) => item.requestId === requestId)).toHaveLength(2);
-    expect(results.result.filter((item: { requestId: string }) => item.requestId === requestId)).toEqual(expect.arrayContaining([
-      expect.objectContaining({ oracleId: "oracle1", verified: true }),
-      expect.objectContaining({ oracleId: "oracle2", verified: true }),
-    ]));
+    expect(commitments.result.filter((item: { requestId: string }) => item.requestId === requestId).length).toBeGreaterThanOrEqual(2);
+    const requestResults = results.result.filter((item: { requestId: string }) => item.requestId === requestId);
+    expect(requestResults.length).toBeGreaterThanOrEqual(2);
+    expect(requestResults.every((item: { verified: boolean }) => item.verified)).toBe(true);
 
     const settlementId = `oracle-settlement-${suffix}`;
     const sourceAccountId = await createFundedSettlementAccount(bank, suffix);
@@ -140,12 +141,12 @@ test("two Oracle workers automatically approve an exact valid result and the ban
     const dossier = await (await insurer.get(`/api/audit/claims/${claimId}`)).json();
     expect(dossier).toMatchObject({ schemaVersion: 6, claim: { status: "SETTLED", oracleOutcome: "EXACT_CONSENSUS" }, settlement: { status: "CONFIRMED" } });
     expect(dossier.oracleRequests).toEqual(expect.arrayContaining([expect.objectContaining({ id: requestId, registrySnapshotId: "registry-demo-v1", modelVersion: "model-v1" })]));
-    expect(dossier.oracleCommitments).toHaveLength(2);
-    expect(dossier.oracleResults).toHaveLength(2);
+    expect(dossier.oracleCommitments.length).toBeGreaterThanOrEqual(2);
+    expect(dossier.oracleResults.length).toBeGreaterThanOrEqual(2);
     const health = await insurer.get("/api/operations/oracles");
     expect(health.ok(), await health.text()).toBe(true);
     expect((await health.json()).workers).toEqual(expect.arrayContaining([
-      expect.objectContaining({ oracleId: "oracle1" }), expect.objectContaining({ oracleId: "oracle2" }),
+      expect.objectContaining({ oracleId: "oracle1" }), expect.objectContaining({ oracleId: "oracle2" }), expect.objectContaining({ oracleId: "oracle3" }),
     ]));
   } finally {
     await Promise.all([insurer.dispose(), policyholder.dispose(), hospital.dispose(), bank.dispose()]);
@@ -167,19 +168,48 @@ test("matching negative Oracle results fall back to fixed four-auditor governanc
     const requestId = await requestOracle(insurer, claimId, suffix);
     await waitForClaimStatus(policyholder, claimId, "ORACLE_FAILED");
     const failed = await (await insurer.get(`/api/ledger/oracle-request/${requestId}`)).json();
-    expect(failed.result).toMatchObject({ status: "FAILED", finalizationCode: "NEGATIVE_RESULT", verifiedResult: false, commitmentCount: 2, revealCount: 2 });
+    expect(failed.result).toMatchObject({ status: "FAILED", finalizationCode: "NEGATIVE_RESULT", verifiedResult: false, requiredConfirmations: 2 });
+    expect(failed.result.commitmentCount).toBeGreaterThanOrEqual(2);
+    expect(failed.result.revealCount).toBeGreaterThanOrEqual(2);
 
     const reviewId = await settleThroughAuditorFallback(insurer, policyholder, bank, auditors, claimId, requestId, suffix);
 
     const dossier = await (await insurer.get(`/api/audit/claims/${claimId}`)).json();
     expect(dossier.claim).toMatchObject({ status: "SETTLED", oracleOutcome: "NEGATIVE_RESULT" });
     expect(dossier.reviewRounds).toEqual(expect.arrayContaining([expect.objectContaining({ id: reviewId, status: "APPROVED", kind: "INITIAL", votesCast: 3 })]));
-    expect(dossier.oracleResults).toEqual(expect.arrayContaining([
-      expect.objectContaining({ oracleId: "oracle1", verified: false, verificationCode: "RECORD_INVALID" }),
-      expect.objectContaining({ oracleId: "oracle2", verified: false, verificationCode: "RECORD_INVALID" }),
-    ]));
+    expect(dossier.oracleResults.length).toBeGreaterThanOrEqual(2);
+    expect(dossier.oracleResults.every((item: { verified: boolean; verificationCode: string }) => !item.verified && item.verificationCode === "RECORD_INVALID")).toBe(true);
   } finally {
     await Promise.all([insurer.dispose(), policyholder.dispose(), hospital.dispose(), bank.dispose(), ...auditors.map((item) => item.dispose())]);
+  }
+});
+
+test("@oracle-one-unavailable a 2-of-3 quorum succeeds while one Oracle is unavailable", async ({ baseURL }) => {
+  test.skip(oracleScenario !== "one-unavailable", "requires the isolated two-worker availability profile");
+  test.setTimeout(120_000);
+  if (!baseURL) throw new Error("Playwright baseURL is required");
+  const suffix = `available-quorum-${Date.now()}-${Math.floor(Math.random() * 1_000_000)}`;
+  const insurer = await actor(baseURL, "insurer-admin");
+  const policyholder = await actor(baseURL, "policyholder-1");
+  const hospital = await actor(baseURL, "hospital-officer");
+  try {
+    await ensureRegistry(insurer);
+    const claimId = await createHospitalVerifiedClaim(insurer, policyholder, hospital, suffix, hashA, "1".repeat(64));
+    const requestId = `oracle-request-${suffix}`;
+    await command(insurer, {
+      operation: "requestOracleVerification", requestId, claimId, snapshotId: "registry-demo-v1",
+      modelVersion: "model-v1", modelHash: hashC, assignedOracleIdsJson: '["oracle1","oracle2","oracle3"]', requiredConfirmations: 2,
+      commitDeadline: new Date(Date.now() + 5_000).toISOString(),
+      revealDeadline: new Date(Date.now() + 60_000).toISOString(),
+    });
+    await waitForClaimStatus(policyholder, claimId, "APPROVED");
+    const oracleRequest = await (await insurer.get(`/api/ledger/oracle-request/${requestId}`)).json();
+    expect(oracleRequest.result).toMatchObject({
+      status: "CONSENSUS", finalizationCode: "EXACT_CONSENSUS", requiredConfirmations: 2,
+      commitmentCount: 2, revealCount: 2, assignedOracleIds: ["oracle1", "oracle2", "oracle3"],
+    });
+  } finally {
+    await Promise.all([insurer.dispose(), policyholder.dispose(), hospital.dispose()]);
   }
 });
 
@@ -199,11 +229,12 @@ test("@oracle-conflict divergent registry snapshots fall back to auditor governa
     const requestId = await requestOracle(insurer, claimId, suffix);
     await waitForClaimStatus(policyholder, claimId, "ORACLE_FAILED");
     const failed = await (await insurer.get(`/api/ledger/oracle-request/${requestId}`)).json();
-    expect(failed.result).toMatchObject({ status: "FAILED", finalizationCode: "CONFLICT", commitmentCount: 2, revealCount: 2 });
+    expect(failed.result).toMatchObject({ status: "FAILED", finalizationCode: "CONFLICT", commitmentCount: 3, revealCount: 3, requiredConfirmations: 2 });
     const results = await (await insurer.get("/api/ledger/oracle-result")).json();
     expect(results.result.filter((item: { requestId: string }) => item.requestId === requestId)).toEqual(expect.arrayContaining([
       expect.objectContaining({ oracleId: "oracle1", verified: true, verificationCode: "VERIFIED" }),
       expect.objectContaining({ oracleId: "oracle2", verified: false, verificationCode: "REGISTRY_ROOT_MISMATCH" }),
+      expect.objectContaining({ oracleId: "oracle3", verified: false, verificationCode: "MODEL_VERSION_MISMATCH" }),
     ]));
     const reviewId = await settleThroughAuditorFallback(insurer, policyholder, bank, auditors, claimId, requestId, suffix);
     const dossier = await (await insurer.get(`/api/audit/claims/${claimId}`)).json();
@@ -214,7 +245,7 @@ test("@oracle-conflict divergent registry snapshots fall back to auditor governa
   }
 });
 
-test("@oracle-timeout unavailable Oracle 2 times out and falls back to auditor governance", async ({ baseURL }) => {
+test("@oracle-timeout loss of Oracle quorum times out and falls back to auditor governance", async ({ baseURL }) => {
   test.skip(oracleScenario !== "timeout", "requires the isolated one-Oracle worker profile");
   test.setTimeout(180_000);
   if (!baseURL) throw new Error("Playwright baseURL is required");
@@ -231,7 +262,7 @@ test("@oracle-timeout unavailable Oracle 2 times out and falls back to auditor g
     const revealDeadline = new Date(Date.now() + 15_000);
     await command(insurer, {
       operation: "requestOracleVerification", requestId, claimId, snapshotId: "registry-demo-v1",
-      modelVersion: "model-v1", modelHash: hashC, assignedOracleIdsJson: '["oracle1","oracle2"]',
+      modelVersion: "model-v1", modelHash: hashC, assignedOracleIdsJson: '["oracle1","oracle2","oracle3"]', requiredConfirmations: 2,
       commitDeadline: new Date(Date.now() + 5_000).toISOString(), revealDeadline: revealDeadline.toISOString(),
     });
     await expect.poll(async () => {

@@ -1,6 +1,6 @@
 package insurance
 
-const SchemaVersion = 12
+const SchemaVersion = 13
 
 type PartnerAgreement struct {
 	AssetType     string `json:"assetType"`

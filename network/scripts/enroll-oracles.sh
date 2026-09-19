@@ -15,7 +15,7 @@ command -v fabric-ca-client >/dev/null || { echo "Missing required tool: fabric-
 test -f "${ca_cert}" || { echo "Oracle CA certificate is missing; start the network CAs first." >&2; exit 1; }
 test -f "${base}/msp/config.yaml" || { echo "Oracle organization admin enrollment is missing." >&2; exit 1; }
 
-for index in 1 2; do
+for index in 1 2 3; do
   user="oracle${index}"
   user_msp="${base}/users/${user}@${domain}/msp"
   if compgen -G "${user_msp}/signcerts/*" >/dev/null; then

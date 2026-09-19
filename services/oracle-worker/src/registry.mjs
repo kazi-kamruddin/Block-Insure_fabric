@@ -104,6 +104,13 @@ export function validateRegistrySnapshot(snapshot) {
     version: Number(snapshot.version),
     rulesVersion: requireId("rulesVersion", snapshot.rulesVersion),
     rulesHash: requireHash("rulesHash", snapshot.rulesHash),
+    provenance: snapshot.provenance ? {
+      datasetId: requireId("provenance.datasetId", snapshot.provenance.datasetId),
+      datasetVersion: requireId("provenance.datasetVersion", snapshot.provenance.datasetVersion),
+      inputSha256: requireHash("provenance.inputSha256", snapshot.provenance.inputSha256),
+      transformationVersion: requireId("provenance.transformationVersion", snapshot.provenance.transformationVersion),
+      generatedAt: String(snapshot.provenance.generatedAt ?? ""),
+    } : null,
     records: snapshot.records.map((record) => ({
       ...record,
       lookupHash: requireHash("record.lookupHash", record.lookupHash),
@@ -119,6 +126,9 @@ export function validateRegistrySnapshot(snapshot) {
   };
   if (!Number.isInteger(normalized.version) || normalized.version < 1) {
     throw new Error("Oracle registry version must be a positive integer");
+  }
+  if (normalized.provenance && Number.isNaN(Date.parse(normalized.provenance.generatedAt))) {
+    throw new Error("provenance.generatedAt must be an ISO timestamp");
   }
   const lookupKeys = new Set();
   for (const record of normalized.records) {
