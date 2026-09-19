@@ -6,6 +6,9 @@ $projectRoot = (Resolve-Path (Join-Path $PSScriptRoot "../..")).Path
 $webRoot = Join-Path $projectRoot "apps/web"
 $reportRoot = Join-Path $PSScriptRoot "reports"
 New-Item -ItemType Directory -Force -Path $reportRoot | Out-Null
+$runId = [DateTimeOffset]::UtcNow.ToString("yyyyMMddTHHmmssfffZ")
+$artifactRelativeRoot = "artifacts/$runId"
+$artifactRoot = Join-Path $reportRoot $artifactRelativeRoot
 
 $profiles = @(
   @{ Name = "baseline"; Scenario = "baseline"; Grep = "2-of-3 Oracle quorum automatically" },
@@ -18,6 +21,7 @@ $profiles = @(
 $measurements = @()
 foreach ($profile in $profiles) {
   $env:ORACLE_E2E_SCENARIO = $profile.Scenario
+  $env:PLAYWRIGHT_OUTPUT_DIR = Join-Path $artifactRoot $profile.Name
   $started = [DateTimeOffset]::UtcNow
   $stopwatch = [Diagnostics.Stopwatch]::StartNew()
   Push-Location $webRoot
@@ -37,9 +41,11 @@ foreach ($profile in $profiles) {
   if ($exitCode -ne 0) { break }
 }
 Remove-Item Env:ORACLE_E2E_SCENARIO -ErrorAction SilentlyContinue
+Remove-Item Env:PLAYWRIGHT_OUTPUT_DIR -ErrorAction SilentlyContinue
 $report = [pscustomobject]@{
   schemaVersion = 1
   generatedAt = [DateTimeOffset]::UtcNow.ToString("o")
+  artifactRoot = $artifactRelativeRoot
   measurements = $measurements
 }
 $report | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $reportRoot "latest.json") -Encoding utf8

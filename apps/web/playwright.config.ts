@@ -33,6 +33,7 @@ const oracleServers = [
 
 export default defineConfig({
   testDir: "./e2e",
+  outputDir: process.env.PLAYWRIGHT_OUTPUT_DIR ?? "test-results",
   fullyParallel: false,
   // The live Fabric tests intentionally share one channel and world state.
   // Serial execution avoids cross-file contention and makes replay-protection

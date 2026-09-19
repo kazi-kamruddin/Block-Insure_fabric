@@ -25,6 +25,7 @@ const cursorPath = path.join(config.stateRoot, config.oracleId, "cursor.json");
 const decoder = new TextDecoder();
 let stopping = false;
 let activeEvents;
+let shutdownPromise;
 
 function log(level, message, details = {}) {
   console[level](JSON.stringify({ timestamp: new Date().toISOString(), service: config.oracleId, message, ...details }));
@@ -273,16 +274,23 @@ async function main() {
 }
 
 async function shutdown(signal) {
-  if (stopping) return;
+  if (shutdownPromise) return shutdownPromise;
   stopping = true;
-  activeEvents?.close();
-  healthServer.close();
-  runtime.close();
-  await updateHealth({ status: "STOPPED", lastError: null }).catch(() => undefined);
-  log("log", "Oracle worker stopped", { signal });
+  shutdownPromise = (async () => {
+    activeEvents?.close();
+    runtime.close();
+    await updateHealth({ status: "STOPPED", lastError: null }).catch(() => undefined);
+    await new Promise((resolve) => healthServer.close(resolve));
+    log("log", "Oracle worker stopped", { signal });
+  })();
+  return shutdownPromise;
 }
 
-for (const signal of ["SIGINT", "SIGTERM"]) process.on(signal, () => void shutdown(signal));
+for (const signal of ["SIGINT", "SIGTERM", "SIGBREAK"]) {
+  process.on(signal, () => {
+    void shutdown(signal).finally(() => process.exit(0));
+  });
+}
 
 main().catch(async (error) => {
   const message = error instanceof Error ? error.message : String(error);
