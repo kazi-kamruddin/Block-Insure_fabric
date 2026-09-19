@@ -37,6 +37,7 @@ test("five organization sessions complete a Fabric insurance workflow", async ({
     review: `e2e-review-${suffix}`,
     fraud: `e2e-fraud-${suffix}`,
     settlement: `e2e-settlement-${suffix}`,
+    insurerAccount: `e2e-insurer-account-${suffix}`,
   };
 
   const insurer = await actor(baseURL, "insurer-admin");
@@ -48,6 +49,13 @@ test("five organization sessions complete a Fabric insurance workflow", async ({
   const bank = await actor(baseURL, "bank-officer");
 
   try {
+    await command(bank, {
+      operation: "openBankAccount", id: ids.insurerAccount, bankId: "bank-demo",
+      ownerId: "insurer", accountType: "INSURER", accountLabel: "E2E settlement reserve",
+      maskedAccount: "**** **** 9001",
+      accountTokenHash: createHash("sha256").update(`e2e-insurer-vault-${suffix}`).digest("hex"),
+      openingBalanceMinor: 500_000,
+    });
     await command(insurer, {
       operation: "createPolicyPackage", id: ids.package, name: "Browser Regression Plan",
       description: "Playwright multi-organization workflow", premiumMinor: 10_000,
@@ -150,13 +158,14 @@ test("five organization sessions complete a Fabric insurance workflow", async ({
     expect(decision.ok(), await decision.text()).toBe(true);
     expect((await decision.json()).result).toMatchObject({ id: `${ids.decision}-3`, claimId: ids.claim, reviewId: ids.review, outcome: "APPROVE" });
     await command(insurer, {
-      operation: "authorizeSettlement", settlementId: ids.settlement, claimId: ids.claim, sourceAccountId: "bank-insurer-premium", destinationAccountId: "showcase-customer-account",
+      operation: "authorizeSettlement", settlementId: ids.settlement, claimId: ids.claim, sourceAccountId: ids.insurerAccount, destinationAccountId: "showcase-customer-account",
     });
 
     const bankBefore = await bank.get("/api/dashboard");
     expect((await bankBefore.json()).dashboard.queue.some((item: { id: string }) => item.id === ids.settlement)).toBe(true);
     await command(bank, {
-      operation: "confirmSettlement", settlementId: ids.settlement, transferId: `payout-${ids.settlement}`, bankReferenceHash: hashB,
+      operation: "confirmSettlement", settlementId: ids.settlement, transferId: `payout-${ids.settlement}`,
+      bankReferenceHash: createHash("sha256").update(`claim-settlement-${suffix}`).digest("hex"),
     });
 
     const claimResponse = await policyholder.get(`/api/ledger/claim/${ids.claim}`);
@@ -191,7 +200,7 @@ test("five organization sessions complete a Fabric insurance workflow", async ({
     expect(research.ok(), await research.text()).toBe(true);
     expect(await research.json()).toMatchObject({
       schemaVersion: 1,
-      provenance: { ledgerSchemaVersion: 8 },
+      provenance: { ledgerSchemaVersion: 12 },
       fraudDecisionSupport: { advisoryOnly: true },
     });
     const auditorNotifications = await auditor.get("/api/operations/notifications");

@@ -17,7 +17,7 @@ bash network/scripts/network.sh verify
 
 The verifier should report 17 healthy services, six reachable CAs, five ready
 CouchDB instances, all five peers joined to `insurance-channel`, both Oracle
-identities enrolled, chaincode `insurance-contract` 1.2.0, and schema version 12.
+identities enrolled, chaincode `insurance-contract` 1.2.2, and schema version 12.
 
 ## 2. Start the supervised application stack
 

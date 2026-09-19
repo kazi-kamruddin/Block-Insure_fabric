@@ -2,11 +2,11 @@ import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 
 const accounts = [
-  "Insurer Administrator",
-  "Policyholder One",
-  "Hospital Officer",
-  "Independent Auditor One",
-  "Bank Officer",
+  { name: "Insurer Administrator", selector: /Insurer Administrator/ },
+  { name: "Policyholder One", selector: /Policyholder One/ },
+  { name: "Hospital Officer", selector: /Dhaka Central Medical Hospital/ },
+  { name: "Independent Auditor One", selector: /Independent Auditor One/ },
+  { name: "Bank Officer", selector: /Bangladesh Demo Commercial Bank/ },
 ] as const;
 
 async function expectWcagAA(page: Page, surface: string) {
@@ -25,13 +25,12 @@ test("public and sign-in surfaces pass automated WCAG 2.1 AA checks", async ({ p
 });
 
 for (const account of accounts) {
-  test(`${account} workspace passes automated WCAG 2.1 AA checks`, async ({ page }) => {
+  test(`${account.name} workspace passes automated WCAG 2.1 AA checks`, async ({ page }) => {
     await page.goto("/workspace");
-    const selector = account === "Hospital Officer" ? /^Hospital Officer HospitalMSP$/ : new RegExp(account);
-    await page.getByRole("button", { name: selector }).click();
+    await page.getByRole("button", { name: account.selector }).click();
     await page.waitForLoadState("networkidle");
     await expect(page.getByLabel("Workflow action")).toBeVisible();
-    await expectWcagAA(page, `${account} workspace`);
+    await expectWcagAA(page, `${account.name} workspace`);
   });
 }
 

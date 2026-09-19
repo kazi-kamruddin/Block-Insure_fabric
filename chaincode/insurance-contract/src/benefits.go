@@ -404,8 +404,40 @@ func (c *Contract) ConfirmBenefitPayment(ctx contractapi.TransactionContextInter
 	if err != nil {
 		return nil, err
 	}
+	payments, err := c.ListPremiumPayments(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var fundingPayment *PremiumPayment
+	for index := range payments {
+		payment := &payments[index]
+		if payment.PolicyID != request.PolicyID || payment.DestinationAccountID == "" {
+			continue
+		}
+		if fundingPayment == nil || payment.RecordedAt > fundingPayment.RecordedAt {
+			fundingPayment = payment
+		}
+	}
+	if fundingPayment == nil {
+		return nil, fmt.Errorf("benefit request %s has no policy-linked insurer funding account", id)
+	}
+	fundingAccount, err := c.ReadBankAccountReference(ctx, fundingPayment.DestinationAccountID)
+	if err != nil {
+		return nil, err
+	}
+	if fundingAccount.AccountType != "INSURER" || fundingAccount.OwnerID != "insurer" {
+		return nil, fmt.Errorf("benefit funding account %s must be an insurer account", fundingAccount.ID)
+	}
+	if fundingAccount.BalanceMinor < request.AmountMinor {
+		return nil, fmt.Errorf("insurer account %s has insufficient funds for benefit %s", fundingAccount.ID, id)
+	}
 	now, err := timestamp(ctx)
 	if err != nil {
+		return nil, err
+	}
+	fundingAccount.BalanceMinor -= request.AmountMinor
+	fundingAccount.UpdatedAt = now
+	if err := persistBankAccount(ctx, fundingAccount, false); err != nil {
 		return nil, err
 	}
 	request.Status = "PAID"

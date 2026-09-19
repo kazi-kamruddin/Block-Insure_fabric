@@ -6,7 +6,7 @@ network_root="$(cd -- "${script_dir}/.." && pwd -P)"
 samples_root="${network_root}/.fabric/fabric-samples"
 channel_name="insurance-channel"
 chaincode_name="${CHAINCODE_NAME:-insurance-contract}"
-expected_chaincode_version="${EXPECTED_CHAINCODE_VERSION:-1.2.0}"
+expected_chaincode_version="${EXPECTED_CHAINCODE_VERSION:-1.2.2}"
 expected_schema_version="${EXPECTED_SCHEMA_VERSION:-12}"
 compose_ca="${network_root}/compose/compose-ca.yaml"
 compose_network="${network_root}/compose/compose-network.yaml"
@@ -232,7 +232,7 @@ oracle 13054 ca-oracle
 orderer 11054 ca-orderer
 EOF
 
-  for port in 5984 6984 7984 8984 9984; do
+  for port in 5984 6984 7984 8984 10084; do
     curl --fail --silent --show-error --user admin:adminpw "http://localhost:${port}/_up" | grep -q '"status":"ok"'
   done
 

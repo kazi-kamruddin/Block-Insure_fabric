@@ -128,9 +128,10 @@ for index in 1 2 3 4 5; do
     *) subject="hospital-${index}" ;;
   esac
   invoice_id="showcase-invoice-${subject}"
+  printf -v invoice_lookup_hash '%064x' "$((index + 16))"
   set_client_context hospital HospitalMSP 8051 "hospital${index}"
   if ! exists ReadHospitalInvoice "${invoice_id}"; then
-    invoke CreateHospitalInvoice "${invoice_id}" "${hash_a}" "${hash_b}" "${registry_root}" "$((200000 + index * 10000))" 2026-06-10 2026-06-20 FINALIZED
+    invoke CreateHospitalInvoice "${invoice_id}" "${hash_a}" "${invoice_lookup_hash}" "${registry_root}" "$((200000 + index * 10000))" 2026-06-10 2026-06-20 FINALIZED
   fi
 done
 

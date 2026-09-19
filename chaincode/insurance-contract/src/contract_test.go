@@ -2,6 +2,7 @@ package insurance
 
 import (
 	"crypto/x509"
+	"encoding/json"
 	"fmt"
 	"slices"
 	"strings"
@@ -242,8 +243,13 @@ func TestBankAccountPrivateDataBoundary(t *testing.T) {
 	requireNoError(t, err)
 	publicPayload, err := ctx.stub.GetState(publicKey)
 	requireNoError(t, err)
-	if strings.Contains(string(publicPayload), tokenHash) || strings.Contains(string(publicPayload), "balanceMinor") {
+	if strings.Contains(string(publicPayload), tokenHash) {
 		t.Fatalf("public account state leaked private fields: %s", publicPayload)
+	}
+	var publicAccount BankAccountReference
+	requireNoError(t, json.Unmarshal(publicPayload, &publicAccount))
+	if publicAccount.BalanceMinor != 0 {
+		t.Fatalf("public account state leaked a non-zero private balance: %s", publicPayload)
 	}
 	privateKey, err := privateBankAccountKey(ctx, account.ID)
 	requireNoError(t, err)
@@ -872,7 +878,9 @@ func TestBenefitsBeneficiariesAndLiabilityLifecycle(t *testing.T) {
 	hashD := strings.Repeat("d", 64)
 
 	setIdentity(ctx, "insurer-admin", "InsurerMSP", "insurerAdmin", nil)
-	_, err := contract.CreatePolicyPackage(ctx, "package-benefit", "Benefits", "", 10_000, 1_000_000, hashA)
+	_, err := contract.CreatePartnerAgreement(ctx, "agreement-bank-benefit", "BANK", "bank-demo", "Demo Bank", "Dhaka", "Settlement", "Benefit payments", "2026-01-01", "2028-12-31")
+	requireNoError(t, err)
+	_, err = contract.CreatePolicyPackage(ctx, "package-benefit", "Benefits", "", 10_000, 1_000_000, hashA)
 	requireNoError(t, err)
 	_, err = contract.CreateBenefitPlan(ctx, "benefit-plan-1", "package-benefit", 500_000, 100_000, 250_000, hashB)
 	requireNoError(t, err)
@@ -881,6 +889,15 @@ func TestBenefitsBeneficiariesAndLiabilityLifecycle(t *testing.T) {
 	_, err = contract.PublishPolicyPackage(ctx, "package-benefit")
 	requireNoError(t, err)
 	_, err = contract.IssuePolicy(ctx, "policy-benefit", "package-benefit", "policyholder1", "2026-01-01", "2026-12-31")
+	requireNoError(t, err)
+	setIdentity(ctx, "bank-officer", "BankMSP", "bankOfficer", nil)
+	_, err = openTestBankAccount(ctx, contract, "benefit-insurer-account", "bank-demo", "insurer", "INSURER", "Benefit funding", "**** **** 9001", hashA, 600_000)
+	requireNoError(t, err)
+	setIdentity(ctx, "insurer-admin", "InsurerMSP", "insurerAdmin", nil)
+	err = putState(ctx, "premiumPayment", "benefit-funding-payment", &PremiumPayment{
+		AssetType: "premiumPayment", SchemaVersion: SchemaVersion, ID: "benefit-funding-payment",
+		PolicyID: "policy-benefit", DestinationAccountID: "benefit-insurer-account", RecordedAt: "2026-01-02T00:00:00Z",
+	})
 	requireNoError(t, err)
 	plan2, err := contract.CreateBenefitPlan(ctx, "benefit-plan-2", "package-benefit", 900_000, 200_000, 400_000, hashC)
 	requireNoError(t, err)
@@ -922,6 +939,11 @@ func TestBenefitsBeneficiariesAndLiabilityLifecycle(t *testing.T) {
 	requireNoError(t, err)
 	if request.Status != "PAID" || liability.Status != "PAID" || liability.BankReferenceHash != hashB {
 		t.Fatalf("benefit payment did not close its liability: request=%+v liability=%+v", request, liability)
+	}
+	fundingAccount, err := contract.ReadBankAccountReference(ctx, "benefit-insurer-account")
+	requireNoError(t, err)
+	if fundingAccount.BalanceMinor != 100_000 {
+		t.Fatalf("benefit payment did not debit insurer funds: balance=%d", fundingAccount.BalanceMinor)
 	}
 }
 

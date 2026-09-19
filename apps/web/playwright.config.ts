@@ -25,7 +25,10 @@ const oracleServers = [
 export default defineConfig({
   testDir: "./e2e",
   fullyParallel: false,
-  workers: 2,
+  // The live Fabric tests intentionally share one channel and world state.
+  // Serial execution avoids cross-file contention and makes replay-protection
+  // assertions deterministic on developer machines and CI alike.
+  workers: 1,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 1 : 0,
   reporter: [["list"]],

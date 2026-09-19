@@ -1,4 +1,5 @@
 import { expect, request, test, type APIRequestContext } from "@playwright/test";
+import { createHash } from "node:crypto";
 
 const hashA = "a".repeat(64);
 const hashB = "b".repeat(64);
@@ -70,6 +71,17 @@ async function waitForClaimStatus(context: APIRequestContext, claimId: string, s
   }, { timeout: 90_000, intervals: [500, 1_000, 2_000] }).toBe(status);
 }
 
+async function createFundedSettlementAccount(bank: APIRequestContext, suffix: string) {
+  const accountId = `oracle-insurer-account-${suffix}`;
+  await command(bank, {
+    operation: "openBankAccount", id: accountId, bankId: "bank-demo", ownerId: "insurer",
+    accountType: "INSURER", accountLabel: "Oracle scenario reserve", maskedAccount: "**** **** 9002",
+    accountTokenHash: createHash("sha256").update(`oracle-insurer-vault-${suffix}`).digest("hex"),
+    openingBalanceMinor: 200_000,
+  });
+  return accountId;
+}
+
 async function settleThroughAuditorFallback(
   insurer: APIRequestContext,
   policyholder: APIRequestContext,
@@ -86,8 +98,10 @@ async function settleThroughAuditorFallback(
   }
   await waitForClaimStatus(policyholder, claimId, "APPROVED");
   const settlementId = `oracle-fallback-settlement-${suffix}`;
-  await command(insurer, { operation: "authorizeSettlement", settlementId, claimId, sourceAccountId: "bank-insurer-premium", destinationAccountId: "showcase-customer-account" });
-  await command(bank, { operation: "confirmSettlement", settlementId, transferId: `payout-${settlementId}`, bankReferenceHash: hashB });
+  const sourceAccountId = await createFundedSettlementAccount(bank, suffix);
+  await command(insurer, { operation: "authorizeSettlement", settlementId, claimId, sourceAccountId, destinationAccountId: "showcase-customer-account" });
+  const bankReferenceHash = createHash("sha256").update(`fallback-settlement-${suffix}`).digest("hex");
+  await command(bank, { operation: "confirmSettlement", settlementId, transferId: `payout-${settlementId}`, bankReferenceHash });
   await waitForClaimStatus(policyholder, claimId, "SETTLED");
   return reviewId;
 }
@@ -117,8 +131,10 @@ test("two Oracle workers automatically approve an exact valid result and the ban
     ]));
 
     const settlementId = `oracle-settlement-${suffix}`;
-    await command(insurer, { operation: "authorizeSettlement", settlementId, claimId, sourceAccountId: "bank-insurer-premium", destinationAccountId: "showcase-customer-account" });
-    await command(bank, { operation: "confirmSettlement", settlementId, transferId: `payout-${settlementId}`, bankReferenceHash: hashB });
+    const sourceAccountId = await createFundedSettlementAccount(bank, suffix);
+    await command(insurer, { operation: "authorizeSettlement", settlementId, claimId, sourceAccountId, destinationAccountId: "showcase-customer-account" });
+    const bankReferenceHash = createHash("sha256").update(`oracle-settlement-${suffix}`).digest("hex");
+    await command(bank, { operation: "confirmSettlement", settlementId, transferId: `payout-${settlementId}`, bankReferenceHash });
     await waitForClaimStatus(policyholder, claimId, "SETTLED");
 
     const dossier = await (await insurer.get(`/api/audit/claims/${claimId}`)).json();

@@ -56,7 +56,7 @@ bash network/scripts/network.sh reset
 - `status` lists containers and each peer's joined channels.
 - `verify` checks all 17 containers, six CAs, five CouchDB instances, the
   orderer channel, and each peer ledger. When chaincode is committed, it also
-  checks version `1.2.0` on all five peers, evaluates schema version `12`, and
+  checks version `1.2.2` on all five peers, evaluates schema version `12`, and
   confirms both Oracle service enrollments.
 - `down` stops and removes containers while retaining identities, channel
   artifacts, and Docker ledger volumes.
@@ -68,7 +68,7 @@ falls back to Docker Desktop's `docker.exe` integration when necessary.
 
 Host ports are `7051`, `8051`, `9051`, `12051`, and `13051` for the five peers;
 `7054`, `8054`, `9054`, `12054`, `13054`, and `11054` for the CAs; and `5984`, `6984`,
-`7984`, `8984`, and `9984` for CouchDB. Credentials embedded in Compose are strictly
+`7984`, `8984`, and `10084` for CouchDB. Credentials embedded in Compose are strictly
 local development defaults and must not be reused outside this disposable
 network.
 

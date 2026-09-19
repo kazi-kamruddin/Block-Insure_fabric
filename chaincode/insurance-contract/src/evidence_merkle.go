@@ -170,7 +170,7 @@ func (c *Contract) VerifyEvidenceInclusion(ctx contractapi.TransactionContextInt
 	return &EvidenceInclusionVerification{
 		BatchID: batch.ID, EvidenceID: evidence.ID, LeafHash: evidenceLeafHash(evidence),
 		ComputedRoot: current, AnchoredRoot: batch.RootHash, ProofSteps: len(proof),
-		Included: inBatch && current == batch.RootHash,
+		Included:      inBatch && current == batch.RootHash,
 		HashAlgorithm: batch.HashAlgorithm, LeafEncoding: batch.LeafEncoding,
 	}, nil
 }

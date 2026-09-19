@@ -48,14 +48,24 @@ invoke() {
 invoke_bank_private() {
   local function="$1"
   shift
-  peer chaincode invoke \
-    -o localhost:7050 --ordererTLSHostnameOverride orderer.blockinsure.test \
-    --tls --cafile "${orderer_ca}" -C "${channel_name}" -n "${chaincode_name}" \
-    --peerAddresses localhost:7051 \
-    --tlsRootCertFiles "${organizations}/peerOrganizations/insurer.blockinsure.test/peers/peer0.insurer.blockinsure.test/tls/ca.crt" \
-    --peerAddresses localhost:12051 \
-    --tlsRootCertFiles "${organizations}/peerOrganizations/bank.blockinsure.test/peers/peer0.bank.blockinsure.test/tls/ca.crt" \
-    --waitForEvent --waitForEventTimeout 90s -c "$(payload "${function}" "$@")" >/dev/null
+  local attempt
+  for attempt in 1 2 3 4 5; do
+    if peer chaincode invoke \
+      -o localhost:7050 --ordererTLSHostnameOverride orderer.blockinsure.test \
+      --tls --cafile "${orderer_ca}" -C "${channel_name}" -n "${chaincode_name}" \
+      --peerAddresses localhost:7051 \
+      --tlsRootCertFiles "${organizations}/peerOrganizations/insurer.blockinsure.test/peers/peer0.insurer.blockinsure.test/tls/ca.crt" \
+      --peerAddresses localhost:12051 \
+      --tlsRootCertFiles "${organizations}/peerOrganizations/bank.blockinsure.test/peers/peer0.bank.blockinsure.test/tls/ca.crt" \
+      --waitForEvent --waitForEventTimeout 90s -c "$(payload "${function}" "$@")" >/dev/null; then
+      return 0
+    fi
+    if [ "${attempt}" -lt 5 ]; then
+      echo "Private-data endorsement for ${function} is not synchronized yet (attempt ${attempt}/5); retrying..." >&2
+      sleep 3
+    fi
+  done
+  return 1
 }
 
 open_private_bank_account() {
@@ -161,7 +171,8 @@ set_client_context bank BankMSP 12051 bankOfficer
 invoke ConfirmBenefitPayment "${benefit_request_id}" "${hash_d}"
 
 set_client_context hospital HospitalMSP 8051 hospital1
-invoke CreateHospitalInvoice "${invoice_id}" "${hash_a}" "${hash_a}" "${hash_c}" 250000 2026-06-10 2026-06-20 FINALIZED
+invoice_lookup_hash="$(printf '%s' "${invoice_id}" | sha256sum | awk '{print $1}')"
+invoke CreateHospitalInvoice "${invoice_id}" "${hash_a}" "${invoice_lookup_hash}" "${hash_c}" 250000 2026-06-10 2026-06-20 FINALIZED
 
 set_client_context insurer InsurerMSP 7051 policyholder1
 invoke SubmitInvoiceClaim "${claim_id}" "${policy_id}" hospital-demo "${invoice_id}" 250000 2026-06-15 "${hash_b}"
@@ -191,7 +202,8 @@ set_client_context insurer InsurerMSP 7051 insurerAdmin
 invoke_bank_private AuthorizeSettlement "${settlement_id}" "${claim_id}" "${insurer_account_id}" "${account_id}"
 
 set_client_context bank BankMSP 12051 bankOfficer
-invoke_bank_private ConfirmSettlement "${settlement_id}" "payout-${settlement_id}" "${hash_c}"
+payout_reference_hash="$(printf '%s' "payout-${settlement_id}" | sha256sum | awk '{print $1}')"
+invoke_bank_private ConfirmSettlement "${settlement_id}" "payout-${settlement_id}" "${payout_reference_hash}"
 
 claim_json="$(peer chaincode query -C "${channel_name}" -n "${chaincode_name}" -c "$(payload ReadClaim "${claim_id}")")"
 settlement_json="$(peer chaincode query -C "${channel_name}" -n "${chaincode_name}" -c "$(payload ReadSettlement "${settlement_id}")")"
@@ -222,7 +234,7 @@ test "$(jq -r '.advisory' <<<"${fraud_json}")" = "true"
 test "$(jq -r '.status' <<<"${grant_json}")" = "REVOKED"
 test "$(jq -r '.accessCount' <<<"${grant_json}")" = "1"
 test "$(jq -r '.balanceMinor' <<<"${customer_account_json}")" = "330000"
-test "$(jq -r '.balanceMinor' <<<"${insurer_account_json}")" = "770000"
+test "$(jq -r '.balanceMinor' <<<"${insurer_account_json}")" = "270000"
 test "$(jq -r '.included' <<<"${evidence_verification_json}")" = "true"
 test "$(jq -r '.anchoredRoot' <<<"${evidence_verification_json}")" = "${evidence_root}"
 

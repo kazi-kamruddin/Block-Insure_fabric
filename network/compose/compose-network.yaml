@@ -106,7 +106,7 @@ services:
   couchdb-oracle:
     <<: *couchdb-defaults
     container_name: couchdb.oracle.blockinsure.test
-    ports: ["9984:5984"]
+    ports: ["10084:5984"]
 
   peer-insurer:
     <<: *peer-defaults

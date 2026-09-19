@@ -94,10 +94,13 @@ type BankAccountReference struct {
 	MaskedAccount    string `json:"maskedAccount"`
 	AccountTokenHash string `json:"accountTokenHash,omitempty"`
 	Currency         string `json:"currency"`
-	BalanceMinor     int64  `json:"balanceMinor,omitempty"`
-	Status           string `json:"status"`
-	CreatedAt        string `json:"createdAt"`
-	UpdatedAt        string `json:"updatedAt"`
+	// BalanceMinor is deliberately serialized as a zero-valued public placeholder.
+	// The authoritative balance remains in bankInsurerPrivateData, while keeping
+	// this scalar present satisfies Fabric's generated transaction schema.
+	BalanceMinor int64  `json:"balanceMinor"`
+	Status       string `json:"status"`
+	CreatedAt    string `json:"createdAt"`
+	UpdatedAt    string `json:"updatedAt"`
 }
 
 // BankAccountPrivateState is stored only in bankInsurerPrivateData. The public

@@ -63,7 +63,7 @@ provenance on every use. Bank identities cannot retrieve clinical evidence.
 Claims link verifications, review rounds, decisions, appeals, fraud assessments,
 access records, and settlements for audit navigation.
 
-The current evidence-Merkle and private-banking definition is `insurance-contract` 1.2.0
+The current evidence-Merkle and private-banking definition is `insurance-contract` 1.2.2
 with schema version 12 and an automatically resolved lifecycle sequence. A clean bootstrap
 starts at sequence 1; a non-destructive source upgrade increments the existing
 channel sequence.

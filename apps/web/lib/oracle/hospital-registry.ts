@@ -70,12 +70,24 @@ function recordsFromInvoices(invoices: HospitalInvoice[]) {
       descriptionHash: invoice.treatmentHash.toLowerCase(),
       status: "VALID",
     }));
-  const seen = new Set<string>();
+
+  // Replayed/idempotent Hospital imports can describe the same invoice facts
+  // more than once. Collapse those safely, but quarantine a lookup hash when
+  // different Hospitals or facts claim it: an Oracle must never choose an
+  // arbitrary record from an ambiguous identifier.
+  const unique = new Map<string, HospitalRegistryRecord>();
+  const ambiguous = new Set<string>();
   for (const record of records) {
-    if (seen.has(record.lookupHash)) throw new Error(`Finalized Hospital invoices contain duplicate Oracle lookup hash ${record.lookupHash}`);
-    seen.add(record.lookupHash);
+    const existing = unique.get(record.lookupHash);
+    if (!existing) {
+      unique.set(record.lookupHash, record);
+      continue;
+    }
+    if (JSON.stringify(existing) !== JSON.stringify(record)) ambiguous.add(record.lookupHash);
   }
-  return records;
+  return [...unique.values()]
+    .filter((record) => !ambiguous.has(record.lookupHash))
+    .sort((left, right) => left.lookupHash.localeCompare(right.lookupHash));
 }
 
 export async function refreshHospitalRegistrySnapshot() {
