@@ -71,10 +71,10 @@ ensure_agreement agreement-bank-demo BANK bank-demo "Bangladesh Demo Commercial 
 
 set_client_context bank BankMSP 12051 bankOfficer
 if ! exists ReadBankAccountReference showcase-customer-account; then
-  invoke OpenBankAccount showcase-customer-account bank-demo policyholder1 CUSTOMER "${hash_a}" 100000
+  invoke OpenBankAccount showcase-customer-account bank-demo policyholder1 CUSTOMER "Policyholder primary" "**** **** 4821" "${hash_a}" 100000
 fi
 if ! exists ReadBankAccountReference bank-insurer-premium; then
-  invoke OpenBankAccount bank-insurer-premium bank-demo insurer INSURER "${hash_b}" 500000
+  invoke OpenBankAccount bank-insurer-premium bank-demo insurer INSURER "Block-Insure settlement" "**** **** 9001" "${hash_b}" 500000
 fi
 
 set_client_context insurer InsurerMSP 7051 insurerAdmin

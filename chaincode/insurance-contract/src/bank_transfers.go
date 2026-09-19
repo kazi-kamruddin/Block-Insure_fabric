@@ -19,7 +19,7 @@ func failureDigest(code string) string {
 	return hex.EncodeToString(digest[:])
 }
 
-func (c *Contract) OpenBankAccount(ctx contractapi.TransactionContextInterface, id, bankID, ownerID, accountType, accountTokenHash string, openingBalanceMinor int64) (*BankAccountReference, error) {
+func (c *Contract) OpenBankAccount(ctx contractapi.TransactionContextInterface, id, bankID, ownerID, accountType, accountLabel, maskedAccount, accountTokenHash string, openingBalanceMinor int64) (*BankAccountReference, error) {
 	if _, err := requireIdentity(ctx, "BankMSP", "bankOfficer"); err != nil {
 		return nil, err
 	}
@@ -36,6 +36,14 @@ func (c *Contract) OpenBankAccount(ctx contractapi.TransactionContextInterface, 
 	if openingBalanceMinor < 0 {
 		return nil, fmt.Errorf("opening balance cannot be negative")
 	}
+	accountLabel = strings.TrimSpace(accountLabel)
+	maskedAccount = strings.TrimSpace(maskedAccount)
+	if accountLabel == "" || len(accountLabel) > 80 {
+		return nil, fmt.Errorf("accountLabel must contain between 1 and 80 characters")
+	}
+	if len(maskedAccount) < 4 || len(maskedAccount) > 40 || !strings.Contains(maskedAccount, "*") {
+		return nil, fmt.Errorf("maskedAccount must contain a masked display value between 4 and 40 characters")
+	}
 	if err := validateHash("accountTokenHash", accountTokenHash); err != nil {
 		return nil, err
 	}
@@ -46,6 +54,7 @@ func (c *Contract) OpenBankAccount(ctx contractapi.TransactionContextInterface, 
 	account := &BankAccountReference{
 		AssetType: "bankAccountReference", SchemaVersion: SchemaVersion, ID: id,
 		BankID: bankID, OwnerID: ownerID, AccountType: accountType,
+		AccountLabel: accountLabel, MaskedAccount: maskedAccount,
 		AccountTokenHash: strings.ToLower(accountTokenHash), Currency: "BDT",
 		BalanceMinor: openingBalanceMinor, Status: "VERIFIED", CreatedAt: now, UpdatedAt: now,
 	}

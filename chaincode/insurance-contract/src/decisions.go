@@ -3,12 +3,13 @@ package insurance
 import (
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/hyperledger/fabric-contract-api-go/v2/contractapi"
 )
 
-func (c *Contract) AuthorizeSettlement(ctx contractapi.TransactionContextInterface, settlementID, claimID string) (*Settlement, error) {
+func (c *Contract) AuthorizeSettlement(ctx contractapi.TransactionContextInterface, settlementID, claimID, sourceAccountID, destinationAccountID string) (*Settlement, error) {
 	if _, err := requireIdentity(ctx, "InsurerMSP", "insurerAdmin"); err != nil {
 		return nil, err
 	}
@@ -19,13 +20,17 @@ func (c *Contract) AuthorizeSettlement(ctx contractapi.TransactionContextInterfa
 	if claim.Status != "APPROVED" {
 		return nil, fmt.Errorf("claim %s must be APPROVED to authorize settlement", claimID)
 	}
+	if _, _, err := c.validateSettlementAccounts(ctx, claim, sourceAccountID, destinationAccountID); err != nil {
+		return nil, err
+	}
 	now, err := timestamp(ctx)
 	if err != nil {
 		return nil, err
 	}
 	settlement := &Settlement{
 		AssetType: "settlement", SchemaVersion: SchemaVersion, ID: settlementID,
-		ClaimID: claimID, AmountMinor: claim.AmountMinor, Status: "AUTHORIZED", AuthorizedAt: now,
+		ClaimID: claimID, SourceAccountID: sourceAccountID, DestinationAccountID: destinationAccountID,
+		AmountMinor: claim.AmountMinor, Currency: "BDT", Status: "AUTHORIZED", AuthorizedAt: now, UpdatedAt: now,
 	}
 	if err := putState(ctx, "settlement", settlementID, settlement); err != nil {
 		return nil, err
@@ -49,7 +54,38 @@ func (c *Contract) AuthorizeSettlement(ctx contractapi.TransactionContextInterfa
 	return settlement, nil
 }
 
-func (c *Contract) ConfirmSettlement(ctx contractapi.TransactionContextInterface, settlementID, bankReferenceHash string) (*Settlement, error) {
+func (c *Contract) validateSettlementAccounts(ctx contractapi.TransactionContextInterface, claim *Claim, sourceAccountID, destinationAccountID string) (*BankAccountReference, *BankAccountReference, error) {
+	source, err := c.ReadBankAccountReference(ctx, sourceAccountID)
+	if err != nil {
+		return nil, nil, err
+	}
+	destination, err := c.ReadBankAccountReference(ctx, destinationAccountID)
+	if err != nil {
+		return nil, nil, err
+	}
+	if source.Status != "VERIFIED" || destination.Status != "VERIFIED" || source.BankID == "" || source.BankID != destination.BankID {
+		return nil, nil, fmt.Errorf("settlement accounts must be verified accounts at the same contracted bank")
+	}
+	if source.AccountType != "INSURER" || source.OwnerID != "insurer" {
+		return nil, nil, fmt.Errorf("settlement source must be an insurer account")
+	}
+	if destination.AccountType != "CUSTOMER" || destination.OwnerID != claim.ClaimantID {
+		return nil, nil, fmt.Errorf("settlement destination must belong to the claimant")
+	}
+	policy, err := c.ReadPolicy(ctx, claim.PolicyID)
+	if err != nil {
+		return nil, nil, err
+	}
+	if !slices.Contains(policy.BankIDs, source.BankID) {
+		return nil, nil, fmt.Errorf("bank %s is not in policy %s's partner network", source.BankID, policy.ID)
+	}
+	if _, err := c.requireActivePartner(ctx, "BANK", source.BankID); err != nil {
+		return nil, nil, err
+	}
+	return source, destination, nil
+}
+
+func (c *Contract) ConfirmSettlement(ctx contractapi.TransactionContextInterface, settlementID, transferID, bankReferenceHash string) (*Settlement, error) {
 	if _, err := requireIdentity(ctx, "BankMSP", "bankOfficer"); err != nil {
 		return nil, err
 	}
@@ -60,8 +96,8 @@ func (c *Contract) ConfirmSettlement(ctx contractapi.TransactionContextInterface
 	if err != nil {
 		return nil, err
 	}
-	if settlement.Status != "AUTHORIZED" {
-		return nil, fmt.Errorf("settlement %s must be AUTHORIZED to confirm", settlementID)
+	if settlement.Status != "AUTHORIZED" && settlement.Status != "PAYMENT_FAILED" {
+		return nil, fmt.Errorf("settlement %s must be AUTHORIZED or PAYMENT_FAILED to confirm", settlementID)
 	}
 	claim, err := c.ReadClaim(ctx, settlement.ClaimID)
 	if err != nil {
@@ -71,8 +107,35 @@ func (c *Contract) ConfirmSettlement(ctx contractapi.TransactionContextInterface
 	if err != nil {
 		return nil, err
 	}
-	settlement.Status = "CONFIRMED"
+	source, destination, err := c.validateSettlementAccounts(ctx, claim, settlement.SourceAccountID, settlement.DestinationAccountID)
+	if err != nil {
+		return nil, err
+	}
+	transfer := &BankTransfer{
+		AssetType: "bankTransfer", SchemaVersion: SchemaVersion, ID: transferID,
+		BankID: source.BankID, SourceAccountID: source.ID, DestinationAccountID: destination.ID,
+		PolicyID: claim.PolicyID, SettlementID: settlement.ID, AmountMinor: settlement.AmountMinor,
+		Currency: "BDT", Method: "CLAIM_PAYOUT", ExternalReferenceHash: strings.ToLower(bankReferenceHash), CreatedAt: now,
+	}
+	if err := c.settlePremiumTransfer(ctx, transfer, source, destination); err != nil {
+		return nil, err
+	}
+	settlement.TransferID = transfer.ID
 	settlement.BankReferenceHash = strings.ToLower(bankReferenceHash)
+	settlement.UpdatedAt = now
+	if transfer.Status == "BOUNCED" {
+		settlement.Status = "PAYMENT_FAILED"
+		settlement.FailureCode = transfer.FailureCode
+		if err := overwriteAsset(ctx, "settlement", settlementID, settlement); err != nil {
+			return nil, err
+		}
+		if err := emit(ctx, "SettlementPaymentFailed", settlement); err != nil {
+			return nil, err
+		}
+		return settlement, nil
+	}
+	settlement.Status = "CONFIRMED"
+	settlement.FailureCode = ""
 	settlement.ConfirmedAt = now
 	if err := overwriteAsset(ctx, "settlement", settlementID, settlement); err != nil {
 		return nil, err

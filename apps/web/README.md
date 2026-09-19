@@ -61,6 +61,24 @@ bounded exponential backoff and produce structured JSON logs. It accepts HTTP
 only for a loopback URL; remote endpoints must use HTTPS. Process supervision
 (for example a container restart policy or service manager) remains a deployment
 responsibility.
+
+## Automatic premium collection worker
+
+Set `BANKING_WORKER_SECRET` for both the web application and worker. The worker
+uses the configured `BANKING_BUSINESS_TIMEZONE` (default `Asia/Dhaka`) to run an
+idempotent cycle:
+
+```powershell
+npm run banking:collect -- --once
+npm run banking:collect
+```
+
+Each cycle creates deterministic on-ledger obligations for active mandates that
+are due, then performs atomic BDT transfers to `INSURER_PREMIUM_ACCOUNT_ID`.
+Restarting the worker cannot create a second collection for the same mandate and
+due date. Insufficient customer funds produce a bounced transfer and leave the
+policy premium unpaid.
+
 - `/api/internal/banking/collections` is the bearer-protected EFT worker boundary;
   each due debit settles or bounces deterministically from the ledger balance.
 - `/api/policies/[id]/statement` exports an ownership-filtered policy, premium,

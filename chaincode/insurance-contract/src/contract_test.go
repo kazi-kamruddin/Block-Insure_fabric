@@ -193,7 +193,13 @@ func TestPolicyToSettlementWorkflow(t *testing.T) {
 	hashD := strings.Repeat("d", 64)
 
 	setIdentity(ctx, "insurer-admin", "InsurerMSP", "insurerAdmin", nil)
-	_, err := contract.CreatePolicyPackage(ctx, "package-basic", "Basic Health", "Core hospitalization coverage", 10_000, 1_000_000, hashA)
+	_, err := contract.CreatePartnerAgreement(ctx, "agreement-bank-basic", "BANK", "bank-demo", "Demo Bank", "Dhaka", "Preferred", "Payments", "2026-01-01", "2028-12-31")
+	requireNoError(t, err)
+	_, err = contract.CreatePartnerAgreement(ctx, "agreement-hospital-basic", "HOSPITAL", "hospital-officer", "Demo Hospital", "Dhaka", "Preferred", "Invoice verification", "2026-01-01", "2028-12-31")
+	requireNoError(t, err)
+	_, err = contract.CreatePolicyPackage(ctx, "package-basic", "Basic Health", "Core hospitalization coverage", 10_000, 1_000_000, hashA)
+	requireNoError(t, err)
+	_, err = contract.ConfigurePolicyPackagePartners(ctx, "package-basic", `["hospital-officer"]`, `["bank-demo"]`)
 	requireNoError(t, err)
 	_, err = contract.PublishPolicyPackage(ctx, "package-basic")
 	requireNoError(t, err)
@@ -224,15 +230,28 @@ func TestPolicyToSettlementWorkflow(t *testing.T) {
 	}
 
 	setIdentity(ctx, "insurer-admin", "InsurerMSP", "insurerAdmin", nil)
-	settlement, err := contract.AuthorizeSettlement(ctx, "settlement-001", "claim-001")
+	setIdentity(ctx, "bank-officer", "BankMSP", "bankOfficer", nil)
+	_, err = contract.OpenBankAccount(ctx, "settlement-customer", "bank-demo", "policyholder1", "CUSTOMER", "Primary savings", "**** **** 4821", hashA, 0)
+	requireNoError(t, err)
+	_, err = contract.OpenBankAccount(ctx, "settlement-insurer", "bank-demo", "insurer", "INSURER", "Claims settlement", "**** **** 9001", hashB, 1_000_000)
+	requireNoError(t, err)
+	setIdentity(ctx, "insurer-admin", "InsurerMSP", "insurerAdmin", nil)
+	settlement, err := contract.AuthorizeSettlement(ctx, "settlement-001", "claim-001", "settlement-insurer", "settlement-customer")
 	requireNoError(t, err)
 	if settlement.AmountMinor != 250_000 {
 		t.Fatalf("settlement amount changed: %d", settlement.AmountMinor)
 	}
 
 	setIdentity(ctx, "bank-officer", "BankMSP", "bankOfficer", nil)
-	_, err = contract.ConfirmSettlement(ctx, "settlement-001", hashC)
+	_, err = contract.ConfirmSettlement(ctx, "settlement-001", "payout-settlement-001", hashC)
 	requireNoError(t, err)
+	sourceAccount, err := contract.ReadBankAccountReference(ctx, "settlement-insurer")
+	requireNoError(t, err)
+	destinationAccount, err := contract.ReadBankAccountReference(ctx, "settlement-customer")
+	requireNoError(t, err)
+	if sourceAccount.BalanceMinor != 750_000 || destinationAccount.BalanceMinor != 250_000 {
+		t.Fatalf("claim payout did not move BDT balances atomically: source=%d destination=%d", sourceAccount.BalanceMinor, destinationAccount.BalanceMinor)
+	}
 	claim, err := contract.ReadClaim(ctx, "claim-001")
 	requireNoError(t, err)
 	if claim.Status != "SETTLED" {
@@ -277,7 +296,7 @@ func TestAuthorizationAndInvalidTransitions(t *testing.T) {
 	setIdentity(ctx, "insurer-admin", "InsurerMSP", "insurerAdmin", nil)
 	_, err = contract.OpenClaimReview(ctx, "claim-001", "review-invalid", `["auditor1","auditor2","auditor3","auditor4"]`, 3, 2, "2026-09-08T12:00:00Z")
 	requireError(t, err, "must be HOSPITAL_VERIFIED")
-	_, err = contract.AuthorizeSettlement(ctx, "settlement-001", "claim-001")
+	_, err = contract.AuthorizeSettlement(ctx, "settlement-001", "claim-001", "missing-insurer", "missing-customer")
 	requireError(t, err, "must be APPROVED")
 }
 
@@ -648,9 +667,9 @@ func TestPolicyPremiumMandateAndCollectionLifecycle(t *testing.T) {
 	requireNoError(t, err)
 
 	setIdentity(ctx, "bank-officer", "BankMSP", "bankOfficer", nil)
-	_, err = contract.OpenBankAccount(ctx, "account-token-1", "bank-demo", "policyholder1", "CUSTOMER", hashA, 30_000)
+	_, err = contract.OpenBankAccount(ctx, "account-token-1", "bank-demo", "policyholder1", "CUSTOMER", "Primary savings", "**** **** 4821", hashA, 30_000)
 	requireNoError(t, err)
-	_, err = contract.OpenBankAccount(ctx, "account-insurer-1", "bank-demo", "insurer", "INSURER", hashB, 0)
+	_, err = contract.OpenBankAccount(ctx, "account-insurer-1", "bank-demo", "insurer", "INSURER", "Premium account", "**** **** 9001", hashB, 0)
 	requireNoError(t, err)
 
 	setIdentity(ctx, "policyholder", "InsurerMSP", "policyholder", map[string]string{"subjectId": "policyholder1"})
@@ -694,14 +713,23 @@ func TestPolicyPremiumMandateAndCollectionLifecycle(t *testing.T) {
 	requireError(t, err, "external bank transfer reference has already been recorded")
 
 	setIdentity(ctx, "insurer-admin", "InsurerMSP", "insurerAdmin", nil)
-	collection, err := contract.QueuePremiumCollection(ctx, "collection-1", "mandate-1", "2026-01-31")
+	scheduled, err := contract.SchedulePremiumCollections(ctx, "2026-01-31")
 	requireNoError(t, err)
+	if len(scheduled) != 1 {
+		t.Fatalf("expected one automatically scheduled collection, got %d", len(scheduled))
+	}
+	collection := &scheduled[0]
 	if collection.Status != "DUE" {
 		t.Fatalf("expected due collection, got %s", collection.Status)
 	}
+	scheduled, err = contract.SchedulePremiumCollections(ctx, "2026-01-31")
+	requireNoError(t, err)
+	if len(scheduled) != 0 {
+		t.Fatalf("idempotent scheduler created duplicate collections: %+v", scheduled)
+	}
 
 	setIdentity(ctx, "bank-officer", "BankMSP", "bankOfficer", nil)
-	collection, err = contract.ProcessPremiumCollection(ctx, "collection-1", "payment-2", "transfer-2", "account-insurer-1", "2026-03-01", hashF)
+	collection, err = contract.ProcessPremiumCollection(ctx, collection.ID, "payment-2", "transfer-2", "account-insurer-1", "2026-03-01", hashF)
 	requireNoError(t, err)
 	if collection.Status != "COMPLETED" || collection.PaymentID != "payment-2" || collection.TransferID != "transfer-2" {
 		t.Fatalf("unexpected completed collection: %+v", collection)
@@ -803,11 +831,22 @@ func setupOracleRequest(t *testing.T, suffix string) (*Contract, *testContext, *
 	hashC := strings.Repeat("c", 64)
 
 	setIdentity(ctx, "insurer-admin", "InsurerMSP", "insurerAdmin", nil)
-	_, err := contract.CreatePolicyPackage(ctx, "package-oracle-"+suffix, "Oracle", "", 100, 100_000, hashA)
+	_, err := contract.CreatePartnerAgreement(ctx, "agreement-bank-oracle-"+suffix, "BANK", "bank-demo", "Demo Bank", "Dhaka", "Preferred", "Settlement payments", "2026-01-01", "2028-12-31")
+	requireNoError(t, err)
+	_, err = contract.CreatePartnerAgreement(ctx, "agreement-hospital-oracle-"+suffix, "HOSPITAL", "hospital1", "Demo Hospital", "Dhaka", "Preferred", "Invoice verification", "2026-01-01", "2028-12-31")
+	requireNoError(t, err)
+	_, err = contract.CreatePolicyPackage(ctx, "package-oracle-"+suffix, "Oracle", "", 100, 100_000, hashA)
+	requireNoError(t, err)
+	_, err = contract.ConfigurePolicyPackagePartners(ctx, "package-oracle-"+suffix, `["hospital1"]`, `["bank-demo"]`)
 	requireNoError(t, err)
 	_, err = contract.PublishPolicyPackage(ctx, "package-oracle-"+suffix)
 	requireNoError(t, err)
 	_, err = contract.IssuePolicy(ctx, "policy-oracle-"+suffix, "package-oracle-"+suffix, "policyholder1", "2026-01-01", "2026-12-31")
+	requireNoError(t, err)
+	setIdentity(ctx, "bank-officer", "BankMSP", "bankOfficer", nil)
+	_, err = contract.OpenBankAccount(ctx, "account-customer-oracle-"+suffix, "bank-demo", "policyholder1", "CUSTOMER", "Oracle customer", "**** **** 4821", hashA, 0)
+	requireNoError(t, err)
+	_, err = contract.OpenBankAccount(ctx, "account-insurer-oracle-"+suffix, "bank-demo", "insurer", "INSURER", "Oracle settlement", "**** **** 9001", hashB, 100_000)
 	requireNoError(t, err)
 
 	setIdentity(ctx, "policyholder-cert", "InsurerMSP", "policyholder", map[string]string{"subjectId": "policyholder1"})
@@ -915,10 +954,10 @@ func TestOracleAuthorizationCommitRevealAndExactSuccess(t *testing.T) {
 	}
 
 	setIdentity(ctx, "certificate-oracle1", "OracleMSP", "oracle", map[string]string{"subjectId": "oracle1"})
-	_, err = contract.AuthorizeSettlement(ctx, "settlement-forged-by-oracle", claim.ID)
+	_, err = contract.AuthorizeSettlement(ctx, "settlement-forged-by-oracle", claim.ID, "account-insurer-oracle-success", "account-customer-oracle-success")
 	requireError(t, err, "caller MSP OracleMSP")
 	setIdentity(ctx, "insurer-admin", "InsurerMSP", "insurerAdmin", nil)
-	_, err = contract.AuthorizeSettlement(ctx, "settlement-oracle-success", claim.ID)
+	_, err = contract.AuthorizeSettlement(ctx, "settlement-oracle-success", claim.ID, "account-insurer-oracle-success", "account-customer-oracle-success")
 	requireNoError(t, err)
 }
 

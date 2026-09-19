@@ -86,8 +86,8 @@ async function settleThroughAuditorFallback(
   }
   await waitForClaimStatus(policyholder, claimId, "APPROVED");
   const settlementId = `oracle-fallback-settlement-${suffix}`;
-  await command(insurer, { operation: "authorizeSettlement", settlementId, claimId });
-  await command(bank, { operation: "confirmSettlement", settlementId, bankReferenceHash: hashB });
+  await command(insurer, { operation: "authorizeSettlement", settlementId, claimId, sourceAccountId: "bank-insurer-premium", destinationAccountId: "showcase-customer-account" });
+  await command(bank, { operation: "confirmSettlement", settlementId, transferId: `payout-${settlementId}`, bankReferenceHash: hashB });
   await waitForClaimStatus(policyholder, claimId, "SETTLED");
   return reviewId;
 }
@@ -117,8 +117,8 @@ test("two Oracle workers automatically approve an exact valid result and the ban
     ]));
 
     const settlementId = `oracle-settlement-${suffix}`;
-    await command(insurer, { operation: "authorizeSettlement", settlementId, claimId });
-    await command(bank, { operation: "confirmSettlement", settlementId, bankReferenceHash: hashB });
+    await command(insurer, { operation: "authorizeSettlement", settlementId, claimId, sourceAccountId: "bank-insurer-premium", destinationAccountId: "showcase-customer-account" });
+    await command(bank, { operation: "confirmSettlement", settlementId, transferId: `payout-${settlementId}`, bankReferenceHash: hashB });
     await waitForClaimStatus(policyholder, claimId, "SETTLED");
 
     const dossier = await (await insurer.get(`/api/audit/claims/${claimId}`)).json();

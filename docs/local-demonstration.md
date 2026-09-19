@@ -17,7 +17,7 @@ bash network/scripts/network.sh verify
 
 The verifier should report 17 healthy services, six reachable CAs, five ready
 CouchDB instances, all five peers joined to `insurance-channel`, both Oracle
-identities enrolled, chaincode `insurance-contract` 1.0.0, and schema version 9.
+identities enrolled, chaincode `insurance-contract` 1.1.0, and schema version 10.
 
 ## 2. Start the supervised application stack
 
@@ -29,8 +29,8 @@ The normal start path is non-destructive and never replaces ledger data:
 .\scripts\demo-stack.ps1 Status
 ```
 
-It supervises the standalone Next.js application, durable event worker, Oracle 1,
-and Oracle 2. `Stop` stops application services and Fabric containers while
+It supervises the standalone Next.js application, durable event worker,
+automatic premium-collection worker, Oracle 1, and Oracle 2. `Stop` stops application services and Fabric containers while
 retaining ledger volumes; add `-KeepNetwork` to leave Fabric running.
 
 The default `-OracleScenario Baseline` gives exact positive/negative agreement.
@@ -70,6 +70,18 @@ npm run events:sync
 
 Use `npm run events:sync -- --once` when only a pre-demonstration catch-up is
 needed. Stop the continuous worker with Ctrl+C.
+
+For unattended EFT mandates, configure the same `BANKING_WORKER_SECRET` in the
+web and worker environments. The supervised stack starts it automatically; a
+manual development terminal can run:
+
+```powershell
+npm run banking:collect
+```
+
+Use `npm run banking:collect -- --once` for one idempotent business-date cycle.
+The worker asks chaincode to materialize due mandate obligations, then performs
+each BDT debit/credit. Its deterministic ledger work items survive restarts.
 
 or the deployable standalone build:
 

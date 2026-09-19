@@ -101,8 +101,8 @@ export async function executeWorkflowCommand(command: WorkflowCommand, session: 
     case "recordAuditorDecision":
       return ledger.recordAuditorDecision(command, findDemoAccount(session.accountId)?.fabricUserName);
     case "authorizeSettlement":
-      return ledger.authorizeSettlement(command.settlementId, command.claimId);
+      return ledger.authorizeSettlement(command.settlementId, command.claimId, command.sourceAccountId, command.destinationAccountId);
     case "confirmSettlement":
-      return ledger.confirmSettlement(command.settlementId, command.bankReferenceHash);
+      return ledger.confirmSettlement(command.settlementId, command.transferId, command.bankReferenceHash);
   }
 }

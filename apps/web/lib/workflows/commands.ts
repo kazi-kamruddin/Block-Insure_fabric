@@ -43,7 +43,7 @@ export const workflowCommandSchema = z.discriminatedUnion("operation", [
   z.object({ operation: z.literal("cancelPolicy"), id, reasonHash: hash }),
   z.object({ operation: z.literal("cancelPolicyAsInsurer"), id, reasonHash: hash }),
   z.object({ operation: z.literal("renewPolicy"), newId: id, existingId: id, newEndDate: date }),
-  z.object({ operation: z.literal("openBankAccount"), id, bankId: id, ownerId: id, accountType: z.enum(["CUSTOMER", "INSURER"]), accountTokenHash: hash, openingBalanceMinor: z.number().int().nonnegative().safe() }),
+  z.object({ operation: z.literal("openBankAccount"), id, bankId: id, ownerId: id, accountType: z.enum(["CUSTOMER", "INSURER"]), accountLabel: z.string().trim().min(1).max(80), maskedAccount: z.string().trim().min(4).max(40).refine((value) => value.includes("*"), "Masked account must hide digits with *"), accountTokenHash: hash, openingBalanceMinor: z.number().int().nonnegative().safe() }),
   z.object({ operation: z.literal("adjustBankAccountBalance"), transferId: id, accountId: id, direction: z.enum(["CREDIT", "DEBIT"]), amountMinor: money, externalReferenceHash: hash }),
   z.object({ operation: z.literal("requestBankMandate"), id, policyId: id, accountReferenceId: id, expiryDate: date }),
   z.object({ operation: z.literal("reviewBankMandate"), id, outcome: z.enum(["APPROVE", "REJECT"]), decisionHash: hash }),
@@ -118,8 +118,8 @@ export const workflowCommandSchema = z.discriminatedUnion("operation", [
     outcome: z.enum(["APPROVE", "REJECT"]),
     reasonHash: hash,
   }),
-  z.object({ operation: z.literal("authorizeSettlement"), settlementId: id, claimId: id }),
-  z.object({ operation: z.literal("confirmSettlement"), settlementId: id, bankReferenceHash: hash }),
+  z.object({ operation: z.literal("authorizeSettlement"), settlementId: id, claimId: id, sourceAccountId: id, destinationAccountId: id }),
+  z.object({ operation: z.literal("confirmSettlement"), settlementId: id, transferId: id, bankReferenceHash: hash }),
 ]);
 
 export type WorkflowCommand = z.infer<typeof workflowCommandSchema>;

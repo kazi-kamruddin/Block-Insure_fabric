@@ -18,7 +18,7 @@ bank mandates, governed benefits, distributed adjudication, appeals, and advisor
 fraud triage, governed evidence grants, durable event projection, and
 ledger-derived research metrics, independent Oracle workers, commit/reveal
 consensus, and governed auditor fallback. The clean local deployment runs
-`insurance-contract` 1.0.0 with schema 9. Its automated code gate and live Fabric
+`insurance-contract` 1.1.0 with schema 10. Its automated code gate and live Fabric
 workflow cover the Phase 1 partner and Hospital boundary.
 
 This is not a production deployment claim. Institutional authentication,
@@ -84,12 +84,12 @@ object-storage implementations.
 
 For a supervised local deployment from the repository root, use
 `scripts/demo-stack.ps1`. `Preflight` is read-only, `Start` reuses the preserved
-ledger, `Status` checks all four application services, and `Stop` retains Fabric
+ledger, `Status` checks the web app plus the event, banking, and Oracle workers, and `Stop` retains Fabric
 volumes. `CleanBootstrap -ConfirmReset` is deliberately destructive and is only
 for an explicitly approved clean showcase; it rebuilds the topology, deploys
-chaincode 1.0.0, seeds partner agreements, balance-bearing Bank accounts, Hospital invoices, and the
-policy/benefit/Oracle catalog, then starts the web app,
-event worker, and both Oracle workers.
+chaincode 1.1.0, seeds partner agreements, balance-bearing Bank accounts, Hospital invoices, and the
+policy/benefit/Oracle catalog, then starts the web app, event worker, automatic
+premium-collection worker, and both Oracle workers.
 
 See [the lifecycle design](docs/policy-premium-benefit-lifecycles.md) for policy,
 OTP, collection-worker, reconciliation, and benefit boundaries;

@@ -104,6 +104,7 @@ export const demoAccounts = {
     displayName: "Bangladesh Demo Commercial Bank",
     organization: "BankMSP",
     role: "bankOfficer",
+    subjectId: "bank-demo",
   },
 } as const satisfies Record<string, Omit<DemoAccount, "id"> & { id: string }>;
 

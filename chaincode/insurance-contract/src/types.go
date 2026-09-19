@@ -1,6 +1,6 @@
 package insurance
 
-const SchemaVersion = 9
+const SchemaVersion = 10
 
 type PartnerAgreement struct {
 	AssetType     string `json:"assetType"`
@@ -90,6 +90,8 @@ type BankAccountReference struct {
 	BankID           string `json:"bankId"`
 	OwnerID          string `json:"ownerId"`
 	AccountType      string `json:"accountType"`
+	AccountLabel     string `json:"accountLabel"`
+	MaskedAccount    string `json:"maskedAccount"`
 	AccountTokenHash string `json:"accountTokenHash"`
 	Currency         string `json:"currency"`
 	BalanceMinor     int64  `json:"balanceMinor"`
@@ -109,6 +111,7 @@ type BankTransfer struct {
 	MandateID             string `json:"mandateId"`
 	CollectionID          string `json:"collectionId"`
 	PaymentID             string `json:"paymentId"`
+	SettlementID          string `json:"settlementId"`
 	AmountMinor           int64  `json:"amountMinor"`
 	Currency              string `json:"currency"`
 	Method                string `json:"method"`
@@ -501,15 +504,21 @@ type FraudAssessment struct {
 }
 
 type Settlement struct {
-	AssetType         string `json:"assetType"`
-	SchemaVersion     int    `json:"schemaVersion"`
-	ID                string `json:"id"`
-	ClaimID           string `json:"claimId"`
-	AmountMinor       int64  `json:"amountMinor"`
-	Status            string `json:"status"`
-	BankReferenceHash string `json:"bankReferenceHash"`
-	AuthorizedAt      string `json:"authorizedAt"`
-	ConfirmedAt       string `json:"confirmedAt"`
+	AssetType            string `json:"assetType"`
+	SchemaVersion        int    `json:"schemaVersion"`
+	ID                   string `json:"id"`
+	ClaimID              string `json:"claimId"`
+	SourceAccountID      string `json:"sourceAccountId"`
+	DestinationAccountID string `json:"destinationAccountId"`
+	TransferID           string `json:"transferId"`
+	AmountMinor          int64  `json:"amountMinor"`
+	Currency             string `json:"currency"`
+	Status               string `json:"status"`
+	FailureCode          string `json:"failureCode"`
+	BankReferenceHash    string `json:"bankReferenceHash"`
+	AuthorizedAt         string `json:"authorizedAt"`
+	ConfirmedAt          string `json:"confirmedAt"`
+	UpdatedAt            string `json:"updatedAt"`
 }
 
 type HistoryRecord struct {

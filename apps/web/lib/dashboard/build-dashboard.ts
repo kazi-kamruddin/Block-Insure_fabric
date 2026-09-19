@@ -40,6 +40,7 @@ export type RoleDashboard = {
   queueTitle: string;
   queue: DashboardItem[];
   recentClaims: Claim[];
+  accountCards?: Array<{ id: string; label: string; maskedAccount: string; accountType: string; balanceMinor: number; currency: string; status: string }>;
 };
 
 export type DashboardAssets = {
@@ -143,6 +144,7 @@ export function buildRoleDashboard(
         })),
       ],
       recentClaims: newestClaims(ownedClaims),
+      accountCards: bankAccounts.filter((item) => item.ownerId === subjectId).map((item) => ({ id: item.id, label: item.accountLabel, maskedAccount: item.maskedAccount, accountType: item.accountType, balanceMinor: item.balanceMinor, currency: item.currency, status: item.status })),
     };
   }
 
@@ -222,12 +224,12 @@ export function buildRoleDashboard(
     const pendingMandates = mandates.filter((item) => item.status === "PENDING");
     const dueCollections = premiumCollections.filter((item) => ["DUE", "RETRY"].includes(item.status));
     const readyBenefits = benefitRequests.filter((item) => item.status === "PAYMENT_READY");
-    const readySettlements = assets.settlements.filter((item) => item.status === "AUTHORIZED");
+    const readySettlements = assets.settlements.filter((item) => ["AUTHORIZED", "PAYMENT_FAILED"].includes(item.status));
     const queue: DashboardItem[] = [
       ...pendingMandates.map((mandate) => ({ id: mandate.id, title: mandate.id, detail: `${money(mandate.amountMinor)} · policy ${mandate.policyId}`, status: mandate.status, commandLabel: "Review mandate", command: { operation: "reviewBankMandate", id: mandate.id, outcome: "APPROVE" } })),
       ...dueCollections.map((collection) => ({ id: collection.id, title: collection.id, detail: `${money(collection.amountMinor)} · due ${collection.dueDate}`, status: collection.status, commandLabel: "Process EFT", command: { operation: "processPremiumCollection", collectionId: collection.id, destinationAccountId: "bank-insurer-premium" } })),
       ...readyBenefits.map((benefit) => ({ id: benefit.id, title: benefit.id, detail: `${money(benefit.amountMinor)} · ${benefit.benefitType.toLowerCase()} benefit`, status: benefit.status, commandLabel: "Confirm payout", command: { operation: "confirmBenefitPayment", id: benefit.id } })),
-      ...readySettlements.map((settlement) => ({ id: settlement.id, title: settlement.id, detail: `${money(settlement.amountMinor)} · claim ${settlement.claimId}`, status: settlement.status, commandLabel: "Prepare confirmation", command: { operation: "confirmSettlement", settlementId: settlement.id } })),
+      ...readySettlements.map((settlement) => ({ id: settlement.id, title: settlement.id, detail: `${money(settlement.amountMinor)} · ${settlement.destinationAccountId}${settlement.failureCode ? ` · ${settlement.failureCode}` : ""}`, status: settlement.status, commandLabel: settlement.status === "PAYMENT_FAILED" ? "Retry payout" : "Execute payout", command: { operation: "confirmSettlement", settlementId: settlement.id, transferId: `payout-transfer-${Date.now()}-${settlement.id}` } })),
     ];
     return {
       title: "Banking operations desk",
@@ -239,9 +241,8 @@ export function buildRoleDashboard(
       ],
       queueTitle: "Mandates, collections, and payouts",
       queue,
-      recentClaims: newestClaims(assets.claims.filter((claim) =>
-        assets.settlements.some((settlement) => settlement.claimId === claim.id),
-      )),
+      recentClaims: [],
+      accountCards: bankAccounts.map((item) => ({ id: item.id, label: item.accountLabel, maskedAccount: item.maskedAccount, accountType: item.accountType, balanceMinor: item.balanceMinor, currency: item.currency, status: item.status })),
     };
   }
 
@@ -280,7 +281,7 @@ export function buildRoleDashboard(
         status: claim.status,
         commandLabel: approved ? "Prepare settlement" : oracleFailed ? "Prepare auditor fallback" : needsInvoiceCheck ? "Cross-check invoice" : "Prepare Oracle request",
         command: approved
-          ? { operation: "authorizeSettlement", settlementId: `settlement-${Date.now()}-${claim.id}`, claimId: claim.id }
+          ? { operation: "authorizeSettlement", settlementId: `settlement-${Date.now()}-${claim.id}`, claimId: claim.id, sourceAccountId: "bank-insurer-premium", destinationAccountId: "showcase-customer-account" }
           : oracleFailed
             ? { operation: "routeOracleFailureToReview", requestId: claim.currentOracleRequestId, reviewId: `review-oracle-${Date.now()}-${claim.id}` }
             : needsInvoiceCheck

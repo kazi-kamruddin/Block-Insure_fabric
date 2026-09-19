@@ -456,10 +456,10 @@ export const ledger = {
     return submit<Policy>("policyholder", "RenewPolicy", newId, existingId, newEndDate);
   },
 
-  openBankAccount(input: { id: string; bankId: string; ownerId: string; accountType: "CUSTOMER" | "INSURER"; accountTokenHash: string; openingBalanceMinor: number }) {
+  openBankAccount(input: { id: string; bankId: string; ownerId: string; accountType: "CUSTOMER" | "INSURER"; accountLabel: string; maskedAccount: string; accountTokenHash: string; openingBalanceMinor: number }) {
     return submit<BankAccountReference>(
       "bankOfficer", "OpenBankAccount", input.id, input.bankId, input.ownerId, input.accountType,
-      input.accountTokenHash, input.openingBalanceMinor,
+      input.accountLabel, input.maskedAccount, input.accountTokenHash, input.openingBalanceMinor,
     );
   },
 
@@ -507,6 +507,10 @@ export const ledger = {
 
   queuePremiumCollection(id: string, mandateId: string, dueDate: string) {
     return submit<PremiumCollection>("insurerAdmin", "QueuePremiumCollection", id, mandateId, dueDate);
+  },
+
+  schedulePremiumCollections(asOfDate: string) {
+    return submit<PremiumCollection[]>("insurerAdmin", "SchedulePremiumCollections", asOfDate);
   },
 
   processPremiumCollection(input: { collectionId: string; paymentId: string; transferId: string; destinationAccountId: string; periodEndDate: string; externalReferenceHash: string }) {
@@ -743,20 +747,23 @@ export const ledger = {
     );
   },
 
-  authorizeSettlement(settlementId: string, claimId: string) {
+  authorizeSettlement(settlementId: string, claimId: string, sourceAccountId: string, destinationAccountId: string) {
     return submit<Settlement>(
       "insurerAdmin",
       "AuthorizeSettlement",
       settlementId,
       claimId,
+      sourceAccountId,
+      destinationAccountId,
     );
   },
 
-  confirmSettlement(settlementId: string, bankReferenceHash: string) {
+  confirmSettlement(settlementId: string, transferId: string, bankReferenceHash: string) {
     return submit<Settlement>(
       "bankOfficer",
       "ConfirmSettlement",
       settlementId,
+      transferId,
       bankReferenceHash,
     );
   },

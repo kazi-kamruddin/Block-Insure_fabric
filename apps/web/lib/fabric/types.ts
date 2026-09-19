@@ -88,6 +88,8 @@ export type BankAccountReference = {
   bankId: string;
   ownerId: string;
   accountType: "CUSTOMER" | "INSURER";
+  accountLabel: string;
+  maskedAccount: string;
   accountTokenHash: string;
   currency: "BDT";
   balanceMinor: number;
@@ -107,9 +109,10 @@ export type BankTransfer = {
   mandateId: string;
   collectionId: string;
   paymentId: string;
+  settlementId: string;
   amountMinor: number;
   currency: "BDT";
-  method: "OTP" | "EFT" | "REVERSAL" | "ADJUSTMENT_CREDIT" | "ADJUSTMENT_DEBIT";
+  method: "OTP" | "EFT" | "CLAIM_PAYOUT" | "REVERSAL" | "ADJUSTMENT_CREDIT" | "ADJUSTMENT_DEBIT";
   status: "SETTLED" | "BOUNCED";
   failureCode: string;
   externalReferenceHash: string;
@@ -512,11 +515,17 @@ export type Settlement = {
   schemaVersion: number;
   id: string;
   claimId: string;
+  sourceAccountId: string;
+  destinationAccountId: string;
+  transferId: string;
   amountMinor: number;
-  status: "AUTHORIZED" | "CONFIRMED";
+  currency: "BDT";
+  status: "AUTHORIZED" | "PAYMENT_FAILED" | "CONFIRMED";
+  failureCode: string;
   bankReferenceHash: string;
   authorizedAt: LedgerTimestamp;
   confirmedAt: LedgerTimestamp;
+  updatedAt: LedgerTimestamp;
 };
 
 export type ClaimHistoryRecord = {

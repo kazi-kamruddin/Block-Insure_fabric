@@ -150,13 +150,13 @@ test("five organization sessions complete a Fabric insurance workflow", async ({
     expect(decision.ok(), await decision.text()).toBe(true);
     expect((await decision.json()).result).toMatchObject({ id: `${ids.decision}-3`, claimId: ids.claim, reviewId: ids.review, outcome: "APPROVE" });
     await command(insurer, {
-      operation: "authorizeSettlement", settlementId: ids.settlement, claimId: ids.claim,
+      operation: "authorizeSettlement", settlementId: ids.settlement, claimId: ids.claim, sourceAccountId: "bank-insurer-premium", destinationAccountId: "showcase-customer-account",
     });
 
     const bankBefore = await bank.get("/api/dashboard");
     expect((await bankBefore.json()).dashboard.queue.some((item: { id: string }) => item.id === ids.settlement)).toBe(true);
     await command(bank, {
-      operation: "confirmSettlement", settlementId: ids.settlement, bankReferenceHash: hashB,
+      operation: "confirmSettlement", settlementId: ids.settlement, transferId: `payout-${ids.settlement}`, bankReferenceHash: hashB,
     });
 
     const claimResponse = await policyholder.get(`/api/ledger/claim/${ids.claim}`);
@@ -323,8 +323,8 @@ test("policy, premium, mandate, benefit, and banking lifecycles complete across 
     await command(insurer, { operation: "createBenefitPlan", id: ids.benefitPlan, packageId: ids.package, deathBenefitMinor: 500_000, surrenderBenefitMinor: 100_000, maturityBenefitMinor: 250_000, rulesHash: digest("benefit-rules") });
     await command(insurer, { operation: "publishBenefitPlan", id: ids.benefitPlan });
     await command(insurer, { operation: "publishPolicyPackage", id: ids.package });
-    await command(bank, { operation: "openBankAccount", id: ids.account, bankId: "bank-demo", ownerId: "policyholder1", accountType: "CUSTOMER", accountTokenHash: digest("vault-token"), openingBalanceMinor: 40_000 });
-    await command(bank, { operation: "openBankAccount", id: ids.insurerAccount, bankId: "bank-demo", ownerId: "insurer", accountType: "INSURER", accountTokenHash: digest("insurer-vault-token"), openingBalanceMinor: 0 });
+    await command(bank, { operation: "openBankAccount", id: ids.account, bankId: "bank-demo", ownerId: "policyholder1", accountType: "CUSTOMER", accountLabel: "Lifecycle savings", maskedAccount: "**** **** 4821", accountTokenHash: digest("vault-token"), openingBalanceMinor: 40_000 });
+    await command(bank, { operation: "openBankAccount", id: ids.insurerAccount, bankId: "bank-demo", ownerId: "insurer", accountType: "INSURER", accountLabel: "Lifecycle insurer", maskedAccount: "**** **** 9001", accountTokenHash: digest("insurer-vault-token"), openingBalanceMinor: 500_000 });
     await command(policyholder, { operation: "acquirePolicy", id: ids.policy, packageId: ids.package, startDate: "2026-01-01", endDate: "2026-12-31" });
     await command(policyholder, { operation: "setBeneficiaries", policyId: ids.policy, allocationsJson: JSON.stringify([{ beneficiaryId: "beneficiary-primary", shareBps: 7000 }, { beneficiaryId: "beneficiary-secondary", shareBps: 3000 }]) });
     await command(policyholder, { operation: "requestBankMandate", id: ids.mandate, policyId: ids.policy, accountReferenceId: ids.account, expiryDate: "2026-12-31" });

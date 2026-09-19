@@ -9,6 +9,8 @@ type RouteContext = { params: Promise<{ assetType: string }> };
 
 export const runtime = "nodejs";
 
+const bankAssetTypes = new Set(["partner-agreement", "account", "bank-transfer", "mandate", "premium-payment", "premium-adjustment", "collection", "liability", "settlement"]);
+
 export async function GET(_request: Request, context: RouteContext) {
   const session = await currentSession().catch(() => null);
   if (!session) return NextResponse.json({ message: "Authentication required" }, { status: 401 });
@@ -17,6 +19,9 @@ export async function GET(_request: Request, context: RouteContext) {
   if (!assetType.success) return NextResponse.json({ message: "Invalid asset collection" }, { status: 400 });
   if (session.role === "hospitalOfficer" && !["partner-agreement", "hospital-invoice", "package"].includes(assetType.data)) {
     return NextResponse.json({ message: "The independent Hospital portal exposes only its agreement, invoices, and public package network" }, { status: 403 });
+  }
+  if (session.role === "bankOfficer" && !bankAssetTypes.has(assetType.data)) {
+    return NextResponse.json({ message: "The independent Bank portal exposes only contracted banking, payment, and settlement records" }, { status: 403 });
   }
 
   try {
@@ -33,6 +38,8 @@ export async function GET(_request: Request, context: RouteContext) {
         const agreements = await ledger.listPartnerAgreements();
         result = session.role === "hospitalOfficer"
           ? agreements.filter((item) => item.partnerType === "HOSPITAL" && item.partnerId === session.subjectId)
+          : session.role === "bankOfficer"
+            ? agreements.filter((item) => item.partnerType === "BANK" && item.partnerId === session.subjectId)
           : agreements;
         break;
       }

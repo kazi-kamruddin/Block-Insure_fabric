@@ -55,7 +55,7 @@ test("liveness, dependency readiness, public catalog, and not-found behavior are
   expect(ready.status(), JSON.stringify(readiness)).toBe(200);
   expect(readiness).toMatchObject({
     status: "ready",
-    dependencies: { chaincode: "connected", schemaVersion: 9, oracle1: "connected", oracle2: "connected" },
+    dependencies: { chaincode: "connected", schemaVersion: 10, oracle1: "connected", oracle2: "connected" },
   });
 
   const catalog = await request.get("/api/public/policies");

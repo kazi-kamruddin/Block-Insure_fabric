@@ -49,6 +49,11 @@ export function GuidedWorkflowForm({
   });
   const [formError, setFormError] = useState("");
   const definition = workflowFormDefinitions[operation];
+  const portalCopy = role === "bankOfficer"
+    ? { kicker: "Banking instruction", heading: "Process a banking operation", submit: "Submit bank instruction" }
+    : role === "hospitalOfficer"
+      ? { kicker: "Invoice desk", heading: "Update the patient billing register", submit: "Save invoice record" }
+      : { kicker: "Guided transaction", heading: "Complete your next ledger action", submit: "Submit verified transaction" };
 
   function selectOperation(nextOperation: WorkflowOperation) {
     setOperation(nextOperation);
@@ -68,8 +73,8 @@ export function GuidedWorkflowForm({
 
   return (
     <article className="workCard guidedCard" id="guided-workflow">
-      <span className="kicker">Guided transaction</span>
-      <h2>Complete your next ledger action</h2>
+      <span className="kicker">{portalCopy.kicker}</span>
+      <h2>{portalCopy.heading}</h2>
       <label>Action
         <select
           aria-label="Workflow action"
@@ -116,7 +121,7 @@ export function GuidedWorkflowForm({
         ))}
         {formError && <p className="formError" role="alert">{formError}</p>}
         <button className="primary button guidedSubmit" disabled={busy} type="submit">
-          {busy ? "Submitting…" : "Submit verified transaction"}
+          {busy ? "Submitting…" : portalCopy.submit}
         </button>
       </form>
     </article>

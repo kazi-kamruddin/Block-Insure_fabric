@@ -95,8 +95,8 @@ invoke PublishPolicyPackage "${package_id}"
 invoke IssuePolicy "${policy_id}" "${package_id}" policyholder1 2026-01-01 2026-12-31
 
 set_client_context bank BankMSP 12051 bankOfficer
-invoke OpenBankAccount "${account_id}" bank-demo policyholder1 CUSTOMER "${hash_a}" 100000
-invoke OpenBankAccount "${insurer_account_id}" bank-demo insurer INSURER "${hash_b}" 0
+invoke OpenBankAccount "${account_id}" bank-demo policyholder1 CUSTOMER "Smoke customer" "**** **** 4821" "${hash_a}" 100000
+invoke OpenBankAccount "${insurer_account_id}" bank-demo insurer INSURER "Smoke insurer" "**** **** 9001" "${hash_b}" 1000000
 
 set_client_context insurer InsurerMSP 7051 policyholder1
 invoke AcquirePolicy "${acquired_policy_id}" "${package_id}" 2026-01-01 2026-12-31
@@ -148,10 +148,10 @@ for index in 1 2 3; do
 done
 
 set_client_context insurer InsurerMSP 7051 insurerAdmin
-invoke AuthorizeSettlement "${settlement_id}" "${claim_id}"
+invoke AuthorizeSettlement "${settlement_id}" "${claim_id}" "${insurer_account_id}" "${account_id}"
 
 set_client_context bank BankMSP 12051 bankOfficer
-invoke ConfirmSettlement "${settlement_id}" "${hash_c}"
+invoke ConfirmSettlement "${settlement_id}" "payout-${settlement_id}" "${hash_c}"
 
 claim_json="$(peer chaincode query -C "${channel_name}" -n "${chaincode_name}" -c "$(payload ReadClaim "${claim_id}")")"
 settlement_json="$(peer chaincode query -C "${channel_name}" -n "${chaincode_name}" -c "$(payload ReadSettlement "${settlement_id}")")"

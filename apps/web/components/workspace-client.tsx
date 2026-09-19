@@ -63,7 +63,7 @@ const commandTemplates = {
     ["Request Oracle verification", { operation: "requestOracleVerification", requestId: "oracle-request-1", claimId: "claim-1", snapshotId: "registry-demo-v1", modelVersion: "model-v1", modelHash: "c".repeat(64), assignedOracleIdsJson: '["oracle1","oracle2"]', commitDeadline: "2026-09-09T12:00:00Z", revealDeadline: "2026-09-09T12:10:00Z" }],
     ["Route Oracle failure", { operation: "routeOracleFailureToReview", requestId: "oracle-request-1", reviewId: "review-1", assignedAuditorIdsJson: '["auditor1","auditor2","auditor3","auditor4"]', approvalThreshold: 3, rejectionThreshold: 2, deadline: "2026-09-12T12:00:00Z" }],
     ["Open review", { operation: "openClaimReview", claimId: "claim-1", reviewId: "review-1", assignedAuditorIdsJson: '["auditor1","auditor2","auditor3","auditor4"]', approvalThreshold: 3, rejectionThreshold: 2, deadline: "2026-09-09T12:00:00Z" }],
-    ["Authorize settlement", { operation: "authorizeSettlement", settlementId: "settlement-1", claimId: "claim-1" }],
+    ["Authorize settlement", { operation: "authorizeSettlement", settlementId: "settlement-1", claimId: "claim-1", sourceAccountId: "bank-insurer-premium", destinationAccountId: "showcase-customer-account" }],
   ],
   policyholder: [
     ["Submit claim", { operation: "submitClaim", id: "claim-1", policyId: "policy-1", hospitalId: "hospital-demo", hospitalInvoiceId: "invoice-1", amountMinor: 250000, incidentDate: "2026-06-15", descriptionHash: hash }],
@@ -76,7 +76,7 @@ const commandTemplates = {
     ["Approve claim", { operation: "recordAuditorDecision", reviewId: "review-1", decisionId: "decision-1", outcome: "APPROVE", reasonHash: hash }],
   ],
   bankOfficer: [
-    ["Confirm settlement", { operation: "confirmSettlement", settlementId: "settlement-1", bankReferenceHash: hash }],
+    ["Confirm settlement", { operation: "confirmSettlement", settlementId: "settlement-1", transferId: "payout-transfer-1", bankReferenceHash: hash }],
   ],
 } as const;
 
@@ -96,7 +96,7 @@ export function WorkspaceClient({
   const router = useRouter();
   const [account, setAccount] = useState(initialAccount);
   const [command, setCommand] = useState("");
-  const [assetType, setAssetType] = useState<AssetType>(initialAccount?.role === "hospitalOfficer" ? "hospital-invoice" : "claim");
+  const [assetType, setAssetType] = useState<AssetType>(initialAccount?.role === "hospitalOfficer" ? "hospital-invoice" : initialAccount?.role === "bankOfficer" ? "account" : "claim");
   const [assetId, setAssetId] = useState("");
   const [evidenceClaimId, setEvidenceClaimId] = useState("");
   const [evidenceId, setEvidenceId] = useState("");
@@ -439,9 +439,9 @@ export function WorkspaceClient({
     <section className={`shell workspace workspace-${account.role}`}>
       <header className="workspaceHeader">
         <div>
-          <span className="kicker">{account.organization}</span>
+          <span className="kicker">{account.role === "bankOfficer" ? "Independent banking portal" : account.role === "hospitalOfficer" ? "Independent hospital portal" : account.organization}</span>
           <h1 className="workspaceTitle">{account.displayName}</h1>
-          <p>Application role: <code>{account.role}</code></p>
+          <p>{account.role === "bankOfficer" ? "Treasury operations · BDT clearing · EFT mandates" : account.role === "hospitalOfficer" ? "Patient billing register · insurer read-only connection" : <>Application role: <code>{account.role}</code></>}</p>
         </div>
         <div className="workspaceHeaderActions">
           <a className="secondary button" href="/showcase">Presentation board</a>
@@ -449,7 +449,13 @@ export function WorkspaceClient({
         </div>
       </header>
 
-      <PresentationGuide role={account.role} />
+      {account.role !== "bankOfficer" && account.role !== "hospitalOfficer" && <PresentationGuide role={account.role} />}
+
+      {(account.role === "bankOfficer" || account.role === "hospitalOfficer") && <nav className="partnerPortalNav" aria-label="Partner portal sections">
+        <strong>{account.role === "bankOfficer" ? "BDCB Treasury Online" : "Hospital Billing Registry"}</strong>
+        <div><a href="#overview">Overview</a><a href="#operations">Operations</a><a href="#transaction-console">Records</a></div>
+        <span>Connected to Block-Insure via Fabric Gateway</span>
+      </nav>}
 
       <section className="roleDashboard" id="overview" aria-busy={dashboardLoading}>
         <div className="dashboardIntro">
@@ -471,6 +477,15 @@ export function WorkspaceClient({
                 </article>
               ))}
             </div>
+
+            {dashboard.accountCards && dashboard.accountCards.length > 0 && <div className="bankAccountGrid">
+              {dashboard.accountCards.map((bankAccount) => <article className="bankAccountCard" key={bankAccount.id}>
+                <span>{bankAccount.accountType === "INSURER" ? "Corporate settlement account" : bankAccount.label || "Customer account"}</span>
+                <strong>{bankAccount.maskedAccount || "**** **** ****"}</strong>
+                <b>{new Intl.NumberFormat("en-BD", { style: "currency", currency: "BDT" }).format(bankAccount.balanceMinor / 100)}</b>
+                <small>{bankAccount.id} · {bankAccount.status}</small>
+              </article>)}
+            </div>}
 
             <div className="dashboardGrid">
               <article className="queuePanel">
@@ -503,6 +518,10 @@ export function WorkspaceClient({
                 <span className="kicker">Organizational boundary</span>
                 <h3>Independent from Block-Insure</h3>
                 <p className="emptyState">This portal maintains Hospital invoices only. The contracted insurer can read verification fields but cannot edit these records.</p>
+              </article> : account.role === "bankOfficer" ? <article className="recentPanel bankBoundaryPanel">
+                <span className="kicker">Bank responsibility</span>
+                <h3>Payments, not insurance decisions</h3>
+                <p className="emptyState">This Bank can operate accounts, EFT mandates, premium transfers, and authorized claim payouts. It cannot inspect claim evidence or decide claim eligibility.</p>
               </article> : <article className="recentPanel">
                 <span className="kicker">Ledger activity</span>
                 <h3>Recently updated claims</h3>
@@ -626,6 +645,12 @@ export function WorkspaceClient({
                 <option value="hospital-invoice">Hospital invoice</option>
                 <option value="partner-agreement">Insurer agreement</option>
                 <option value="package">Connected policy packages</option>
+              </> : account.role === "bankOfficer" ? <>
+                <option value="account">Bank account</option><option value="mandate">EFT mandate</option>
+                <option value="collection">Premium collection</option><option value="premium-payment">Premium payment</option>
+                <option value="premium-adjustment">Premium reversal</option><option value="bank-transfer">Bank transfer</option>
+                <option value="settlement">Authorized claim payout</option><option value="liability">Payment liability</option>
+                <option value="partner-agreement">Insurer agreement</option>
               </> : <>
               {account.role === "insurerAdmin" && <option value="partner-agreement">Partner agreement</option>}
               {account.role === "insurerAdmin" && <option value="hospital-invoice">Hospital invoice</option>}
@@ -651,7 +676,7 @@ export function WorkspaceClient({
           </div>
         </article>
 
-        <article className="workCard advancedCard">
+        {account.role !== "bankOfficer" && account.role !== "hospitalOfficer" && <article className="workCard advancedCard">
           <span className="kicker">Advanced diagnostics</span>
           <h2>JSON command console</h2>
           <p className="cardNote">Use the guided form for normal work. This console remains available for development and contract diagnostics.</p>
@@ -665,7 +690,7 @@ export function WorkspaceClient({
             <textarea value={command} onChange={(event) => setCommand(event.target.value)} placeholder="Select a command template" spellCheck={false} />
             <button className="primary button" disabled={busy || !command} onClick={submitCommand}>Submit raw command</button>
           </details>
-        </article>
+        </article>}
 
         {account.role === "policyholder" && (
           <article className="workCard evidenceCard">

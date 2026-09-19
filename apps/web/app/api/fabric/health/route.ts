@@ -7,7 +7,7 @@ export const runtime = "nodejs";
 export async function GET() {
   try {
     const schemaVersion = await ledger.schemaVersion();
-    const expectedSchemaVersion = Number(process.env.FABRIC_EXPECTED_SCHEMA_VERSION ?? "9");
+    const expectedSchemaVersion = Number(process.env.FABRIC_EXPECTED_SCHEMA_VERSION ?? "10");
     if (schemaVersion !== expectedSchemaVersion) {
       return NextResponse.json({
         status: "incompatible",

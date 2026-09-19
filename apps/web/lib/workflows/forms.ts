@@ -149,7 +149,7 @@ export const workflowFormDefinitions: Record<WorkflowOperation, WorkflowFormDefi
   openBankAccount: {
     label: "Open simulated bank account",
     description: "Create a balance-bearing customer or insurer account at an actively contracted Bank.",
-    fields: [{ name: "id", label: "Account reference ID" }, { name: "bankId", label: "Contracted Bank ID" }, { name: "ownerId", label: "Account owner subject ID" }, { name: "accountType", label: "Account type", kind: "select", options: ["CUSTOMER", "INSURER"] }, { name: "openingBalanceBdt", label: "Opening balance (BDT)", kind: "money" }, { name: "accountTokenText", label: "Bank-vault token", help: "Hashed locally before Fabric submission." }],
+    fields: [{ name: "id", label: "Account reference ID" }, { name: "bankId", label: "Contracted Bank ID" }, { name: "ownerId", label: "Account owner subject ID" }, { name: "accountType", label: "Account type", kind: "select", options: ["CUSTOMER", "INSURER"] }, { name: "accountLabel", label: "Account label", placeholder: "Primary savings" }, { name: "maskedAccount", label: "Masked account number", placeholder: "**** **** 4821", help: "Use dummy digits and hide all but the display suffix." }, { name: "openingBalanceBdt", label: "Opening balance (BDT)", kind: "money" }, { name: "accountTokenText", label: "Bank-vault token", help: "Hashed locally before Fabric submission." }],
   },
   adjustBankAccountBalance: {
     label: "Adjust account balance",
@@ -391,13 +391,16 @@ export const workflowFormDefinitions: Record<WorkflowOperation, WorkflowFormDefi
     fields: [
       { name: "settlementId", label: "Settlement ID", placeholder: "settlement-1001" },
       { name: "claimId", label: "Claim ID", placeholder: "claim-1001" },
+      { name: "sourceAccountId", label: "Insurer source account", placeholder: "bank-insurer-premium" },
+      { name: "destinationAccountId", label: "Claimant destination account", placeholder: "showcase-customer-account" },
     ],
   },
   confirmSettlement: {
     label: "Confirm settlement",
-    description: "Confirm that the authorized payment completed outside Fabric.",
+    description: "Execute the authorized BDT payout atomically between the simulated Bank accounts.",
     fields: [
       { name: "settlementId", label: "Settlement ID", placeholder: "settlement-1001" },
+      { name: "transferId", label: "Transfer ID", placeholder: "payout-transfer-1001" },
       { name: "bankReferenceText", label: "Bank transfer reference", placeholder: "EFT or transaction reference", help: "Hashed locally; the external bank reference is not exposed on-chain." },
     ],
   },
@@ -438,7 +441,7 @@ export function createWorkflowFormValues(
     cancelPolicy: { id: "", reasonText: "" },
     cancelPolicyAsInsurer: { id: "", reasonText: "" },
     renewPolicy: { newId: generatedId("policy-renewal", idFactory), existingId: "", newEndDate: dateOffset(2) },
-    openBankAccount: { id: generatedId("account-ref", idFactory), bankId: "bank-demo", ownerId: "policyholder1", accountType: "CUSTOMER", openingBalanceBdt: "", accountTokenText: "" },
+    openBankAccount: { id: generatedId("account-ref", idFactory), bankId: "bank-demo", ownerId: "policyholder1", accountType: "CUSTOMER", accountLabel: "Primary savings", maskedAccount: "**** **** 4821", openingBalanceBdt: "", accountTokenText: "" },
     adjustBankAccountBalance: { transferId: generatedId("bank-adjustment", idFactory), accountId: "", direction: "CREDIT", amountBdt: "", externalReferenceText: "" },
     requestBankMandate: { id: generatedId("mandate", idFactory), policyId: "", accountReferenceId: "", expiryDate: dateOffset(1) },
     reviewBankMandate: { id: "", outcome: "APPROVE", decisionText: "" },
@@ -468,8 +471,8 @@ export function createWorkflowFormValues(
     openAppealReview: { appealId: "", reviewId: generatedId("review-appeal", idFactory), assignedAuditorIdsJson: '["auditor1","auditor2","auditor3","auditor4"]', approvalThreshold: "3", rejectionThreshold: "2", deadline: deadlineOffset(3) },
     finalizeExpiredReview: { reviewId: "" },
     recordAuditorDecision: { reviewId: "", decisionId: generatedId("decision", idFactory), outcome: "APPROVE", reasonText: "" },
-    authorizeSettlement: { settlementId: generatedId("settlement", idFactory), claimId: "" },
-    confirmSettlement: { settlementId: "", bankReferenceText: "" },
+    authorizeSettlement: { settlementId: generatedId("settlement", idFactory), claimId: "", sourceAccountId: "bank-insurer-premium", destinationAccountId: "showcase-customer-account" },
+    confirmSettlement: { settlementId: "", transferId: generatedId("payout-transfer", idFactory), bankReferenceText: "" },
   };
   return defaults[operation];
 }
@@ -610,7 +613,7 @@ export async function buildWorkflowCommand(
       command = { operation, newId: required(values, "newId", "New policy ID"), existingId: required(values, "existingId", "Existing policy ID"), newEndDate: required(values, "newEndDate", "New coverage end") };
       break;
     case "openBankAccount":
-      command = { operation, id: required(values, "id", "Account reference ID"), bankId: required(values, "bankId", "Contracted Bank ID"), ownerId: required(values, "ownerId", "Account owner subject ID"), accountType: required(values, "accountType", "Account type"), accountTokenHash: await digest("accountTokenText", "Bank-vault token"), openingBalanceMinor: nonNegativeBdtToMinor(values.openingBalanceBdt || "0") };
+      command = { operation, id: required(values, "id", "Account reference ID"), bankId: required(values, "bankId", "Contracted Bank ID"), ownerId: required(values, "ownerId", "Account owner subject ID"), accountType: required(values, "accountType", "Account type"), accountLabel: required(values, "accountLabel", "Account label"), maskedAccount: required(values, "maskedAccount", "Masked account number"), accountTokenHash: await digest("accountTokenText", "Bank-vault token"), openingBalanceMinor: nonNegativeBdtToMinor(values.openingBalanceBdt || "0") };
       break;
     case "adjustBankAccountBalance":
       command = { operation, transferId: required(values, "transferId", "Transfer ID"), accountId: required(values, "accountId", "Account reference ID"), direction: required(values, "direction", "Direction"), amountMinor: bdtToMinor(required(values, "amountBdt", "Amount")), externalReferenceHash: await digest("externalReferenceText", "External adjustment reference") };
@@ -749,12 +752,15 @@ export async function buildWorkflowCommand(
         operation,
         settlementId: required(values, "settlementId", "Settlement ID"),
         claimId: required(values, "claimId", "Claim ID"),
+        sourceAccountId: required(values, "sourceAccountId", "Insurer source account"),
+        destinationAccountId: required(values, "destinationAccountId", "Claimant destination account"),
       };
       break;
     case "confirmSettlement":
       command = {
         operation,
         settlementId: required(values, "settlementId", "Settlement ID"),
+        transferId: required(values, "transferId", "Transfer ID"),
         bankReferenceHash: await digest("bankReferenceText", "Bank transfer reference"),
       };
       break;

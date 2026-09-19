@@ -138,6 +138,7 @@ function Start-DemoStack {
     }
 
     $records += Start-ManagedProcess "event-worker" $webRoot @("scripts/sync-events.mjs")
+    $records += Start-ManagedProcess "banking-collection-worker" $webRoot @("scripts/process-premium-collections.mjs")
     $records += Start-ManagedProcess "oracle1" $oracleRoot @("src/index.mjs", "--env=.env.oracle1.example")
     if ($OracleScenario -ne "Oracle2Unavailable") {
         $records += Start-ManagedProcess "oracle2" $oracleRoot @("src/index.mjs", "--env=$oracle2Environment")

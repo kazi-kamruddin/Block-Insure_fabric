@@ -1,6 +1,8 @@
 package insurance
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"slices"
@@ -476,6 +478,67 @@ func (c *Contract) QueuePremiumCollection(ctx contractapi.TransactionContextInte
 		return nil, err
 	}
 	return collection, nil
+}
+
+func automaticCollectionID(mandateID, dueDate string) string {
+	digest := sha256.Sum256([]byte(mandateID + ":" + dueDate))
+	return "collection-auto-" + hex.EncodeToString(digest[:12])
+}
+
+// SchedulePremiumCollections deterministically materializes every active mandate
+// due on or before asOfDate. Existing mandate/date obligations are skipped, so a
+// restarted scheduler can safely submit this transaction again.
+func (c *Contract) SchedulePremiumCollections(ctx contractapi.TransactionContextInterface, asOfDate string) ([]PremiumCollection, error) {
+	if _, err := requireIdentity(ctx, "InsurerMSP", "insurerAdmin"); err != nil {
+		return nil, err
+	}
+	if _, err := validateDate("asOfDate", asOfDate); err != nil {
+		return nil, err
+	}
+	mandates, err := c.ListBankMandates(ctx)
+	if err != nil {
+		return nil, err
+	}
+	existingCollections, err := c.ListPremiumCollections(ctx)
+	if err != nil {
+		return nil, err
+	}
+	existing := make(map[string]bool, len(existingCollections))
+	for _, collection := range existingCollections {
+		existing[collection.MandateID+":"+collection.DueDate] = true
+	}
+	now, err := timestamp(ctx)
+	if err != nil {
+		return nil, err
+	}
+	created := make([]PremiumCollection, 0)
+	for _, mandate := range mandates {
+		if mandate.Status != "ACTIVE" || mandate.NextDebitDate == "" || mandate.NextDebitDate > asOfDate || mandate.NextDebitDate > mandate.ExpiryDate {
+			continue
+		}
+		key := mandate.ID + ":" + mandate.NextDebitDate
+		if existing[key] {
+			continue
+		}
+		collection := PremiumCollection{
+			AssetType: "premiumCollection", SchemaVersion: SchemaVersion,
+			ID: automaticCollectionID(mandate.ID, mandate.NextDebitDate), PolicyID: mandate.PolicyID,
+			MandateID: mandate.ID, DueDate: mandate.NextDebitDate, AmountMinor: mandate.AmountMinor,
+			Status: "DUE", CreatedAt: now, UpdatedAt: now,
+		}
+		if err := putState(ctx, "premiumCollection", collection.ID, &collection); err != nil {
+			return nil, err
+		}
+		existing[key] = true
+		created = append(created, collection)
+	}
+	if err := emit(ctx, "PremiumCollectionsScheduled", map[string]any{
+		"asOfDate": asOfDate,
+		"count":    len(created),
+	}); err != nil {
+		return nil, err
+	}
+	return created, nil
 }
 
 func (c *Contract) CompletePremiumCollection(ctx contractapi.TransactionContextInterface, collectionID, paymentID, periodEndDate, externalReferenceHash string) (*PremiumCollection, error) {
