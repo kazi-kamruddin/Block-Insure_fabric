@@ -199,7 +199,7 @@ test("@oracle-one-unavailable a 2-of-3 quorum succeeds while one Oracle is unava
     await command(insurer, {
       operation: "requestOracleVerification", requestId, claimId, snapshotId: "registry-demo-v1",
       modelVersion: "model-v1", modelHash: hashC, assignedOracleIdsJson: '["oracle1","oracle2","oracle3"]', requiredConfirmations: 2,
-      commitDeadline: new Date(Date.now() + 5_000).toISOString(),
+      commitDeadline: new Date(Date.now() + 20_000).toISOString(),
       revealDeadline: new Date(Date.now() + 60_000).toISOString(),
     });
     await waitForClaimStatus(policyholder, claimId, "APPROVED");

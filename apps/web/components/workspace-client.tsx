@@ -27,7 +27,7 @@ type ResearchSnapshotView = {
   evidenceGovernance: { grants: number; accesses: number; grantBackedAccesses: number };
 };
 type OracleOperationsView = {
-  workers: Array<{ oracleId: string; label: string; status: string; registrySource: string; registrySnapshotId: string; registryVersion: number; modelVersion: string; updatedAt: string; lastProcessedBlock: string | number | null; lastProcessedRequestId: string | null; lastError: string | null; counts: { requests: number; commitments: number; reveals: number; verified: number; failed: number }; lastProcessingLatencyMs: number | null }>;
+  workers: Array<{ oracleId: string; label: string; status: string; registrySource: string; registrySnapshotId: string; registryVersion: number; registryDatasetId?: string | null; registryDatasetVersion?: string | null; registryInputSha256?: string | null; registryTransformationVersion?: string | null; modelVersion: string; updatedAt: string; lastProcessedBlock: string | number | null; lastProcessedRequestId: string | null; lastError: string | null; counts: { requests: number; commitments: number; reveals: number; verified: number; failed: number }; lastProcessingLatencyMs: number | null }>;
   metrics: { requests: number; pending: number; agreements: number; conflicts: number; timeouts: number; finalized: number };
 };
 
@@ -627,7 +627,7 @@ export function WorkspaceClient({
               <div className="metricCard"><span>Conflicts / timeouts</span><strong>{oracleOperations.metrics.conflicts} / {oracleOperations.metrics.timeouts}</strong><small>auditor fallback outcomes</small></div>
             </div>
             <div className="queueList">{oracleOperations.workers.map((worker) => <div className="queueItem" key={worker.oracleId}>
-              <div><div className="queueTitle"><strong>{worker.label} · {worker.oracleId}</strong><span className={`status status-${worker.status.toLowerCase()}`}>{worker.status}</span></div><p>{worker.registrySource} · snapshot {worker.registrySnapshotId || "unavailable"} v{worker.registryVersion} · model {worker.modelVersion || "unavailable"}</p><small>Block {worker.lastProcessedBlock ?? "—"} · request {worker.lastProcessedRequestId ?? "—"} · {worker.lastProcessingLatencyMs ?? "—"} ms</small>{worker.lastError && <p className="evidenceWarning">{worker.lastError}</p>}</div>
+              <div><div className="queueTitle"><strong>{worker.label} · {worker.oracleId}</strong><span className={`status status-${worker.status.toLowerCase()}`}>{worker.status}</span></div><p>{worker.registrySource} · snapshot {worker.registrySnapshotId || "unavailable"} v{worker.registryVersion} · model {worker.modelVersion || "unavailable"}</p>{worker.registryDatasetId && <small>{worker.registryDatasetId}@{worker.registryDatasetVersion} · transform {worker.registryTransformationVersion} · input {worker.registryInputSha256?.slice(0, 12)}…</small>}<small>Block {worker.lastProcessedBlock ?? "—"} · request {worker.lastProcessedRequestId ?? "—"} · {worker.lastProcessingLatencyMs ?? "—"} ms</small>{worker.lastError && <p className="evidenceWarning">{worker.lastError}</p>}</div>
               <span>{worker.counts.commitments} commit / {worker.counts.reveals} reveal</span>
             </div>)}</div>
           </>}

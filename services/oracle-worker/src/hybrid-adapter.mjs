@@ -126,8 +126,8 @@ export async function buildHybridRegistryReplicas({
   const common = { snapshotId, version, datasetId, datasetVersion, inputSha256, generatedAt };
   const replicas = ["oracle1", "oracle2", "oracle3"].map((oracleId) => buildHybridRegistryReplica(records, { ...common, oracleId }));
   await fs.mkdir(outputDirectory, { recursive: true });
-  for (const replica of replicas) {
-    await fs.writeFile(path.join(outputDirectory, `${replica}-hybrid-v${version}.json`), `${JSON.stringify(replica, null, 2)}\n`);
+  for (const [index, replica] of replicas.entries()) {
+    await fs.writeFile(path.join(outputDirectory, `oracle${index + 1}-hybrid-v${version}.json`), `${JSON.stringify(replica, null, 2)}\n`);
   }
   let corruptReplica = null;
   if (includeCorruptReplica) {
@@ -142,6 +142,8 @@ export async function buildHybridRegistryReplicas({
     recordCount: records.length,
     snapshotId: replicas[0].snapshotId,
     version,
+    rulesVersion: replicas[0].rulesVersion,
+    rulesHash: replicas[0].rulesHash,
     baselineRootHash: replicas[0].rootHash,
     replicaRoots: Object.fromEntries(replicas.map((item) => [item.sourceId.split("-")[0], item.rootHash])),
     corruptRootHash: corruptReplica?.rootHash ?? null,

@@ -139,7 +139,7 @@ up() {
     bash "${network_root}/scripts/enroll-hospitals.sh"
     bash "${network_root}/scripts/enroll-oracles.sh"
     start_runtime
-    verify
+    verify true
     return
   fi
   compose up -d ca-insurer
@@ -194,6 +194,8 @@ status() {
 }
 
 verify() {
+  local allow_chaincode_upgrade="${1:-false}"
+  local chaincode_upgrade_pending=false
   local containers=(
     ca.insurer.blockinsure.test ca.hospital.blockinsure.test
     ca.auditor.blockinsure.test ca.bank.blockinsure.test
@@ -262,8 +264,12 @@ EOF
       definition="$(peer lifecycle chaincode querycommitted \
         --channelID "${channel_name}" --name "${chaincode_name}")"
       if ! grep -q "Version: ${expected_chaincode_version}," <<<"${definition}"; then
-        echo "Verification failed: ${org} peer does not report ${chaincode_name} ${expected_chaincode_version}." >&2
-        exit 1
+        if [[ "${allow_chaincode_upgrade}" == true ]]; then
+          chaincode_upgrade_pending=true
+        else
+          echo "Verification failed: ${org} peer does not report ${chaincode_name} ${expected_chaincode_version}." >&2
+          exit 1
+        fi
       fi
     done <<'EOF'
 insurer InsurerMSP 7051
@@ -273,14 +279,16 @@ bank BankMSP 12051
 oracle OracleMSP 13051
 EOF
 
-    set_peer_context insurer InsurerMSP 7051
-    schema="$(peer chaincode query -C "${channel_name}" -n "${chaincode_name}" \
-      -c '{"function":"GetSchemaVersion","Args":[]}')"
-    if [[ "${schema}" != "${expected_schema_version}" ]]; then
-      echo "Verification failed: expected chaincode schema ${expected_schema_version}, received ${schema}." >&2
-      exit 1
+    if [[ "${chaincode_upgrade_pending}" == false ]]; then
+      set_peer_context insurer InsurerMSP 7051
+      schema="$(peer chaincode query -C "${channel_name}" -n "${chaincode_name}" \
+        -c '{"function":"GetSchemaVersion","Args":[]}')"
+      if [[ "${schema}" != "${expected_schema_version}" ]]; then
+        echo "Verification failed: expected chaincode schema ${expected_schema_version}, received ${schema}." >&2
+        exit 1
+      fi
+      chaincode_verified=true
     fi
-    chaincode_verified=true
     for index in 1 2 3 4; do
       if ! compgen -G "${organizations}/peerOrganizations/auditor.blockinsure.test/users/auditor${index}@auditor.blockinsure.test/msp/signcerts/*" >/dev/null; then
         echo "Verification failed: auditor${index} enrollment is missing." >&2
@@ -301,8 +309,10 @@ EOF
     done
   fi
 
-  if [[ "${chaincode_verified}" == true ]]; then
-    echo "Verified: 17 services healthy, 6 CAs reachable, 5 CouchDBs ready, all 5 peers joined ${channel_name}, five Hospital and both Oracle identities enrolled, and ${chaincode_name} ${expected_chaincode_version} exposes schema ${expected_schema_version}."
+  if [[ "${chaincode_upgrade_pending}" == true ]]; then
+    echo "Verified: runtime services and identities are healthy; ${chaincode_name} requires upgrade to ${expected_chaincode_version} before full verification."
+  elif [[ "${chaincode_verified}" == true ]]; then
+    echo "Verified: 17 services healthy, 6 CAs reachable, 5 CouchDBs ready, all 5 peers joined ${channel_name}, five Hospital and three Oracle identities enrolled, and ${chaincode_name} ${expected_chaincode_version} exposes schema ${expected_schema_version}."
   else
     echo "Verified: 17 services healthy, 6 CAs reachable, 5 CouchDBs ready, and all 5 peers joined ${channel_name}; no committed ${chaincode_name} was found."
   fi

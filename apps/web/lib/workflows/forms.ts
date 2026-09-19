@@ -289,7 +289,7 @@ export const workflowFormDefinitions: Record<WorkflowOperation, WorkflowFormDefi
   },
   publishOracleRegistrySnapshot: {
     label: "Publish Oracle registry snapshot",
-    description: "Anchor the versioned registry root independently loaded by both Oracle services.",
+    description: "Anchor the versioned registry root independently loaded by the assigned Oracle services.",
     fields: [
       { name: "id", label: "Snapshot ID", placeholder: "registry-demo-v1" },
       { name: "version", label: "Snapshot version", placeholder: "1" },

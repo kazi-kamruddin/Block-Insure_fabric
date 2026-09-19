@@ -46,7 +46,7 @@ export function loadOracleConfig(environment = process.env) {
     pollIntervalMs: boundedInteger(environment, "ORACLE_POLL_INTERVAL_MS", 1_000, 100, 60_000),
     registryRequestTimeoutMs: boundedInteger(environment, "ORACLE_REGISTRY_REQUEST_TIMEOUT_MS", 5_000, 100, 60_000),
     retry: {
-      attempts: boundedInteger(environment, "ORACLE_MAX_RETRY_ATTEMPTS", 4, 1, 10),
+      attempts: boundedInteger(environment, "ORACLE_MAX_RETRY_ATTEMPTS", 6, 1, 10),
       baseDelayMs: boundedInteger(environment, "ORACLE_RETRY_BASE_MS", 500, 0, 60_000),
       maximumDelayMs: boundedInteger(environment, "ORACLE_RETRY_MAX_MS", 5_000, 0, 300_000),
     },

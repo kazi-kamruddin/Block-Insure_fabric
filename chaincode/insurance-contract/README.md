@@ -19,8 +19,9 @@ This Go chaincode owns the shared, permissioned insurance ledger for
    agreement-scoped read-only access and cross-checks the claim against a
    finalized invoice from the policy's snapshotted Hospital network.
 4. The insurer records optional advisory fraud triage and requests verification
-   from exactly two assigned `OracleMSP` certificate subjects. Each independently
-   commits then reveals a registry/model/version-bound result. Exact positive
+   from a strict-majority set of assigned `OracleMSP` certificate subjects. The
+   default 2-of-3 profile independently commits then reveals a
+   registry/model/version-bound result. Matching positive
    consensus approves the claim; negative, conflict, or timeout routes through an
    explicit transaction into a review round with immutable auditor assignments,
    thresholds, and a deadline. Four distinct
@@ -63,8 +64,8 @@ provenance on every use. Bank identities cannot retrieve clinical evidence.
 Claims link verifications, review rounds, decisions, appeals, fraud assessments,
 access records, and settlements for audit navigation.
 
-The current evidence-Merkle and private-banking definition is `insurance-contract` 1.2.2
-with schema version 12 and an automatically resolved lifecycle sequence. A clean bootstrap
+The current provenance-bound threshold definition is `insurance-contract` 1.3.0
+with schema version 13 and an automatically resolved lifecycle sequence. A clean bootstrap
 starts at sequence 1; a non-destructive source upgrade increments the existing
 channel sequence.
 

@@ -1,90 +1,126 @@
-# Permissioned Oracle consensus
+# Provenance-bound threshold Oracle consensus
 
-Block-Insure uses one thesis-scale `OracleMSP` with two separately enrolled,
-certificate-bound service identities: `oracle1` and `oracle2`. Each worker owns
-its Fabric signing identity, registry loader, cursor, retry loop, and health
-record. One certificate subject cannot fill both positions. This demonstrates
-operational independence without claiming that the two services are separate
-legal organizations; a production design could split them into two MSPs.
+Block-Insure uses one thesis-scale `OracleMSP` with three separately enrolled,
+certificate-bound service identities: `oracle1`, `oracle2`, and `oracle3`. Each
+worker owns its Fabric signing identity, registry replica, cursor, retry loop,
+and health record. One certificate subject cannot submit more than one response
+to a request.
 
-## Version-bound protocol
+This is operational and identity separation inside one permissioned
+organization. It must not be described as three independent real-world data
+providers. A production deployment can place each worker in a separate MSP and
+connect it to an independently governed hospital, policy, or regulator source.
 
-After the insurer cross-checks an invoice-bound claim against the contracted
-Hospital's finalized invoice, an insurer administrator publishes an
-`OracleRegistrySnapshot` commitment and creates an `OracleRequest`.
-The request freezes the claim ID and version, insurer invoice cross-check, query hash,
-registry root/version, rules hash/version, model hash/version, exactly two Oracle
-certificate subjects, and commit/reveal deadlines.
+## Version-bound 2-of-3 protocol
 
-Each assigned worker loads the exact snapshot named by the request. Tracked
-synthetic fixtures remain available for controlled baseline/conflict experiments;
-normal Hospital workflows generate immutable `registry-hospital-vN` snapshots
-from finalized invoice-register records and publish their canonical roots on
-Fabric. Workers fetch those hash-only snapshots by ID, resolve the Hospital
-record, and compute a deterministic result containing the complete
-verdict, verification code, canonical record hash, and every snapshotted version.
-It first submits a salted commitment. Reveal begins after both commitments arrive
-or the commit deadline passes. Chaincode recomputes both the result hash and the
-commitment before accepting a reveal. It accepts only the documented result-code
-set and requires `verified=true` exactly for `VERIFIED`; malformed combinations
-cannot become internally inconsistent ledger evidence. A worker whose configured
-model differs from the request produces the governed `MODEL_VERSION_MISMATCH`
-negative result instead of blocking its event cursor.
+After the insurer cross-checks a claim against the contracted Hospital's
+finalized invoice, an insurer administrator publishes an
+`OracleRegistrySnapshot` commitment and creates an `OracleRequest`. The request
+binds all adjudication inputs:
 
-Two identical canonical result hashes are required:
+- claim ID and version, Hospital verification, query hash, and appeal commitment;
+- registry ID, version, canonical root, rules version, and rules hash;
+- model version and model hash;
+- three assigned certificate subjects and the required confirmation count;
+- commit and reveal deadlines.
 
-- matching valid results set the claim to `APPROVED`;
-- matching invalid results finalize `NEGATIVE_RESULT`;
-- different complete results finalize `CONFLICT`;
-- an insurer administrator can finalize an incomplete request as `TIMEOUT` after
-  the reveal deadline.
+The chaincode accepts a configurable 1–9-worker profile only when the threshold
+is a strict majority and does not exceed the assigned worker count. The deployed
+research profile assigns three workers and requires two matching canonical
+result hashes. This means one unavailable or divergent worker cannot prevent a
+valid decision, while one worker cannot decide a request alone.
 
-The last three outcomes set the claim to `ORACLE_FAILED`. An insurer can then use
-`RouteOracleFailureToReview` to open the existing certificate-bound four-auditor
-round. An Oracle never creates a settlement, and an insurer cannot submit Oracle
-commitments or reveals. Settlement still requires insurer authorization followed
-by BankMSP confirmation.
+Each worker first submits a salted commitment. Reveal begins when every assigned
+worker has committed or when the commit deadline passes. Chaincode recomputes
+the result and commitment hashes before accepting a reveal. A result reaches
+consensus as soon as two identical hashes are revealed:
+
+- a matching valid result sets the claim to `APPROVED`;
+- a matching invalid result finalizes `NEGATIVE_RESULT`;
+- three different complete results finalize `CONFLICT`;
+- fewer than two matching results at the reveal deadline finalize `TIMEOUT`.
+
+Failure outcomes set the claim to `ORACLE_FAILED` and may be routed to the
+existing certificate-bound four-auditor review. Oracles cannot create
+settlements. Settlement still requires insurer authorization and `BankMSP`
+confirmation.
 
 Appeal submission increments the claim version and clears the active Oracle
-request reference. Any old commitment or result is therefore stale. A new appeal
-request has a different query/result domain even if all visible claim fields are
-otherwise identical.
+request. Old commitments and results therefore cannot authorize a corrected
+claim. A new request has a different query/result domain even when visible claim
+fields happen to match an earlier version.
 
-## Demonstration registry data
+## Dataset provenance and isolated replicas
 
-`services/oracle-worker/registry/` contains deterministic local research fixtures:
+The tracked files under `services/oracle-worker/registry/` are small deterministic
+fixtures. The three baseline files have different source IDs and the same
+canonical root. Fault profiles alter one registry or one configured model so
+that divergent results are observable and repeatable.
 
-- the Oracle 1 and Oracle 2 baseline files have different source IDs but the same
-  canonical root;
-- lookup `11…11` produces a matching valid result;
-- lookup `22…22` produces a matching negative result;
-- the Oracle 2 conflict fixture changes one record and therefore has a different
-  registry root.
+For the larger experiment, run this from `services/oracle-worker`:
 
-The supervised launcher selects these without source editing through
-`-OracleScenario Baseline`, `Conflict`, or `Oracle2Unavailable`.
+```powershell
+npm run build:hybrid-registries
+```
 
-The dynamic snapshots are also synthetic demonstration data: their source is the
-project's Fabric Hospital invoice register, not a live hospital, government, or
-national-health integration. They contain reference/treatment hashes, Hospital
-IDs, exact demo amounts, and service-date bounds—not patient names or clinical
-documents. The root, rules, and model commitments make that provenance explicit.
+The adapter reads the existing Kaggle-derived hybrid JSONL and writes three
+isolated registry replicas plus a controlled corrupt replica under ignored
+`data/oracle/generated-hybrid/`. Its manifest records the input SHA-256, dataset
+identifier/version, transformation version, record count, generation time, and
+all canonical roots. The input digest is included in the rules commitment, so a
+different source file produces a different on-ledger registry commitment.
 
-## Operations and verification
+The three generated replicas deliberately share one source dataset. They
+demonstrate reproducible provenance, process isolation, identity separation, and
+fault tolerance—not independent factual corroboration. Independent real sources
+can later implement the same snapshot interface without changing the consensus
+contract.
 
-Workers persist identity-bound cursors and secret-free health JSON under ignored
-`data/oracle/`. The insurer/auditor health screen shows identities, sources,
-snapshot/model versions, progress, counts, errors, and last latency. Claim dossier
-schema 4 includes requests, commitments, revealed results, and registry provenance.
-Unrevealed result material is never returned because commitments contain only a
-salted hash. Counters and progress survive worker restarts, while the web health
-reader verifies each live endpoint and labels a retained checkpoint offline when
-its worker is no longer reachable.
+To run a worker against a generated replica, set `ORACLE_REGISTRY_PATH` before
+starting its normal identity profile. For example, from `services/oracle-worker`:
 
-The Go suite covers authorization, certificate-subject separation, duplicate and
-late submissions, reveal matching, exact positive/negative consensus, conflict,
-timeout, stale versions, appeal isolation, and auditor fallback. Worker tests
-cover cross-language hashing, independent snapshots/configuration, phase ordering,
-cursor restart behavior, bounded retry, and health persistence. The live browser
-suite exercises both automatic approval-to-bank-settlement and negative-result
-fallback through a 3-of-4 auditor approval.
+```powershell
+$env:ORACLE_REGISTRY_PATH="../../data/oracle/generated-hybrid/oracle1-hybrid-v1.json"
+node src/index.mjs --env=.env.oracle1.example
+```
+
+Use the corresponding `oracle2` and `oracle3` file in the other worker
+processes. Publish the manifest's `baselineRootHash`, record count, rules version,
+and rules hash as the Fabric registry snapshot before requesting verification.
+
+## Fault profiles
+
+The supervised stack supports these profiles:
+
+| Profile | Running inputs | Expected result |
+| --- | --- | --- |
+| `Baseline` | Three matching registries/models | 2-of-3 consensus |
+| `Oracle2Unavailable` | Oracle 1 and Oracle 3 | Consensus after the commit deadline |
+| `Conflict` | valid registry, corrupt registry, mismatched model | `CONFLICT` and auditor fallback |
+| `QuorumUnavailable` | Oracle 1 only | `TIMEOUT` and auditor fallback |
+
+The browser suite uses the equivalent `baseline`, `one-unavailable`, `conflict`,
+and `timeout` profiles.
+
+## Executable safety evaluation
+
+Run:
+
+```powershell
+npm run evaluate:consensus
+```
+
+The evaluator enumerates all 64 response states for three workers where each is
+unavailable or returns result `A`, `B`, or `C`. It checks that at most one result
+can reach a strict-majority quorum and reports representative healthy,
+unavailable, divergent, conflict, and timeout scenarios. Chaincode tests then
+exercise the same properties against ledger state transitions, including stale
+appeals, duplicate subjects, malformed thresholds, and delayed reveals.
+
+## Observable provenance
+
+Worker health exposes the certificate subject, source ID, registry root,
+dataset/version, input digest, transformation version, model version, processing
+counts, cursor progress, errors, and last latency. No private key, salt, patient
+identity, or clinical document is exposed. Persisted checkpoints are marked
+offline when their live endpoint cannot be reached.

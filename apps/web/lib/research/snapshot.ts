@@ -53,6 +53,14 @@ export function buildResearchSnapshot(
   const paidBenefits = input.benefitRequests.filter((item) => item.status === "PAID");
   const finalizedOracleRequests = input.oracleRequests.filter((item) => item.finalizedAt);
   const oracleLatencies = finalizedOracleRequests.map((item) => Date.parse(item.finalizedAt) - Date.parse(item.requestedAt)).filter((value) => Number.isFinite(value) && value >= 0);
+  const oracleResultsByRequest = new Map<string, OracleResult[]>();
+  for (const result of input.oracleResults) oracleResultsByRequest.set(result.requestId, [...(oracleResultsByRequest.get(result.requestId) ?? []), result]);
+  const requestResultCounts = (request: OracleRequest) => Object.values(countBy(oracleResultsByRequest.get(request.id) ?? [], (item) => item.resultHash));
+  const observedFaultTolerantFinalizations = finalizedOracleRequests.filter((request) => {
+    const results = oracleResultsByRequest.get(request.id) ?? [];
+    return request.status === "CONSENSUS" && (request.revealCount < request.expectedResponses || new Set(results.map((item) => item.resultHash)).size > 1);
+  }).length;
+  const oracleSafetyViolations = finalizedOracleRequests.filter((request) => requestResultCounts(request).filter((count) => count >= request.requiredConfirmations).length > 1).length;
 
   const body = {
     schemaVersion: 1,
@@ -82,6 +90,9 @@ export function buildResearchSnapshot(
       revealedResults: input.oracleResults.length,
       agreementBps: finalizedOracleRequests.length ? Math.round(finalizedOracleRequests.filter((item) => ["EXACT_CONSENSUS", "NEGATIVE_RESULT"].includes(item.finalizationCode)).length * 10_000 / finalizedOracleRequests.length) : null,
       meanFinalizationLatencyMs: oracleLatencies.length ? sum(oracleLatencies) / oracleLatencies.length : null,
+      meanRevealParticipationBps: finalizedOracleRequests.length ? Math.round(sum(finalizedOracleRequests.map((item) => item.revealCount * 10_000 / item.expectedResponses)) / finalizedOracleRequests.length) : null,
+      observedFaultTolerantFinalizations,
+      safetyViolations: oracleSafetyViolations,
     },
     fraudDecisionSupport: {
       assessments: input.fraudAssessments.length,

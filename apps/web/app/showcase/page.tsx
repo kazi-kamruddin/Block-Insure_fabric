@@ -10,7 +10,7 @@ const organizations = [
 
 const stories = [
   { index: "A", title: "Premium integrity", flow: "Policyholder → Bank → Insurer", detail: "Manual email OTP or scheduled EFT creates one linked transfer and payment. Funds settle customer-to-insurer or bounce without changing coverage dates." },
-  { index: "B", title: "Claim integrity", flow: "Hospital → Policyholder → Insurer → Oracles", detail: "A claim binds to a finalized contracted-Hospital invoice, passes a read-only cross-check, then receives a version-bound two-Oracle result." },
+  { index: "B", title: "Claim integrity", flow: "Hospital → Policyholder → Insurer → Oracles", detail: "A claim binds to a finalized contracted-Hospital invoice, passes a read-only cross-check, then receives a version-bound 2-of-3 Oracle result." },
   { index: "C", title: "Governed fallback", flow: "Oracles → Auditors → Insurer → Bank", detail: "Negative, conflicting, or timed-out Oracle work enters fixed quorum review. Approval creates a liability; Bank confirmation closes it." },
 ] as const;
 

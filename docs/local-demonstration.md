@@ -16,8 +16,8 @@ bash network/scripts/network.sh verify
 ```
 
 The verifier should report 17 healthy services, six reachable CAs, five ready
-CouchDB instances, all five peers joined to `insurance-channel`, both Oracle
-identities enrolled, chaincode `insurance-contract` 1.2.2, and schema version 12.
+CouchDB instances, all five peers joined to `insurance-channel`, all three Oracle
+identities enrolled, chaincode `insurance-contract` 1.3.0, and schema version 13.
 
 ## 2. Start the supervised application stack
 
@@ -144,10 +144,10 @@ inside the browser and convert BDT values to exact integer poisha.
    Hospital's invoice using agreement-scoped read access. The amount, incident
    date, Hospital, invoice status, and clinical reference must match. Then record
    the transparent advisory fraud assessment,
-   then request two-Oracle verification with the newest `registry-hospital-vN`
+   then request 2-of-3 Oracle verification with the newest `registry-hospital-vN`
    snapshot prepared by the dashboard, `model-v1`,
-   assigned subjects `oracle1`/`oracle2`, and future commit/reveal deadlines.
-5. **Oracle 1 and Oracle 2 services** — independently consume the committed request,
+   assigned subjects `oracle1`/`oracle2`/`oracle3`, threshold `2`, and future commit/reveal deadlines.
+5. **Three Oracle services** — independently consume the committed request,
    query their own registry snapshots, submit salted commitments, and reveal only
    after the commit phase. Show identities, sources, progress, and latency in the
    Oracle operations panel.

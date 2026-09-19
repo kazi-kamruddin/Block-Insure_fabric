@@ -8,6 +8,7 @@ import { emptyCursor, loadCursor, persistCursor } from "../src/cursor.mjs";
 import { buildCommitmentDigest, buildDeterministicSalt, buildResultDigest, oracleRequestPhase } from "../src/protocol.mjs";
 import { createHealthState, loadPersistedHealth, persistHealth } from "../src/health.mjs";
 import { buildHybridRegistryReplicas, hybridDescriptionHash, hybridRecordToRegistryRecord } from "../src/hybrid-adapter.mjs";
+import { enumerateThreeOracleStateSpace, evaluateThreshold } from "../src/threshold-model.mjs";
 import { appealCommitmentHash, assessRegistryRecord, loadRegistrySnapshot, validateAppealBinding, validateRegistrySnapshot } from "../src/registry.mjs";
 import { withBoundedRetry } from "../src/retry.mjs";
 
@@ -94,6 +95,8 @@ test("Kaggle-derived JSONL creates three provenance-bound replicas and a control
     await fs.writeFile(inputPath, `${JSON.stringify(record)}\n`);
     const manifest = await buildHybridRegistryReplicas({ inputPath, outputDirectory, snapshotId: "registry-hybrid-test" });
     assert.equal(manifest.recordCount, 1);
+    assert.equal(manifest.rulesVersion, "block-insure-hybrid-oracle-v1");
+    assert.match(manifest.rulesHash, /^[a-f0-9]{64}$/);
     assert.equal(new Set(Object.values(manifest.replicaRoots)).size, 1);
     assert.notEqual(manifest.baselineRootHash, manifest.corruptRootHash);
     const [first, second, third] = await Promise.all(["oracle1", "oracle2", "oracle3"].map((id) => loadRegistrySnapshot(path.join(outputDirectory, `${id}-hybrid-v1.json`))));
@@ -243,6 +246,22 @@ test("worker commit/reveal sequencing waits for quorum or the commit deadline", 
   assert.equal(oracleRequestPhase(phases, Date.parse("2026-09-06T12:01:01Z")), "REVEAL");
   assert.equal(oracleRequestPhase(phases, Date.parse("2026-09-06T12:02:01Z")), "TIMED_OUT");
   assert.equal(oracleRequestPhase({ ...phases, status: "CONSENSUS" }, Date.parse("2026-09-06T12:00:00Z")), "FINALIZED");
+});
+
+test("exhaustive 2-of-3 state enumeration preserves safety and tolerates one fault", () => {
+  const states = enumerateThreeOracleStateSpace();
+  assert.equal(states.length, 64);
+  for (const state of states) {
+    if (state.outcome.status === "CONSENSUS") {
+      assert.ok(state.outcome.matchingResponses >= 2);
+      assert.ok(["A", "B", "C"].includes(state.outcome.resultHash));
+    }
+  }
+  assert.equal(evaluateThreshold({ responses: ["A", "A", null], requiredConfirmations: 2, expectedResponses: 3, deadlineExpired: true }).status, "CONSENSUS");
+  assert.equal(evaluateThreshold({ responses: ["A", "A", "B"], requiredConfirmations: 2, expectedResponses: 3 }).status, "CONSENSUS");
+  assert.equal(evaluateThreshold({ responses: ["A", "B", "C"], requiredConfirmations: 2, expectedResponses: 3 }).status, "CONFLICT");
+  assert.equal(evaluateThreshold({ responses: ["A", null, null], requiredConfirmations: 2, expectedResponses: 3, deadlineExpired: true }).status, "TIMEOUT");
+  assert.throws(() => evaluateThreshold({ responses: ["A", "A", "B"], requiredConfirmations: 1, expectedResponses: 3 }), /strict majority/);
 });
 
 test("health reporting persists identity, provenance, progress, and non-secret counters", async () => {

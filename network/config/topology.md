@@ -32,7 +32,7 @@ validate both the caller MSP and that attribute.
 | Hospital officer | `HospitalMSP` | `hospitalOfficer` |
 | Auditor subjects `auditor1`–`auditor4` | `AuditorMSP` | `auditor` |
 | Bank officer | `BankMSP` | `bankOfficer` |
-| Oracle services `oracle1` and `oracle2` | `OracleMSP` | `oracle` plus unique `subjectId` |
+| Oracle services `oracle1`–`oracle3` | `OracleMSP` | `oracle` plus unique `subjectId` |
 
 ## Data boundary
 
