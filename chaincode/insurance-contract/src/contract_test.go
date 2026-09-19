@@ -16,10 +16,12 @@ import (
 
 type memoryStub struct {
 	shim.ChaincodeStubInterface
-	state      map[string][]byte
-	eventName  string
-	eventValue []byte
-	timestamp  *timestamppb.Timestamp
+	state        map[string][]byte
+	privateState map[string]map[string][]byte
+	transient    map[string][]byte
+	eventName    string
+	eventValue   []byte
+	timestamp    *timestamppb.Timestamp
 }
 
 type memoryStateIterator struct {
@@ -37,9 +39,35 @@ func (i *memoryStateIterator) Next() (*queryresult.KV, error) {
 
 func newMemoryStub() *memoryStub {
 	return &memoryStub{
-		state:     make(map[string][]byte),
-		timestamp: timestamppb.New(time.Date(2026, time.September, 5, 12, 0, 0, 0, time.UTC)),
+		state:        make(map[string][]byte),
+		privateState: make(map[string]map[string][]byte),
+		transient:    make(map[string][]byte),
+		timestamp:    timestamppb.New(time.Date(2026, time.September, 5, 12, 0, 0, 0, time.UTC)),
 	}
+}
+
+func (s *memoryStub) GetPrivateData(collection, key string) ([]byte, error) {
+	value := s.privateState[collection][key]
+	if value == nil {
+		return nil, nil
+	}
+	return append([]byte(nil), value...), nil
+}
+
+func (s *memoryStub) PutPrivateData(collection, key string, value []byte) error {
+	if s.privateState[collection] == nil {
+		s.privateState[collection] = make(map[string][]byte)
+	}
+	s.privateState[collection][key] = append([]byte(nil), value...)
+	return nil
+}
+
+func (s *memoryStub) GetTransient() (map[string][]byte, error) {
+	result := make(map[string][]byte, len(s.transient))
+	for key, value := range s.transient {
+		result[key] = append([]byte(nil), value...)
+	}
+	return result, nil
 }
 
 func (s *memoryStub) GetState(key string) ([]byte, error) {
@@ -146,6 +174,11 @@ func requireError(t *testing.T, err error, contains string) {
 	}
 }
 
+func openTestBankAccount(ctx *testContext, contract *Contract, id, bankID, ownerID, accountType, accountLabel, maskedAccount, accountTokenHash string, openingBalanceMinor int64) (*BankAccountReference, error) {
+	ctx.stub.transient[bankAccountTransientKey] = []byte(fmt.Sprintf(`{"accountTokenHash":"%s","openingBalanceMinor":%d}`, accountTokenHash, openingBalanceMinor))
+	return contract.OpenPrivateBankAccount(ctx, id, bankID, ownerID, accountType, accountLabel, maskedAccount)
+}
+
 func TestAppealCommitmentProtocolVector(t *testing.T) {
 	appeal := &ClaimAppeal{
 		ClaimID: "claim-vector", ClaimVersion: 2, ReasonCategory: "DOCUMENT_ERROR",
@@ -158,6 +191,76 @@ func TestAppealCommitmentProtocolVector(t *testing.T) {
 	const expected = "6ce90e23704ce9c29a2a814804546af406c143cc497c632d2220fe025c1e97e8"
 	if actual := appealCommitmentHash(appeal); actual != expected {
 		t.Fatalf("appeal commitment protocol drifted: expected %s, got %s", expected, actual)
+	}
+}
+
+func TestEvidenceMerkleBatchAndInclusionProof(t *testing.T) {
+	contract := &Contract{}
+	ctx := &testContext{stub: newMemoryStub()}
+	evidenceA := &EvidenceReference{AssetType: "evidenceReference", SchemaVersion: SchemaVersion, ID: "evidence-merkle-a", ClaimID: "claim-merkle", ClaimVersion: 1, DocumentType: "INVOICE", ContentHash: strings.Repeat("a", 64), StorageReferenceHash: strings.Repeat("b", 64), SubmittedBy: "policyholder1", CreatedAt: "2026-09-05T12:00:00Z"}
+	evidenceB := &EvidenceReference{AssetType: "evidenceReference", SchemaVersion: SchemaVersion, ID: "evidence-merkle-b", ClaimID: "claim-merkle", ClaimVersion: 1, DocumentType: "DISCHARGE_SUMMARY", ContentHash: strings.Repeat("c", 64), StorageReferenceHash: strings.Repeat("d", 64), SubmittedBy: "policyholder1", CreatedAt: "2026-09-05T12:00:00Z"}
+	requireNoError(t, putState(ctx, "evidenceReference", evidenceA.ID, evidenceA))
+	requireNoError(t, putState(ctx, "evidenceReference", evidenceB.ID, evidenceB))
+	root, err := evidenceMerkleRoot([]string{evidenceLeafHash(evidenceA), evidenceLeafHash(evidenceB)})
+	requireNoError(t, err)
+
+	setIdentity(ctx, "insurer-admin", "InsurerMSP", "insurerAdmin", nil)
+	batch, err := contract.PublishEvidenceMerkleBatch(ctx, "evidence-batch-1", `["evidence-merkle-b","evidence-merkle-a"]`, root)
+	requireNoError(t, err)
+	if batch.RootHash != root || batch.EvidenceIDs[0] != evidenceA.ID || batch.LeafCount != 2 {
+		t.Fatalf("unexpected evidence Merkle batch: %+v", batch)
+	}
+	proofJSON := fmt.Sprintf(`[{"hash":"%s","position":"RIGHT"}]`, evidenceLeafHash(evidenceB))
+	verification, err := contract.VerifyEvidenceInclusion(ctx, batch.ID, evidenceA.ID, proofJSON)
+	requireNoError(t, err)
+	if !verification.Included || verification.ComputedRoot != root {
+		t.Fatalf("valid inclusion proof was rejected: %+v", verification)
+	}
+	tampered, err := contract.VerifyEvidenceInclusion(ctx, batch.ID, evidenceA.ID, `[{"hash":"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff","position":"RIGHT"}]`)
+	requireNoError(t, err)
+	if tampered.Included {
+		t.Fatalf("tampered inclusion proof was accepted: %+v", tampered)
+	}
+}
+
+func TestBankAccountPrivateDataBoundary(t *testing.T) {
+	contract := &Contract{}
+	ctx := &testContext{stub: newMemoryStub()}
+	tokenHash := strings.Repeat("a", 64)
+	setIdentity(ctx, "insurer-admin", "InsurerMSP", "insurerAdmin", nil)
+	_, err := contract.CreatePartnerAgreement(ctx, "agreement-bank-private", "BANK", "bank-demo", "Demo Bank", "Dhaka", "Private", "Private balance operations", "2026-01-01", "2028-12-31")
+	requireNoError(t, err)
+
+	setIdentity(ctx, "bank-officer", "BankMSP", "bankOfficer", nil)
+	ctx.stub.transient[bankAccountTransientKey] = []byte(fmt.Sprintf(`{"accountTokenHash":"%s","openingBalanceMinor":250000}`, tokenHash))
+	account, err := contract.OpenPrivateBankAccount(ctx, "private-account-1", "bank-demo", "policyholder1", "CUSTOMER", "Private savings", "**** **** 4821")
+	requireNoError(t, err)
+	if account.BalanceMinor != 250000 || account.AccountTokenHash != tokenHash {
+		t.Fatalf("private account response was not merged: %+v", account)
+	}
+	publicKey, err := stateKey(ctx, "bankAccountReference", account.ID)
+	requireNoError(t, err)
+	publicPayload, err := ctx.stub.GetState(publicKey)
+	requireNoError(t, err)
+	if strings.Contains(string(publicPayload), tokenHash) || strings.Contains(string(publicPayload), "balanceMinor") {
+		t.Fatalf("public account state leaked private fields: %s", publicPayload)
+	}
+	privateKey, err := privateBankAccountKey(ctx, account.ID)
+	requireNoError(t, err)
+	privatePayload, err := ctx.stub.GetPrivateData(bankInsurerPrivateCollection, privateKey)
+	requireNoError(t, err)
+	if !strings.Contains(string(privatePayload), tokenHash) || !strings.Contains(string(privatePayload), "250000") {
+		t.Fatalf("private account state was not stored in the collection: %s", privatePayload)
+	}
+
+	setIdentity(ctx, "hospital", "HospitalMSP", "hospitalOfficer", nil)
+	_, err = contract.ReadBankAccountReference(ctx, account.ID)
+	requireError(t, err, "shared only with BankMSP and InsurerMSP")
+	setIdentity(ctx, "policyholder", "InsurerMSP", "policyholder", map[string]string{"subjectId": "policyholder1"})
+	owned, err := contract.ReadBankAccountReference(ctx, account.ID)
+	requireNoError(t, err)
+	if owned.BalanceMinor != 250000 {
+		t.Fatalf("owning policyholder could not read merged private state: %+v", owned)
 	}
 }
 
@@ -231,9 +334,9 @@ func TestPolicyToSettlementWorkflow(t *testing.T) {
 
 	setIdentity(ctx, "insurer-admin", "InsurerMSP", "insurerAdmin", nil)
 	setIdentity(ctx, "bank-officer", "BankMSP", "bankOfficer", nil)
-	_, err = contract.OpenBankAccount(ctx, "settlement-customer", "bank-demo", "policyholder1", "CUSTOMER", "Primary savings", "**** **** 4821", hashA, 0)
+	_, err = openTestBankAccount(ctx, contract, "settlement-customer", "bank-demo", "policyholder1", "CUSTOMER", "Primary savings", "**** **** 4821", hashA, 0)
 	requireNoError(t, err)
-	_, err = contract.OpenBankAccount(ctx, "settlement-insurer", "bank-demo", "insurer", "INSURER", "Claims settlement", "**** **** 9001", hashB, 1_000_000)
+	_, err = openTestBankAccount(ctx, contract, "settlement-insurer", "bank-demo", "insurer", "INSURER", "Claims settlement", "**** **** 9001", hashB, 1_000_000)
 	requireNoError(t, err)
 	setIdentity(ctx, "insurer-admin", "InsurerMSP", "insurerAdmin", nil)
 	settlement, err := contract.AuthorizeSettlement(ctx, "settlement-001", "claim-001", "settlement-insurer", "settlement-customer")
@@ -667,9 +770,9 @@ func TestPolicyPremiumMandateAndCollectionLifecycle(t *testing.T) {
 	requireNoError(t, err)
 
 	setIdentity(ctx, "bank-officer", "BankMSP", "bankOfficer", nil)
-	_, err = contract.OpenBankAccount(ctx, "account-token-1", "bank-demo", "policyholder1", "CUSTOMER", "Primary savings", "**** **** 4821", hashA, 30_000)
+	_, err = openTestBankAccount(ctx, contract, "account-token-1", "bank-demo", "policyholder1", "CUSTOMER", "Primary savings", "**** **** 4821", hashA, 30_000)
 	requireNoError(t, err)
-	_, err = contract.OpenBankAccount(ctx, "account-insurer-1", "bank-demo", "insurer", "INSURER", "Premium account", "**** **** 9001", hashB, 0)
+	_, err = openTestBankAccount(ctx, contract, "account-insurer-1", "bank-demo", "insurer", "INSURER", "Premium account", "**** **** 9001", hashB, 0)
 	requireNoError(t, err)
 
 	setIdentity(ctx, "policyholder", "InsurerMSP", "policyholder", map[string]string{"subjectId": "policyholder1"})
@@ -844,9 +947,9 @@ func setupOracleRequest(t *testing.T, suffix string) (*Contract, *testContext, *
 	_, err = contract.IssuePolicy(ctx, "policy-oracle-"+suffix, "package-oracle-"+suffix, "policyholder1", "2026-01-01", "2026-12-31")
 	requireNoError(t, err)
 	setIdentity(ctx, "bank-officer", "BankMSP", "bankOfficer", nil)
-	_, err = contract.OpenBankAccount(ctx, "account-customer-oracle-"+suffix, "bank-demo", "policyholder1", "CUSTOMER", "Oracle customer", "**** **** 4821", hashA, 0)
+	_, err = openTestBankAccount(ctx, contract, "account-customer-oracle-"+suffix, "bank-demo", "policyholder1", "CUSTOMER", "Oracle customer", "**** **** 4821", hashA, 0)
 	requireNoError(t, err)
-	_, err = contract.OpenBankAccount(ctx, "account-insurer-oracle-"+suffix, "bank-demo", "insurer", "INSURER", "Oracle settlement", "**** **** 9001", hashB, 100_000)
+	_, err = openTestBankAccount(ctx, contract, "account-insurer-oracle-"+suffix, "bank-demo", "insurer", "INSURER", "Oracle settlement", "**** **** 9001", hashB, 100_000)
 	requireNoError(t, err)
 
 	setIdentity(ctx, "policyholder-cert", "InsurerMSP", "policyholder", map[string]string{"subjectId": "policyholder1"})

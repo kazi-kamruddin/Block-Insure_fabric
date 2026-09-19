@@ -418,6 +418,33 @@ export type EvidenceReference = {
   createdAt: LedgerTimestamp;
 };
 
+export type EvidenceMerkleBatch = {
+  assetType: "evidenceMerkleBatch";
+  schemaVersion: number;
+  id: string;
+  rootHash: string;
+  hashAlgorithm: "SHA-256";
+  leafEncoding: "block-insure-evidence-leaf-v1";
+  evidenceIds: string[];
+  leafCount: number;
+  publishedBy: string;
+  createdAt: LedgerTimestamp;
+};
+
+export type MerkleProofStep = { hash: string; position: "LEFT" | "RIGHT" };
+
+export type EvidenceInclusionVerification = {
+  batchId: string;
+  evidenceId: string;
+  leafHash: string;
+  computedRoot: string;
+  anchoredRoot: string;
+  proofSteps: number;
+  included: boolean;
+  hashAlgorithm: string;
+  leafEncoding: string;
+};
+
 export type HospitalVerification = {
   assetType: "hospitalVerification";
   schemaVersion: number;

@@ -56,7 +56,7 @@ bash network/scripts/network.sh reset
 - `status` lists containers and each peer's joined channels.
 - `verify` checks all 17 containers, six CAs, five CouchDB instances, the
   orderer channel, and each peer ledger. When chaincode is committed, it also
-  checks version `0.8.0` on all five peers, evaluates schema version `7`, and
+  checks version `1.2.0` on all five peers, evaluates schema version `12`, and
   confirms both Oracle service enrollments.
 - `down` stops and removes containers while retaining identities, channel
   artifacts, and Docker ledger volumes.
@@ -84,12 +84,15 @@ bash network/scripts/deploy-chaincode.sh
 bash network/scripts/smoke-workflow.sh
 ```
 
-The deployment script installs and approves the package for all five business
-organizations before committing the definition. Four separately enrolled auditor
+The deployment script installs the package and obtains all five organizations'
+approval of the definition, including its collection configuration, before
+commit. Membership in `bankInsurerPrivateData` itself remains limited to
+BankMSP and InsurerMSP. Four separately enrolled auditor
 identities exercise a 3-of-4 approval quorum. The smoke script asserts a final
 `SETTLED` claim, an advisory fraud assessment that cannot decide the claim,
-an active premium-funded policy, a completed collection, and a paid benefit
-liability. Bump `CHAINCODE_VERSION` whenever source changes. The script uses
+an active premium-funded policy, a completed collection, a paid benefit
+liability, Bank/Insurer PDC isolation and balance movement, and a chaincode-
+verified evidence Merkle proof. Bump `CHAINCODE_VERSION` whenever source changes. The script uses
 sequence 1 on a clean channel, detects an already-committed version, and chooses
 the next sequence for a new version; `CHAINCODE_SEQUENCE` remains an explicit
 override for controlled recovery.

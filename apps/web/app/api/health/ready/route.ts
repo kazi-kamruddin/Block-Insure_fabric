@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function GET() {
-  const expectedSchemaVersion = Number(process.env.FABRIC_EXPECTED_SCHEMA_VERSION ?? "10");
+  const expectedSchemaVersion = Number(process.env.FABRIC_EXPECTED_SCHEMA_VERSION ?? "12");
   const payload = await buildReadinessPayload({
     expectedSchemaVersion,
     fabricProbe: async () => ({ ok: true, schemaVersion: await ledger.schemaVersion() }),

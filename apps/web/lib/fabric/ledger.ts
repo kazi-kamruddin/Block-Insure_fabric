@@ -16,6 +16,8 @@ import type {
   ClaimReview,
   ClaimHistoryRecord,
   EvidenceReference,
+  EvidenceMerkleBatch,
+  EvidenceInclusionVerification,
   EvidenceAccessRecord,
   EvidenceAccessGrant,
   HospitalVerification,
@@ -62,6 +64,17 @@ async function submit<T>(
       await contract.submitTransaction(transactionName, ...stringifyArguments(args)),
     ),
   );
+}
+
+async function submitWithTransient<T>(
+  role: FabricRole,
+  transactionName: string,
+  args: Array<string | number>,
+  transientData: Record<string, string | Uint8Array>,
+) {
+  return withFabricContract(role, async (contract) => decodeJson<T>(
+    await contract.submit(transactionName, { arguments: stringifyArguments(args), transientData }),
+  ));
 }
 
 async function submitAsAuditor<T>(
@@ -266,6 +279,18 @@ export const ledger = {
     return evaluate<EvidenceReference[]>("insurerAdmin", "ListEvidenceReferences");
   },
 
+  readEvidenceMerkleBatch(id: string) {
+    return evaluate<EvidenceMerkleBatch>("insurerAdmin", "ReadEvidenceMerkleBatch", id);
+  },
+
+  listEvidenceMerkleBatches() {
+    return evaluate<EvidenceMerkleBatch[]>("insurerAdmin", "ListEvidenceMerkleBatches");
+  },
+
+  verifyEvidenceInclusion(batchId: string, evidenceId: string, proofJson: string) {
+    return evaluate<EvidenceInclusionVerification>("insurerAdmin", "VerifyEvidenceInclusion", batchId, evidenceId, proofJson);
+  },
+
   listEvidenceAccessRecords() {
     return evaluate<EvidenceAccessRecord[]>("insurerAdmin", "ListEvidenceAccessRecords");
   },
@@ -457,10 +482,15 @@ export const ledger = {
   },
 
   openBankAccount(input: { id: string; bankId: string; ownerId: string; accountType: "CUSTOMER" | "INSURER"; accountLabel: string; maskedAccount: string; accountTokenHash: string; openingBalanceMinor: number }) {
-    return submit<BankAccountReference>(
-      "bankOfficer", "OpenBankAccount", input.id, input.bankId, input.ownerId, input.accountType,
-      input.accountLabel, input.maskedAccount, input.accountTokenHash, input.openingBalanceMinor,
+    return submitWithTransient<BankAccountReference>(
+      "bankOfficer", "OpenPrivateBankAccount",
+      [input.id, input.bankId, input.ownerId, input.accountType, input.accountLabel, input.maskedAccount],
+      { bankAccountPrivate: JSON.stringify({ accountTokenHash: input.accountTokenHash, openingBalanceMinor: input.openingBalanceMinor }) },
     );
+  },
+
+  publishEvidenceMerkleBatch(id: string, evidenceIdsJson: string, rootHash: string) {
+    return submit<EvidenceMerkleBatch>("insurerAdmin", "PublishEvidenceMerkleBatch", id, evidenceIdsJson, rootHash);
   },
 
   adjustBankAccountBalance(input: { transferId: string; accountId: string; direction: "CREDIT" | "DEBIT"; amountMinor: number; externalReferenceHash: string }) {

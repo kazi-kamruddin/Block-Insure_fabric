@@ -9,7 +9,9 @@ This Go chaincode owns the shared, permissioned insurance ledger for
    policy package with active Hospital and Bank partners, then issues a policy
    whose terms and provider network are snapshotted.
 2. The policy owner, an `InsurerMSP` identity with `role=policyholder`, submits
-   an invoice-bound claim and immutable evidence references. Only SHA-256 hashes and safe
+   an invoice-bound claim and immutable evidence references. The insurer may
+   anchor sorted evidence batches with SHA-256 Merkle roots and portable
+   inclusion proofs. Only hashes and safe
    metadata are placed on the shared ledger; medical documents remain
    off-chain.
 3. A `HospitalMSP` identity with `role=hospitalOfficer` independently creates
@@ -34,8 +36,9 @@ and request configured death/surrender/maturity benefits. Bank-confirmed premium
 activate or reinstate coverage; insurer lifecycle processing applies grace,
 lapse, expiry, cancellation, and renewal rules. Scheduled collections, receipt
 replay markers, append-only reversals, explicit funding gates, and claim/benefit
-liabilities preserve the external-fiat audit trail without putting account
-numbers or real BDT on-chain.
+liabilities preserve the external-fiat audit trail. Masked account metadata is
+public; token hashes and simulated balances are stored only in the targeted
+BankMSP–InsurerMSP private-data collection.
 
 Fraud assessments are explainable, versioned, and strictly advisory: there is no
 transaction path from a fraud score to a claim decision. Review votes are unique
@@ -60,13 +63,14 @@ provenance on every use. Bank identities cannot retrieve clinical evidence.
 Claims link verifications, review rounds, decisions, appeals, fraud assessments,
 access records, and settlements for audit navigation.
 
-The current partner-, Bank-payment-, and Oracle-capable definition is `insurance-contract` 1.1.0
-with schema version 10 and an automatically resolved lifecycle sequence. A clean bootstrap
+The current evidence-Merkle and private-banking definition is `insurance-contract` 1.2.0
+with schema version 12 and an automatically resolved lifecycle sequence. A clean bootstrap
 starts at sequence 1; a non-destructive source upgrade increments the existing
 channel sequence.
 
-Schema 10 adds display-safe masked BDT account metadata, atomic insurer-to-customer
-claim payout transfers, and deterministic automatic premium-collection scheduling.
+Schema 11 adds evidence Merkle batches and chaincode inclusion verification.
+Schema 12 moves account-token hashes and balances into `bankInsurerPrivateData`,
+uses transient opening input, and disables sensitive public-argument registration.
 
 ## Test
 

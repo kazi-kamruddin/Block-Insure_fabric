@@ -122,7 +122,7 @@ test("two Oracle workers automatically approve an exact valid result and the ban
     await waitForClaimStatus(policyholder, claimId, "SETTLED");
 
     const dossier = await (await insurer.get(`/api/audit/claims/${claimId}`)).json();
-    expect(dossier).toMatchObject({ schemaVersion: 5, claim: { status: "SETTLED", oracleOutcome: "EXACT_CONSENSUS" }, settlement: { status: "CONFIRMED" } });
+    expect(dossier).toMatchObject({ schemaVersion: 6, claim: { status: "SETTLED", oracleOutcome: "EXACT_CONSENSUS" }, settlement: { status: "CONFIRMED" } });
     expect(dossier.oracleRequests).toEqual(expect.arrayContaining([expect.objectContaining({ id: requestId, registrySnapshotId: "registry-demo-v1", modelVersion: "model-v1" })]));
     expect(dossier.oracleCommitments).toHaveLength(2);
     expect(dossier.oracleResults).toHaveLength(2);

@@ -16,9 +16,10 @@ five-business-organization network with a Go contract, Next.js Gateway boundary,
 workflows/evidence, release verification, policy acquisition, premium collection,
 bank mandates, governed benefits, distributed adjudication, appeals, and advisory
 fraud triage, governed evidence grants, durable event projection, and
-ledger-derived research metrics, independent Oracle workers, commit/reveal
+ledger-derived research metrics, evidence Merkle inclusion proofs, a targeted
+Bank–Insurer private-data collection, independent Oracle workers, commit/reveal
 consensus, and governed auditor fallback. The clean local deployment runs
-`insurance-contract` 1.1.0 with schema 10. Its automated code gate and live Fabric
+`insurance-contract` 1.2.0 with schema 12. Its automated code gate and live Fabric
 workflow cover the Phase 1 partner and Hospital boundary.
 
 This is not a production deployment claim. Institutional authentication,
@@ -87,7 +88,7 @@ For a supervised local deployment from the repository root, use
 ledger, `Status` checks the web app plus the event, banking, and Oracle workers, and `Stop` retains Fabric
 volumes. `CleanBootstrap -ConfirmReset` is deliberately destructive and is only
 for an explicitly approved clean showcase; it rebuilds the topology, deploys
-chaincode 1.1.0, seeds partner agreements, balance-bearing Bank accounts, Hospital invoices, and the
+chaincode 1.2.0, seeds partner agreements, private balance-bearing Bank accounts, Hospital invoices, and the
 policy/benefit/Oracle catalog, then starts the web app, event worker, automatic
 premium-collection worker, and both Oracle workers.
 
@@ -106,6 +107,9 @@ for Fabric event checkpointing, notification projection, evidence grants, and
 reproducible thesis metrics. The [Oracle consensus design](docs/oracle-consensus.md)
 documents certificate assignment, exact-result commit/reveal, version binding,
 worker independence, and manual-review fallback.
+The [Merkle and private-banking design](docs/evidence-merkle-and-private-banking.md)
+specifies canonical evidence proofs, transient input, collection membership, and
+the public/private account split.
 
 ## Complete verification
 

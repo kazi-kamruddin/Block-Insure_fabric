@@ -5,7 +5,7 @@ import { findDemoAccount } from "@/lib/auth/accounts";
 import { ledger } from "@/lib/fabric/ledger";
 
 const routeSchema = z.object({
-  assetType: z.enum(["partner-agreement", "hospital-invoice", "package", "policy", "claim", "evidence", "evidence-grant", "verification", "decision", "review", "appeal", "fraud-assessment", "settlement", "claim-history", "account", "bank-transfer", "mandate", "premium-payment", "premium-adjustment", "collection", "benefit-plan", "beneficiaries", "benefit-request", "liability", "oracle-snapshot", "oracle-request", "oracle-commitment", "oracle-result", "oracle-history"]),
+  assetType: z.enum(["partner-agreement", "hospital-invoice", "package", "policy", "claim", "evidence", "evidence-batch", "evidence-grant", "verification", "decision", "review", "appeal", "fraud-assessment", "settlement", "claim-history", "account", "bank-transfer", "mandate", "premium-payment", "premium-adjustment", "collection", "benefit-plan", "beneficiaries", "benefit-request", "liability", "oracle-snapshot", "oracle-request", "oracle-commitment", "oracle-result", "oracle-history"]),
   id: z.string().trim().min(1).max(100).regex(/^[a-zA-Z0-9._:-]+$/),
 });
 
@@ -119,6 +119,21 @@ export async function GET(_request: Request, context: RouteContext) {
             return NextResponse.json({ message: "Asset is not owned by this account" }, { status: 403 });
           }
         }
+        break;
+      }
+      case "evidence-batch": {
+        const batch = await ledger.readEvidenceMerkleBatch(id);
+        if (session.role !== "policyholder") {
+          result = batch;
+          break;
+        }
+        const references = await Promise.all(batch.evidenceIds.map((evidenceId) => ledger.readEvidenceReference(evidenceId)));
+        const visibleEvidenceIds = new Set<string>();
+        for (const evidence of references) {
+          if ((await ledger.readClaim(evidence.claimId)).claimantId === session.subjectId) visibleEvidenceIds.add(evidence.id);
+        }
+        if (visibleEvidenceIds.size === 0) return NextResponse.json({ message: "Asset is not owned by this account" }, { status: 403 });
+        result = { ...batch, evidenceIds: batch.evidenceIds.filter((evidenceId) => visibleEvidenceIds.has(evidenceId)) };
         break;
       }
       case "evidence-grant": {

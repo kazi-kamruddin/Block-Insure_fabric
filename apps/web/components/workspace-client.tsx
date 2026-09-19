@@ -15,7 +15,7 @@ import type { WorkflowCommand } from "@/lib/workflows/commands";
 import { bdtToMinor } from "@/lib/workflows/forms";
 import { decryptEvidenceBytes, encryptEvidenceBytes, sha256Hex } from "@/lib/evidence/browser-crypto";
 
-type AssetType = "partner-agreement" | "hospital-invoice" | "package" | "policy" | "claim" | "evidence" | "evidence-grant" | "verification" | "decision" | "review" | "appeal" | "fraud-assessment" | "settlement" | "access" | "claim-history" | "account" | "bank-transfer" | "mandate" | "premium-payment" | "premium-adjustment" | "collection" | "benefit-plan" | "beneficiaries" | "benefit-request" | "liability" | "oracle-snapshot" | "oracle-request" | "oracle-commitment" | "oracle-result" | "oracle-history";
+type AssetType = "partner-agreement" | "hospital-invoice" | "package" | "policy" | "claim" | "evidence" | "evidence-batch" | "evidence-grant" | "verification" | "decision" | "review" | "appeal" | "fraud-assessment" | "settlement" | "access" | "claim-history" | "account" | "bank-transfer" | "mandate" | "premium-payment" | "premium-adjustment" | "collection" | "benefit-plan" | "beneficiaries" | "benefit-request" | "liability" | "oracle-snapshot" | "oracle-request" | "oracle-commitment" | "oracle-result" | "oracle-history";
 type NotificationItem = { id: string; title: string; message: string; assetId: string; blockNumber: string };
 type BankCommunicationItem = { id: string; title: string; assetId: string; amountMinor: number; currency: string; status: string; adapter: string; recipient: string; deliveredAt: string; error: string };
 type ResearchSnapshotView = {
@@ -114,6 +114,8 @@ export function WorkspaceClient({
   const [retrieving, setRetrieving] = useState(false);
   const [decryptedEvidence, setDecryptedEvidence] = useState<{ url: string; name: string } | null>(null);
   const [auditClaimId, setAuditClaimId] = useState("");
+  const [proofEvidenceId, setProofEvidenceId] = useState("");
+  const [proofBatchId, setProofBatchId] = useState("");
   const [manualPayment, setManualPayment] = useState({ policyId: "", sourceAccountId: "", destinationAccountId: "bank-insurer-premium", transferId: "", paymentId: "", periodStartDate: "", periodEndDate: "", amountBdt: "", externalReference: "", challengeId: "", otp: "", demoCode: "" });
   const [statementPolicyId, setStatementPolicyId] = useState("");
   const [output, setOutput] = useState("Ready.");
@@ -182,6 +184,18 @@ export function WorkspaceClient({
       setOracleOperations(await responseJson(await fetch("/api/operations/oracles", { cache: "no-store" })));
     } catch (error) {
       setOutput(error instanceof Error ? error.message : "Oracle operations health failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function verifyEvidenceProof() {
+    setBusy(true);
+    try {
+      const result = await responseJson(await fetch(`/api/evidence/${encodeURIComponent(proofEvidenceId.trim())}/proof?batchId=${encodeURIComponent(proofBatchId.trim())}`, { cache: "no-store" }));
+      setOutput(JSON.stringify(result, null, 2));
+    } catch (error) {
+      setOutput(error instanceof Error ? error.message : "Evidence proof verification failed");
     } finally {
       setBusy(false);
     }
@@ -683,7 +697,7 @@ export function WorkspaceClient({
               {account.role === "insurerAdmin" && <option value="partner-agreement">Partner agreement</option>}
               {account.role === "insurerAdmin" && <option value="hospital-invoice">Hospital invoice</option>}
               <option value="package">Policy package</option><option value="policy">Policy</option>
-              <option value="claim">Claim</option><option value="evidence">Evidence reference</option><option value="evidence-grant">Evidence access grant</option>
+              <option value="claim">Claim</option><option value="evidence">Evidence reference</option><option value="evidence-batch">Evidence Merkle batch</option><option value="evidence-grant">Evidence access grant</option>
               <option value="verification">Invoice cross-check</option><option value="decision">Auditor decision</option>
               <option value="review">Claim review round</option><option value="appeal">Claim appeal</option><option value="fraud-assessment">Fraud assessment</option>
               <option value="settlement">Settlement</option><option value="claim-history">Claim history</option>
@@ -776,6 +790,22 @@ export function WorkspaceClient({
                 download
                 href={auditClaimId.trim() ? `/api/audit/claims/${encodeURIComponent(auditClaimId.trim())}` : undefined}
               >Download audit JSON</a>
+            </div>
+          </article>
+        )}
+
+        {account.role !== "bankOfficer" && account.role !== "hospitalOfficer" && (
+          <article className="workCard evidenceCard">
+            <span className="kicker">Merkle integrity proof</span>
+            <h2>Verify anchored evidence</h2>
+            <p className="cardNote">Reconstruct an evidence leaf from its Fabric reference, apply the inclusion path, and compare the computed root with the insurer-published batch root.</p>
+            <div className="evidenceFields">
+              <label>Evidence ID<input value={proofEvidenceId} onChange={(event) => setProofEvidenceId(event.target.value)} placeholder="evidence-1001" /></label>
+              <label>Merkle batch ID<input value={proofBatchId} onChange={(event) => setProofBatchId(event.target.value)} placeholder="evidence-batch-1001" /></label>
+            </div>
+            <div className="evidenceActions">
+              <button className="primary button" disabled={busy || !proofEvidenceId.trim() || !proofBatchId.trim()} onClick={verifyEvidenceProof}>Verify proof</button>
+              <a className={`secondary button${proofEvidenceId.trim() && proofBatchId.trim() ? "" : " disabledLink"}`} download href={proofEvidenceId.trim() && proofBatchId.trim() ? `/api/evidence/${encodeURIComponent(proofEvidenceId.trim())}/proof?batchId=${encodeURIComponent(proofBatchId.trim())}&download=1` : undefined}>Download proof JSON</a>
             </div>
           </article>
         )}

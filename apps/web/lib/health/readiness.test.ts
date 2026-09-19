@@ -6,7 +6,7 @@ const okOracle = async () => ({ ok: true });
 describe("dependency readiness", () => {
   it("is ready only for the expected live Fabric schema and both Oracles", async () => {
     const payload = await buildReadinessPayload({
-      fabricProbe: async () => ({ ok: true, schemaVersion: 10 }),
+      fabricProbe: async () => ({ ok: true, schemaVersion: 12 }),
       oracle1Probe: okOracle,
       oracle2Probe: okOracle,
       now: () => "2026-09-13T12:00:00.000Z",
@@ -31,6 +31,6 @@ describe("dependency readiness", () => {
       oracle1Probe: okOracle,
       oracle2Probe: okOracle,
     });
-    expect(payload).toMatchObject({ status: "not_ready", dependencies: { fabric: "connected", chaincode: "incompatible", schemaVersion: 6, expectedSchemaVersion: 10 } });
+    expect(payload).toMatchObject({ status: "not_ready", dependencies: { fabric: "connected", chaincode: "incompatible", schemaVersion: 6, expectedSchemaVersion: 12 } });
   });
 });

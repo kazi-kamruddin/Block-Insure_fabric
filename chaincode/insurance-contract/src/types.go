@@ -1,6 +1,6 @@
 package insurance
 
-const SchemaVersion = 10
+const SchemaVersion = 12
 
 type PartnerAgreement struct {
 	AssetType     string `json:"assetType"`
@@ -92,11 +92,24 @@ type BankAccountReference struct {
 	AccountType      string `json:"accountType"`
 	AccountLabel     string `json:"accountLabel"`
 	MaskedAccount    string `json:"maskedAccount"`
-	AccountTokenHash string `json:"accountTokenHash"`
+	AccountTokenHash string `json:"accountTokenHash,omitempty"`
 	Currency         string `json:"currency"`
-	BalanceMinor     int64  `json:"balanceMinor"`
+	BalanceMinor     int64  `json:"balanceMinor,omitempty"`
 	Status           string `json:"status"`
 	CreatedAt        string `json:"createdAt"`
+	UpdatedAt        string `json:"updatedAt"`
+}
+
+// BankAccountPrivateState is stored only in bankInsurerPrivateData. The public
+// BankAccountReference retains organization, ownership, masked display, and
+// lifecycle fields while token and balance data remain private to BankMSP and
+// InsurerMSP peers.
+type BankAccountPrivateState struct {
+	AssetType        string `json:"assetType"`
+	SchemaVersion    int    `json:"schemaVersion"`
+	ID               string `json:"id"`
+	AccountTokenHash string `json:"accountTokenHash"`
+	BalanceMinor     int64  `json:"balanceMinor"`
 	UpdatedAt        string `json:"updatedAt"`
 }
 
@@ -409,6 +422,36 @@ type EvidenceReference struct {
 	StorageReferenceHash string `json:"storageReferenceHash"`
 	SubmittedBy          string `json:"submittedBy"`
 	CreatedAt            string `json:"createdAt"`
+}
+
+type EvidenceMerkleBatch struct {
+	AssetType     string   `json:"assetType"`
+	SchemaVersion int      `json:"schemaVersion"`
+	ID            string   `json:"id"`
+	RootHash      string   `json:"rootHash"`
+	HashAlgorithm string   `json:"hashAlgorithm"`
+	LeafEncoding  string   `json:"leafEncoding"`
+	EvidenceIDs   []string `json:"evidenceIds"`
+	LeafCount     int      `json:"leafCount"`
+	PublishedBy   string   `json:"publishedBy"`
+	CreatedAt     string   `json:"createdAt"`
+}
+
+type MerkleProofStep struct {
+	Hash     string `json:"hash"`
+	Position string `json:"position"`
+}
+
+type EvidenceInclusionVerification struct {
+	BatchID       string `json:"batchId"`
+	EvidenceID    string `json:"evidenceId"`
+	LeafHash      string `json:"leafHash"`
+	ComputedRoot  string `json:"computedRoot"`
+	AnchoredRoot  string `json:"anchoredRoot"`
+	ProofSteps    int    `json:"proofSteps"`
+	Included      bool   `json:"included"`
+	HashAlgorithm string `json:"hashAlgorithm"`
+	LeafEncoding  string `json:"leafEncoding"`
 }
 
 type HospitalVerification struct {

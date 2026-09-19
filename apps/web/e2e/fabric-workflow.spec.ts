@@ -172,7 +172,7 @@ test("five organization sessions complete a Fabric insurance workflow", async ({
     expect(dossierResponse.headers()["content-disposition"]).toContain(`${ids.claim}-audit.json`);
     const dossier = await dossierResponse.json();
     expect(dossier).toMatchObject({
-      schemaVersion: 5,
+      schemaVersion: 6,
       claim: { id: ids.claim, status: "SETTLED" },
       hospitalVerification: { id: ids.verification, outcome: "VERIFIED" },
       settlement: { id: ids.settlement, status: "CONFIRMED" },
@@ -290,7 +290,7 @@ test("rejected claim requires a committed correction, matching Hospital invoice,
     const oracleRequest = await (await insurer.get(`/api/ledger/oracle-request/${requestId}`)).json();
     expect(oracleRequest.result).toMatchObject({ claimVersion: 2, appealId, appealCommitmentHash: appeal.result.commitmentHash, status: "CONSENSUS" });
     const dossier = await (await insurer.get(`/api/audit/claims/${claimId}`)).json();
-    expect(dossier).toMatchObject({ schemaVersion: 5 });
+    expect(dossier).toMatchObject({ schemaVersion: 6 });
     expect(dossier.hospitalVerifications).toEqual(expect.arrayContaining([
       expect.objectContaining({ claimVersion: 1, appealId: "" }),
       expect.objectContaining({ claimVersion: 2, appealId, id: verification2 }),

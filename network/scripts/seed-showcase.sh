@@ -42,6 +42,34 @@ invoke() {
     --waitForEvent --waitForEventTimeout 90s -c "$(payload "${function}" "$@")" >/dev/null
 }
 
+open_private_bank_account() {
+  local id="$1" bank_id="$2" owner_id="$3" account_type="$4" label="$5" masked="$6" token_hash="$7" opening_balance="$8"
+  local private_json private_b64 transient_json
+  private_json="$(jq -nc --arg accountTokenHash "${token_hash}" --argjson openingBalanceMinor "${opening_balance}" '{accountTokenHash: $accountTokenHash, openingBalanceMinor: $openingBalanceMinor}')"
+  private_b64="$(printf '%s' "${private_json}" | base64 | tr -d '\r\n')"
+  transient_json="$(jq -nc --arg value "${private_b64}" '{bankAccountPrivate: $value}')"
+  peer chaincode invoke \
+    -o localhost:7050 --ordererTLSHostnameOverride orderer.blockinsure.test \
+    --tls --cafile "${orderer_ca}" -C "${channel_name}" -n "${chaincode_name}" \
+    --peerAddresses localhost:7051 \
+    --tlsRootCertFiles "${organizations}/peerOrganizations/insurer.blockinsure.test/peers/peer0.insurer.blockinsure.test/tls/ca.crt" \
+    --peerAddresses localhost:12051 \
+    --tlsRootCertFiles "${organizations}/peerOrganizations/bank.blockinsure.test/peers/peer0.bank.blockinsure.test/tls/ca.crt" \
+    --transient "${transient_json}" --waitForEvent --waitForEventTimeout 90s \
+    -c "$(payload OpenPrivateBankAccount "${id}" "${bank_id}" "${owner_id}" "${account_type}" "${label}" "${masked}")" >/dev/null
+}
+
+migrate_private_bank_account() {
+  peer chaincode invoke \
+    -o localhost:7050 --ordererTLSHostnameOverride orderer.blockinsure.test \
+    --tls --cafile "${orderer_ca}" -C "${channel_name}" -n "${chaincode_name}" \
+    --peerAddresses localhost:7051 \
+    --tlsRootCertFiles "${organizations}/peerOrganizations/insurer.blockinsure.test/peers/peer0.insurer.blockinsure.test/tls/ca.crt" \
+    --peerAddresses localhost:12051 \
+    --tlsRootCertFiles "${organizations}/peerOrganizations/bank.blockinsure.test/peers/peer0.bank.blockinsure.test/tls/ca.crt" \
+    --waitForEvent --waitForEventTimeout 90s -c "$(payload MigrateBankAccountPrivateState "$1")" >/dev/null
+}
+
 exists() {
   peer chaincode query -C "${channel_name}" -n "${chaincode_name}" -c "$(payload "$1" "$2")" >/dev/null 2>&1
 }
@@ -71,10 +99,14 @@ ensure_agreement agreement-bank-demo BANK bank-demo "Bangladesh Demo Commercial 
 
 set_client_context bank BankMSP 12051 bankOfficer
 if ! exists ReadBankAccountReference showcase-customer-account; then
-  invoke OpenBankAccount showcase-customer-account bank-demo policyholder1 CUSTOMER "Policyholder primary" "**** **** 4821" "${hash_a}" 100000
+  open_private_bank_account showcase-customer-account bank-demo policyholder1 CUSTOMER "Policyholder primary" "**** **** 4821" "${hash_a}" 100000
+else
+  migrate_private_bank_account showcase-customer-account
 fi
 if ! exists ReadBankAccountReference bank-insurer-premium; then
-  invoke OpenBankAccount bank-insurer-premium bank-demo insurer INSURER "Block-Insure settlement" "**** **** 9001" "${hash_b}" 500000
+  open_private_bank_account bank-insurer-premium bank-demo insurer INSURER "Block-Insure settlement" "**** **** 9001" "${hash_b}" 500000
+else
+  migrate_private_bank_account bank-insurer-premium
 fi
 
 set_client_context insurer InsurerMSP 7051 insurerAdmin

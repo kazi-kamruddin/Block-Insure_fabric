@@ -11,11 +11,13 @@ chaincode_root="${project_root}/chaincode/insurance-contract"
 
 channel_name="${CHANNEL_NAME:-insurance-channel}"
 chaincode_name="${CHAINCODE_NAME:-insurance-contract}"
-chaincode_version="${CHAINCODE_VERSION:-1.1.0}"
+chaincode_version="${CHAINCODE_VERSION:-1.2.0}"
 chaincode_sequence="${CHAINCODE_SEQUENCE:-}"
 chaincode_label="${chaincode_name}_${chaincode_version}"
 package_file="${artifacts}/${chaincode_label}.tar.gz"
 orderer_ca="${organizations}/ordererOrganizations/blockinsure.test/orderers/orderer.blockinsure.test/tls/ca.crt"
+collections_config="${network_root}/config/collections_config.json"
+endorsement_policy="OutOf(2, 'InsurerMSP.peer','HospitalMSP.peer','AuditorMSP.peer','BankMSP.peer','OracleMSP.peer')"
 
 export PATH="${samples_root}/bin:${PATH}"
 export FABRIC_CFG_PATH="${samples_root}/config"
@@ -81,7 +83,8 @@ approve_for_org() {
     -o localhost:7050 --ordererTLSHostnameOverride orderer.blockinsure.test \
     --channelID "${channel_name}" --name "${chaincode_name}" \
     --version "${chaincode_version}" --package-id "${package_id}" \
-    --sequence "${chaincode_sequence}" --tls --cafile "${orderer_ca}"
+    --sequence "${chaincode_sequence}" --collections-config "${collections_config}" \
+    --signature-policy "${endorsement_policy}" --tls --cafile "${orderer_ca}"
 }
 
 resolve_chaincode_sequence() {
@@ -133,12 +136,14 @@ approve_for_org oracle OracleMSP 13051
 set_peer_context insurer InsurerMSP 7051
 peer lifecycle chaincode checkcommitreadiness \
   --channelID "${channel_name}" --name "${chaincode_name}" \
-  --version "${chaincode_version}" --sequence "${chaincode_sequence}" --output json
+  --version "${chaincode_version}" --sequence "${chaincode_sequence}" \
+  --collections-config "${collections_config}" --signature-policy "${endorsement_policy}" --output json
 
 peer lifecycle chaincode commit \
   -o localhost:7050 --ordererTLSHostnameOverride orderer.blockinsure.test \
   --channelID "${channel_name}" --name "${chaincode_name}" \
   --version "${chaincode_version}" --sequence "${chaincode_sequence}" \
+  --collections-config "${collections_config}" --signature-policy "${endorsement_policy}" \
   --tls --cafile "${orderer_ca}" \
   --peerAddresses localhost:7051 \
   --tlsRootCertFiles "${organizations}/peerOrganizations/insurer.blockinsure.test/peers/peer0.insurer.blockinsure.test/tls/ca.crt" \

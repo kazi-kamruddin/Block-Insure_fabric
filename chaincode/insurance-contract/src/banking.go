@@ -16,28 +16,7 @@ func (c *Contract) RegisterBankAccountReference(ctx contractapi.TransactionConte
 	if _, err := requireIdentity(ctx, "BankMSP", "bankOfficer"); err != nil {
 		return nil, err
 	}
-	if !idPattern.MatchString(ownerID) {
-		return nil, fmt.Errorf("invalid owner id %q", ownerID)
-	}
-	if err := validateHash("accountTokenHash", accountTokenHash); err != nil {
-		return nil, err
-	}
-	now, err := timestamp(ctx)
-	if err != nil {
-		return nil, err
-	}
-	account := &BankAccountReference{
-		AssetType: "bankAccountReference", SchemaVersion: SchemaVersion, ID: id,
-		OwnerID: ownerID, AccountTokenHash: strings.ToLower(accountTokenHash), Status: "VERIFIED",
-		CreatedAt: now, UpdatedAt: now,
-	}
-	if err := putState(ctx, "bankAccountReference", id, account); err != nil {
-		return nil, err
-	}
-	if err := emit(ctx, "BankAccountReferenceRegistered", account); err != nil {
-		return nil, err
-	}
-	return account, nil
+	return nil, fmt.Errorf("legacy Bank account registration is disabled; use OpenPrivateBankAccount with transient data")
 }
 
 func (c *Contract) RequestBankMandate(ctx contractapi.TransactionContextInterface, id, policyID, accountReferenceID, expiryDate string) (*BankMandate, error) {
@@ -413,10 +392,10 @@ func (c *Contract) RecordPremiumAdjustment(ctx contractapi.TransactionContextInt
 		source.BalanceMinor += amountMinor
 		destination.UpdatedAt = now
 		source.UpdatedAt = now
-		if err := overwriteAsset(ctx, "bankAccountReference", destination.ID, destination); err != nil {
+		if err := persistBankAccount(ctx, destination, false); err != nil {
 			return nil, err
 		}
-		if err := overwriteAsset(ctx, "bankAccountReference", source.ID, source); err != nil {
+		if err := persistBankAccount(ctx, source, false); err != nil {
 			return nil, err
 		}
 		if err := putState(ctx, "bankTransfer", transfer.ID, transfer); err != nil {
@@ -556,7 +535,11 @@ func (c *Contract) FailPremiumCollection(ctx contractapi.TransactionContextInter
 }
 
 func (c *Contract) ReadBankAccountReference(ctx contractapi.TransactionContextInterface, id string) (*BankAccountReference, error) {
-	return getState[BankAccountReference](ctx, "bankAccountReference", id)
+	public, err := getState[BankAccountReference](ctx, "bankAccountReference", id)
+	if err != nil {
+		return nil, err
+	}
+	return mergedBankAccount(ctx, public)
 }
 
 func (c *Contract) ReadBankMandate(ctx contractapi.TransactionContextInterface, id string) (*BankMandate, error) {

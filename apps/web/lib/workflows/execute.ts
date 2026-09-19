@@ -6,6 +6,7 @@ import type { Session } from "@/lib/auth/session-token";
 import { assessClaimFraud } from "@/lib/fraud/assess-claim";
 import type { WorkflowCommand } from "./commands";
 import { refreshHospitalRegistrySnapshot } from "@/lib/oracle/hospital-registry";
+import { buildEvidenceMerkleTree } from "@/lib/evidence/merkle";
 
 export async function executeWorkflowCommand(command: WorkflowCommand, session: Session) {
   switch (command.operation) {
@@ -81,6 +82,14 @@ export async function executeWorkflowCommand(command: WorkflowCommand, session: 
       return ledger.submitClaim(command);
     case "crossCheckClaimInvoice":
       return ledger.crossCheckClaimInvoice(command.claimId, command.verificationId);
+    case "publishEvidenceMerkleBatch": {
+      const parsed = JSON.parse(command.evidenceIdsJson) as unknown;
+      if (!Array.isArray(parsed) || parsed.length === 0 || parsed.some((value) => typeof value !== "string")) {
+        throw new Error("Evidence IDs must be a non-empty JSON string array");
+      }
+      const tree = buildEvidenceMerkleTree(await Promise.all(parsed.map((id) => ledger.readEvidenceReference(id))));
+      return ledger.publishEvidenceMerkleBatch(command.id, JSON.stringify(tree.evidenceIds), tree.rootHash);
+    }
     case "openClaimReview":
       return ledger.openClaimReview(command);
     case "publishOracleRegistrySnapshot":

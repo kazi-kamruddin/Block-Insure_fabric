@@ -1,6 +1,7 @@
 import "server-only";
 
 import { ledger } from "@/lib/fabric/ledger";
+import { buildEvidenceMerkleTree, evidenceLeafHash } from "@/lib/evidence/merkle";
 import type {
   AuditorDecision,
   Claim,
@@ -10,6 +11,8 @@ import type {
   EvidenceAccessRecord,
   EvidenceAccessGrant,
   EvidenceReference,
+  EvidenceMerkleBatch,
+  MerkleProofStep,
   FraudAssessment,
   HospitalVerification,
   OracleCommitment,
@@ -20,11 +23,12 @@ import type {
 } from "@/lib/fabric/types";
 
 export type ClaimAuditDossier = {
-  schemaVersion: 5;
+  schemaVersion: 6;
   exportedAt: string;
   claim: Claim;
   history: ClaimHistoryRecord[];
   evidence: EvidenceReference[];
+  evidenceMerkle: Array<{ batch: EvidenceMerkleBatch; proofs: Array<{ evidenceId: string; leafHash: string; proof: MerkleProofStep[] }> }>;
   evidenceAccess: EvidenceAccessRecord[];
   evidenceGrants: EvidenceAccessGrant[];
   hospitalVerification: HospitalVerification | null;
@@ -42,9 +46,10 @@ export type ClaimAuditDossier = {
 
 export async function loadClaimAuditDossier(claimId: string): Promise<ClaimAuditDossier> {
   const claim = await ledger.readClaim(claimId);
-  const [history, allEvidence, allAccess, allGrants, allVerifications, allDecisions, allReviews, allAppeals, allFraudAssessments, allSettlements, allOracleRequests, allOracleCommitments, allOracleResults, allOracleSnapshots] = await Promise.all([
+  const [history, allEvidence, allEvidenceBatches, allAccess, allGrants, allVerifications, allDecisions, allReviews, allAppeals, allFraudAssessments, allSettlements, allOracleRequests, allOracleCommitments, allOracleResults, allOracleSnapshots] = await Promise.all([
     ledger.claimHistory(claimId),
     ledger.listEvidenceReferences(),
+    ledger.listEvidenceMerkleBatches(),
     ledger.listEvidenceAccessRecords(),
     ledger.listEvidenceAccessGrants(),
     ledger.listHospitalVerifications(),
@@ -59,12 +64,28 @@ export async function loadClaimAuditDossier(claimId: string): Promise<ClaimAudit
     ledger.listOracleRegistrySnapshots(),
   ]);
 
+  const claimEvidence = allEvidence.filter((item) => item.claimId === claimId);
+  const claimEvidenceIds = new Set(claimEvidence.map((item) => item.id));
+  const evidenceMerkle = allEvidenceBatches.filter((batch) => batch.evidenceIds.some((id) => claimEvidenceIds.has(id))).map((batch) => {
+    const tree = buildEvidenceMerkleTree(batch.evidenceIds.map((id) => {
+      const evidence = allEvidence.find((item) => item.id === id);
+      if (!evidence) throw new Error(`Evidence ${id} from Merkle batch ${batch.id} is unavailable`);
+      return evidence;
+    }));
+    if (tree.rootHash !== batch.rootHash) throw new Error(`Merkle batch ${batch.id} no longer reproduces its anchored root`);
+    return {
+      batch,
+      proofs: claimEvidence.filter((item) => batch.evidenceIds.includes(item.id)).map((item) => ({ evidenceId: item.id, leafHash: evidenceLeafHash(item), proof: tree.proofFor(item.id) })),
+    };
+  });
+
   return {
-    schemaVersion: 5,
+    schemaVersion: 6,
     exportedAt: new Date().toISOString(),
     claim,
     history,
-    evidence: allEvidence.filter((item) => item.claimId === claimId),
+    evidence: claimEvidence,
+    evidenceMerkle,
     evidenceAccess: allAccess.filter((item) => item.claimId === claimId),
     evidenceGrants: allGrants.filter((item) => item.claimId === claimId),
     hospitalVerification: allVerifications.find((item) => item.id === claim.hospitalVerificationId) ?? null,

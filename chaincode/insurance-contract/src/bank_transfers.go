@@ -23,6 +23,13 @@ func (c *Contract) OpenBankAccount(ctx contractapi.TransactionContextInterface, 
 	if _, err := requireIdentity(ctx, "BankMSP", "bankOfficer"); err != nil {
 		return nil, err
 	}
+	return nil, fmt.Errorf("sensitive Bank account arguments are disabled; use OpenPrivateBankAccount with transient data")
+}
+
+func (c *Contract) openBankAccount(ctx contractapi.TransactionContextInterface, id, bankID, ownerID, accountType, accountLabel, maskedAccount, accountTokenHash string, openingBalanceMinor int64) (*BankAccountReference, error) {
+	if _, err := requireIdentity(ctx, "BankMSP", "bankOfficer"); err != nil {
+		return nil, err
+	}
 	if _, err := c.requireActivePartner(ctx, "BANK", bankID); err != nil {
 		return nil, err
 	}
@@ -58,10 +65,10 @@ func (c *Contract) OpenBankAccount(ctx contractapi.TransactionContextInterface, 
 		AccountTokenHash: strings.ToLower(accountTokenHash), Currency: "BDT",
 		BalanceMinor: openingBalanceMinor, Status: "VERIFIED", CreatedAt: now, UpdatedAt: now,
 	}
-	if err := putState(ctx, "bankAccountReference", id, account); err != nil {
+	if err := persistBankAccount(ctx, account, true); err != nil {
 		return nil, err
 	}
-	if err := emit(ctx, "BankAccountOpened", account); err != nil {
+	if err := emit(ctx, "BankAccountOpened", publicBankAccountEvent(account)); err != nil {
 		return nil, err
 	}
 	return account, nil
@@ -121,7 +128,7 @@ func (c *Contract) AdjustBankAccountBalance(ctx contractapi.TransactionContextIn
 		transfer.SourceAccountID = account.ID
 	}
 	account.UpdatedAt = now
-	if err := overwriteAsset(ctx, "bankAccountReference", account.ID, account); err != nil {
+	if err := persistBankAccount(ctx, account, false); err != nil {
 		return nil, err
 	}
 	if err := putState(ctx, "bankTransfer", transfer.ID, transfer); err != nil {
@@ -283,10 +290,10 @@ func (c *Contract) settlePremiumTransfer(ctx contractapi.TransactionContextInter
 		destination.BalanceMinor += transfer.AmountMinor
 		source.UpdatedAt = transfer.CreatedAt
 		destination.UpdatedAt = transfer.CreatedAt
-		if err := overwriteAsset(ctx, "bankAccountReference", source.ID, source); err != nil {
+		if err := persistBankAccount(ctx, source, false); err != nil {
 			return err
 		}
-		if err := overwriteAsset(ctx, "bankAccountReference", destination.ID, destination); err != nil {
+		if err := persistBankAccount(ctx, destination, false); err != nil {
 			return err
 		}
 	}

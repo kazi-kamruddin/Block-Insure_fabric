@@ -4,7 +4,7 @@ import { currentSession } from "@/lib/auth/current-session";
 import { findDemoAccount } from "@/lib/auth/accounts";
 import { ledger } from "@/lib/fabric/ledger";
 
-const assetTypeSchema = z.enum(["partner-agreement", "hospital-invoice", "package", "policy", "claim", "evidence", "evidence-grant", "verification", "decision", "review", "appeal", "fraud-assessment", "settlement", "access", "account", "bank-transfer", "mandate", "premium-payment", "premium-adjustment", "collection", "benefit-plan", "beneficiaries", "benefit-request", "liability", "oracle-snapshot", "oracle-request", "oracle-commitment", "oracle-result"]);
+const assetTypeSchema = z.enum(["partner-agreement", "hospital-invoice", "package", "policy", "claim", "evidence", "evidence-batch", "evidence-grant", "verification", "decision", "review", "appeal", "fraud-assessment", "settlement", "access", "account", "bank-transfer", "mandate", "premium-payment", "premium-adjustment", "collection", "benefit-plan", "beneficiaries", "benefit-request", "liability", "oracle-snapshot", "oracle-request", "oracle-commitment", "oracle-result"]);
 type RouteContext = { params: Promise<{ assetType: string }> };
 
 export const runtime = "nodejs";
@@ -95,6 +95,21 @@ export async function GET(_request: Request, context: RouteContext) {
         const evidence = await ledger.listEvidenceReferences();
         const claimIds = await visibleClaimIds();
         result = claimIds ? evidence.filter((item) => claimIds.has(item.claimId)) : evidence;
+        break;
+      }
+      case "evidence-batch": {
+        const batches = await ledger.listEvidenceMerkleBatches();
+        if (session.role !== "policyholder") {
+          result = batches;
+          break;
+        }
+        const ownedClaimIds = await visibleClaimIds();
+        const visibleEvidenceIds = new Set((await ledger.listEvidenceReferences())
+          .filter((item) => ownedClaimIds?.has(item.claimId))
+          .map((item) => item.id));
+        result = batches
+          .filter((batch) => batch.evidenceIds.some((id) => visibleEvidenceIds.has(id)))
+          .map((batch) => ({ ...batch, evidenceIds: batch.evidenceIds.filter((id) => visibleEvidenceIds.has(id)) }));
         break;
       }
       case "evidence-grant": {

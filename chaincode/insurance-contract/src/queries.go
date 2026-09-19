@@ -32,6 +32,10 @@ func (c *Contract) ListEvidenceReferences(ctx contractapi.TransactionContextInte
 	return listState[EvidenceReference](ctx, "evidenceReference")
 }
 
+func (c *Contract) ListEvidenceMerkleBatches(ctx contractapi.TransactionContextInterface) ([]EvidenceMerkleBatch, error) {
+	return listState[EvidenceMerkleBatch](ctx, "evidenceMerkleBatch")
+}
+
 func (c *Contract) ListHospitalVerifications(ctx contractapi.TransactionContextInterface) ([]HospitalVerification, error) {
 	return listState[HospitalVerification](ctx, "hospitalVerification")
 }
@@ -65,7 +69,19 @@ func (c *Contract) ListSettlements(ctx contractapi.TransactionContextInterface) 
 }
 
 func (c *Contract) ListBankAccountReferences(ctx contractapi.TransactionContextInterface) ([]BankAccountReference, error) {
-	return listState[BankAccountReference](ctx, "bankAccountReference")
+	public, err := listState[BankAccountReference](ctx, "bankAccountReference")
+	if err != nil {
+		return nil, err
+	}
+	result := make([]BankAccountReference, 0, len(public))
+	for index := range public {
+		merged, mergeErr := mergedBankAccount(ctx, &public[index])
+		if mergeErr != nil {
+			continue
+		}
+		result = append(result, *merged)
+	}
+	return result, nil
 }
 
 func (c *Contract) ListBankTransfers(ctx contractapi.TransactionContextInterface) ([]BankTransfer, error) {

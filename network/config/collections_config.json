@@ -1,0 +1,14 @@
+[
+  {
+    "name": "bankInsurerPrivateData",
+    "policy": "OR('BankMSP.member','InsurerMSP.member')",
+    "requiredPeerCount": 1,
+    "maxPeerCount": 2,
+    "blockToLive": 0,
+    "memberOnlyRead": true,
+    "memberOnlyWrite": true,
+    "endorsementPolicy": {
+      "signaturePolicy": "AND('BankMSP.peer','InsurerMSP.peer')"
+    }
+  }
+]

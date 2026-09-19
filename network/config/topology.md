@@ -39,9 +39,10 @@ validate both the caller MSP and that attribute.
 All organizations share the workflow ledger on `insurance-channel`. The
 channel ledger stores only safe operational identifiers, states, hashes, and
 references. Encrypted medical documents and encryption keys remain off chain.
-The local release does not configure Private Data Collections; whether shared
-confidential metadata requires them is an explicit production-governance
-decision, not an implied capability of this topology.
+One deliberately narrow collection, `bankInsurerPrivateData`, shares Bank account
+token hashes and simulated balances only between BankMSP and InsurerMSP peers.
+Public account state retains masked display and ownership metadata. Hospital,
+Auditor, and Oracle peers receive only the public hashes and transfer outcomes.
 
 ## Development ordering model
 
@@ -52,9 +53,11 @@ development network.
 
 ## Endorsement governance
 
-The channel application policy uses `MAJORITY Endorsement`. With five business
-organizations, a valid chaincode transaction therefore needs endorsements from
-three organization peers. The chaincode definition lifecycle similarly uses
+The channel application policy uses `MAJORITY Endorsement`. The insurance
+chaincode overrides this with an explicit two-of-five organization policy so
+ordinary workflow transactions remain practical while retaining cross-organization
+validation. Writes to `bankInsurerPrivateData` use the stricter collection-level
+`AND('BankMSP.peer','InsurerMSP.peer')` policy. The definition lifecycle uses
 `MAJORITY LifecycleEndorsement`, while the deployment script deliberately obtains
 definition approvals from all five organizations before commit.
 

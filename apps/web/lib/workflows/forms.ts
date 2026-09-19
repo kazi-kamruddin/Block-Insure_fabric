@@ -24,7 +24,7 @@ export type WorkflowFormValues = Record<string, string>;
 export type HashText = (value: string) => Promise<string>;
 
 export const operationsByRole = {
-  insurerAdmin: ["createPartnerAgreement", "setPartnerAgreementStatus", "createPolicyPackage", "configurePolicyPackagePartners", "publishPolicyPackage", "retirePolicyPackage", "createBenefitPlan", "publishBenefitPlan", "retireBenefitPlan", "issuePolicy", "advancePolicyLifecycle", "cancelPolicyAsInsurer", "queuePremiumCollection", "decideBenefitRequest", "markBenefitPaymentReady", "crossCheckClaimInvoice", "assessClaimFraud", "publishOracleRegistrySnapshot", "requestOracleVerification", "finalizeOracleTimeout", "routeOracleFailureToReview", "openClaimReview", "finalizeExpiredReview", "authorizeSettlement"],
+  insurerAdmin: ["createPartnerAgreement", "setPartnerAgreementStatus", "createPolicyPackage", "configurePolicyPackagePartners", "publishPolicyPackage", "retirePolicyPackage", "createBenefitPlan", "publishBenefitPlan", "retireBenefitPlan", "issuePolicy", "advancePolicyLifecycle", "cancelPolicyAsInsurer", "queuePremiumCollection", "decideBenefitRequest", "markBenefitPaymentReady", "crossCheckClaimInvoice", "publishEvidenceMerkleBatch", "assessClaimFraud", "publishOracleRegistrySnapshot", "requestOracleVerification", "finalizeOracleTimeout", "routeOracleFailureToReview", "openClaimReview", "finalizeExpiredReview", "authorizeSettlement"],
   policyholder: ["acquirePolicy", "requestBankMandate", "cancelBankMandate", "setBeneficiaries", "submitBenefitRequest", "renewPolicy", "cancelPolicy", "submitClaim", "submitClaimAppeal", "grantEvidenceAccess", "revokeEvidenceAccess"],
   hospitalOfficer: ["createHospitalInvoice", "updateHospitalInvoice"],
   auditor: ["recordAuditorDecision"],
@@ -262,6 +262,14 @@ export const workflowFormDefinitions: Record<WorkflowOperation, WorkflowFormDefi
     description: "Compare a submitted claim with the immutable invoice maintained by its contracted Hospital. The insurer cannot edit the source record.",
     fields: [{ name: "claimId", label: "Claim ID" }, { name: "verificationId", label: "Verification ID", placeholder: "invoice-check-1001" }],
   },
+  publishEvidenceMerkleBatch: {
+    label: "Anchor evidence Merkle batch",
+    description: "Canonicalize selected encrypted-evidence references, verify the computed SHA-256 root in chaincode, and publish one immutable batch commitment.",
+    fields: [
+      { name: "id", label: "Merkle batch ID", placeholder: "evidence-batch-1001" },
+      { name: "evidenceIdsJson", label: "Evidence IDs", kind: "textarea", placeholder: '["evidence-1001","evidence-1002"]', help: "IDs are sorted before hashing; each must already exist on Fabric." },
+    ],
+  },
   assessClaimFraud: {
     label: "Generate fraud triage assessment",
     description: "Run the transparent server-side rules engine and anchor its advisory result without changing claim status.",
@@ -459,6 +467,7 @@ export function createWorkflowFormValues(
     updateHospitalInvoice: { id: "", patientReferenceText: "", invoiceReferenceText: "", treatmentText: "", amountBdt: "", admissionDate: today, dischargeDate: today, status: "DRAFT" },
     submitClaim: { id: generatedId("claim", idFactory), policyId: "", hospitalId: "hospital-demo", hospitalInvoiceId: "", amountBdt: "", incidentDate: today, descriptionText: "" },
     crossCheckClaimInvoice: { claimId: "", verificationId: generatedId("invoice-check", idFactory) },
+    publishEvidenceMerkleBatch: { id: generatedId("evidence-batch", idFactory), evidenceIdsJson: "[]" },
     assessClaimFraud: { assessmentId: generatedId("fraud", idFactory), claimId: "" },
     openClaimReview: { claimId: "", reviewId: generatedId("review", idFactory), assignedAuditorIdsJson: '["auditor1","auditor2","auditor3","auditor4"]', approvalThreshold: "3", rejectionThreshold: "2", deadline: deadlineOffset(3) },
     publishOracleRegistrySnapshot: { id: "registry-demo-v1", version: "1", rootHash: "c6da6361115c611b091faa9f35836f9f5c8ee0fdbefb6bc0d8cc6fdde571ebcd", rulesVersion: "rules-v1", rulesHash: "a".repeat(64), recordCount: "3" },
@@ -681,6 +690,9 @@ export async function buildWorkflowCommand(
       break;
     case "crossCheckClaimInvoice":
       command = { operation, claimId: required(values, "claimId", "Claim ID"), verificationId: required(values, "verificationId", "Verification ID") };
+      break;
+    case "publishEvidenceMerkleBatch":
+      command = { operation, id: required(values, "id", "Merkle batch ID"), evidenceIdsJson: required(values, "evidenceIdsJson", "Evidence IDs") };
       break;
     case "assessClaimFraud":
       command = { operation, assessmentId: required(values, "assessmentId", "Assessment ID"), claimId: required(values, "claimId", "Claim ID") };
