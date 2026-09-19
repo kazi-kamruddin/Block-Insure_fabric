@@ -19,18 +19,21 @@ const (
 )
 
 var oracleVerificationCodes = map[string]bool{
-	"VERIFIED":                   true,
-	"SNAPSHOT_VERSION_MISMATCH":  true,
-	"REGISTRY_ROOT_MISMATCH":     true,
-	"RULES_VERSION_MISMATCH":     true,
-	"MODEL_VERSION_MISMATCH":     true,
-	"APPEAL_COMMITMENT_MISMATCH": true,
-	"RECORD_NOT_FOUND":           true,
-	"RECORD_INVALID":             true,
-	"AMOUNT_OUT_OF_RANGE":        true,
-	"INCIDENT_DATE_MISMATCH":     true,
-	"DESCRIPTION_MISMATCH":       true,
-	"HOSPITAL_MISMATCH":          true,
+	"VERIFIED":                     true,
+	"SNAPSHOT_VERSION_MISMATCH":    true,
+	"REGISTRY_ROOT_MISMATCH":       true,
+	"RULES_VERSION_MISMATCH":       true,
+	"MODEL_VERSION_MISMATCH":       true,
+	"APPEAL_COMMITMENT_MISMATCH":   true,
+	"RECORD_NOT_FOUND":             true,
+	"RECORD_INVALID":               true,
+	"AMOUNT_OUT_OF_RANGE":          true,
+	"INCIDENT_DATE_MISMATCH":       true,
+	"DESCRIPTION_MISMATCH":         true,
+	"HOSPITAL_MISMATCH":            true,
+	"PRIVACY_PRESENTATION_MISSING": true,
+	"PRIVACY_PROOF_INVALID":        true,
+	"PRIVACY_PRESENTATION_EXPIRED": true,
 }
 
 func canonicalProtocolHash(domain string, values ...string) string {
@@ -84,6 +87,9 @@ func oracleResultDigest(request *OracleRequest, verified bool, verificationCode,
 		request.RulesHash,
 		request.ModelVersion,
 		request.ModelHash,
+		request.PrivacyPresentationID,
+		request.PrivacyPresentationHash,
+		request.PrivacyProtocolVersion,
 		strconv.FormatBool(verified),
 		verificationCode,
 		strings.ToLower(recordHash),
@@ -178,6 +184,51 @@ func containsOracleAssignment(assignments []string, subject string) bool {
 		}
 	}
 	return false
+}
+
+// EvaluateOracleThreshold is a read-only, deterministic protocol primitive
+// used by tests and Caliper to compare consensus configurations without
+// creating ledger assets.
+func (c *Contract) EvaluateOracleThreshold(ctx contractapi.TransactionContextInterface, responsesJSON string, requiredConfirmations int) (*OracleThresholdEvaluation, error) {
+	var responses []*string
+	if err := json.Unmarshal([]byte(responsesJSON), &responses); err != nil {
+		return nil, fmt.Errorf("responses must be a JSON array of SHA-256 hashes or null")
+	}
+	if len(responses) < oracleMinimumAssignees || len(responses) > oracleMaximumAssignees {
+		return nil, fmt.Errorf("response slots must be between %d and %d", oracleMinimumAssignees, oracleMaximumAssignees)
+	}
+	if requiredConfirmations < 1 || requiredConfirmations > len(responses) || requiredConfirmations <= len(responses)/2 {
+		return nil, fmt.Errorf("requiredConfirmations must be a strict majority of response slots")
+	}
+	counts := make(map[string]int)
+	responseCount := 0
+	winner := ""
+	matching := 0
+	for _, response := range responses {
+		if response == nil {
+			continue
+		}
+		hash := strings.ToLower(strings.TrimSpace(*response))
+		if err := validateHash("response hash", hash); err != nil {
+			return nil, err
+		}
+		responseCount++
+		counts[hash]++
+		if counts[hash] > matching || (counts[hash] == matching && (winner == "" || hash < winner)) {
+			winner = hash
+			matching = counts[hash]
+		}
+	}
+	status := "PENDING"
+	if matching >= requiredConfirmations {
+		status = "CONSENSUS"
+	} else if responseCount == len(responses) {
+		status = "CONFLICT"
+	}
+	return &OracleThresholdEvaluation{
+		AssignedOracleCount: len(responses), RequiredConfirmations: requiredConfirmations,
+		ResponseCount: responseCount, MatchingResponses: matching, WinningResultHash: winner, Status: status,
+	}, nil
 }
 
 func oracleSubmissionID(requestID, oracleID string) string {
@@ -297,11 +348,33 @@ func (c *Contract) RequestOracleVerification(
 	if err != nil {
 		return nil, err
 	}
+	privacyPresentationID := ""
+	privacyPresentationHash := ""
+	privacyProtocol := ""
+	if claim.PrivacyPresentationID != "" {
+		presentation, presentationErr := c.ReadSelectiveDisclosurePresentation(ctx, claim.PrivacyPresentationID)
+		if presentationErr != nil {
+			return nil, presentationErr
+		}
+		expiry, parseErr := time.Parse(time.RFC3339, presentation.ExpiresAt)
+		requestTime, requestTimeErr := time.Parse(time.RFC3339Nano, now)
+		if parseErr != nil || requestTimeErr != nil || !expiry.After(requestTime) {
+			return nil, fmt.Errorf("privacy presentation %s is expired", presentation.ID)
+		}
+		if presentation.Status != "VERIFIED" || presentation.ClaimID != claim.ID || presentation.ClaimVersion != claim.Version {
+			return nil, fmt.Errorf("privacy presentation %s is stale for claim %s", presentation.ID, claim.ID)
+		}
+		privacyPresentationID = presentation.ID
+		privacyPresentationHash = presentation.PresentationHash
+		privacyProtocol = presentation.ProtocolVersion
+	}
 	request := &OracleRequest{
 		AssetType: "oracleRequest", SchemaVersion: SchemaVersion, ID: requestID,
 		ClaimID: claimID, ClaimVersion: claim.Version, HospitalVerificationID: verification.ID,
 		AppealID: appealID, AppealCommitmentHash: appealHash,
-		QueryHash: oracleQueryHash(claim, verification), RegistrySnapshotID: snapshot.ID,
+		PrivacyPresentationID: privacyPresentationID, PrivacyPresentationHash: privacyPresentationHash,
+		PrivacyProtocolVersion: privacyProtocol,
+		QueryHash:              oracleQueryHash(claim, verification), RegistrySnapshotID: snapshot.ID,
 		RegistryVersion: snapshot.Version, RegistryRootHash: snapshot.RootHash,
 		RulesVersion: snapshot.RulesVersion, RulesHash: snapshot.RulesHash,
 		ModelVersion: strings.TrimSpace(modelVersion), ModelHash: strings.ToLower(modelHash),
@@ -472,7 +545,9 @@ func (c *Contract) RevealOracleResult(
 		RequestID: requestID, ClaimID: request.ClaimID, ClaimVersion: claimVersion,
 		RegistryVersion: registryVersion, ModelVersion: modelVersion, OracleID: oracleID,
 		OracleIdentity: oracleIdentity, Verified: verified, VerificationCode: verificationCode,
-		RecordHash: strings.ToLower(recordHash), ResultHash: expectedResultHash, CreatedAt: now,
+		RecordHash: strings.ToLower(recordHash), ResultHash: expectedResultHash,
+		PrivacyPresentationID: request.PrivacyPresentationID, PrivacyPresentationHash: request.PrivacyPresentationHash,
+		CreatedAt: now,
 	}
 	if err := putState(ctx, "oracleResult", result.ID, result); err != nil {
 		return nil, err

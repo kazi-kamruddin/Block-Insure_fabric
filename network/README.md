@@ -16,7 +16,7 @@ organizations:
 | Hospital | `HospitalMSP` | Hospital claim verification |
 | Auditor | `AuditorMSP` | Manual-review decisions |
 | Bank | `BankMSP` | Settlement/EFT status confirmation |
-| Oracle | `OracleMSP` | Two certificate-bound registry-verification services |
+| Oracle | `OracleMSP` | Three certificate-bound registry-verification services |
 
 Each business organization starts with one peer, one Fabric CA, and one
 CouchDB state database. The shared application channel is
@@ -56,7 +56,7 @@ bash network/scripts/network.sh reset
 - `status` lists containers and each peer's joined channels.
 - `verify` checks all 17 containers, six CAs, five CouchDB instances, the
   orderer channel, and each peer ledger. When chaincode is committed, it also
-  checks version `1.3.0` on all five peers, evaluates schema version `13`, and
+  checks version `1.4.0` on all five peers, evaluates schema version `14`, and
   confirms all three Oracle service enrollments.
 - `down` stops and removes containers while retaining identities, channel
   artifacts, and Docker ledger volumes.
@@ -87,7 +87,10 @@ bash network/scripts/smoke-workflow.sh
 The deployment script installs the package and obtains all five organizations'
 approval of the definition, including its collection configuration, before
 commit. Membership in `bankInsurerPrivateData` itself remains limited to
-BankMSP and InsurerMSP. Four separately enrolled auditor
+BankMSP and InsurerMSP. `oracleProofPrivateData` is limited to HospitalMSP,
+InsurerMSP, and OracleMSP and carries salted credential fields and selective
+presentations; shared world state receives only roots and proof metadata.
+Four separately enrolled auditor
 identities exercise a 3-of-4 approval quorum. The smoke script asserts a final
 `SETTLED` claim, an advisory fraud assessment that cannot decide the claim,
 an active premium-funded policy, a completed collection, a paid benefit

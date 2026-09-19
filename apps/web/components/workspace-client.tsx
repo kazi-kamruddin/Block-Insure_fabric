@@ -15,7 +15,7 @@ import type { WorkflowCommand } from "@/lib/workflows/commands";
 import { bdtToMinor } from "@/lib/workflows/forms";
 import { decryptEvidenceBytes, encryptEvidenceBytes, sha256Hex } from "@/lib/evidence/browser-crypto";
 
-type AssetType = "partner-agreement" | "hospital-invoice" | "package" | "policy" | "claim" | "evidence" | "evidence-batch" | "evidence-grant" | "verification" | "decision" | "review" | "appeal" | "fraud-assessment" | "settlement" | "access" | "claim-history" | "account" | "bank-transfer" | "mandate" | "premium-payment" | "premium-adjustment" | "collection" | "benefit-plan" | "beneficiaries" | "benefit-request" | "liability" | "oracle-snapshot" | "oracle-request" | "oracle-commitment" | "oracle-result" | "oracle-history";
+type AssetType = "partner-agreement" | "hospital-invoice" | "package" | "policy" | "claim" | "evidence" | "evidence-batch" | "evidence-grant" | "verification" | "decision" | "review" | "appeal" | "fraud-assessment" | "settlement" | "access" | "claim-history" | "account" | "bank-transfer" | "mandate" | "premium-payment" | "premium-adjustment" | "collection" | "benefit-plan" | "beneficiaries" | "benefit-request" | "liability" | "oracle-snapshot" | "oracle-request" | "oracle-commitment" | "oracle-result" | "oracle-history" | "privacy-credential" | "privacy-presentation";
 type NotificationItem = { id: string; title: string; message: string; assetId: string; blockNumber: string };
 type BankCommunicationItem = { id: string; title: string; assetId: string; amountMinor: number; currency: string; status: string; adapter: string; recipient: string; deliveredAt: string; error: string };
 type ResearchSnapshotView = {
@@ -25,6 +25,7 @@ type ResearchSnapshotView = {
   adjudication: { reviewRounds: number; appeals: number; meanClosureLatencyMs: number | null };
   fraudDecisionSupport: { assessments: number; advisoryOnly: boolean };
   evidenceGovernance: { grants: number; accesses: number; grantBackedAccesses: number };
+  privacyPreservingVerification: { credentials: number; presentations: number; privacyBoundOracleRequests: number };
 };
 type OracleOperationsView = {
   workers: Array<{ oracleId: string; label: string; status: string; registrySource: string; registrySnapshotId: string; registryVersion: number; registryDatasetId?: string | null; registryDatasetVersion?: string | null; registryInputSha256?: string | null; registryTransformationVersion?: string | null; modelVersion: string; updatedAt: string; lastProcessedBlock: string | number | null; lastProcessedRequestId: string | null; lastError: string | null; counts: { requests: number; commitments: number; reveals: number; verified: number; failed: number }; lastProcessingLatencyMs: number | null }>;
@@ -611,6 +612,7 @@ export function WorkspaceClient({
             <div className="metricCard"><span>Reviews / appeals</span><strong>{researchSnapshot.adjudication.reviewRounds} / {researchSnapshot.adjudication.appeals}</strong><small>Immutable rounds</small></div>
             <div className="metricCard"><span>Fraud assessments</span><strong>{researchSnapshot.fraudDecisionSupport.assessments}</strong><small>{researchSnapshot.fraudDecisionSupport.advisoryOnly ? "Advisory only" : "Boundary violation"}</small></div>
             <div className="metricCard"><span>Evidence grants / access</span><strong>{researchSnapshot.evidenceGovernance.grants} / {researchSnapshot.evidenceGovernance.accesses}</strong><small>{researchSnapshot.evidenceGovernance.grantBackedAccesses} grant-backed</small></div>
+            <div className="metricCard"><span>Private credentials / proofs</span><strong>{researchSnapshot.privacyPreservingVerification.credentials} / {researchSnapshot.privacyPreservingVerification.presentations}</strong><small>{researchSnapshot.privacyPreservingVerification.privacyBoundOracleRequests} requests bound</small></div>
           </div>}
           {researchSnapshot && <p className="cardNote">Schema {researchSnapshot.provenance.ledgerSchemaVersion}; indexed events {researchSnapshot.provenance.indexedEvents}; hash <code>{researchSnapshot.reproducibilityHash.slice(0, 16)}…</code></p>}
         </article>}
@@ -703,6 +705,7 @@ export function WorkspaceClient({
               <option value="settlement">Settlement</option><option value="claim-history">Claim history</option>
               <option value="oracle-snapshot">Oracle registry snapshot</option><option value="oracle-request">Oracle request</option>
               <option value="oracle-commitment">Oracle commitment</option><option value="oracle-result">Oracle revealed result</option><option value="oracle-history">Oracle request history</option>
+              <option value="privacy-credential">Privacy credential anchor</option><option value="privacy-presentation">Selective disclosure presentation</option>
               <option value="account">Bank account</option><option value="bank-transfer">Bank transfer</option><option value="mandate">Debit mandate</option>
               <option value="premium-payment">Premium payment</option><option value="premium-adjustment">Premium reversal</option><option value="collection">Premium collection</option>
               <option value="benefit-plan">Benefit plan</option><option value="beneficiaries">Beneficiary designation</option>

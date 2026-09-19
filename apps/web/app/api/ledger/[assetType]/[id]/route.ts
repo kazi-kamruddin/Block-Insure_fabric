@@ -5,7 +5,7 @@ import { findDemoAccount } from "@/lib/auth/accounts";
 import { ledger } from "@/lib/fabric/ledger";
 
 const routeSchema = z.object({
-  assetType: z.enum(["partner-agreement", "hospital-invoice", "package", "policy", "claim", "evidence", "evidence-batch", "evidence-grant", "verification", "decision", "review", "appeal", "fraud-assessment", "settlement", "claim-history", "account", "bank-transfer", "mandate", "premium-payment", "premium-adjustment", "collection", "benefit-plan", "beneficiaries", "benefit-request", "liability", "oracle-snapshot", "oracle-request", "oracle-commitment", "oracle-result", "oracle-history"]),
+  assetType: z.enum(["partner-agreement", "hospital-invoice", "package", "policy", "claim", "evidence", "evidence-batch", "evidence-grant", "verification", "decision", "review", "appeal", "fraud-assessment", "settlement", "claim-history", "account", "bank-transfer", "mandate", "premium-payment", "premium-adjustment", "collection", "benefit-plan", "beneficiaries", "benefit-request", "liability", "oracle-snapshot", "oracle-request", "oracle-commitment", "oracle-result", "oracle-history", "privacy-credential", "privacy-presentation"]),
   id: z.string().trim().min(1).max(100).regex(/^[a-zA-Z0-9._:-]+$/),
 });
 
@@ -21,7 +21,7 @@ export async function GET(_request: Request, context: RouteContext) {
 
   const parsed = routeSchema.safeParse(await context.params);
   if (!parsed.success) return NextResponse.json({ message: "Invalid asset query" }, { status: 400 });
-  if (session.role === "hospitalOfficer" && !["partner-agreement", "hospital-invoice", "package"].includes(parsed.data.assetType)) {
+  if (session.role === "hospitalOfficer" && !["partner-agreement", "hospital-invoice", "package", "privacy-credential", "privacy-presentation"].includes(parsed.data.assetType)) {
     return NextResponse.json({ message: "The independent Hospital portal exposes only its agreement, invoices, and public package network" }, { status: 403 });
   }
   if (session.role === "bankOfficer" && !bankAssetTypes.has(parsed.data.assetType)) {
@@ -107,6 +107,30 @@ export async function GET(_request: Request, context: RouteContext) {
         if (session.role === "policyholder" && (await ledger.readClaim(item.claimId)).claimantId !== session.subjectId) return NextResponse.json({ message: "Asset is not owned by this account" }, { status: 403 });
         if (!(await hospitalOwnsClaim(item.claimId))) return NextResponse.json({ message: "Claim is assigned to another hospital" }, { status: 403 });
         result = await ledger.oracleRequestHistory(id);
+        break;
+      }
+      case "privacy-credential": {
+        const credential = await ledger.readPrivacyCredential(id);
+        if (session.role === "bankOfficer" || session.role === "auditor") return NextResponse.json({ message: "Credential is not visible to this account" }, { status: 403 });
+        if (session.role === "hospitalOfficer") {
+          if (credential.credentialType !== "HOSPITAL_INVOICE" || (await ledger.readHospitalInvoice(credential.sourceId)).hospitalId !== session.subjectId) return NextResponse.json({ message: "Credential belongs to another organization" }, { status: 403 });
+        }
+        if (session.role === "policyholder") {
+          const owned = credential.credentialType === "INSURANCE_POLICY"
+            ? (await ledger.readPolicy(credential.sourceId)).policyholderId === session.subjectId
+            : (await ledger.listClaims()).some((claim) => claim.claimantId === session.subjectId && claim.hospitalInvoiceId === credential.sourceId);
+          if (!owned) return NextResponse.json({ message: "Credential is not owned by this account" }, { status: 403 });
+        }
+        result = credential;
+        break;
+      }
+      case "privacy-presentation": {
+        const presentation = await ledger.readSelectiveDisclosurePresentation(id);
+        const claim = await ledger.readClaim(presentation.claimId);
+        if (session.role === "policyholder" && claim.claimantId !== session.subjectId) return NextResponse.json({ message: "Presentation is not owned by this account" }, { status: 403 });
+        if (session.role === "hospitalOfficer" && claim.hospitalId !== session.subjectId) return NextResponse.json({ message: "Presentation belongs to another Hospital claim" }, { status: 403 });
+        if (session.role === "bankOfficer") return NextResponse.json({ message: "Presentation is not visible to this account" }, { status: 403 });
+        result = presentation;
         break;
       }
       case "evidence": {

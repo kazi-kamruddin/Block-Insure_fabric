@@ -21,6 +21,7 @@ binds all adjudication inputs:
 - claim ID and version, Hospital verification, query hash, and appeal commitment;
 - registry ID, version, canonical root, rules version, and rules hash;
 - model version and model hash;
+- optional claim/version-bound selective-presentation ID, protocol, and hash;
 - three assigned certificate subjects and the required confirmation count;
 - commit and reveal deadlines.
 
@@ -124,3 +125,21 @@ dataset/version, input digest, transformation version, model version, processing
 counts, cursor progress, errors, and last latency. No private key, salt, patient
 identity, or clinical document is exposed. Persisted checkpoints are marked
 offline when their live endpoint cannot be reached.
+
+## Selective-disclosure binding
+
+HospitalMSP issues a Merkle credential for each finalized invoice and
+InsurerMSP issues one for an active policy. Salts and complete credential fields
+are stored in `oracleProofPrivateData`; only the issuer identity, source ID,
+root, version, status, and expiry are public. Issuance is authenticated by the
+normal Fabric transaction signature.
+
+The policyholder registers a short-lived presentation after invoice
+cross-checking. Chaincode generates and verifies proofs for the minimum invoice
+and policy fields required for adjudication, checks their semantics against the
+claim, binds the presentation to the claim version and a unique challenge, and
+stores only its SHA-256 commitment publicly. Each assigned Oracle reads the
+authorized private presentation, recomputes every Merkle path, checks expiry and
+claim semantics, and includes the presentation commitment in its canonical
+result hash. Undisclosed patient, treatment, premium, package, and terms fields
+do not enter the shared world state or Oracle presentation.

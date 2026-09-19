@@ -10,5 +10,17 @@
     "endorsementPolicy": {
       "signaturePolicy": "AND('BankMSP.peer','InsurerMSP.peer')"
     }
+  },
+  {
+    "name": "oracleProofPrivateData",
+    "policy": "OR('HospitalMSP.member','InsurerMSP.member','OracleMSP.member')",
+    "requiredPeerCount": 2,
+    "maxPeerCount": 3,
+    "blockToLive": 0,
+    "memberOnlyRead": true,
+    "memberOnlyWrite": true,
+    "endorsementPolicy": {
+      "signaturePolicy": "OutOf(2,'HospitalMSP.peer','InsurerMSP.peer','OracleMSP.peer')"
+    }
   }
 ]

@@ -82,6 +82,12 @@ export async function executeWorkflowCommand(command: WorkflowCommand, session: 
       return ledger.submitClaim(command);
     case "crossCheckClaimInvoice":
       return ledger.crossCheckClaimInvoice(command.claimId, command.verificationId);
+    case "issueInvoicePrivacyCredential":
+      return ledger.issueInvoicePrivacyCredential(command, findDemoAccount(session.accountId)?.fabricUserName);
+    case "issuePolicyPrivacyCredential":
+      return ledger.issuePolicyPrivacyCredential(command);
+    case "registerClaimPrivacyPresentation":
+      return ledger.registerClaimPrivacyPresentation(command);
     case "publishEvidenceMerkleBatch": {
       const parsed = JSON.parse(command.evidenceIdsJson) as unknown;
       if (!Array.isArray(parsed) || parsed.length === 0 || parsed.some((value) => typeof value !== "string")) {

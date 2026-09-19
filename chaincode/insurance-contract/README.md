@@ -64,8 +64,8 @@ provenance on every use. Bank identities cannot retrieve clinical evidence.
 Claims link verifications, review rounds, decisions, appeals, fraud assessments,
 access records, and settlements for audit navigation.
 
-The current provenance-bound threshold definition is `insurance-contract` 1.3.0
-with schema version 13 and an automatically resolved lifecycle sequence. A clean bootstrap
+The current provenance-bound threshold definition is `insurance-contract` 1.4.0
+with schema version 14 and an automatically resolved lifecycle sequence. A clean bootstrap
 starts at sequence 1; a non-destructive source upgrade increments the existing
 channel sequence.
 

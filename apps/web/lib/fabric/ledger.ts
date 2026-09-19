@@ -1,5 +1,6 @@
 import "server-only";
 
+import { randomBytes } from "node:crypto";
 import type { Contract } from "@hyperledger/fabric-gateway";
 import { withFabricContract } from "./gateway";
 import type { FabricRole } from "./config";
@@ -35,6 +36,8 @@ import type {
   PremiumCollection,
   PremiumAdjustment,
   PremiumPayment,
+  PrivacyCredential,
+  SelectiveDisclosurePresentation,
   Settlement,
 } from "./types";
 
@@ -71,10 +74,15 @@ async function submitWithTransient<T>(
   transactionName: string,
   args: Array<string | number>,
   transientData: Record<string, string | Uint8Array>,
+  profileUserName?: string,
 ) {
   return withFabricContract(role, async (contract) => decodeJson<T>(
     await contract.submit(transactionName, { arguments: stringifyArguments(args), transientData }),
-  ));
+  ), profileUserName);
+}
+
+function randomSalts(names: readonly string[]) {
+  return JSON.stringify(Object.fromEntries(names.map((name) => [name, randomBytes(32).toString("hex")])));
 }
 
 async function submitAsAuditor<T>(
@@ -675,6 +683,44 @@ export const ledger = {
 
   crossCheckClaimInvoice(claimId: string, verificationId: string) {
     return submit<HospitalVerification>("insurerAdmin", "CrossCheckClaimInvoice", claimId, verificationId);
+  },
+
+  issueInvoicePrivacyCredential(input: { id: string; invoiceId: string; expiresAt: string }, hospitalUserName?: string) {
+    return submitWithTransient<PrivacyCredential>(
+      "hospitalOfficer", "IssueInvoicePrivacyCredential", [input.id, input.invoiceId, input.expiresAt],
+      { credentialSalts: randomSalts(["admissionDate", "amountMinor", "dischargeDate", "hospitalId", "invoiceId", "invoiceReferenceHash", "patientReferenceHash", "status", "treatmentHash"]) },
+      hospitalUserName,
+    );
+  },
+
+  issuePolicyPrivacyCredential(input: { id: string; policyId: string; expiresAt: string }) {
+    return submitWithTransient<PrivacyCredential>(
+      "insurerAdmin", "IssuePolicyPrivacyCredential", [input.id, input.policyId, input.expiresAt],
+      { credentialSalts: randomSalts(["coverageLimitMinor", "endDate", "packageId", "policyId", "policyholderId", "premiumMinor", "startDate", "status", "termsHash"]) },
+    );
+  },
+
+  registerClaimPrivacyPresentation(input: { id: string; claimId: string; invoiceCredentialId: string; policyCredentialId: string; challenge: string; expiresAt: string }) {
+    return submit<SelectiveDisclosurePresentation>(
+      "policyholder", "RegisterClaimPrivacyPresentation", input.id, input.claimId,
+      input.invoiceCredentialId, input.policyCredentialId, input.challenge, input.expiresAt,
+    );
+  },
+
+  readPrivacyCredential(id: string) {
+    return evaluate<PrivacyCredential>("insurerAdmin", "ReadPrivacyCredential", id);
+  },
+
+  listPrivacyCredentials() {
+    return evaluate<PrivacyCredential[]>("insurerAdmin", "ListPrivacyCredentials");
+  },
+
+  readSelectiveDisclosurePresentation(id: string) {
+    return evaluate<SelectiveDisclosurePresentation>("insurerAdmin", "ReadSelectiveDisclosurePresentation", id);
+  },
+
+  listSelectiveDisclosurePresentations() {
+    return evaluate<SelectiveDisclosurePresentation[]>("insurerAdmin", "ListSelectiveDisclosurePresentations");
   },
 
   publishOracleRegistrySnapshot(input: {

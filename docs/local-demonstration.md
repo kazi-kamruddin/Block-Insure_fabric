@@ -17,7 +17,7 @@ bash network/scripts/network.sh verify
 
 The verifier should report 17 healthy services, six reachable CAs, five ready
 CouchDB instances, all five peers joined to `insurance-channel`, all three Oracle
-identities enrolled, chaincode `insurance-contract` 1.3.0, and schema version 13.
+identities enrolled, chaincode `insurance-contract` 1.4.0, and schema version 14.
 
 ## 2. Start the supervised application stack
 
@@ -30,13 +30,14 @@ The normal start path is non-destructive and never replaces ledger data:
 ```
 
 It supervises the standalone Next.js application, durable event worker,
-automatic premium-collection worker, Oracle 1, and Oracle 2. `Stop` stops application services and Fabric containers while
+automatic premium-collection worker, and all three Oracle workers. `Stop` stops application services and Fabric containers while
 retaining ledger volumes; add `-KeepNetwork` to leave Fabric running.
 
 The default `-OracleScenario Baseline` gives exact positive/negative agreement.
 After stopping only the managed processes with `Stop -KeepNetwork`, use
 `Start -OracleScenario Conflict` for the tracked divergent Oracle 2 snapshot or
-`Start -OracleScenario Oracle2Unavailable` for a deliberate timeout. No source or
+`Start -OracleScenario Oracle2Unavailable` for one-worker tolerance, or
+`Start -OracleScenario QuorumUnavailable` for a deliberate timeout. No source or
 private-key edit is required during the presentation.
 
 Only after deliberately approving loss of the local development ledger, create a

@@ -24,9 +24,9 @@ export type WorkflowFormValues = Record<string, string>;
 export type HashText = (value: string) => Promise<string>;
 
 export const operationsByRole = {
-  insurerAdmin: ["createPartnerAgreement", "setPartnerAgreementStatus", "createPolicyPackage", "configurePolicyPackagePartners", "publishPolicyPackage", "retirePolicyPackage", "createBenefitPlan", "publishBenefitPlan", "retireBenefitPlan", "issuePolicy", "advancePolicyLifecycle", "cancelPolicyAsInsurer", "queuePremiumCollection", "decideBenefitRequest", "markBenefitPaymentReady", "crossCheckClaimInvoice", "publishEvidenceMerkleBatch", "assessClaimFraud", "publishOracleRegistrySnapshot", "requestOracleVerification", "finalizeOracleTimeout", "routeOracleFailureToReview", "openClaimReview", "finalizeExpiredReview", "authorizeSettlement"],
-  policyholder: ["acquirePolicy", "requestBankMandate", "cancelBankMandate", "setBeneficiaries", "submitBenefitRequest", "renewPolicy", "cancelPolicy", "submitClaim", "submitClaimAppeal", "grantEvidenceAccess", "revokeEvidenceAccess"],
-  hospitalOfficer: ["createHospitalInvoice", "updateHospitalInvoice"],
+  insurerAdmin: ["createPartnerAgreement", "setPartnerAgreementStatus", "createPolicyPackage", "configurePolicyPackagePartners", "publishPolicyPackage", "retirePolicyPackage", "createBenefitPlan", "publishBenefitPlan", "retireBenefitPlan", "issuePolicy", "issuePolicyPrivacyCredential", "advancePolicyLifecycle", "cancelPolicyAsInsurer", "queuePremiumCollection", "decideBenefitRequest", "markBenefitPaymentReady", "crossCheckClaimInvoice", "publishEvidenceMerkleBatch", "assessClaimFraud", "publishOracleRegistrySnapshot", "requestOracleVerification", "finalizeOracleTimeout", "routeOracleFailureToReview", "openClaimReview", "finalizeExpiredReview", "authorizeSettlement"],
+  policyholder: ["acquirePolicy", "requestBankMandate", "cancelBankMandate", "setBeneficiaries", "submitBenefitRequest", "renewPolicy", "cancelPolicy", "submitClaim", "registerClaimPrivacyPresentation", "submitClaimAppeal", "grantEvidenceAccess", "revokeEvidenceAccess"],
+  hospitalOfficer: ["createHospitalInvoice", "updateHospitalInvoice", "issueInvoicePrivacyCredential"],
   auditor: ["recordAuditorDecision"],
   bankOfficer: ["openBankAccount", "adjustBankAccountBalance", "reviewBankMandate", "recordPremiumAdjustment", "processPremiumCollection", "expireBankMandate", "confirmBenefitPayment", "confirmSettlement"],
 } as const satisfies Record<FabricRole, readonly WorkflowOperation[]>;
@@ -262,6 +262,25 @@ export const workflowFormDefinitions: Record<WorkflowOperation, WorkflowFormDefi
     description: "Compare a submitted claim with the immutable invoice maintained by its contracted Hospital. The insurer cannot edit the source record.",
     fields: [{ name: "claimId", label: "Claim ID" }, { name: "verificationId", label: "Verification ID", placeholder: "invoice-check-1001" }],
   },
+  issueInvoicePrivacyCredential: {
+    label: "Issue private invoice credential",
+    description: "Anchor a salted Merkle root for a finalized invoice and retain the credential fields in the authorized private collection.",
+    fields: [{ name: "id", label: "Credential ID" }, { name: "invoiceId", label: "Finalized invoice ID" }, { name: "expiresAt", label: "Credential expiry (RFC3339)" }],
+  },
+  issuePolicyPrivacyCredential: {
+    label: "Issue private policy credential",
+    description: "Anchor a salted Merkle root for an active policy without publishing the complete credential.",
+    fields: [{ name: "id", label: "Credential ID" }, { name: "policyId", label: "Active policy ID" }, { name: "expiresAt", label: "Credential expiry (RFC3339)" }],
+  },
+  registerClaimPrivacyPresentation: {
+    label: "Create selective claim presentation",
+    description: "Disclose only the invoice and policy facts required by the Oracles, with claim-bound Merkle proofs and an anti-replay challenge.",
+    fields: [
+      { name: "id", label: "Presentation ID" }, { name: "claimId", label: "Hospital-verified claim ID" },
+      { name: "invoiceCredentialId", label: "Invoice credential ID" }, { name: "policyCredentialId", label: "Policy credential ID" },
+      { name: "challenge", label: "Unique challenge" }, { name: "expiresAt", label: "Presentation expiry (RFC3339)" },
+    ],
+  },
   publishEvidenceMerkleBatch: {
     label: "Anchor evidence Merkle batch",
     description: "Canonicalize selected encrypted-evidence references, verify the computed SHA-256 root in chaincode, and publish one immutable batch commitment.",
@@ -468,6 +487,9 @@ export function createWorkflowFormValues(
     updateHospitalInvoice: { id: "", patientReferenceText: "", invoiceReferenceText: "", treatmentText: "", amountBdt: "", admissionDate: today, dischargeDate: today, status: "DRAFT" },
     submitClaim: { id: generatedId("claim", idFactory), policyId: "", hospitalId: "hospital-demo", hospitalInvoiceId: "", amountBdt: "", incidentDate: today, descriptionText: "" },
     crossCheckClaimInvoice: { claimId: "", verificationId: generatedId("invoice-check", idFactory) },
+    issueInvoicePrivacyCredential: { id: generatedId("invoice-credential", idFactory), invoiceId: "", expiresAt: deadlineOffset(365) },
+    issuePolicyPrivacyCredential: { id: generatedId("policy-credential", idFactory), policyId: "", expiresAt: deadlineOffset(365) },
+    registerClaimPrivacyPresentation: { id: generatedId("privacy-presentation", idFactory), claimId: "", invoiceCredentialId: "", policyCredentialId: "", challenge: generatedId("challenge", idFactory), expiresAt: deadlineOffset(1) },
     publishEvidenceMerkleBatch: { id: generatedId("evidence-batch", idFactory), evidenceIdsJson: "[]" },
     assessClaimFraud: { assessmentId: generatedId("fraud", idFactory), claimId: "" },
     openClaimReview: { claimId: "", reviewId: generatedId("review", idFactory), assignedAuditorIdsJson: '["auditor1","auditor2","auditor3","auditor4"]', approvalThreshold: "3", rejectionThreshold: "2", deadline: deadlineOffset(3) },
@@ -691,6 +713,15 @@ export async function buildWorkflowCommand(
       break;
     case "crossCheckClaimInvoice":
       command = { operation, claimId: required(values, "claimId", "Claim ID"), verificationId: required(values, "verificationId", "Verification ID") };
+      break;
+    case "issueInvoicePrivacyCredential":
+      command = { operation, id: required(values, "id", "Credential ID"), invoiceId: required(values, "invoiceId", "Invoice ID"), expiresAt: required(values, "expiresAt", "Credential expiry") };
+      break;
+    case "issuePolicyPrivacyCredential":
+      command = { operation, id: required(values, "id", "Credential ID"), policyId: required(values, "policyId", "Policy ID"), expiresAt: required(values, "expiresAt", "Credential expiry") };
+      break;
+    case "registerClaimPrivacyPresentation":
+      command = { operation, id: required(values, "id", "Presentation ID"), claimId: required(values, "claimId", "Claim ID"), invoiceCredentialId: required(values, "invoiceCredentialId", "Invoice credential ID"), policyCredentialId: required(values, "policyCredentialId", "Policy credential ID"), challenge: required(values, "challenge", "Challenge"), expiresAt: required(values, "expiresAt", "Presentation expiry") };
       break;
     case "publishEvidenceMerkleBatch":
       command = { operation, id: required(values, "id", "Merkle batch ID"), evidenceIdsJson: required(values, "evidenceIdsJson", "Evidence IDs") };

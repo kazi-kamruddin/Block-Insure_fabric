@@ -4,11 +4,12 @@ import { environmentFileArgument, loadEnvironmentFile } from "./environment.mjs"
 
 loadEnvironmentFile(environmentFileArgument());
 
-const [{ loadOracleConfig }, { connectOracleGateway }, { loadRegistrySnapshot, validateRegistrySnapshot, assessRegistryRecord }, protocol, cursorModule, retryModule, healthModule] = await Promise.all([
+const [{ loadOracleConfig }, { connectOracleGateway }, { loadRegistrySnapshot, validateRegistrySnapshot, assessRegistryRecord }, protocol, privacy, cursorModule, retryModule, healthModule] = await Promise.all([
   import("./config.mjs"),
   import("./gateway.mjs"),
   import("./registry.mjs"),
   import("./protocol.mjs"),
+  import("./privacy.mjs"),
   import("./cursor.mjs"),
   import("./retry.mjs"),
   import("./health.mjs"),
@@ -140,10 +141,12 @@ async function processRequest(requestId) {
   let request = await evaluate("ReadOracleRequest", requestId);
   if (!request.assignedOracleIds.includes(config.oracleId)) return;
   if (request.status !== "PENDING" || await evaluateOrNull("ReadOracleResult", `${request.id}:${config.oracleId}`)) return;
-  const [claim, hospitalVerification, appeal] = await Promise.all([
+  const [claim, hospitalVerification, appeal, publicPresentation, privatePresentation] = await Promise.all([
     evaluate("ReadClaim", request.claimId),
     evaluate("ReadHospitalVerification", request.hospitalVerificationId),
     request.appealId ? evaluate("ReadClaimAppeal", request.appealId) : Promise.resolve(null),
+    request.privacyPresentationId ? evaluate("ReadSelectiveDisclosurePresentation", request.privacyPresentationId) : Promise.resolve(null),
+    request.privacyPresentationId ? evaluate("ReadSelectiveDisclosurePresentationPrivate", request.privacyPresentationId) : Promise.resolve(null),
   ]);
   const requestRegistry = await registryForRequest(request);
   if (claim.version !== request.claimVersion || claim.currentOracleRequestId !== request.id) {
@@ -159,7 +162,7 @@ async function processRequest(requestId) {
     await updateHealth({ status: "ONLINE", lastProcessedRequestId: request.id, lastError: `Reveal deadline expired for ${request.id}` });
     return;
   }
-  const assessment = assessRegistryRecord({
+  let assessment = assessRegistryRecord({
     snapshot: requestRegistry,
     request,
     claim,
@@ -168,6 +171,16 @@ async function processRequest(requestId) {
     configuredModelVersion: config.modelVersion,
     configuredModelHash: config.modelHash,
   });
+  const privacyAssessment = privacy.verifySelectiveDisclosurePresentation({
+    request, claim, publicPresentation, privatePresentation,
+  });
+  if (!privacyAssessment.valid) {
+    assessment = {
+      verified: false,
+      verificationCode: privacyAssessment.code,
+      recordHash: request.privacyPresentationHash || "0".repeat(64),
+    };
+  }
   const resultHash = protocol.buildResultDigest(request, assessment);
   const salt = protocol.buildDeterministicSalt(runtime.privateKey, request.id, config.oracleId);
   const commitmentHash = protocol.buildCommitmentDigest(request, { verified: assessment.verified, resultHash, salt });

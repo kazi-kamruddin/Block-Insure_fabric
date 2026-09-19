@@ -11,6 +11,13 @@ coverage/
 /apps/web/test-results/
 /apps/web/playwright-report/
 /verification-results/*.json
+/benchmarks/caliper/generated/
+/benchmarks/caliper/reports/
+/benchmarks/oracle-faults/reports/
+/formal/insurance-workflow/reports/
+/formal/insurance-workflow/.cache/
+/formal/insurance-workflow/states/
+/formal/insurance-workflow/*_TTrace_*
 
 # Local configuration and credentials
 .env

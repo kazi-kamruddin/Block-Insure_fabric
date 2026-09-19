@@ -279,6 +279,7 @@ export type Claim = {
   currentReviewId: string;
   currentAppealId: string;
   currentOracleRequestId: string;
+  privacyPresentationId?: string;
   oracleOutcome: string;
   oracleResultHash: string;
   version: number;
@@ -287,6 +288,46 @@ export type Claim = {
   status: ClaimStatus;
   createdAt: LedgerTimestamp;
   updatedAt: LedgerTimestamp;
+};
+
+export type PrivacyCredential = {
+  assetType: "privacyCredential";
+  schemaVersion: number;
+  id: string;
+  credentialType: "HOSPITAL_INVOICE" | "INSURANCE_POLICY";
+  sourceId: string;
+  subjectHash: string;
+  issuerMsp: "HospitalMSP" | "InsurerMSP";
+  issuerIdentity: string;
+  credentialVersion: number;
+  rootHash: string;
+  fieldCount: number;
+  hashAlgorithm: "SHA-256";
+  leafEncoding: "block-insure-credential-leaf-v1";
+  status: "ACTIVE" | "REVOKED";
+  issuedAt: LedgerTimestamp;
+  expiresAt: LedgerTimestamp;
+  revokedAt: LedgerTimestamp;
+};
+
+export type SelectiveDisclosurePresentation = {
+  assetType: "selectiveDisclosurePresentation";
+  schemaVersion: number;
+  id: string;
+  protocolVersion: "block-insure-selective-disclosure-v1";
+  claimId: string;
+  claimVersion: number;
+  invoiceCredentialId: string;
+  policyCredentialId: string;
+  invoiceRootHash: string;
+  policyRootHash: string;
+  challengeHash: string;
+  presentationHash: string;
+  disclosedFields: string[];
+  status: "VERIFIED";
+  registeredBy: string;
+  createdAt: LedgerTimestamp;
+  expiresAt: LedgerTimestamp;
 };
 
 export type OracleRegistrySnapshot = {
@@ -311,6 +352,9 @@ export type OracleRequest = {
   hospitalVerificationId: string;
   appealId: string;
   appealCommitmentHash: string;
+  privacyPresentationId?: string;
+  privacyPresentationHash?: string;
+  privacyProtocolVersion?: string;
   queryHash: string;
   registrySnapshotId: string;
   registryVersion: number;
@@ -361,6 +405,8 @@ export type OracleResult = {
   verified: boolean;
   verificationCode: string;
   recordHash: string;
+  privacyPresentationId?: string;
+  privacyPresentationHash?: string;
   resultHash: string;
   createdAt: LedgerTimestamp;
 };

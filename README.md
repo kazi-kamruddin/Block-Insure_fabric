@@ -18,8 +18,10 @@ bank mandates, governed benefits, distributed adjudication, appeals, and advisor
 fraud triage, governed evidence grants, durable event projection, and
 ledger-derived research metrics, evidence Merkle inclusion proofs, a targeted
 Bank–Insurer private-data collection, independent Oracle workers, commit/reveal
-consensus, and governed auditor fallback. The clean local deployment runs
-`insurance-contract` 1.3.0 with schema 13. Its automated code gate and live Fabric
+consensus, governed auditor fallback, issuer-bound selective-disclosure
+credentials, executable TLA+ workflow verification, and reproducible Caliper
+and fault-profile benchmarks. The clean local deployment runs
+`insurance-contract` 1.4.0 with schema 14. Its automated code gate and live Fabric
 workflow cover the Phase 1 partner and Hospital boundary.
 
 This is not a production deployment claim. Institutional authentication,
@@ -36,6 +38,8 @@ governance remain environment-specific work outside the local release.
 - `scripts/` — shared verification and supervised demonstration automation.
 - `services/oracle-worker/` — independent Oracle processes, registry fixtures,
   durable cursors, and health reporting.
+- `formal/insurance-workflow/` — TLA+ specification and exhaustive executable checker.
+- `benchmarks/` — Hyperledger Caliper and end-to-end Oracle fault experiments.
 
 Server-side Gateway, identity, evidence, fraud, event, and research modules are
 co-located under `apps/web/lib/`; cross-component browser tests live in
@@ -88,7 +92,7 @@ For a supervised local deployment from the repository root, use
 ledger, `Status` checks the web app plus the event, banking, and Oracle workers, and `Stop` retains Fabric
 volumes. `CleanBootstrap -ConfirmReset` is deliberately destructive and is only
 for an explicitly approved clean showcase; it rebuilds the topology, deploys
-chaincode 1.3.0, seeds partner agreements, private balance-bearing Bank accounts, Hospital invoices, and the
+chaincode 1.4.0, seeds partner agreements, private balance-bearing Bank accounts, Hospital invoices, and the
 policy/benefit/Oracle catalog, then starts the web app, event worker, automatic
 premium-collection worker, and all three Oracle workers.
 
@@ -110,6 +114,9 @@ worker independence, and manual-review fallback.
 The [Merkle and private-banking design](docs/evidence-merkle-and-private-banking.md)
 specifies canonical evidence proofs, transient input, collection membership, and
 the public/private account split.
+The [privacy, formal-verification, and benchmarking design](docs/privacy-formal-benchmarking.md)
+defines the selective-disclosure protocol, checked invariants, experiment matrix,
+and interpretation limits.
 
 ## Complete verification
 

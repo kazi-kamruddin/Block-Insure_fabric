@@ -47,8 +47,18 @@ async function createHospitalVerifiedClaim(
   await command(insurer, { operation: "publishPolicyPackage", id: packageId });
   await command(insurer, { operation: "issuePolicy", id: policyId, packageId, policyholderId: "policyholder1", startDate: "2026-01-01", endDate: "2026-12-31" });
   await command(hospital, { operation: "createHospitalInvoice", id: invoiceId, patientReferenceHash: hashA, invoiceReferenceHash: clinicalReferenceHash, treatmentHash: hashB, amountMinor: 50_000, admissionDate: "2026-06-10", dischargeDate: "2026-06-20", status: "FINALIZED" });
+  const credentialExpiry = new Date(Date.now() + 86_400_000).toISOString();
+  const invoiceCredentialId = `oracle-invoice-credential-${suffix}`;
+  const policyCredentialId = `oracle-policy-credential-${suffix}`;
+  await command(hospital, { operation: "issueInvoicePrivacyCredential", id: invoiceCredentialId, invoiceId, expiresAt: credentialExpiry });
+  await command(insurer, { operation: "issuePolicyPrivacyCredential", id: policyCredentialId, policyId, expiresAt: credentialExpiry });
   await command(policyholder, { operation: "submitClaim", id: claimId, policyId, hospitalId: "hospital-demo", hospitalInvoiceId: invoiceId, amountMinor: 50_000, incidentDate: "2026-06-15", descriptionHash });
   await command(insurer, { operation: "crossCheckClaimInvoice", claimId, verificationId: `oracle-verification-${suffix}` });
+  await command(policyholder, {
+    operation: "registerClaimPrivacyPresentation", id: `oracle-presentation-${suffix}`, claimId,
+    invoiceCredentialId, policyCredentialId, challenge: `oracle-challenge-${suffix}`,
+    expiresAt: new Date(Date.now() + 30 * 60_000).toISOString(),
+  });
   return claimId;
 }
 
@@ -121,7 +131,8 @@ test("a 2-of-3 Oracle quorum automatically approves an exact valid result and th
     await waitForClaimStatus(policyholder, claimId, "APPROVED");
 
     const oracleRequest = await (await insurer.get(`/api/ledger/oracle-request/${requestId}`)).json();
-    expect(oracleRequest.result).toMatchObject({ status: "CONSENSUS", finalizationCode: "EXACT_CONSENSUS", verifiedResult: true, assignedOracleIds: ["oracle1", "oracle2", "oracle3"], requiredConfirmations: 2 });
+    expect(oracleRequest.result).toMatchObject({ status: "CONSENSUS", finalizationCode: "EXACT_CONSENSUS", verifiedResult: true, assignedOracleIds: ["oracle1", "oracle2", "oracle3"], requiredConfirmations: 2, privacyProtocolVersion: "block-insure-selective-disclosure-v1" });
+    expect(oracleRequest.result.privacyPresentationHash).toMatch(/^[a-f0-9]{64}$/);
     expect(oracleRequest.result.commitmentCount).toBeGreaterThanOrEqual(2);
     expect(oracleRequest.result.revealCount).toBeGreaterThanOrEqual(2);
     const commitments = await (await insurer.get("/api/ledger/oracle-commitment")).json();

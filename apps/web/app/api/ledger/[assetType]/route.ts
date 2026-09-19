@@ -4,7 +4,7 @@ import { currentSession } from "@/lib/auth/current-session";
 import { findDemoAccount } from "@/lib/auth/accounts";
 import { ledger } from "@/lib/fabric/ledger";
 
-const assetTypeSchema = z.enum(["partner-agreement", "hospital-invoice", "package", "policy", "claim", "evidence", "evidence-batch", "evidence-grant", "verification", "decision", "review", "appeal", "fraud-assessment", "settlement", "access", "account", "bank-transfer", "mandate", "premium-payment", "premium-adjustment", "collection", "benefit-plan", "beneficiaries", "benefit-request", "liability", "oracle-snapshot", "oracle-request", "oracle-commitment", "oracle-result"]);
+const assetTypeSchema = z.enum(["partner-agreement", "hospital-invoice", "package", "policy", "claim", "evidence", "evidence-batch", "evidence-grant", "verification", "decision", "review", "appeal", "fraud-assessment", "settlement", "access", "account", "bank-transfer", "mandate", "premium-payment", "premium-adjustment", "collection", "benefit-plan", "beneficiaries", "benefit-request", "liability", "oracle-snapshot", "oracle-request", "oracle-commitment", "oracle-result", "privacy-credential", "privacy-presentation"]);
 type RouteContext = { params: Promise<{ assetType: string }> };
 
 export const runtime = "nodejs";
@@ -17,7 +17,7 @@ export async function GET(_request: Request, context: RouteContext) {
 
   const assetType = assetTypeSchema.safeParse((await context.params).assetType);
   if (!assetType.success) return NextResponse.json({ message: "Invalid asset collection" }, { status: 400 });
-  if (session.role === "hospitalOfficer" && !["partner-agreement", "hospital-invoice", "package"].includes(assetType.data)) {
+  if (session.role === "hospitalOfficer" && !["partner-agreement", "hospital-invoice", "package", "privacy-credential", "privacy-presentation"].includes(assetType.data)) {
     return NextResponse.json({ message: "The independent Hospital portal exposes only its agreement, invoices, and public package network" }, { status: 403 });
   }
   if (session.role === "bankOfficer" && !bankAssetTypes.has(assetType.data)) {
@@ -89,6 +89,25 @@ export async function GET(_request: Request, context: RouteContext) {
         const results = await ledger.listOracleResults();
         const claimIds = await visibleClaimIds();
         result = claimIds ? results.filter((item) => claimIds.has(item.claimId)) : results;
+        break;
+      }
+      case "privacy-credential": {
+        const credentials = await ledger.listPrivacyCredentials();
+        if (session.role === "insurerAdmin") result = credentials;
+        else if (session.role === "hospitalOfficer") {
+          const invoiceIds = new Set((await ledger.listHospitalInvoices()).filter((item) => item.hospitalId === session.subjectId).map((item) => item.id));
+          result = credentials.filter((item) => item.credentialType === "HOSPITAL_INVOICE" && invoiceIds.has(item.sourceId));
+        } else if (session.role === "policyholder") {
+          const claims = (await ledger.listClaims()).filter((item) => item.claimantId === session.subjectId);
+          const sourceIds = new Set([...(await ledger.listPolicies()).filter((item) => item.policyholderId === session.subjectId).map((item) => item.id), ...claims.map((item) => item.hospitalInvoiceId ?? "")]);
+          result = credentials.filter((item) => sourceIds.has(item.sourceId));
+        } else result = [];
+        break;
+      }
+      case "privacy-presentation": {
+        const presentations = await ledger.listSelectiveDisclosurePresentations();
+        const claimIds = await visibleClaimIds();
+        result = claimIds ? presentations.filter((item) => claimIds.has(item.claimId)) : presentations;
         break;
       }
       case "evidence": {

@@ -6,6 +6,7 @@ import test from "node:test";
 import { loadOracleConfig } from "../src/config.mjs";
 import { emptyCursor, loadCursor, persistCursor } from "../src/cursor.mjs";
 import { buildCommitmentDigest, buildDeterministicSalt, buildResultDigest, oracleRequestPhase } from "../src/protocol.mjs";
+import { privacyLeafHash, privacyParentHash, verifyDisclosure, verifySelectiveDisclosurePresentation } from "../src/privacy.mjs";
 import { createHealthState, loadPersistedHealth, persistHealth } from "../src/health.mjs";
 import { buildHybridRegistryReplicas, hybridDescriptionHash, hybridRecordToRegistryRecord } from "../src/hybrid-adapter.mjs";
 import { enumerateThreeOracleStateSpace, evaluateThreshold } from "../src/threshold-model.mjs";
@@ -32,10 +33,10 @@ const request = {
 test("canonical result and commitment digests bind every adjudication version", () => {
   const common = { verified: true, verificationCode: "VERIFIED", recordHash: "5".repeat(64) };
   const resultHash = buildResultDigest(request, common);
-  assert.equal(resultHash, "82f423a623598cfdcbff6239a447f9ac774eec08175ba8c2f76ae7485e131eb7");
+  assert.equal(resultHash, "26b3db31914509e7d5935b2726389ef5958b7987f530e96d9afeeeff41570bbe");
   assert.equal(
     buildCommitmentDigest(request, { verified: true, resultHash, salt: "6".repeat(64) }),
-    "d72e0d6dc8003404d09d75d6db5d5e7eba6f48437c536784b97c6f1afcc0a942",
+    "2228c3f37167b622a585bc56361063a2ab8850b57887e7d998ca2b7f0b3b3133",
   );
   assert.equal(resultHash, buildResultDigest({ ...request }, { ...common }));
   assert.notEqual(resultHash, buildResultDigest({ ...request, claimVersion: 3 }, common));
@@ -45,6 +46,25 @@ test("canonical result and commitment digests bind every adjudication version", 
   assert.notEqual(
     buildCommitmentDigest(request, { verified: true, resultHash, salt: salt1 }),
     buildCommitmentDigest(request, { verified: true, resultHash, salt: salt2 }),
+  );
+});
+
+test("selective-disclosure Merkle proofs reject altered values and missing private payloads", () => {
+  const first = { credentialId: "credential-1", credentialVersion: 1, name: "amountMinor", value: "50000", salt: "a".repeat(64) };
+  const second = { credentialId: "credential-1", credentialVersion: 1, name: "status", value: "FINALIZED", salt: "b".repeat(64) };
+  const firstHash = privacyLeafHash(first);
+  const secondHash = privacyLeafHash(second);
+  const root = privacyParentHash(firstHash, secondHash);
+  const disclosure = { ...first, leafIndex: 0, proof: [{ hash: secondHash, position: "RIGHT" }] };
+  assert.equal(verifyDisclosure(disclosure, root), true);
+  assert.equal(verifyDisclosure({ ...disclosure, value: "50001" }, root), false);
+  assert.deepEqual(
+    verifySelectiveDisclosurePresentation({ request: {}, claim: {}, publicPresentation: null, privatePresentation: null }),
+    { valid: true, code: "LEGACY_NO_PRESENTATION" },
+  );
+  assert.deepEqual(
+    verifySelectiveDisclosurePresentation({ request: { privacyPresentationId: "presentation-1" }, claim: {}, publicPresentation: null, privatePresentation: null }),
+    { valid: false, code: "PRIVACY_PRESENTATION_MISSING" },
   );
 });
 

@@ -3,6 +3,7 @@ import type {
   AuditorDecision, BenefitRequest, Claim, ClaimAppeal, ClaimReview,
   EvidenceAccessGrant, EvidenceAccessRecord, EvidenceReference, FraudAssessment,
   Liability, OracleRequest, OracleResult, Policy, PremiumAdjustment, PremiumPayment, Settlement,
+  PrivacyCredential, SelectiveDisclosurePresentation,
 } from "@/lib/fabric/types";
 
 export type ResearchInput = {
@@ -22,6 +23,8 @@ export type ResearchInput = {
   liabilities: Liability[];
   oracleRequests: OracleRequest[];
   oracleResults: OracleResult[];
+  privacyCredentials?: PrivacyCredential[];
+  privacyPresentations?: SelectiveDisclosurePresentation[];
 };
 
 const countBy = <T>(values: T[], key: (value: T) => string) => values.reduce<Record<string, number>>((counts, value) => {
@@ -61,6 +64,8 @@ export function buildResearchSnapshot(
     return request.status === "CONSENSUS" && (request.revealCount < request.expectedResponses || new Set(results.map((item) => item.resultHash)).size > 1);
   }).length;
   const oracleSafetyViolations = finalizedOracleRequests.filter((request) => requestResultCounts(request).filter((count) => count >= request.requiredConfirmations).length > 1).length;
+  const privacyCredentials = input.privacyCredentials ?? [];
+  const privacyPresentations = input.privacyPresentations ?? [];
 
   const body = {
     schemaVersion: 1,
@@ -94,6 +99,15 @@ export function buildResearchSnapshot(
       observedFaultTolerantFinalizations,
       safetyViolations: oracleSafetyViolations,
     },
+    privacyPreservingVerification: {
+      credentials: privacyCredentials.length,
+      credentialTypes: countBy(privacyCredentials, (item) => item.credentialType),
+      revokedCredentials: privacyCredentials.filter((item) => item.status === "REVOKED").length,
+      presentations: privacyPresentations.length,
+      privacyBoundOracleRequests: input.oracleRequests.filter((item) => Boolean(item.privacyPresentationId)).length,
+      meanDisclosedFields: privacyPresentations.length ? sum(privacyPresentations.map((item) => item.disclosedFields.length)) / privacyPresentations.length : null,
+      invalidProofResults: input.oracleResults.filter((item) => item.verificationCode.startsWith("PRIVACY_") && item.verificationCode !== "PRIVACY_PROOF_VERIFIED").length,
+    },
     fraudDecisionSupport: {
       assessments: input.fraudAssessments.length,
       riskLevels: countBy(input.fraudAssessments, (item) => item.riskLevel),
@@ -123,6 +137,7 @@ export function buildResearchSnapshot(
       "Metrics describe the current local Fabric ledger and are not clinical or causal findings.",
       "Fraud scores are deterministic triage aids; only governed review transactions decide claims.",
       "Oracle agreement measures exact canonical result hashes; failed Oracle requests route to fixed-quorum manual review.",
+      "Selective disclosure hides undisclosed credential fields from shared world state; required claim facts remain visible to authorized collection members.",
       "Latency reflects transaction timestamps in this development network, not production capacity.",
       "Counts can include uniquely named records created by verification and demonstration runs.",
     ],

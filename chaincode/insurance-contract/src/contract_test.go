@@ -1323,11 +1323,99 @@ func TestOracleProtocolMatchesWorkerHashVector(t *testing.T) {
 		ModelVersion: "model-v1", ModelHash: strings.Repeat("4", 64),
 	}
 	resultHash := oracleResultDigest(request, true, "VERIFIED", strings.Repeat("5", 64))
-	if resultHash != "82f423a623598cfdcbff6239a447f9ac774eec08175ba8c2f76ae7485e131eb7" {
+	if resultHash != "26b3db31914509e7d5935b2726389ef5958b7987f530e96d9afeeeff41570bbe" {
 		t.Fatalf("Go Oracle result hash diverged from the Node worker: %s", resultHash)
 	}
 	commitment := oracleCommitmentDigest(request, true, resultHash, strings.Repeat("6", 64))
-	if commitment != "d72e0d6dc8003404d09d75d6db5d5e7eba6f48437c536784b97c6f1afcc0a942" {
+	if commitment != "2228c3f37167b622a585bc56361063a2ab8850b57887e7d998ca2b7f0b3b3133" {
 		t.Fatalf("Go Oracle commitment diverged from the Node worker: %s", commitment)
+	}
+}
+
+func TestSelectiveDisclosureCredentialAndPresentationLifecycle(t *testing.T) {
+	contract := &Contract{}
+	ctx := &testContext{stub: newMemoryStub()}
+	hashA := strings.Repeat("a", 64)
+	hashB := strings.Repeat("b", 64)
+	hashC := strings.Repeat("c", 64)
+
+	invoice := &HospitalInvoice{
+		AssetType: "hospitalInvoice", SchemaVersion: SchemaVersion, ID: "invoice-private-1", HospitalID: "hospital1",
+		PatientReferenceHash: hashA, InvoiceReferenceHash: hashB, TreatmentHash: hashC, AmountMinor: 50_000,
+		AdmissionDate: "2026-06-10", DischargeDate: "2026-06-20", Status: "FINALIZED",
+	}
+	policy := &Policy{
+		AssetType: "policy", SchemaVersion: SchemaVersion, ID: "policy-private-1", PackageID: "package-private-1",
+		PolicyholderID: "policyholder1", StartDate: "2026-01-01", EndDate: "2026-12-31",
+		PremiumMinor: 1_000, CoverageLimitMinor: 100_000, TermsHash: hashC, Status: "ACTIVE",
+	}
+	claim := &Claim{
+		AssetType: "claim", SchemaVersion: SchemaVersion, ID: "claim-private-1", PolicyID: policy.ID,
+		ClaimantID: "policyholder1", HospitalID: "hospital1", HospitalInvoiceID: invoice.ID,
+		AmountMinor: 50_000, IncidentDate: "2026-06-15", DescriptionHash: hashA,
+		HospitalVerificationID: "verification-private-1", Version: 1, Status: "HOSPITAL_VERIFIED",
+	}
+	requireNoError(t, putState(ctx, "hospitalInvoice", invoice.ID, invoice))
+	requireNoError(t, putState(ctx, "policy", policy.ID, policy))
+	requireNoError(t, putState(ctx, "claim", claim.ID, claim))
+
+	setSalts := func(names []string, value string) {
+		salts := make(map[string]string, len(names))
+		for _, name := range names {
+			salts[name] = value
+		}
+		payload, err := json.Marshal(salts)
+		requireNoError(t, err)
+		ctx.stub.transient["credentialSalts"] = payload
+	}
+
+	setIdentity(ctx, "hospital1-cert", "HospitalMSP", "hospitalOfficer", map[string]string{"subjectId": "hospital1"})
+	setSalts([]string{"admissionDate", "amountMinor", "dischargeDate", "hospitalId", "invoiceId", "invoiceReferenceHash", "patientReferenceHash", "status", "treatmentHash"}, hashA)
+	invoiceCredential, err := contract.IssueInvoicePrivacyCredential(ctx, "credential-invoice-1", invoice.ID, "2027-01-01T00:00:00Z")
+	requireNoError(t, err)
+
+	setIdentity(ctx, "insurer-admin", "InsurerMSP", "insurerAdmin", nil)
+	setSalts([]string{"coverageLimitMinor", "endDate", "packageId", "policyId", "policyholderId", "premiumMinor", "startDate", "status", "termsHash"}, hashB)
+	policyCredential, err := contract.IssuePolicyPrivacyCredential(ctx, "credential-policy-1", policy.ID, "2027-01-01T00:00:00Z")
+	requireNoError(t, err)
+	if invoiceCredential.RootHash == policyCredential.RootHash {
+		t.Fatal("independent credentials unexpectedly produced the same Merkle root")
+	}
+
+	setIdentity(ctx, "policyholder-cert", "InsurerMSP", "policyholder", map[string]string{"subjectId": "policyholder1"})
+	presentation, err := contract.RegisterClaimPrivacyPresentation(
+		ctx, "presentation-private-1", claim.ID, invoiceCredential.ID, policyCredential.ID,
+		"challenge-private-1", "2026-09-06T12:00:00Z",
+	)
+	requireNoError(t, err)
+	if presentation.Status != "VERIFIED" || presentation.ClaimVersion != 1 || presentation.PresentationHash == "" {
+		t.Fatalf("unexpected public presentation: %+v", presentation)
+	}
+	publicJSON, err := json.Marshal(presentation)
+	requireNoError(t, err)
+	if strings.Contains(string(publicJSON), invoice.TreatmentHash) || strings.Contains(string(publicJSON), invoice.PatientReferenceHash) {
+		t.Fatalf("public presentation leaked undisclosed medical fields: %s", publicJSON)
+	}
+
+	setIdentity(ctx, "oracle1-cert", "OracleMSP", "oracle", map[string]string{"subjectId": "oracle1"})
+	private, err := contract.ReadSelectiveDisclosurePresentationPrivate(ctx, presentation.ID)
+	requireNoError(t, err)
+	if len(private.Disclosures) != len(invoiceDisclosureNames)+len(policyDisclosureNames) {
+		t.Fatalf("unexpected disclosure count: %+v", private)
+	}
+	for _, disclosure := range private.Disclosures {
+		root := invoiceCredential.RootHash
+		if disclosure.CredentialID == policyCredential.ID {
+			root = policyCredential.RootHash
+		}
+		if !verifyPrivacyDisclosure(disclosure, root) {
+			t.Fatalf("valid disclosure proof rejected: %+v", disclosure)
+		}
+	}
+
+	tampered := private.Disclosures[0]
+	tampered.Value += "-tampered"
+	if verifyPrivacyDisclosure(tampered, invoiceCredential.RootHash) {
+		t.Fatal("tampered selective disclosure was accepted")
 	}
 }

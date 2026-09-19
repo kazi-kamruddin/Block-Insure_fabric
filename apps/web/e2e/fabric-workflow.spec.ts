@@ -200,7 +200,7 @@ test("five organization sessions complete a Fabric insurance workflow", async ({
     expect(research.ok(), await research.text()).toBe(true);
     expect(await research.json()).toMatchObject({
       schemaVersion: 1,
-      provenance: { ledgerSchemaVersion: 13 },
+      provenance: { ledgerSchemaVersion: 14 },
       fraudDecisionSupport: { advisoryOnly: true },
     });
     const auditorNotifications = await auditor.get("/api/operations/notifications");

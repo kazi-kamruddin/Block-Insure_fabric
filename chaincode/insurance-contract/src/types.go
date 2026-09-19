@@ -1,6 +1,6 @@
 package insurance
 
-const SchemaVersion = 13
+const SchemaVersion = 14
 
 type PartnerAgreement struct {
 	AssetType     string `json:"assetType"`
@@ -288,6 +288,7 @@ type Claim struct {
 	CurrentReviewID        string   `json:"currentReviewId"`
 	CurrentAppealID        string   `json:"currentAppealId"`
 	CurrentOracleRequestID string   `json:"currentOracleRequestId"`
+	PrivacyPresentationID  string   `json:"privacyPresentationId"`
 	OracleOutcome          string   `json:"oracleOutcome"`
 	OracleResultHash       string   `json:"oracleResultHash"`
 	Version                int      `json:"version"`
@@ -296,6 +297,86 @@ type Claim struct {
 	Status                 string   `json:"status"`
 	CreatedAt              string   `json:"createdAt"`
 	UpdatedAt              string   `json:"updatedAt"`
+}
+
+// PrivacyCredential is the public, Fabric-signed anchor for a credential whose
+// salted fields remain in oracleProofPrivateData.
+type PrivacyCredential struct {
+	AssetType         string `json:"assetType"`
+	SchemaVersion     int    `json:"schemaVersion"`
+	ID                string `json:"id"`
+	CredentialType    string `json:"credentialType"`
+	SourceID          string `json:"sourceId"`
+	SubjectHash       string `json:"subjectHash"`
+	IssuerMSP         string `json:"issuerMsp"`
+	IssuerIdentity    string `json:"issuerIdentity"`
+	CredentialVersion int    `json:"credentialVersion"`
+	RootHash          string `json:"rootHash"`
+	FieldCount        int    `json:"fieldCount"`
+	HashAlgorithm     string `json:"hashAlgorithm"`
+	LeafEncoding      string `json:"leafEncoding"`
+	Status            string `json:"status"`
+	IssuedAt          string `json:"issuedAt"`
+	ExpiresAt         string `json:"expiresAt"`
+	RevokedAt         string `json:"revokedAt"`
+}
+
+type PrivacyCredentialField struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
+	Salt  string `json:"salt"`
+}
+
+type PrivacyCredentialPrivate struct {
+	CredentialID      string                   `json:"credentialId"`
+	CredentialType    string                   `json:"credentialType"`
+	CredentialVersion int                      `json:"credentialVersion"`
+	Fields            []PrivacyCredentialField `json:"fields"`
+}
+
+type PrivacyProofStep struct {
+	Hash     string `json:"hash"`
+	Position string `json:"position"`
+}
+
+type PrivacyDisclosure struct {
+	CredentialID      string             `json:"credentialId"`
+	CredentialVersion int                `json:"credentialVersion"`
+	Name              string             `json:"name"`
+	Value             string             `json:"value"`
+	Salt              string             `json:"salt"`
+	LeafIndex         int                `json:"leafIndex"`
+	Proof             []PrivacyProofStep `json:"proof"`
+}
+
+type SelectiveDisclosurePresentationPrivate struct {
+	ProtocolVersion string              `json:"protocolVersion"`
+	PresentationID  string              `json:"presentationId"`
+	ClaimID         string              `json:"claimId"`
+	ClaimVersion    int                 `json:"claimVersion"`
+	Challenge       string              `json:"challenge"`
+	ExpiresAt       string              `json:"expiresAt"`
+	Disclosures     []PrivacyDisclosure `json:"disclosures"`
+}
+
+type SelectiveDisclosurePresentation struct {
+	AssetType           string   `json:"assetType"`
+	SchemaVersion       int      `json:"schemaVersion"`
+	ID                  string   `json:"id"`
+	ProtocolVersion     string   `json:"protocolVersion"`
+	ClaimID             string   `json:"claimId"`
+	ClaimVersion        int      `json:"claimVersion"`
+	InvoiceCredentialID string   `json:"invoiceCredentialId"`
+	PolicyCredentialID  string   `json:"policyCredentialId"`
+	InvoiceRootHash     string   `json:"invoiceRootHash"`
+	PolicyRootHash      string   `json:"policyRootHash"`
+	ChallengeHash       string   `json:"challengeHash"`
+	PresentationHash    string   `json:"presentationHash"`
+	DisclosedFields     []string `json:"disclosedFields"`
+	Status              string   `json:"status"`
+	RegisteredBy        string   `json:"registeredBy"`
+	CreatedAt           string   `json:"createdAt"`
+	ExpiresAt           string   `json:"expiresAt"`
 }
 
 type OracleRegistrySnapshot struct {
@@ -312,35 +393,38 @@ type OracleRegistrySnapshot struct {
 }
 
 type OracleRequest struct {
-	AssetType              string   `json:"assetType"`
-	SchemaVersion          int      `json:"schemaVersion"`
-	ID                     string   `json:"id"`
-	ClaimID                string   `json:"claimId"`
-	ClaimVersion           int      `json:"claimVersion"`
-	HospitalVerificationID string   `json:"hospitalVerificationId"`
-	AppealID               string   `json:"appealId"`
-	AppealCommitmentHash   string   `json:"appealCommitmentHash"`
-	QueryHash              string   `json:"queryHash"`
-	RegistrySnapshotID     string   `json:"registrySnapshotId"`
-	RegistryVersion        int      `json:"registryVersion"`
-	RegistryRootHash       string   `json:"registryRootHash"`
-	RulesVersion           string   `json:"rulesVersion"`
-	RulesHash              string   `json:"rulesHash"`
-	ModelVersion           string   `json:"modelVersion"`
-	ModelHash              string   `json:"modelHash"`
-	AssignedOracleIDs      []string `json:"assignedOracleIds"`
-	RequiredConfirmations  int      `json:"requiredConfirmations"`
-	ExpectedResponses      int      `json:"expectedResponses"`
-	CommitmentCount        int      `json:"commitmentCount"`
-	RevealCount            int      `json:"revealCount"`
-	Status                 string   `json:"status"`
-	VerifiedResult         bool     `json:"verifiedResult"`
-	ResultHash             string   `json:"resultHash"`
-	FinalizationCode       string   `json:"finalizationCode"`
-	CommitDeadline         string   `json:"commitDeadline"`
-	RevealDeadline         string   `json:"revealDeadline"`
-	RequestedAt            string   `json:"requestedAt"`
-	FinalizedAt            string   `json:"finalizedAt"`
+	AssetType               string   `json:"assetType"`
+	SchemaVersion           int      `json:"schemaVersion"`
+	ID                      string   `json:"id"`
+	ClaimID                 string   `json:"claimId"`
+	ClaimVersion            int      `json:"claimVersion"`
+	HospitalVerificationID  string   `json:"hospitalVerificationId"`
+	AppealID                string   `json:"appealId"`
+	AppealCommitmentHash    string   `json:"appealCommitmentHash"`
+	PrivacyPresentationID   string   `json:"privacyPresentationId"`
+	PrivacyPresentationHash string   `json:"privacyPresentationHash"`
+	PrivacyProtocolVersion  string   `json:"privacyProtocolVersion"`
+	QueryHash               string   `json:"queryHash"`
+	RegistrySnapshotID      string   `json:"registrySnapshotId"`
+	RegistryVersion         int      `json:"registryVersion"`
+	RegistryRootHash        string   `json:"registryRootHash"`
+	RulesVersion            string   `json:"rulesVersion"`
+	RulesHash               string   `json:"rulesHash"`
+	ModelVersion            string   `json:"modelVersion"`
+	ModelHash               string   `json:"modelHash"`
+	AssignedOracleIDs       []string `json:"assignedOracleIds"`
+	RequiredConfirmations   int      `json:"requiredConfirmations"`
+	ExpectedResponses       int      `json:"expectedResponses"`
+	CommitmentCount         int      `json:"commitmentCount"`
+	RevealCount             int      `json:"revealCount"`
+	Status                  string   `json:"status"`
+	VerifiedResult          bool     `json:"verifiedResult"`
+	ResultHash              string   `json:"resultHash"`
+	FinalizationCode        string   `json:"finalizationCode"`
+	CommitDeadline          string   `json:"commitDeadline"`
+	RevealDeadline          string   `json:"revealDeadline"`
+	RequestedAt             string   `json:"requestedAt"`
+	FinalizedAt             string   `json:"finalizedAt"`
 }
 
 type OracleCommitment struct {
@@ -357,21 +441,23 @@ type OracleCommitment struct {
 }
 
 type OracleResult struct {
-	AssetType        string `json:"assetType"`
-	SchemaVersion    int    `json:"schemaVersion"`
-	ID               string `json:"id"`
-	RequestID        string `json:"requestId"`
-	ClaimID          string `json:"claimId"`
-	ClaimVersion     int    `json:"claimVersion"`
-	RegistryVersion  int    `json:"registryVersion"`
-	ModelVersion     string `json:"modelVersion"`
-	OracleID         string `json:"oracleId"`
-	OracleIdentity   string `json:"oracleIdentity"`
-	Verified         bool   `json:"verified"`
-	VerificationCode string `json:"verificationCode"`
-	RecordHash       string `json:"recordHash"`
-	ResultHash       string `json:"resultHash"`
-	CreatedAt        string `json:"createdAt"`
+	AssetType               string `json:"assetType"`
+	SchemaVersion           int    `json:"schemaVersion"`
+	ID                      string `json:"id"`
+	RequestID               string `json:"requestId"`
+	ClaimID                 string `json:"claimId"`
+	ClaimVersion            int    `json:"claimVersion"`
+	RegistryVersion         int    `json:"registryVersion"`
+	ModelVersion            string `json:"modelVersion"`
+	OracleID                string `json:"oracleId"`
+	OracleIdentity          string `json:"oracleIdentity"`
+	Verified                bool   `json:"verified"`
+	VerificationCode        string `json:"verificationCode"`
+	RecordHash              string `json:"recordHash"`
+	PrivacyPresentationID   string `json:"privacyPresentationId"`
+	PrivacyPresentationHash string `json:"privacyPresentationHash"`
+	ResultHash              string `json:"resultHash"`
+	CreatedAt               string `json:"createdAt"`
 }
 
 type OracleRequestHistoryRecord struct {
@@ -379,6 +465,15 @@ type OracleRequestHistoryRecord struct {
 	Timestamp string         `json:"timestamp"`
 	IsDelete  bool           `json:"isDelete"`
 	Value     *OracleRequest `json:"value,omitempty"`
+}
+
+type OracleThresholdEvaluation struct {
+	AssignedOracleCount   int    `json:"assignedOracleCount"`
+	RequiredConfirmations int    `json:"requiredConfirmations"`
+	ResponseCount         int    `json:"responseCount"`
+	MatchingResponses     int    `json:"matchingResponses"`
+	WinningResultHash     string `json:"winningResultHash"`
+	Status                string `json:"status"`
 }
 
 type EvidenceAccessRecord struct {

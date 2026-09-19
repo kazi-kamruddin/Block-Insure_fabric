@@ -1,0 +1,67 @@
+test:
+  name: block-insure-fabric
+  description: Reproducible ledger latency and throughput measurements
+  workers:
+    number: 2
+  rounds:
+    - label: schema-read
+      description: Read-only Fabric Gateway baseline
+      txNumber: 200
+      rateControl:
+        type: fixed-rate
+        opts:
+          tps: 20
+      workload:
+        module: ./benchmarks/caliper/workload/schema-read.cjs
+        arguments:
+          contractId: insurance-contract
+    - label: oracle-1-of-1
+      description: Evaluate a one-Oracle threshold profile
+      txNumber: 200
+      rateControl:
+        type: fixed-rate
+        opts:
+          tps: 20
+      workload:
+        module: ./benchmarks/caliper/workload/oracle-threshold.cjs
+        arguments:
+          contractId: insurance-contract
+          responses: '["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"]'
+          requiredConfirmations: 1
+    - label: oracle-2-of-2
+      description: Evaluate the legacy two-Oracle threshold profile
+      txNumber: 200
+      rateControl:
+        type: fixed-rate
+        opts:
+          tps: 20
+      workload:
+        module: ./benchmarks/caliper/workload/oracle-threshold.cjs
+        arguments:
+          contractId: insurance-contract
+          responses: '["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"]'
+          requiredConfirmations: 2
+    - label: oracle-2-of-3
+      description: Evaluate the fault-tolerant three-Oracle threshold profile
+      txNumber: 200
+      rateControl:
+        type: fixed-rate
+        opts:
+          tps: 20
+      workload:
+        module: ./benchmarks/caliper/workload/oracle-threshold.cjs
+        arguments:
+          contractId: insurance-contract
+          responses: '["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",null]'
+          requiredConfirmations: 2
+    - label: anchored-write
+      description: Submit unique versioned registry commitments
+      txNumber: 100
+      rateControl:
+        type: fixed-rate
+        opts:
+          tps: 10
+      workload:
+        module: ./benchmarks/caliper/workload/registry-write.cjs
+        arguments:
+          contractId: insurance-contract
