@@ -24,6 +24,16 @@ Oracle collection members see the disclosed claim facts. Undisclosed medical
 and policy terms remain outside the presentation, and no private disclosure is
 written to shared world state.
 
+Credential revocation is checked when a presentation is registered: a revoked
+invoice or policy credential cannot create a new presentation. Registration
+copies the verified roots and status into an immutable presentation record.
+The current `RequestOracleVerification` path checks that record's expiry, claim
+ID, version, and `VERIFIED` status, but does not re-read the credential status.
+Thus revoking a credential after registration does not invalidate that existing
+presentation before its expiry. `RevokePrivacyCredential` is currently a
+chaincode-only operation, with no web action. The demonstration must not claim
+retroactive revocation or end-to-end credential lifecycle governance.
+
 ## Formal workflow safety
 
 `formal/insurance-workflow/InsuranceWorkflow.tla` models hospital verification,

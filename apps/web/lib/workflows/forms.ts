@@ -213,7 +213,7 @@ export const workflowFormDefinitions: Record<WorkflowOperation, WorkflowFormDefi
   },
   confirmBenefitPayment: {
     label: "Confirm benefit payout",
-    description: "Close the benefit liability against a hashed external transfer reference.",
+    description: "Record the Bank's simulated payment confirmation: debit the demo insurer balance and close the liability. Beneficiary credits and real bank transfers are outside this workflow.",
     fields: [{ name: "id", label: "Benefit request ID" }, { name: "bankReferenceText", label: "Bank transfer reference" }],
   },
   createHospitalInvoice: {
@@ -386,18 +386,6 @@ export const workflowFormDefinitions: Record<WorkflowOperation, WorkflowFormDefi
     description: "Immediately prevent any unused access allowed by an owned grant while preserving its ledger history.",
     fields: [{ name: "grantId", label: "Grant ID", placeholder: "grant-1001" }],
   },
-  openAppealReview: {
-    label: "Open appeal review",
-    description: "Create a new immutable review round for a submitted appeal.",
-    fields: [
-      { name: "appealId", label: "Appeal ID", placeholder: "appeal-1001" },
-      { name: "reviewId", label: "Review ID", placeholder: "review-appeal-1001" },
-      { name: "assignedAuditorIdsJson", label: "Assigned auditor IDs", kind: "textarea" },
-      { name: "approvalThreshold", label: "Approval threshold" },
-      { name: "rejectionThreshold", label: "Rejection threshold" },
-      { name: "deadline", label: "Review deadline (RFC3339)" },
-    ],
-  },
   finalizeExpiredReview: {
     label: "Finalize expired review",
     description: "Close an open review after its deadline; timeout rejects the claim and upholds an appeal.",
@@ -500,7 +488,6 @@ export function createWorkflowFormValues(
     submitClaimAppeal: { appealId: generatedId("appeal", idFactory), claimId: "", reasonCategory: "DOCUMENT_ERROR", reasonText: "", descriptionText: "", evidenceText: "", proposedHospitalId: "", proposedAmountMinor: "0", proposedIncidentDate: "", proposedDescriptionText: "", proposedClinicalReferenceHash: "" },
     grantEvidenceAccess: { id: generatedId("grant", idFactory), evidenceId: "", granteeMsp: "AuditorMSP", granteeRole: "auditor", granteeSubject: "auditor1", purpose: "AUDIT", expiresAt: deadlineOffset(7), maxAccesses: "3" },
     revokeEvidenceAccess: { grantId: "" },
-    openAppealReview: { appealId: "", reviewId: generatedId("review-appeal", idFactory), assignedAuditorIdsJson: '["auditor1","auditor2","auditor3","auditor4"]', approvalThreshold: "3", rejectionThreshold: "2", deadline: deadlineOffset(3) },
     finalizeExpiredReview: { reviewId: "" },
     recordAuditorDecision: { reviewId: "", decisionId: generatedId("decision", idFactory), outcome: "APPROVE", reasonText: "" },
     authorizeSettlement: { settlementId: generatedId("settlement", idFactory), claimId: "", sourceAccountId: "bank-insurer-premium", destinationAccountId: "showcase-customer-account" },
@@ -775,9 +762,6 @@ export async function buildWorkflowCommand(
       break;
     case "revokeEvidenceAccess":
       command = { operation, grantId: required(values, "grantId", "Grant ID") };
-      break;
-    case "openAppealReview":
-      command = { operation, appealId: required(values, "appealId", "Appeal ID"), reviewId: required(values, "reviewId", "Review ID"), assignedAuditorIdsJson: required(values, "assignedAuditorIdsJson", "Assigned auditor IDs"), approvalThreshold: positiveInteger(values, "approvalThreshold", "Approval threshold"), rejectionThreshold: positiveInteger(values, "rejectionThreshold", "Rejection threshold"), deadline: required(values, "deadline", "Review deadline") };
       break;
     case "finalizeExpiredReview":
       command = { operation, reviewId: required(values, "reviewId", "Review ID") };

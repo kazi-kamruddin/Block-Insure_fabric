@@ -114,6 +114,9 @@ worker independence, and manual-review fallback.
 The [Merkle and private-banking design](docs/evidence-merkle-and-private-banking.md)
 specifies canonical evidence proofs, transient input, collection membership, and
 the public/private account split.
+The [Phase 1 baseline](docs/results/phase1-baseline-2026-09-26.md) records the
+current source/package/ledger provenance, completed checks, workflow boundaries,
+and the remaining isolated live gate.
 The [privacy, formal-verification, and benchmarking design](docs/privacy-formal-benchmarking.md)
 defines the selective-disclosure protocol, checked invariants, experiment matrix,
 and interpretation limits.

@@ -24,6 +24,7 @@ describe("workflow command boundary", () => {
   });
 
   it("validates versioned review, appeal, and fraud-support commands", () => {
+    expect(workflowCommandSchema.safeParse({ operation: "openAppealReview", appealId: "appeal-1", reviewId: "review-1", assignedAuditorIdsJson: '["auditor1","auditor2","auditor3","auditor4"]', approvalThreshold: 3, rejectionThreshold: 2, deadline: "2026-09-09T12:00:00Z" }).success).toBe(false);
     expect(workflowCommandSchema.safeParse({ operation: "openClaimReview", claimId: "claim-1", reviewId: "review-1", assignedAuditorIdsJson: '["auditor1","auditor2","auditor3","auditor4"]', approvalThreshold: 3, rejectionThreshold: 2, deadline: "2026-09-09T12:00:00Z" }).success).toBe(true);
     expect(workflowCommandSchema.safeParse({ operation: "submitClaimAppeal", appealId: "appeal-1", claimId: "claim-1", reasonCategory: "DOCUMENT_ERROR", reasonHash: "a".repeat(64), descriptionHash: "b".repeat(64), proposedClinicalReferenceHash: "c".repeat(64) }).success).toBe(true);
     expect(workflowCommandSchema.safeParse({ operation: "submitClaimAppeal", appealId: "appeal-1", claimId: "claim-1", reasonCategory: "DOCUMENT_ERROR", reasonHash: "a".repeat(64), descriptionHash: "b".repeat(64) }).success).toBe(false);

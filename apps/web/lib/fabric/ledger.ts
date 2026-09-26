@@ -784,16 +784,6 @@ export const ledger = {
     );
   },
 
-  openAppealReview(input: {
-    appealId: string; reviewId: string; assignedAuditorIdsJson: string;
-    approvalThreshold: number; rejectionThreshold: number; deadline: string;
-  }) {
-    return submit<ClaimReview>(
-      "insurerAdmin", "OpenAppealReview", input.appealId, input.reviewId,
-      input.assignedAuditorIdsJson, input.approvalThreshold, input.rejectionThreshold, input.deadline,
-    );
-  },
-
   finalizeExpiredReview(reviewId: string) {
     return submit<ClaimReview>("insurerAdmin", "FinalizeExpiredReview", reviewId);
   },

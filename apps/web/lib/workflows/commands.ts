@@ -112,7 +112,6 @@ export const workflowCommandSchema = z.discriminatedUnion("operation", [
     maxAccesses: z.number().int().min(1).max(100),
   }),
   z.object({ operation: z.literal("revokeEvidenceAccess"), grantId: id }),
-  z.object({ operation: z.literal("openAppealReview"), appealId: id, reviewId: id, assignedAuditorIdsJson: z.string().trim().min(2).max(1_000), approvalThreshold: z.number().int().positive().max(9), rejectionThreshold: z.number().int().positive().max(9), deadline: z.string().datetime({ offset: true }) }),
   z.object({ operation: z.literal("finalizeExpiredReview"), reviewId: id }),
   z.object({ operation: z.literal("assessClaimFraud"), assessmentId: id, claimId: id }),
   z.object({
@@ -175,7 +174,6 @@ export const requiredRoleByOperation = {
   submitClaimAppeal: "policyholder",
   grantEvidenceAccess: "policyholder",
   revokeEvidenceAccess: "policyholder",
-  openAppealReview: "insurerAdmin",
   finalizeExpiredReview: "insurerAdmin",
   assessClaimFraud: "insurerAdmin",
   recordAuditorDecision: "auditor",

@@ -1418,4 +1418,19 @@ func TestSelectiveDisclosureCredentialAndPresentationLifecycle(t *testing.T) {
 	if verifyPrivacyDisclosure(tampered, invoiceCredential.RootHash) {
 		t.Fatal("tampered selective disclosure was accepted")
 	}
+
+	setIdentity(ctx, "hospital1-cert", "HospitalMSP", "hospitalOfficer", map[string]string{"subjectId": "hospital1"})
+	revoked, err := contract.RevokePrivacyCredential(ctx, invoiceCredential.ID)
+	requireNoError(t, err)
+	if revoked.Status != "REVOKED" {
+		t.Fatalf("credential revocation was not recorded: %+v", revoked)
+	}
+	setIdentity(ctx, "policyholder-cert", "InsurerMSP", "policyholder", map[string]string{"subjectId": "policyholder1"})
+	_, err = contract.RegisterClaimPrivacyPresentation(ctx, "presentation-private-2", claim.ID, invoiceCredential.ID, policyCredential.ID, "challenge-private-2", "2026-09-06T12:00:00Z")
+	requireError(t, err, "not active")
+	unchanged, err := contract.ReadSelectiveDisclosurePresentation(ctx, presentation.ID)
+	requireNoError(t, err)
+	if unchanged.Status != "VERIFIED" {
+		t.Fatalf("existing presentation changed after credential revocation: %+v", unchanged)
+	}
 }

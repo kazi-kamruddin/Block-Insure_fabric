@@ -112,8 +112,6 @@ export async function executeWorkflowCommand(command: WorkflowCommand, session: 
       return ledger.grantEvidenceAccess(command);
     case "revokeEvidenceAccess":
       return ledger.revokeEvidenceAccess(command.grantId);
-    case "openAppealReview":
-      return ledger.openAppealReview(command);
     case "finalizeExpiredReview":
       return ledger.finalizeExpiredReview(command.reviewId);
     case "assessClaimFraud": {
