@@ -54,13 +54,35 @@ test:
           contractId: insurance-contract
           responses: '["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",null]'
           requiredConfirmations: 2
-    - label: anchored-write
-      description: Submit unique versioned registry commitments
+    - label: anchored-write-5-tps
+      description: Submit unique versioned registry commitments at 5 offered TPS
+      txNumber: 100
+      rateControl:
+        type: fixed-rate
+        opts:
+          tps: 5
+      workload:
+        module: ./benchmarks/caliper/workload/registry-write.cjs
+        arguments:
+          contractId: insurance-contract
+    - label: anchored-write-10-tps
+      description: Submit unique versioned registry commitments at 10 offered TPS
       txNumber: 100
       rateControl:
         type: fixed-rate
         opts:
           tps: 10
+      workload:
+        module: ./benchmarks/caliper/workload/registry-write.cjs
+        arguments:
+          contractId: insurance-contract
+    - label: anchored-write-20-tps
+      description: Submit unique versioned registry commitments at 20 offered TPS
+      txNumber: 100
+      rateControl:
+        type: fixed-rate
+        opts:
+          tps: 20
       workload:
         module: ./benchmarks/caliper/workload/registry-write.cjs
         arguments:

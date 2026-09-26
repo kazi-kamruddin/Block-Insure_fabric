@@ -1,0 +1,2 @@
+insurance-channel Blockchain info: {"height":2100,"currentBlockHash":"KEXpmruMaXUnA8IGIQ8D2/u3yUIJM23Q0waCLjPvMGA=","previousBlockHash":"aY+OH0sn+T2vGZrE0nE73YjrQek7W9OIKNMjnv2V6pA="}
+insurance-phase1-20260926 Blockchain info: {"height":483,"currentBlockHash":"qgkTD2ZBUpb8YnqNvoitQw5RnUcIHWQQa0Mqu2JnnC8=","previousBlockHash":"OmftRRaluREhdOUJo1pvS2VkvFFTocYKu7qU0nLPjXA="}

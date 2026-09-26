@@ -1,4 +1,5 @@
 import { promises as fs } from "node:fs";
+import { createHash } from "node:crypto";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -209,6 +210,39 @@ const comparisons = {
   twoOfThreeLatencyOverheadVsCentralized: summary.find((item) => item.configuration === "oracle-2-of-3").latencyOverheadVsCentralized,
   privacyLatencyOverheadVsNonPrivateTwoOfThree: round(summary.find((item) => item.configuration === "oracle-2-of-3-private").meanLatencyUs / nonPrivateThreeOracleSummary.meanLatencyUs),
 };
+function pairedComparison(treatmentId, controlId) {
+  const treatment = trials.filter((trial) => trial.configuration === treatmentId);
+  const control = trials.filter((trial) => trial.configuration === controlId);
+  const differences = treatment.map((trial, index) => trial.meanLatencyUs - control[index].meanLatencyUs);
+  const ratios = treatment.map((trial, index) => trial.meanLatencyUs / control[index].meanLatencyUs);
+  const differenceCi = confidenceInterval95(differences);
+  const ratioCi = confidenceInterval95(ratios);
+  return {
+    treatment: treatmentId,
+    control: controlId,
+    repetitions: treatment.length,
+    meanDifferenceUs: round(mean(differences)),
+    difference95CiUs: { lower: round(differenceCi.lower), upper: round(differenceCi.upper) },
+    meanRatio: round(mean(ratios)),
+    ratio95Ci: { lower: round(ratioCi.lower), upper: round(ratioCi.upper) },
+  };
+}
+comparisons.paired = [
+  pairedComparison("oracle-2-of-3", "centralized"),
+  pairedComparison("oracle-2-of-3-private", "oracle-2-of-3"),
+];
+const fixturePaths = [
+  "services/oracle-worker/registry/oracle1-v1.json",
+  "services/oracle-worker/src/protocol.mjs",
+  "services/oracle-worker/src/privacy.mjs",
+  "services/oracle-worker/src/registry.mjs",
+  "services/oracle-worker/src/threshold-model.mjs",
+  "benchmarks/lib/privacy-fixture.mjs",
+];
+const inputSha256 = Object.fromEntries(await Promise.all(fixturePaths.map(async (relative) => [
+  relative,
+  createHash("sha256").update(await fs.readFile(path.join(projectRoot, relative))).digest("hex"),
+])));
 
 const report = {
   schemaVersion: 1,
@@ -231,6 +265,7 @@ const report = {
     confidenceInterval: "normal approximation over independent trial means (95%)",
     scope: "Oracle decision, binding, threshold, and optional selective-disclosure computation; excludes Fabric network and storage latency",
   },
+  inputSha256,
   summary,
   comparisons,
   trials,

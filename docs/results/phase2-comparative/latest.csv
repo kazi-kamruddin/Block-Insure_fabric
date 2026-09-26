@@ -1,0 +1,6 @@
+configuration,repetitions,total_operations,mean_latency_us,median_latency_us,p95_latency_us,latency_ci_lower_us,latency_ci_upper_us,mean_throughput_ops_s,throughput_ci_lower,throughput_ci_upper,cpu_user_ms_per_1000_ops,mean_process_cpu_utilization_percent,latency_overhead_vs_centralized,throughput_relative_to_centralized_percent
+centralized,30,30000,5.056,3.2,9.3,3.964,6.148,223276.475,199255.28,247297.67,7.9,179.857,1,100
+oracle-1-of-1,30,30000,17.67,10.3,38.9,13.54,21.8,68389.616,60441.109,76338.123,14.6,80.806,3.495,30.63
+oracle-2-of-2,30,30000,24.822,13.5,49.3,16.268,33.376,51918.641,45809.921,58027.361,20.767,104.339,4.909,23.253
+oracle-2-of-3,30,30000,27.934,16.8,58.6,23.139,32.728,41071.752,36395.736,45747.768,26.533,106.202,5.525,18.395
+oracle-2-of-3-private,30,30000,548.221,364.2,1210.7,471.181,625.26,2041.323,1824.057,2258.589,502.067,98.186,108.43,0.914

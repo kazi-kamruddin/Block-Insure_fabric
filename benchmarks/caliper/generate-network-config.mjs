@@ -4,6 +4,10 @@ import { fileURLToPath } from 'node:url';
 
 const directory = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(directory, '../..');
+const channelName = process.env.FABRIC_CHANNEL_NAME;
+if (!/^insurance-phase2-[a-z0-9-]+$/.test(channelName ?? '')) {
+  throw new Error('Set FABRIC_CHANNEL_NAME to an isolated insurance-phase2-* channel before running Caliper');
+}
 const domain = 'insurer.blockinsure.test';
 const orgRoot = path.join(projectRoot, 'network', 'organizations', 'peerOrganizations', domain);
 const userMsp = path.join(orgRoot, 'users', `insurerAdmin@${domain}`, 'msp');
@@ -35,10 +39,10 @@ const connection = {
       grpcOptions: { 'ssl-target-name-override': `peer0.${domain}`, hostnameOverride: `peer0.${domain}` },
     },
   },
-  channels: { 'insurance-channel': { peers: { [`peer0.${domain}`]: { endorsingPeer: true, chaincodeQuery: true, ledgerQuery: true, eventSource: true } } } },
+  channels: { [channelName]: { peers: { [`peer0.${domain}`]: { endorsingPeer: true, chaincodeQuery: true, ledgerQuery: true, eventSource: true } } } },
 };
 await writeFile(path.join(generated, 'connection-insurer.json'), `${JSON.stringify(connection, null, 2)}\n`);
 
-const yaml = `name: Block Insure Fabric\nversion: "2.0.0"\ncaliper:\n  blockchain: fabric\nchannels:\n  - channelName: insurance-channel\n    contracts:\n      - id: insurance-contract\norganizations:\n  - mspid: InsurerMSP\n    identities:\n      certificates:\n        - name: insurerAdmin\n          clientPrivateKey:\n            path: '${containerPath(keyPath)}'\n          clientSignedCert:\n            path: '${containerPath(certPath)}'\n    connectionProfile:\n      path: 'benchmarks/caliper/generated/connection-insurer.json'\n      discover: false\n`;
+const yaml = `name: Block Insure Fabric\nversion: "2.0.0"\ncaliper:\n  blockchain: fabric\nchannels:\n  - channelName: ${channelName}\n    contracts:\n      - id: insurance-contract\norganizations:\n  - mspid: InsurerMSP\n    identities:\n      certificates:\n        - name: insurerAdmin\n          clientPrivateKey:\n            path: '${containerPath(keyPath)}'\n          clientSignedCert:\n            path: '${containerPath(certPath)}'\n    connectionProfile:\n      path: 'benchmarks/caliper/generated/connection-insurer.json'\n      discover: false\n`;
 await writeFile(path.join(generated, 'network.yaml'), yaml);
 console.log(path.join(generated, 'network.yaml'));

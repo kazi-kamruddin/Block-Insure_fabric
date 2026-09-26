@@ -1,0 +1,309 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-09-26T16:55:23.960Z",
+  "model": {
+    "system": "Block-Insure provenance-bound Oracle adjudication",
+    "method": "STRIDE-informed misuse cases with protocol safety outcomes",
+    "trustAssumptions": [
+      "Fabric MSP certificate issuance and private keys are not compromised.",
+      "At most one of three assigned Oracles is Byzantine for integrity guarantees.",
+      "SHA-256 collision and preimage resistance hold.",
+      "Authorized Fabric peers enforce the configured private-data collection policy.",
+      "Auditor governance remains available when Oracle consensus fails closed."
+    ]
+  },
+  "metrics": {
+    "threatsEvaluated": 8,
+    "threatsPassed": 8,
+    "safeOutcomeRatePercent": 100,
+    "automatedEvidenceCoveragePercent": 100,
+    "controlCoveragePercent": 100,
+    "highOrCriticalResidualRisks": 2,
+    "uniqueChaincodeTestsExecuted": 5
+  },
+  "results": [
+    {
+      "id": "T01",
+      "name": "Single malicious Oracle",
+      "initialRisk": "HIGH",
+      "expectedOutcome": "CONTAINED",
+      "passed": true,
+      "controls": [
+        "strict-majority quorum",
+        "certificate-bound assignment",
+        "commit-reveal binding"
+      ],
+      "securityProperty": "One Byzantine Oracle cannot determine a 2-of-3 decision.",
+      "residualRisk": "Two colluding assigned Oracles can form a quorum; this is the explicit 2-of-3 trust boundary.",
+      "residualRiskRating": "HIGH",
+      "evidence": [
+        {
+          "kind": "attack-simulation",
+          "test": "singleMaliciousOracle",
+          "passed": true,
+          "durationMs": 3.488,
+          "details": {
+            "observed": "one conflicting vote contained",
+            "trustBoundaryConfirmed": "two colluding votes can form quorum"
+          }
+        },
+        {
+          "kind": "chaincode-test",
+          "test": "TestOracleTwoOfThreeThresholdConsensus",
+          "backend": "docker",
+          "command": "docker run ... golang:1.25 go test ./src -run ^TestOracleTwoOfThreeThresholdConsensus$ -count=1",
+          "passed": true,
+          "durationMs": 19704.891,
+          "output": "ok  \tgithub.com/kazi-kamruddin/block-insure-fabric/chaincode/insurance-contract/src\t0.009s"
+        }
+      ]
+    },
+    {
+      "id": "T02",
+      "name": "Unavailable Oracle",
+      "initialRisk": "HIGH",
+      "expectedOutcome": "TOLERATED",
+      "passed": true,
+      "controls": [
+        "2-of-3 threshold",
+        "commit deadline",
+        "timeout fallback"
+      ],
+      "securityProperty": "Two available honest Oracles can complete a 2-of-3 decision.",
+      "residualRisk": "Loss of two workers prevents automatic consensus and requires governed fallback.",
+      "residualRiskRating": "MEDIUM",
+      "evidence": [
+        {
+          "kind": "attack-simulation",
+          "test": "unavailableOracle",
+          "passed": true,
+          "durationMs": 0.1,
+          "details": {
+            "observed": "consensus with one unavailable worker"
+          }
+        },
+        {
+          "kind": "chaincode-test",
+          "test": "TestOracleTwoOfThreeThresholdConsensus",
+          "backend": "docker",
+          "command": "docker run ... golang:1.25 go test ./src -run ^TestOracleTwoOfThreeThresholdConsensus$ -count=1",
+          "passed": true,
+          "durationMs": 19704.891,
+          "output": "ok  \tgithub.com/kazi-kamruddin/block-insure-fabric/chaincode/insurance-contract/src\t0.009s"
+        }
+      ]
+    },
+    {
+      "id": "T03",
+      "name": "Conflicting or corrupted registry",
+      "initialRisk": "HIGH",
+      "expectedOutcome": "DETECTED_AND_FAILED_CLOSED",
+      "passed": true,
+      "controls": [
+        "snapshot root binding",
+        "version binding",
+        "rules hash binding"
+      ],
+      "securityProperty": "A mismatched registry root is detected and cannot be reported as VERIFIED.",
+      "residualRisk": "All replicas derived from the same incorrect source can agree on incorrect data.",
+      "residualRiskRating": "HIGH",
+      "evidence": [
+        {
+          "kind": "attack-simulation",
+          "test": "conflictingRegistry",
+          "passed": true,
+          "durationMs": 38.165,
+          "details": {
+            "observed": "corrupt replica rejected by root binding"
+          }
+        },
+        {
+          "kind": "chaincode-test",
+          "test": "TestOracleTwoOfThreeThresholdConsensus",
+          "backend": "docker",
+          "command": "docker run ... golang:1.25 go test ./src -run ^TestOracleTwoOfThreeThresholdConsensus$ -count=1",
+          "passed": true,
+          "durationMs": 19704.891,
+          "output": "ok  \tgithub.com/kazi-kamruddin/block-insure-fabric/chaincode/insurance-contract/src\t0.009s"
+        }
+      ]
+    },
+    {
+      "id": "T04",
+      "name": "Forged or unassigned Oracle identity",
+      "initialRisk": "CRITICAL",
+      "expectedOutcome": "PREVENTED",
+      "passed": true,
+      "controls": [
+        "Fabric MSP authentication",
+        "role attribute check",
+        "subject assignment check"
+      ],
+      "securityProperty": "Only an assigned OracleMSP certificate subject with the oracle role may vote.",
+      "residualRisk": "A stolen valid Oracle private key remains able to act until certificate revocation is enforced operationally.",
+      "residualRiskRating": "MEDIUM",
+      "evidence": [
+        {
+          "kind": "chaincode-test",
+          "test": "TestOracleAuthorizationCommitRevealAndExactSuccess",
+          "backend": "docker",
+          "command": "docker run ... golang:1.25 go test ./src -run ^TestOracleAuthorizationCommitRevealAndExactSuccess$ -count=1",
+          "passed": true,
+          "durationMs": 20105.138,
+          "output": "ok  \tgithub.com/kazi-kamruddin/block-insure-fabric/chaincode/insurance-contract/src\t0.016s"
+        }
+      ]
+    },
+    {
+      "id": "T05",
+      "name": "Replay or stale Oracle result",
+      "initialRisk": "HIGH",
+      "expectedOutcome": "PREVENTED",
+      "passed": true,
+      "controls": [
+        "domain-separated digest",
+        "claim-version binding",
+        "current-request check",
+        "unique ledger key"
+      ],
+      "securityProperty": "Changing any adjudication binding changes the canonical digest and stale ledger submissions are rejected.",
+      "residualRisk": "Compromise before finalization is governed by the quorum assumption rather than replay protection.",
+      "residualRiskRating": "LOW",
+      "evidence": [
+        {
+          "kind": "attack-simulation",
+          "test": "replayAndStaleResult",
+          "passed": true,
+          "durationMs": 0.7,
+          "details": {
+            "observed": "request, claim, registry, and model replay bindings changed the digest"
+          }
+        },
+        {
+          "kind": "chaincode-test",
+          "test": "TestOracleAuthorizationCommitRevealAndExactSuccess",
+          "backend": "docker",
+          "command": "docker run ... golang:1.25 go test ./src -run ^TestOracleAuthorizationCommitRevealAndExactSuccess$ -count=1",
+          "passed": true,
+          "durationMs": 20105.138,
+          "output": "ok  \tgithub.com/kazi-kamruddin/block-insure-fabric/chaincode/insurance-contract/src\t0.016s"
+        },
+        {
+          "kind": "chaincode-test",
+          "test": "TestOracleDeadlinesStaleVersionsAndAppealIsolation",
+          "backend": "docker",
+          "command": "docker run ... golang:1.25 go test ./src -run ^TestOracleDeadlinesStaleVersionsAndAppealIsolation$ -count=1",
+          "passed": true,
+          "durationMs": 18961.696,
+          "output": "ok  \tgithub.com/kazi-kamruddin/block-insure-fabric/chaincode/insurance-contract/src\t0.010s"
+        }
+      ]
+    },
+    {
+      "id": "T06",
+      "name": "Altered selective-disclosure proof",
+      "initialRisk": "CRITICAL",
+      "expectedOutcome": "PREVENTED",
+      "passed": true,
+      "controls": [
+        "salted Merkle commitment",
+        "presentation hash",
+        "claim/version binding",
+        "private data collection"
+      ],
+      "securityProperty": "Any changed disclosure or proof fails presentation verification.",
+      "residualRisk": "Authorized Oracle collection members still see disclosed fields; this is selective disclosure, not zero knowledge.",
+      "residualRiskRating": "MEDIUM",
+      "evidence": [
+        {
+          "kind": "attack-simulation",
+          "test": "alteredPrivacyProof",
+          "passed": true,
+          "durationMs": 4.11,
+          "details": {
+            "observed": "altered disclosure rejected"
+          }
+        },
+        {
+          "kind": "chaincode-test",
+          "test": "TestSelectiveDisclosureCredentialAndPresentationLifecycle",
+          "backend": "docker",
+          "command": "docker run ... golang:1.25 go test ./src -run ^TestSelectiveDisclosureCredentialAndPresentationLifecycle$ -count=1",
+          "passed": true,
+          "durationMs": 20424.097,
+          "output": "ok  \tgithub.com/kazi-kamruddin/block-insure-fabric/chaincode/insurance-contract/src\t0.008s"
+        }
+      ]
+    },
+    {
+      "id": "T07",
+      "name": "Late commitment or reveal",
+      "initialRisk": "MEDIUM",
+      "expectedOutcome": "PREVENTED",
+      "passed": true,
+      "controls": [
+        "ledger-time deadlines",
+        "phase checks",
+        "explicit timeout finalization"
+      ],
+      "securityProperty": "Expired phases reject submissions and transition to timeout handling.",
+      "residualRisk": "A transaction submitted near a deadline can be affected by normal ordering latency.",
+      "residualRiskRating": "LOW",
+      "evidence": [
+        {
+          "kind": "attack-simulation",
+          "test": "lateReveal",
+          "passed": true,
+          "durationMs": 0.209,
+          "details": {
+            "observed": "expired request entered terminal timeout phase"
+          }
+        },
+        {
+          "kind": "chaincode-test",
+          "test": "TestOracleLateSubmissionsAreRejected",
+          "backend": "docker",
+          "command": "docker run ... golang:1.25 go test ./src -run ^TestOracleLateSubmissionsAreRejected$ -count=1",
+          "passed": true,
+          "durationMs": 19590.087,
+          "output": "ok  \tgithub.com/kazi-kamruddin/block-insure-fabric/chaincode/insurance-contract/src\t0.009s"
+        }
+      ]
+    },
+    {
+      "id": "T08",
+      "name": "Appeal-version substitution",
+      "initialRisk": "HIGH",
+      "expectedOutcome": "PREVENTED",
+      "passed": true,
+      "controls": [
+        "appeal commitment hash",
+        "fresh hospital attestation",
+        "claim-version isolation"
+      ],
+      "securityProperty": "Appeal commitment, claim fields, hospital verification, and version must match exactly.",
+      "residualRisk": "The correctness of newly submitted source evidence remains an off-chain provenance concern.",
+      "residualRiskRating": "MEDIUM",
+      "evidence": [
+        {
+          "kind": "attack-simulation",
+          "test": "appealSubstitution",
+          "passed": true,
+          "durationMs": 6.004,
+          "details": {
+            "observed": "altered amount and stale version rejected"
+          }
+        },
+        {
+          "kind": "chaincode-test",
+          "test": "TestOracleDeadlinesStaleVersionsAndAppealIsolation",
+          "backend": "docker",
+          "command": "docker run ... golang:1.25 go test ./src -run ^TestOracleDeadlinesStaleVersionsAndAppealIsolation$ -count=1",
+          "passed": true,
+          "durationMs": 18961.696,
+          "output": "ok  \tgithub.com/kazi-kamruddin/block-insure-fabric/chaincode/insurance-contract/src\t0.010s"
+        }
+      ]
+    }
+  ]
+}
