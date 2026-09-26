@@ -1,0 +1,96 @@
+{
+  "schemaVersion": 2,
+  "status": "passed",
+  "startedAt": "2026-09-26T11:49:53.6474569+00:00",
+  "completedAt": "2026-09-26T12:03:15.7994455+00:00",
+  "gitCommit": "ed2727a",
+  "gitBranch": "developement",
+  "gitDirty": false,
+  "options": {
+    "networkIncluded": true,
+    "browserIncluded": true,
+    "auditIncluded": true
+  },
+  "runtime": {
+    "node": "v24.16.0",
+    "npm": "10.2.5",
+    "powerShell": "7.6.5"
+  },
+  "results": [
+    {
+      "name": "Web lint",
+      "status": "passed",
+      "durationSeconds": 10.776
+    },
+    {
+      "name": "Web type check",
+      "status": "passed",
+      "durationSeconds": 7.071
+    },
+    {
+      "name": "Web unit tests",
+      "status": "passed",
+      "durationSeconds": 2.835
+    },
+    {
+      "name": "Event worker syntax",
+      "status": "passed",
+      "durationSeconds": 1.105
+    },
+    {
+      "name": "Dependency audit",
+      "status": "passed",
+      "durationSeconds": 1.945
+    },
+    {
+      "name": "Production build",
+      "status": "passed",
+      "durationSeconds": 13.642
+    },
+    {
+      "name": "Oracle worker syntax",
+      "status": "passed",
+      "durationSeconds": 2.301
+    },
+    {
+      "name": "Oracle worker unit tests",
+      "status": "passed",
+      "durationSeconds": 1.663
+    },
+    {
+      "name": "Go chaincode suite",
+      "status": "passed",
+      "durationSeconds": 71.558
+    },
+    {
+      "name": "Fabric network and contract",
+      "status": "passed",
+      "durationSeconds": 46.379
+    },
+    {
+      "name": "Oracle worker supervision and health",
+      "status": "passed",
+      "durationSeconds": 8.583
+    },
+    {
+      "name": "Browser and live workflow suite",
+      "status": "passed",
+      "durationSeconds": 372.446
+    },
+    {
+      "name": "Live Oracle conflict fallback",
+      "status": "passed",
+      "durationSeconds": 72.805
+    },
+    {
+      "name": "Live Oracle one-worker fault tolerance",
+      "status": "passed",
+      "durationSeconds": 60.738
+    },
+    {
+      "name": "Live Oracle timeout fallback",
+      "status": "passed",
+      "durationSeconds": 68.398
+    }
+  ]
+}

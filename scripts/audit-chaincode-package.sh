@@ -4,7 +4,10 @@ set -euo pipefail
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 project_root="$(cd -- "${script_dir}/.." && pwd -P)"
 network_root="${project_root}/network"
-package_file="${network_root}/channel-artifacts/insurance-contract_1.4.0.tar.gz"
+channel_name="${CHANNEL_NAME:-insurance-channel}"
+chaincode_version="${CHAINCODE_VERSION:-1.4.0}"
+chaincode_sequence="${CHAINCODE_SEQUENCE:-11}"
+package_file="${network_root}/channel-artifacts/insurance-contract_${chaincode_version}.tar.gz"
 organizations="${network_root}/organizations"
 export PATH="${network_root}/.fabric/fabric-samples/bin:${PATH}"
 export FABRIC_CFG_PATH="${network_root}/.fabric/fabric-samples/config"
@@ -48,11 +51,11 @@ for entry in "insurer InsurerMSP 7051" "hospital HospitalMSP 8051" "auditor Audi
   export CORE_PEER_MSPCONFIGPATH="${organizations}/peerOrganizations/${domain}/users/Admin@${domain}/msp"
   export CORE_PEER_ADDRESS="localhost:${port}"
 
-  definition="$(peer lifecycle chaincode querycommitted --channelID insurance-channel --name insurance-contract)"
-  approval="$(peer lifecycle chaincode queryapproved --channelID insurance-channel --name insurance-contract --sequence 11)"
+  definition="$(peer lifecycle chaincode querycommitted --channelID "${channel_name}" --name insurance-contract)"
+  approval="$(peer lifecycle chaincode queryapproved --channelID "${channel_name}" --name insurance-contract --sequence "${chaincode_sequence}")"
   installed="$(peer lifecycle chaincode queryinstalled)"
-  [[ "${definition}" == *"Version: 1.4.0, Sequence: 11"* ]] || { echo "${org}: unexpected committed definition: ${definition}" >&2; exit 1; }
+  [[ "${definition}" == *"Version: ${chaincode_version}, Sequence: ${chaincode_sequence}"* ]] || { echo "${org}: unexpected committed definition: ${definition}" >&2; exit 1; }
   [[ "${approval}" == *"${expected_id}"* ]] || { echo "${org}: approved package differs from local package" >&2; exit 1; }
   [[ "${installed}" == *"${expected_id}"* ]] || { echo "${org}: local package ID not installed" >&2; exit 1; }
-  echo "${org}: committed 1.4.0/11, approved and installed local package ID"
+  echo "${org}: ${channel_name} committed ${chaincode_version}/${chaincode_sequence}, approved and installed local package ID"
 done

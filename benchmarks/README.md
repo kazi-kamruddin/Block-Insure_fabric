@@ -4,7 +4,11 @@
 
 `oracle-faults/run-matrix.ps1` runs the live end-to-end profiles for normal consensus, negative consensus, one unavailable worker, conflicting replicas/model versions, and quorum timeout. It writes elapsed time and pass/fail status to `oracle-faults/reports/latest.json`; each run uses an isolated `reports/artifacts/<run-id>` directory so Playwright traces cannot collide across profiles or repeated Windows runs.
 
-Run these after deploying schema 14 and building the web application:
+Run these after deploying schema 14 and building the web application. For the
+Oracle matrix, set `FABRIC_CHANNEL_NAME=insurance-phase1-20260926` and separate
+`ORACLE_STATE_ROOT`, `EVENT_PROJECTION_ROOT`, and `EVIDENCE_STORAGE_ROOT`
+directories as shown in `scripts/verify-phase1.ps1`; the matrix writes ledger
+records and should use the experiment channel:
 
 ```powershell
 ./benchmarks/caliper/run.ps1

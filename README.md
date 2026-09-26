@@ -123,12 +123,19 @@ and interpretation limits.
 
 ## Complete verification
 
-With Docker Desktop and the Fabric network running, execute every code, network,
-security, browser, and live-workflow check from Windows PowerShell:
+With Docker Desktop and the Fabric network running, create the isolated Phase 1
+channel once from Ubuntu WSL:
+
+```bash
+bash network/scripts/create-phase1-channel.sh
+```
+
+Then execute every code, network, security, browser, and live-workflow check
+from Windows PowerShell:
 
 ```powershell
 .\scripts\demo-stack.ps1 Stop -KeepNetwork
-.\scripts\verify-all.ps1
+.\scripts\verify-phase1.ps1
 .\scripts\demo-stack.ps1 Start
 ```
 
@@ -136,7 +143,10 @@ The verifier needs exclusive access to the Next.js build and Oracle worker ports
 it fails early with an actionable message if managed application services are
 still running. Fabric ledger volumes remain available throughout this sequence.
 
-The command writes an ignored machine-readable summary to
+The wrapper runs `verify-all.ps1` with an experiment channel and separate local
+evidence, event, Oracle, and browser-artifact paths. The preserved
+`insurance-channel` remains available for demonstrations. The command writes
+an ignored machine-readable summary to
 `verification-results/latest.json`. Its browser phase creates uniquely named
 local ledger records and proves role isolation plus automatic consensus and
 negative, divergent-snapshot, and unavailable-Oracle fallback settlement paths.

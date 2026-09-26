@@ -189,11 +189,13 @@ attributes even if the application boundary is bypassed.
 
 ## 4. Run the reproducible integrity gate
 
-From the repository root in Windows PowerShell:
+Create the separate experiment channel from Ubuntu WSL once with
+`bash network/scripts/create-phase1-channel.sh`. From the repository root in
+Windows PowerShell:
 
 ```powershell
 .\scripts\demo-stack.ps1 Stop -KeepNetwork
-.\scripts\verify-all.ps1
+.\scripts\verify-phase1.ps1
 .\scripts\demo-stack.ps1 Start
 ```
 
@@ -213,5 +215,7 @@ fallbacks, and the existing multi-session workflows.
 The ignored result is written to `verification-results/latest.json`, including
 the commit/branch, dirty-tree flag, selected gates, runtime versions, and timings.
 
-The browser workflow creates uniquely named ledger records. Use the local
-development network for rehearsals; do not point it at shared or production state.
+The browser workflow creates uniquely named records on
+`insurance-phase1-20260926`. It does not write to the preserved
+`insurance-channel`. Both channels use the same development peers and orderer;
+do not point this harness at shared or production state.
