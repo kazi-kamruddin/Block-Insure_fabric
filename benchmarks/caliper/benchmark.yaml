@@ -87,3 +87,63 @@ test:
         module: ./benchmarks/caliper/workload/registry-write.cjs
         arguments:
           contractId: insurance-contract
+    - label: claim-submit-5-tps
+      description: Submit invoice-bound claims using the synthetic active load policy at 5 offered TPS
+      txNumber: 100
+      rateControl: { type: fixed-rate, opts: { tps: 5 } }
+      workload: { module: ./benchmarks/caliper/workload/claim-submit.cjs, arguments: { contractId: insurance-contract } }
+    - label: claim-submit-10-tps
+      description: Submit invoice-bound claims at 10 offered TPS
+      txNumber: 100
+      rateControl: { type: fixed-rate, opts: { tps: 10 } }
+      workload: { module: ./benchmarks/caliper/workload/claim-submit.cjs, arguments: { contractId: insurance-contract } }
+    - label: claim-submit-20-tps
+      description: Submit invoice-bound claims at 20 offered TPS
+      txNumber: 100
+      rateControl: { type: fixed-rate, opts: { tps: 20 } }
+      workload: { module: ./benchmarks/caliper/workload/claim-submit.cjs, arguments: { contractId: insurance-contract } }
+    - label: claim-submit-40-tps
+      description: Submit invoice-bound claims at 40 offered TPS
+      txNumber: 100
+      rateControl: { type: fixed-rate, opts: { tps: 40 } }
+      workload: { module: ./benchmarks/caliper/workload/claim-submit.cjs, arguments: { contractId: insurance-contract } }
+    - label: claim-submit-80-tps
+      description: Submit invoice-bound claims at 80 offered TPS
+      txNumber: 100
+      rateControl: { type: fixed-rate, opts: { tps: 80 } }
+      workload: { module: ./benchmarks/caliper/workload/claim-submit.cjs, arguments: { contractId: insurance-contract } }
+    - label: claim-submit-160-tps
+      description: Submit invoice-bound claims at 160 offered TPS
+      txNumber: 100
+      rateControl: { type: fixed-rate, opts: { tps: 160 } }
+      workload: { module: ./benchmarks/caliper/workload/claim-submit.cjs, arguments: { contractId: insurance-contract } }
+    - label: mixed-policy-claim-5-tps
+      description: Equal policy reads and invoice-bound claim writes at 5 offered TPS
+      txNumber: 100
+      rateControl: { type: fixed-rate, opts: { tps: 5 } }
+      workload: { module: ./benchmarks/caliper/workload/mixed-policy-claim.cjs, arguments: { contractId: insurance-contract } }
+    - label: mixed-policy-claim-10-tps
+      description: Equal policy reads and invoice-bound claim writes at 10 offered TPS
+      txNumber: 100
+      rateControl: { type: fixed-rate, opts: { tps: 10 } }
+      workload: { module: ./benchmarks/caliper/workload/mixed-policy-claim.cjs, arguments: { contractId: insurance-contract } }
+    - label: mixed-policy-claim-20-tps
+      description: Equal policy reads and invoice-bound claim writes at 20 offered TPS
+      txNumber: 100
+      rateControl: { type: fixed-rate, opts: { tps: 20 } }
+      workload: { module: ./benchmarks/caliper/workload/mixed-policy-claim.cjs, arguments: { contractId: insurance-contract } }
+    - label: mixed-policy-claim-40-tps
+      description: Equal policy reads and invoice-bound claim writes at 40 offered TPS
+      txNumber: 100
+      rateControl: { type: fixed-rate, opts: { tps: 40 } }
+      workload: { module: ./benchmarks/caliper/workload/mixed-policy-claim.cjs, arguments: { contractId: insurance-contract } }
+    - label: mixed-policy-claim-80-tps
+      description: Equal policy reads and invoice-bound claim writes at 80 offered TPS
+      txNumber: 100
+      rateControl: { type: fixed-rate, opts: { tps: 80 } }
+      workload: { module: ./benchmarks/caliper/workload/mixed-policy-claim.cjs, arguments: { contractId: insurance-contract } }
+    - label: mixed-policy-claim-160-tps
+      description: Equal policy reads and invoice-bound claim writes at 160 offered TPS
+      txNumber: 100
+      rateControl: { type: fixed-rate, opts: { tps: 160 } }
+      workload: { module: ./benchmarks/caliper/workload/mixed-policy-claim.cjs, arguments: { contractId: insurance-contract } }

@@ -44,10 +44,15 @@ const live = profileNames.map((profile) => {
   };
 });
 
-const expectedRounds = ["schema-read", "oracle-1-of-1", "oracle-2-of-2", "oracle-2-of-3", "anchored-write-5-tps", "anchored-write-10-tps", "anchored-write-20-tps"];
+const expectedRounds = [
+  "schema-read", "oracle-1-of-1", "oracle-2-of-2", "oracle-2-of-3",
+  "anchored-write-5-tps", "anchored-write-10-tps", "anchored-write-20-tps",
+  ...[5, 10, 20, 40, 80, 160].map((rate) => `claim-submit-${rate}-tps`),
+  ...[5, 10, 20, 40, 80, 160].map((rate) => `mixed-policy-claim-${rate}-tps`),
+];
 function parseCaliper(content, run) {
   const log = content.toString("utf8").replace(/\x1b\[[0-9;]*m/g, "");
-  assert.match(log, /Successful rounds:\s+7\. Failed rounds:\s+0/);
+  assert.match(log, /Successful rounds:\s+19\. Failed rounds:\s+0/);
   const section = log.slice(log.lastIndexOf("### All test results ###"), log.lastIndexOf("Generated report with path"));
   assert.ok(section.length > 0, `${run} final report`);
   const pattern = /\|\s*([\w-]+)\s*\|\s*(\d+)\s*\|\s*(\d+)\s*\|\s*([\d.]+)\s*\|\s*([\d.]+)\s*\|\s*([\d.]+)\s*\|\s*([\d.]+)\s*\|\s*([\d.]+)\s*\|/g;
@@ -66,6 +71,55 @@ function parseCaliper(content, run) {
   return rows;
 }
 const caliperTrials = [1, 2, 3].flatMap((index) => parseCaliper(raw[`caliper${index}`], index));
+function distribution(values) {
+  const ordered = [...values].sort((left, right) => left - right);
+  function percentile(percent) {
+    const index = (percent / 100) * (ordered.length - 1);
+    const lower = Math.floor(index);
+    const fraction = index - lower;
+    return ordered[lower] + (ordered[Math.min(lower + 1, ordered.length - 1)] - ordered[lower]) * fraction;
+  }
+  return { count: ordered.length, medianMs: round(percentile(50), 3), p95Ms: round(percentile(95), 3), maxMs: round(ordered.at(-1), 3) };
+}
+for (const trial of caliperTrials) {
+  const roundIndex = expectedRounds.indexOf(trial.label);
+  if (roundIndex < 4) continue;
+  const workerFiles = await Promise.all([0, 1].map(async (worker) => {
+    const relative = `phase2-caliper/samples/run${trial.run}-round${roundIndex}-worker${worker}.json`;
+    const content = await readFile(path.join(resultsRoot, relative));
+    hashes[relative] = createHash("sha256").update(content).digest("hex");
+    return JSON.parse(content);
+  }));
+  const samples = workerFiles.flatMap((file) => file.samples);
+  assert.equal(samples.length, 100, `${trial.label} run ${trial.run} sample count`);
+  trial.workloadLatency = {
+    all: distribution(samples.map((item) => item.elapsedMs)),
+    reads: samples.some((item) => item.readOnly) ? distribution(samples.filter((item) => item.readOnly).map((item) => item.elapsedMs)) : null,
+    writes: distribution(samples.filter((item) => !item.readOnly).map((item) => item.elapsedMs)),
+    threw: samples.filter((item) => item.threw).length,
+  };
+}
+function memoryMiB(rawUsage) {
+  const match = /^([\d.]+)([KMG]iB)\s*\//.exec(rawUsage);
+  if (!match) throw new Error(`Unsupported docker memory unit: ${rawUsage}`);
+  return Number(match[1]) * { KiB: 1 / 1024, MiB: 1, GiB: 1024 }[match[2]];
+}
+const resourceSamples = [];
+for (let run = 1; run <= 3; run += 1) {
+  const relative = `phase2-caliper/run${run}-resources.jsonl`;
+  const content = await readFile(path.join(resultsRoot, relative));
+  hashes[relative] = createHash("sha256").update(content).digest("hex");
+  const lines = content.toString("utf8").trim().split(/\r?\n/).filter(Boolean);
+  assert.ok(lines.length > 0, `${relative} resource samples`);
+  resourceSamples.push(...lines.map((line) => {
+    const item = JSON.parse(line);
+    return { run, observedAt: item.observedAt, name: item.name, cpuPercent: Number(item.cpuPercent.replace("%", "")), memoryMiB: memoryMiB(item.memoryUsage) };
+  }));
+}
+const resources = [...new Set(resourceSamples.map((item) => item.name))].map((name) => {
+  const samples = resourceSamples.filter((item) => item.name === name);
+  return { name, samples: samples.length, meanCpuPercent: round(mean(samples.map((item) => item.cpuPercent)), 2), maxCpuPercent: round(Math.max(...samples.map((item) => item.cpuPercent)), 2), meanMemoryMiB: round(mean(samples.map((item) => item.memoryMiB)), 2), maxMemoryMiB: round(Math.max(...samples.map((item) => item.memoryMiB)), 2) };
+});
 const caliper = expectedRounds.map((label) => {
   const rows = caliperTrials.filter((item) => item.label === label);
   return {
@@ -78,6 +132,7 @@ const caliper = expectedRounds.map((label) => {
     achievedTpsRange: [Math.min(...rows.map((row) => row.achievedTps)), Math.max(...rows.map((row) => row.achievedTps))],
     meanAverageLatencySeconds: round(mean(rows.map((row) => row.averageLatencySeconds)), 3),
     averageLatencyRangeSeconds: [Math.min(...rows.map((row) => row.averageLatencySeconds)), Math.max(...rows.map((row) => row.averageLatencySeconds))],
+    workloadP95MsRange: rows[0].workloadLatency ? [Math.min(...rows.map((row) => row.workloadLatency.all.p95Ms)), Math.max(...rows.map((row) => row.workloadLatency.all.p95Ms))] : null,
   };
 });
 const report = {
@@ -90,6 +145,7 @@ const report = {
   live,
   caliperTrials,
   caliper,
+  resources,
   interpretation: "Protocol operations, full browser tests, and Caliper Gateway transactions have different timing boundaries; the three Caliper runs and three browser trials per profile are local observations rather than population reliability estimates.",
 };
 const output = path.join(resultsRoot, "phase2-summary");
@@ -114,9 +170,15 @@ const lines = [
   "",
   "## Fabric Gateway and ledger",
   "",
-  "| Round | Success | Fail | Observed send TPS | Achieved TPS, mean (range) | Average latency, mean (range), s |",
+  "| Round | Success | Fail | Observed send TPS | Achieved TPS, mean (range) | Caliper mean latency, s | Workload P95 range, ms |",
+  "| --- | ---: | ---: | ---: | ---: | ---: | ---: |",
+  ...caliper.map((item) => `| ${item.label} | ${item.successful} | ${item.failed} | ${item.meanObservedSendTps} | ${item.meanAchievedTps} (${item.achievedTpsRange.join("–")}) | ${item.meanAverageLatencySeconds} (${item.averageLatencyRangeSeconds.join("–")}) | ${item.workloadP95MsRange?.join("–") ?? "—"} |`),
+  "",
+  "## Docker resource samples during Caliper",
+  "",
+  "| Container | Samples | Mean CPU % | Max CPU % | Mean memory MiB | Max memory MiB |",
   "| --- | ---: | ---: | ---: | ---: | ---: |",
-  ...caliper.map((item) => `| ${item.label} | ${item.successful} | ${item.failed} | ${item.meanObservedSendTps} | ${item.meanAchievedTps} (${item.achievedTpsRange.join("–")}) | ${item.meanAverageLatencySeconds} (${item.averageLatencyRangeSeconds.join("–")}) |`),
+  ...resources.map((item) => `| ${item.name} | ${item.samples} | ${item.meanCpuPercent} | ${item.maxCpuPercent} | ${item.meanMemoryMiB} | ${item.maxMemoryMiB} |`),
   "",
   `Security model: ${security.metrics.threatsPassed}/${security.metrics.threatsEvaluated} expected safe outcomes passed. The synthetic common-source error produced ${protocol.commonSourceAssessment.classification}.`,
   "",

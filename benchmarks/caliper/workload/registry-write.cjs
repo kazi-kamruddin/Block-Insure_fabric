@@ -1,8 +1,8 @@
 'use strict';
 
-const { WorkloadModuleBase } = require('@hyperledger/caliper-core');
+const { LatencySampledWorkload } = require('./latency-samples.cjs');
 
-class RegistryWriteWorkload extends WorkloadModuleBase {
+class RegistryWriteWorkload extends LatencySampledWorkload {
   constructor() {
     super();
     this.sequence = 0;
@@ -11,7 +11,7 @@ class RegistryWriteWorkload extends WorkloadModuleBase {
   async submitTransaction() {
     this.sequence += 1;
     const unique = `${Date.now()}-${this.workerIndex}-${this.sequence}`;
-    return this.sutAdapter.sendRequests({
+    return this.sendMeasured({
       contractId: this.roundArguments.contractId,
       contractFunction: 'PublishOracleRegistrySnapshot',
       contractArguments: [

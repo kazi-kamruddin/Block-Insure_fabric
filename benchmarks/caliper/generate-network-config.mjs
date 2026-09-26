@@ -11,6 +11,7 @@ if (!/^insurance-phase2-[a-z0-9-]+$/.test(channelName ?? '')) {
 const domain = 'insurer.blockinsure.test';
 const orgRoot = path.join(projectRoot, 'network', 'organizations', 'peerOrganizations', domain);
 const userMsp = path.join(orgRoot, 'users', `insurerAdmin@${domain}`, 'msp');
+const policyholderMsp = path.join(orgRoot, 'users', `policyholder1@${domain}`, 'msp');
 
 async function onlyFile(folder) {
   const files = (await readdir(folder, { withFileTypes: true })).filter((entry) => entry.isFile() && !entry.name.startsWith('.'));
@@ -23,7 +24,12 @@ function containerPath(hostPath) {
   return `/hyperledger/caliper/workspace/${relative}`;
 }
 
-const [keyPath, certPath] = await Promise.all([onlyFile(path.join(userMsp, 'keystore')), onlyFile(path.join(userMsp, 'signcerts'))]);
+const [keyPath, certPath, policyholderKeyPath, policyholderCertPath] = await Promise.all([
+  onlyFile(path.join(userMsp, 'keystore')),
+  onlyFile(path.join(userMsp, 'signcerts')),
+  onlyFile(path.join(policyholderMsp, 'keystore')),
+  onlyFile(path.join(policyholderMsp, 'signcerts')),
+]);
 const tlsPath = path.join(orgRoot, 'peers', `peer0.${domain}`, 'tls', 'ca.crt');
 const generated = path.join(directory, 'generated');
 await mkdir(generated, { recursive: true });
@@ -43,6 +49,6 @@ const connection = {
 };
 await writeFile(path.join(generated, 'connection-insurer.json'), `${JSON.stringify(connection, null, 2)}\n`);
 
-const yaml = `name: Block Insure Fabric\nversion: "2.0.0"\ncaliper:\n  blockchain: fabric\nchannels:\n  - channelName: ${channelName}\n    contracts:\n      - id: insurance-contract\norganizations:\n  - mspid: InsurerMSP\n    identities:\n      certificates:\n        - name: insurerAdmin\n          clientPrivateKey:\n            path: '${containerPath(keyPath)}'\n          clientSignedCert:\n            path: '${containerPath(certPath)}'\n    connectionProfile:\n      path: 'benchmarks/caliper/generated/connection-insurer.json'\n      discover: false\n`;
+const yaml = `name: Block Insure Fabric\nversion: "2.0.0"\ncaliper:\n  blockchain: fabric\nchannels:\n  - channelName: ${channelName}\n    contracts:\n      - id: insurance-contract\norganizations:\n  - mspid: InsurerMSP\n    identities:\n      certificates:\n        - name: insurerAdmin\n          clientPrivateKey:\n            path: '${containerPath(keyPath)}'\n          clientSignedCert:\n            path: '${containerPath(certPath)}'\n        - name: policyholder1\n          clientPrivateKey:\n            path: '${containerPath(policyholderKeyPath)}'\n          clientSignedCert:\n            path: '${containerPath(policyholderCertPath)}'\n    connectionProfile:\n      path: 'benchmarks/caliper/generated/connection-insurer.json'\n      discover: false\n`;
 await writeFile(path.join(generated, 'network.yaml'), yaml);
 console.log(path.join(generated, 'network.yaml'));
