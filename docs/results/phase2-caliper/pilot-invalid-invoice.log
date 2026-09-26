@@ -1,0 +1,1124 @@
+2026.09.26-17:43:41.210 info  [caliper] [cli-launch-manager] 	Binding specification is present, performing binding for "fabric:fabric-gateway"
+2026.09.26-17:43:41.214 warn  [caliper] [bind] 	Working directory is not specified. Current path: "/hyperledger/caliper/workspace"
+2026.09.26-17:43:41.214 info  [caliper] [bind] 	User-provided arguments for npm: "-g"
+2026.09.26-17:43:41.215 info  [caliper] [bind] 	Binding for fabric@fabric-gateway. This might take some time...
+2026.09.26-17:43:41.215 info  [caliper] [bind] 	Using working directory: /hyperledger/caliper/workspace
+2026.09.26-17:43:41.216 info  [caliper] [bind] 	Calling npm with: install -g @hyperledger/fabric-gateway@1.7.1 @grpc/grpc-js@1.13.1
+
+added 39 packages in 11s
+
+6 packages are looking for funding
+  run `npm fund` for details
+npm notice
+npm notice New minor version of npm available! 11.6.1 -> 11.20.0
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v11.20.0
+npm notice To update run: npm install -g npm@11.20.0
+npm notice
+2026.09.26-17:43:52.753 info  [caliper] [cli-launch-manager] 	Set workspace path: /hyperledger/caliper/workspace
+2026.09.26-17:43:52.753 info  [caliper] [cli-launch-manager] 	Set benchmark configuration path: /hyperledger/caliper/workspace/benchmarks/caliper/benchmark.yaml
+2026.09.26-17:43:52.754 info  [caliper] [cli-launch-manager] 	Set network configuration path: /hyperledger/caliper/workspace/benchmarks/caliper/generated/network.yaml
+2026.09.26-17:43:52.754 info  [caliper] [cli-launch-manager] 	Set SUT type: fabric
+2026.09.26-17:43:52.800 info  [caliper] [benchmark-validator] 	No observer specified, will default to `none`
+2026.09.26-17:43:52.800 info  [caliper] [caliper-engine] 	Starting benchmark flow
+2026.09.26-17:43:52.800 info  [caliper] [caliper-engine] 	Skipping start commands due to benchmark flow conditioning
+2026.09.26-17:43:52.800 info  [caliper] [caliper-engine] 	Skipping initialization phase due to benchmark flow conditioning
+2026.09.26-17:43:52.800 info  [caliper] [caliper-engine] 	Skipping install smart contract phase due to benchmark flow conditioning
+2026.09.26-17:43:52.960 info  [caliper] [FabricConnectorFactory] 	Initializing peer gateway connector compatible with installed fabric-gateway SDK: 1.7.1
+2026.09.26-17:43:52.985 info  [caliper] [IdentityManager] 	Adding insurerAdmin (admin=false) as insurerAdmin for organization InsurerMSP
+2026.09.26-17:43:53.013 info  [caliper] [IdentityManager] 	Adding policyholder1 (admin=false) as policyholder1 for organization InsurerMSP
+2026.09.26-17:43:53.018 info  [caliper] [monitor.js] 	No resource monitors specified
+2026.09.26-17:43:53.021 info  [caliper] [default-observer] 	Observer interval set to 5000 milliseconds
+2026.09.26-17:43:53.034 info  [caliper] [round-orchestrator] 	Preparing worker connections
+2026.09.26-17:43:53.036 info  [caliper] [worker-orchestrator] 	Launching worker 1 of 2
+2026.09.26-17:43:53.042 info  [caliper] [worker-orchestrator] 	Launching worker 2 of 2
+2026.09.26-17:43:53.046 info  [caliper] [worker-orchestrator] 	Messenger not configured, entering configure phase...
+2026.09.26-17:43:53.047 info  [caliper] [worker-orchestrator] 	No existing workers detected, entering worker launch phase...
+2026.09.26-17:43:53.048 info  [caliper] [worker-orchestrator] 	Waiting for 2 workers to be connected...
+2026.09.26-17:43:53.504 info  [caliper] [cli-launch-worker] 	Worker is a locally forked process, skipping the binding step, already performed by the manager process
+2026.09.26-17:43:53.505 info  [caliper] [cli-launch-worker] 	Set workspace path: /hyperledger/caliper/workspace
+2026.09.26-17:43:53.505 info  [caliper] [cli-launch-worker] 	Set benchmark configuration path: /hyperledger/caliper/workspace/benchmarks/caliper/benchmark.yaml
+2026.09.26-17:43:53.505 info  [caliper] [cli-launch-worker] 	Set network configuration path: /hyperledger/caliper/workspace/benchmarks/caliper/generated/network.yaml
+2026.09.26-17:43:53.506 info  [caliper] [cli-launch-worker] 	Set SUT type: fabric
+2026.09.26-17:43:53.505 info  [caliper] [cli-launch-worker] 	Worker is a locally forked process, skipping the binding step, already performed by the manager process
+2026.09.26-17:43:53.506 info  [caliper] [cli-launch-worker] 	Set workspace path: /hyperledger/caliper/workspace
+2026.09.26-17:43:53.506 info  [caliper] [cli-launch-worker] 	Set benchmark configuration path: /hyperledger/caliper/workspace/benchmarks/caliper/benchmark.yaml
+2026.09.26-17:43:53.507 info  [caliper] [cli-launch-worker] 	Set network configuration path: /hyperledger/caliper/workspace/benchmarks/caliper/generated/network.yaml
+2026.09.26-17:43:53.508 info  [caliper] [cli-launch-worker] 	Set SUT type: fabric
+2026.09.26-17:43:53.552 info  [caliper] [worker-orchestrator] 	2 workers connected, progressing to worker assignment phase.
+2026.09.26-17:43:53.552 info  [caliper] [worker-orchestrator] 	Workers currently unassigned, awaiting index assignment...
+2026.09.26-17:43:53.553 info  [caliper] [worker-orchestrator] 	Waiting for 2 workers to be assigned...
+2026.09.26-17:43:53.609 info  [caliper] [worker-orchestrator] 	2 workers assigned, progressing to worker initialization phase.
+2026.09.26-17:43:53.609 info  [caliper] [worker-orchestrator] 	Waiting for 2 workers to be ready...
+2026.09.26-17:43:53.610 info  [caliper] [worker-message-handler] 	Initializing Worker#1...
+2026.09.26-17:43:53.611 info  [caliper] [worker-message-handler] 	Initializing Worker#0...
+2026.09.26-17:43:53.762 info  [caliper] [FabricConnectorFactory] 	Initializing peer gateway connector compatible with installed fabric-gateway SDK: 1.7.1
+2026.09.26-17:43:53.769 info  [caliper] [FabricConnectorFactory] 	Initializing peer gateway connector compatible with installed fabric-gateway SDK: 1.7.1
+2026.09.26-17:43:53.784 info  [caliper] [IdentityManager] 	Adding insurerAdmin (admin=false) as insurerAdmin for organization InsurerMSP
+2026.09.26-17:43:53.786 info  [caliper] [IdentityManager] 	Adding insurerAdmin (admin=false) as insurerAdmin for organization InsurerMSP
+2026.09.26-17:43:53.792 info  [caliper] [IdentityManager] 	Adding policyholder1 (admin=false) as policyholder1 for organization InsurerMSP
+2026.09.26-17:43:53.793 info  [caliper] [IdentityManager] 	Adding policyholder1 (admin=false) as policyholder1 for organization InsurerMSP
+2026.09.26-17:43:53.806 info  [caliper] [worker-message-handler] 	Worker#0 initialized
+2026.09.26-17:43:53.807 info  [caliper] [worker-message-handler] 	Worker#1 initialized
+2026.09.26-17:43:53.810 info  [caliper] [worker-orchestrator] 	2 workers ready, progressing to test preparation phase.
+2026.09.26-17:43:53.811 info  [caliper] [round-orchestrator] 	Started round 1 (schema-read)
+2026.09.26-17:43:53.814 info  [caliper] [worker-message-handler] 	Preparing Worker#0 for Round#0
+2026.09.26-17:43:53.825 info  [caliper] [worker-message-handler] 	Preparing Worker#1 for Round#0
+2026.09.26-17:43:53.879 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-17:43:53.879 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-17:43:53.880 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-17:43:53.880 info  [caliper] [caliper-worker] 	Info: worker 0 prepare test phase for round 0 is starting...
+2026.09.26-17:43:53.881 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-17:43:53.881 info  [caliper] [caliper-worker] 	Info: worker 1 prepare test phase for round 0 is starting...
+2026.09.26-17:43:53.882 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-17:43:53.882 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-17:43:53.882 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-17:43:53.882 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-17:43:53.883 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-17:43:53.883 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-17:43:53.884 info  [caliper] [caliper-worker] 	Info: worker 1 prepare test phase for round 0 is completed
+2026.09.26-17:43:53.884 info  [caliper] [worker-message-handler] 	Worker#1 prepared for Round#0
+2026.09.26-17:43:53.886 info  [caliper] [caliper-worker] 	Info: worker 0 prepare test phase for round 0 is completed
+2026.09.26-17:43:53.886 info  [caliper] [worker-message-handler] 	Worker#0 prepared for Round#0
+2026.09.26-17:43:53.887 info  [caliper] [worker-orchestrator] 	2 workers prepared, progressing to test phase.
+2026.09.26-17:43:53.888 info  [caliper] [round-orchestrator] 	Monitors successfully started
+2026.09.26-17:43:53.889 info  [caliper] [worker-message-handler] 	Worker#0 is starting Round#0
+2026.09.26-17:43:53.890 info  [caliper] [worker-message-handler] 	Worker#1 is starting Round#0
+2026.09.26-17:43:53.897 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-17:43:53.898 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-17:43:53.898 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-17:43:53.898 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-17:43:53.900 info  [caliper] [caliper-worker] 	Worker #0 starting workload loop
+2026.09.26-17:43:53.900 info  [caliper] [caliper-worker] 	Worker #1 starting workload loop
+2026.09.26-17:43:58.900 info  [caliper] [default-observer] 	[schema-read Round 0 Transaction Info] - Submitted: 81 Succ: 81 Fail:0 Unfinished:0
+2026.09.26-17:44:03.890 info  [caliper] [default-observer] 	[schema-read Round 0 Transaction Info] - Submitted: 182 Succ: 182 Fail:0 Unfinished:0
+2026.09.26-17:44:04.904 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-17:44:04.904 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-17:44:04.904 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-17:44:04.904 info  [caliper] [worker-message-handler] 	Worker#1 finished Round#0
+2026.09.26-17:44:04.908 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-17:44:04.908 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-17:44:04.908 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-17:44:04.908 info  [caliper] [worker-message-handler] 	Worker#0 finished Round#0
+2026.09.26-17:44:09.913 info  [caliper] [default-observer] 	Resetting txCount indicator count
+2026.09.26-17:44:09.915 info  [caliper] [report-builder] 	### Test result ###
+2026.09.26-17:44:09.937 info  [caliper] [report-builder] 	
++-------------+------+------+-----------------+-----------------+-----------------+-----------------+------------------+
+| Name        | Succ | Fail | Send Rate (TPS) | Max Latency (s) | Min Latency (s) | Avg Latency (s) | Throughput (TPS) |
+|-------------|------|------|-----------------|-----------------|-----------------|-----------------|------------------|
+| schema-read | 200  | 0    | 20.2            | 0.21            | 0.00            | 0.01            | 20.2             |
++-------------+------+------+-----------------+-----------------+-----------------+-----------------+------------------+
+
+2026.09.26-17:44:09.938 info  [caliper] [round-orchestrator] 	Finished round 1 (schema-read) in 10.007 seconds
+2026.09.26-17:44:09.938 info  [caliper] [monitor.js] 	Stopping all monitors
+2026.09.26-17:44:09.939 info  [caliper] [round-orchestrator] 	Waiting 5 seconds for the next round...
+2026.09.26-17:44:14.941 info  [caliper] [round-orchestrator] 	Started round 2 (oracle-1-of-1)
+2026.09.26-17:44:14.942 info  [caliper] [worker-message-handler] 	Preparing Worker#0 for Round#1
+2026.09.26-17:44:14.942 info  [caliper] [worker-message-handler] 	Preparing Worker#1 for Round#1
+2026.09.26-17:44:14.953 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-17:44:14.954 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-17:44:14.954 info  [caliper] [caliper-worker] 	Info: worker 1 prepare test phase for round 1 is starting...
+2026.09.26-17:44:14.954 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-17:44:14.955 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-17:44:14.955 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-17:44:14.955 info  [caliper] [caliper-worker] 	Info: worker 0 prepare test phase for round 1 is starting...
+2026.09.26-17:44:14.956 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-17:44:14.956 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-17:44:14.956 info  [caliper] [caliper-worker] 	Info: worker 1 prepare test phase for round 1 is completed
+2026.09.26-17:44:14.956 info  [caliper] [worker-message-handler] 	Worker#1 prepared for Round#1
+2026.09.26-17:44:14.957 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-17:44:14.957 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-17:44:14.957 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-17:44:14.958 info  [caliper] [caliper-worker] 	Info: worker 0 prepare test phase for round 1 is completed
+2026.09.26-17:44:14.958 info  [caliper] [worker-message-handler] 	Worker#0 prepared for Round#1
+2026.09.26-17:44:14.959 info  [caliper] [worker-orchestrator] 	2 workers prepared, progressing to test phase.
+2026.09.26-17:44:14.959 info  [caliper] [round-orchestrator] 	Monitors successfully started
+2026.09.26-17:44:14.960 info  [caliper] [worker-message-handler] 	Worker#0 is starting Round#1
+2026.09.26-17:44:14.960 info  [caliper] [worker-message-handler] 	Worker#1 is starting Round#1
+2026.09.26-17:44:14.966 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-17:44:14.966 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-17:44:14.967 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-17:44:14.967 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-17:44:14.967 info  [caliper] [caliper-worker] 	Worker #1 starting workload loop
+2026.09.26-17:44:14.968 info  [caliper] [caliper-worker] 	Worker #0 starting workload loop
+2026.09.26-17:44:19.959 info  [caliper] [default-observer] 	[oracle-1-of-1 Round 1 Transaction Info] - Submitted: 81 Succ: 80 Fail:0 Unfinished:1
+2026.09.26-17:44:24.960 info  [caliper] [default-observer] 	[oracle-1-of-1 Round 1 Transaction Info] - Submitted: 182 Succ: 180 Fail:0 Unfinished:2
+2026.09.26-17:44:25.972 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-17:44:25.972 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-17:44:25.972 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-17:44:25.972 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-17:44:25.972 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-17:44:25.972 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-17:44:25.972 info  [caliper] [worker-message-handler] 	Worker#0 finished Round#1
+2026.09.26-17:44:25.972 info  [caliper] [worker-message-handler] 	Worker#1 finished Round#1
+2026.09.26-17:44:30.974 info  [caliper] [default-observer] 	Resetting txCount indicator count
+2026.09.26-17:44:30.975 info  [caliper] [report-builder] 	### Test result ###
+2026.09.26-17:44:30.977 info  [caliper] [report-builder] 	
++---------------+------+------+-----------------+-----------------+-----------------+-----------------+------------------+
+| Name          | Succ | Fail | Send Rate (TPS) | Max Latency (s) | Min Latency (s) | Avg Latency (s) | Throughput (TPS) |
+|---------------|------|------|-----------------|-----------------|-----------------|-----------------|------------------|
+| oracle-1-of-1 | 200  | 0    | 20.2            | 0.03            | 0.01            | 0.01            | 20.2             |
++---------------+------+------+-----------------+-----------------+-----------------+-----------------+------------------+
+
+2026.09.26-17:44:30.977 info  [caliper] [round-orchestrator] 	Finished round 2 (oracle-1-of-1) in 10.003 seconds
+2026.09.26-17:44:30.977 info  [caliper] [monitor.js] 	Stopping all monitors
+2026.09.26-17:44:30.977 info  [caliper] [round-orchestrator] 	Waiting 5 seconds for the next round...
+2026.09.26-17:44:35.983 info  [caliper] [round-orchestrator] 	Started round 3 (oracle-2-of-2)
+2026.09.26-17:44:35.984 info  [caliper] [worker-message-handler] 	Preparing Worker#0 for Round#2
+2026.09.26-17:44:35.984 info  [caliper] [worker-message-handler] 	Preparing Worker#1 for Round#2
+2026.09.26-17:44:35.990 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-17:44:35.990 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-17:44:35.990 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-17:44:35.991 info  [caliper] [caliper-worker] 	Info: worker 0 prepare test phase for round 2 is starting...
+2026.09.26-17:44:35.991 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-17:44:35.991 info  [caliper] [caliper-worker] 	Info: worker 1 prepare test phase for round 2 is starting...
+2026.09.26-17:44:35.992 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-17:44:35.992 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-17:44:35.992 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-17:44:35.993 info  [caliper] [caliper-worker] 	Info: worker 0 prepare test phase for round 2 is completed
+2026.09.26-17:44:35.993 info  [caliper] [worker-message-handler] 	Worker#0 prepared for Round#2
+2026.09.26-17:44:35.993 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-17:44:35.993 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-17:44:35.993 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-17:44:35.994 info  [caliper] [caliper-worker] 	Info: worker 1 prepare test phase for round 2 is completed
+2026.09.26-17:44:35.994 info  [caliper] [worker-message-handler] 	Worker#1 prepared for Round#2
+2026.09.26-17:44:35.995 info  [caliper] [worker-orchestrator] 	2 workers prepared, progressing to test phase.
+2026.09.26-17:44:35.995 info  [caliper] [round-orchestrator] 	Monitors successfully started
+2026.09.26-17:44:35.996 info  [caliper] [worker-message-handler] 	Worker#0 is starting Round#2
+2026.09.26-17:44:35.996 info  [caliper] [worker-message-handler] 	Worker#1 is starting Round#2
+2026.09.26-17:44:36.002 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-17:44:36.002 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-17:44:36.002 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-17:44:36.002 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-17:44:36.003 info  [caliper] [caliper-worker] 	Worker #0 starting workload loop
+2026.09.26-17:44:36.003 info  [caliper] [caliper-worker] 	Worker #1 starting workload loop
+2026.09.26-17:44:40.997 info  [caliper] [default-observer] 	[oracle-2-of-2 Round 2 Transaction Info] - Submitted: 81 Succ: 80 Fail:0 Unfinished:1
+2026.09.26-17:44:45.997 info  [caliper] [default-observer] 	[oracle-2-of-2 Round 2 Transaction Info] - Submitted: 181 Succ: 180 Fail:0 Unfinished:1
+2026.09.26-17:44:47.009 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-17:44:47.009 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-17:44:47.009 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-17:44:47.010 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-17:44:47.010 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-17:44:47.010 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-17:44:47.013 info  [caliper] [worker-message-handler] 	Worker#1 finished Round#2
+2026.09.26-17:44:47.014 info  [caliper] [worker-message-handler] 	Worker#0 finished Round#2
+2026.09.26-17:44:52.039 info  [caliper] [default-observer] 	Resetting txCount indicator count
+2026.09.26-17:44:52.052 info  [caliper] [report-builder] 	### Test result ###
+2026.09.26-17:44:52.062 info  [caliper] [report-builder] 	
++---------------+------+------+-----------------+-----------------+-----------------+-----------------+------------------+
+| Name          | Succ | Fail | Send Rate (TPS) | Max Latency (s) | Min Latency (s) | Avg Latency (s) | Throughput (TPS) |
+|---------------|------|------|-----------------|-----------------|-----------------|-----------------|------------------|
+| oracle-2-of-2 | 200  | 0    | 20.2            | 0.03            | 0.01            | 0.01            | 20.2             |
++---------------+------+------+-----------------+-----------------+-----------------+-----------------+------------------+
+
+2026.09.26-17:44:52.067 info  [caliper] [round-orchestrator] 	Finished round 3 (oracle-2-of-2) in 10.003 seconds
+2026.09.26-17:44:52.067 info  [caliper] [monitor.js] 	Stopping all monitors
+2026.09.26-17:44:52.067 info  [caliper] [round-orchestrator] 	Waiting 5 seconds for the next round...
+2026.09.26-17:44:57.072 info  [caliper] [round-orchestrator] 	Started round 4 (oracle-2-of-3)
+2026.09.26-17:44:57.087 info  [caliper] [worker-message-handler] 	Preparing Worker#0 for Round#3
+2026.09.26-17:44:57.088 info  [caliper] [worker-message-handler] 	Preparing Worker#1 for Round#3
+2026.09.26-17:44:57.144 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-17:44:57.144 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-17:44:57.145 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-17:44:57.145 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-17:44:57.146 info  [caliper] [caliper-worker] 	Info: worker 1 prepare test phase for round 3 is starting...
+2026.09.26-17:44:57.146 info  [caliper] [caliper-worker] 	Info: worker 0 prepare test phase for round 3 is starting...
+2026.09.26-17:44:57.147 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-17:44:57.148 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-17:44:57.148 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-17:44:57.148 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-17:44:57.148 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-17:44:57.148 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-17:44:57.148 info  [caliper] [caliper-worker] 	Info: worker 1 prepare test phase for round 3 is completed
+2026.09.26-17:44:57.149 info  [caliper] [worker-message-handler] 	Worker#1 prepared for Round#3
+2026.09.26-17:44:57.149 info  [caliper] [caliper-worker] 	Info: worker 0 prepare test phase for round 3 is completed
+2026.09.26-17:44:57.149 info  [caliper] [worker-message-handler] 	Worker#0 prepared for Round#3
+2026.09.26-17:44:57.155 info  [caliper] [worker-orchestrator] 	2 workers prepared, progressing to test phase.
+2026.09.26-17:44:57.156 info  [caliper] [round-orchestrator] 	Monitors successfully started
+2026.09.26-17:44:57.158 info  [caliper] [worker-message-handler] 	Worker#0 is starting Round#3
+2026.09.26-17:44:57.159 info  [caliper] [worker-message-handler] 	Worker#1 is starting Round#3
+2026.09.26-17:44:57.176 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-17:44:57.176 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-17:44:57.177 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-17:44:57.177 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-17:44:57.181 info  [caliper] [caliper-worker] 	Worker #1 starting workload loop
+2026.09.26-17:44:57.181 info  [caliper] [caliper-worker] 	Worker #0 starting workload loop
+2026.09.26-17:45:02.159 info  [caliper] [default-observer] 	[oracle-2-of-3 Round 3 Transaction Info] - Submitted: 80 Succ: 80 Fail:0 Unfinished:0
+2026.09.26-17:45:07.159 info  [caliper] [default-observer] 	[oracle-2-of-3 Round 3 Transaction Info] - Submitted: 182 Succ: 180 Fail:0 Unfinished:2
+2026.09.26-17:45:08.184 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-17:45:08.184 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-17:45:08.185 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-17:45:08.185 info  [caliper] [worker-message-handler] 	Worker#1 finished Round#3
+2026.09.26-17:45:08.185 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-17:45:08.185 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-17:45:08.185 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-17:45:08.185 info  [caliper] [worker-message-handler] 	Worker#0 finished Round#3
+2026.09.26-17:45:13.188 info  [caliper] [default-observer] 	Resetting txCount indicator count
+2026.09.26-17:45:13.189 info  [caliper] [report-builder] 	### Test result ###
+2026.09.26-17:45:13.192 info  [caliper] [report-builder] 	
++---------------+------+------+-----------------+-----------------+-----------------+-----------------+------------------+
+| Name          | Succ | Fail | Send Rate (TPS) | Max Latency (s) | Min Latency (s) | Avg Latency (s) | Throughput (TPS) |
+|---------------|------|------|-----------------|-----------------|-----------------|-----------------|------------------|
+| oracle-2-of-3 | 200  | 0    | 20.2            | 0.10            | 0.01            | 0.01            | 20.2             |
++---------------+------+------+-----------------+-----------------+-----------------+-----------------+------------------+
+
+2026.09.26-17:45:13.192 info  [caliper] [round-orchestrator] 	Finished round 4 (oracle-2-of-3) in 10.003 seconds
+2026.09.26-17:45:13.193 info  [caliper] [monitor.js] 	Stopping all monitors
+2026.09.26-17:45:13.193 info  [caliper] [round-orchestrator] 	Waiting 5 seconds for the next round...
+2026.09.26-17:45:18.196 info  [caliper] [round-orchestrator] 	Started round 5 (anchored-write-5-tps)
+2026.09.26-17:45:18.197 info  [caliper] [worker-message-handler] 	Preparing Worker#0 for Round#4
+2026.09.26-17:45:18.197 info  [caliper] [worker-message-handler] 	Preparing Worker#1 for Round#4
+2026.09.26-17:45:18.227 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-17:45:18.227 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-17:45:18.227 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-17:45:18.227 info  [caliper] [caliper-worker] 	Info: worker 1 prepare test phase for round 4 is starting...
+2026.09.26-17:45:18.228 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-17:45:18.228 info  [caliper] [caliper-worker] 	Info: worker 0 prepare test phase for round 4 is starting...
+2026.09.26-17:45:18.229 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-17:45:18.229 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-17:45:18.229 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-17:45:18.229 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-17:45:18.229 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-17:45:18.229 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-17:45:18.230 info  [caliper] [caliper-worker] 	Info: worker 1 prepare test phase for round 4 is completed
+2026.09.26-17:45:18.230 info  [caliper] [caliper-worker] 	Info: worker 0 prepare test phase for round 4 is completed
+2026.09.26-17:45:18.230 info  [caliper] [worker-message-handler] 	Worker#0 prepared for Round#4
+2026.09.26-17:45:18.230 info  [caliper] [worker-message-handler] 	Worker#1 prepared for Round#4
+2026.09.26-17:45:18.232 info  [caliper] [worker-orchestrator] 	2 workers prepared, progressing to test phase.
+2026.09.26-17:45:18.232 info  [caliper] [round-orchestrator] 	Monitors successfully started
+2026.09.26-17:45:18.234 info  [caliper] [worker-message-handler] 	Worker#0 is starting Round#4
+2026.09.26-17:45:18.234 info  [caliper] [worker-message-handler] 	Worker#1 is starting Round#4
+2026.09.26-17:45:18.240 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-17:45:18.240 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-17:45:18.241 info  [caliper] [caliper-worker] 	Worker #0 starting workload loop
+2026.09.26-17:45:18.241 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-17:45:18.242 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-17:45:18.243 info  [caliper] [caliper-worker] 	Worker #1 starting workload loop
+2026.09.26-17:45:23.235 info  [caliper] [default-observer] 	[anchored-write-5-tps Round 4 Transaction Info] - Submitted: 22 Succ: 20 Fail:0 Unfinished:2
+2026.09.26-17:45:28.236 info  [caliper] [default-observer] 	[anchored-write-5-tps Round 4 Transaction Info] - Submitted: 46 Succ: 40 Fail:0 Unfinished:6
+2026.09.26-17:45:33.236 info  [caliper] [default-observer] 	[anchored-write-5-tps Round 4 Transaction Info] - Submitted: 72 Succ: 70 Fail:0 Unfinished:2
+2026.09.26-17:45:38.236 info  [caliper] [default-observer] 	[anchored-write-5-tps Round 4 Transaction Info] - Submitted: 100 Succ: 100 Fail:0 Unfinished:0
+2026.09.26-17:45:39.073 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-17:45:39.073 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-17:45:39.073 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-17:45:39.073 info  [caliper] [worker-message-handler] 	Worker#1 finished Round#4
+2026.09.26-17:45:39.077 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-17:45:39.077 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-17:45:39.077 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-17:45:39.078 info  [caliper] [worker-message-handler] 	Worker#0 finished Round#4
+2026.09.26-17:45:44.084 info  [caliper] [default-observer] 	Resetting txCount indicator count
+2026.09.26-17:45:44.084 info  [caliper] [report-builder] 	### Test result ###
+2026.09.26-17:45:44.090 info  [caliper] [report-builder] 	
++----------------------+------+------+-----------------+-----------------+-----------------+-----------------+------------------+
+| Name                 | Succ | Fail | Send Rate (TPS) | Max Latency (s) | Min Latency (s) | Avg Latency (s) | Throughput (TPS) |
+|----------------------|------|------|-----------------|-----------------|-----------------|-----------------|------------------|
+| anchored-write-5-tps | 100  | 0    | 5.1             | 2.34            | 0.14            | 1.04            | 5.1              |
++----------------------+------+------+-----------------+-----------------+-----------------+-----------------+------------------+
+
+2026.09.26-17:45:44.092 info  [caliper] [round-orchestrator] 	Finished round 5 (anchored-write-5-tps) in 19.802 seconds
+2026.09.26-17:45:44.092 info  [caliper] [monitor.js] 	Stopping all monitors
+2026.09.26-17:45:44.093 info  [caliper] [round-orchestrator] 	Waiting 5 seconds for the next round...
+2026.09.26-17:45:49.096 info  [caliper] [round-orchestrator] 	Started round 6 (anchored-write-10-tps)
+2026.09.26-17:45:49.098 info  [caliper] [worker-message-handler] 	Preparing Worker#0 for Round#5
+2026.09.26-17:45:49.098 info  [caliper] [worker-message-handler] 	Preparing Worker#1 for Round#5
+2026.09.26-17:45:49.106 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-17:45:49.107 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-17:45:49.107 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-17:45:49.107 info  [caliper] [caliper-worker] 	Info: worker 1 prepare test phase for round 5 is starting...
+2026.09.26-17:45:49.107 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-17:45:49.107 info  [caliper] [caliper-worker] 	Info: worker 0 prepare test phase for round 5 is starting...
+2026.09.26-17:45:49.109 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-17:45:49.109 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-17:45:49.109 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-17:45:49.109 info  [caliper] [caliper-worker] 	Info: worker 1 prepare test phase for round 5 is completed
+2026.09.26-17:45:49.109 info  [caliper] [worker-message-handler] 	Worker#1 prepared for Round#5
+2026.09.26-17:45:49.109 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-17:45:49.109 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-17:45:49.110 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-17:45:49.110 info  [caliper] [caliper-worker] 	Info: worker 0 prepare test phase for round 5 is completed
+2026.09.26-17:45:49.110 info  [caliper] [worker-message-handler] 	Worker#0 prepared for Round#5
+2026.09.26-17:45:49.112 info  [caliper] [worker-orchestrator] 	2 workers prepared, progressing to test phase.
+2026.09.26-17:45:49.113 info  [caliper] [round-orchestrator] 	Monitors successfully started
+2026.09.26-17:45:49.114 info  [caliper] [worker-message-handler] 	Worker#0 is starting Round#5
+2026.09.26-17:45:49.116 info  [caliper] [worker-message-handler] 	Worker#1 is starting Round#5
+2026.09.26-17:45:49.121 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-17:45:49.121 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-17:45:49.122 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-17:45:49.122 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-17:45:49.122 info  [caliper] [caliper-worker] 	Worker #1 starting workload loop
+2026.09.26-17:45:49.122 info  [caliper] [caliper-worker] 	Worker #0 starting workload loop
+2026.09.26-17:45:54.115 info  [caliper] [default-observer] 	[anchored-write-10-tps Round 5 Transaction Info] - Submitted: 42 Succ: 40 Fail:0 Unfinished:2
+2026.09.26-17:45:59.115 info  [caliper] [default-observer] 	[anchored-write-10-tps Round 5 Transaction Info] - Submitted: 92 Succ: 90 Fail:0 Unfinished:2
+2026.09.26-17:46:00.136 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-17:46:00.136 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-17:46:00.136 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-17:46:00.136 info  [caliper] [worker-message-handler] 	Worker#0 finished Round#5
+2026.09.26-17:46:00.141 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-17:46:00.141 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-17:46:00.141 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-17:46:00.141 info  [caliper] [worker-message-handler] 	Worker#1 finished Round#5
+2026.09.26-17:46:05.145 info  [caliper] [default-observer] 	Resetting txCount indicator count
+2026.09.26-17:46:05.146 info  [caliper] [report-builder] 	### Test result ###
+2026.09.26-17:46:05.148 info  [caliper] [report-builder] 	
++-----------------------+------+------+-----------------+-----------------+-----------------+-----------------+------------------+
+| Name                  | Succ | Fail | Send Rate (TPS) | Max Latency (s) | Min Latency (s) | Avg Latency (s) | Throughput (TPS) |
+|-----------------------|------|------|-----------------|-----------------|-----------------|-----------------|------------------|
+| anchored-write-10-tps | 100  | 0    | 10.2            | 1.00            | 0.12            | 0.56            | 10.1             |
++-----------------------+------+------+-----------------+-----------------+-----------------+-----------------+------------------+
+
+2026.09.26-17:46:05.148 info  [caliper] [round-orchestrator] 	Finished round 6 (anchored-write-10-tps) in 10.003 seconds
+2026.09.26-17:46:05.149 info  [caliper] [monitor.js] 	Stopping all monitors
+2026.09.26-17:46:05.149 info  [caliper] [round-orchestrator] 	Waiting 5 seconds for the next round...
+2026.09.26-17:46:10.155 info  [caliper] [round-orchestrator] 	Started round 7 (anchored-write-20-tps)
+2026.09.26-17:46:10.156 info  [caliper] [worker-message-handler] 	Preparing Worker#0 for Round#6
+2026.09.26-17:46:10.156 info  [caliper] [worker-message-handler] 	Preparing Worker#1 for Round#6
+2026.09.26-17:46:10.201 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-17:46:10.201 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-17:46:10.202 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-17:46:10.202 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-17:46:10.202 info  [caliper] [caliper-worker] 	Info: worker 0 prepare test phase for round 6 is starting...
+2026.09.26-17:46:10.202 info  [caliper] [caliper-worker] 	Info: worker 1 prepare test phase for round 6 is starting...
+2026.09.26-17:46:10.203 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-17:46:10.203 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-17:46:10.204 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-17:46:10.204 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-17:46:10.204 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-17:46:10.204 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-17:46:10.204 info  [caliper] [caliper-worker] 	Info: worker 0 prepare test phase for round 6 is completed
+2026.09.26-17:46:10.204 info  [caliper] [caliper-worker] 	Info: worker 1 prepare test phase for round 6 is completed
+2026.09.26-17:46:10.204 info  [caliper] [worker-message-handler] 	Worker#0 prepared for Round#6
+2026.09.26-17:46:10.204 info  [caliper] [worker-message-handler] 	Worker#1 prepared for Round#6
+2026.09.26-17:46:10.206 info  [caliper] [worker-orchestrator] 	2 workers prepared, progressing to test phase.
+2026.09.26-17:46:10.206 info  [caliper] [round-orchestrator] 	Monitors successfully started
+2026.09.26-17:46:10.207 info  [caliper] [worker-message-handler] 	Worker#0 is starting Round#6
+2026.09.26-17:46:10.207 info  [caliper] [worker-message-handler] 	Worker#1 is starting Round#6
+2026.09.26-17:46:10.214 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-17:46:10.215 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-17:46:10.215 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-17:46:10.215 info  [caliper] [caliper-worker] 	Worker #0 starting workload loop
+2026.09.26-17:46:10.215 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-17:46:10.216 info  [caliper] [caliper-worker] 	Worker #1 starting workload loop
+2026.09.26-17:46:15.207 info  [caliper] [default-observer] 	[anchored-write-20-tps Round 6 Transaction Info] - Submitted: 81 Succ: 70 Fail:0 Unfinished:11
+2026.09.26-17:46:16.426 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-17:46:16.426 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-17:46:16.426 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-17:46:16.426 info  [caliper] [worker-message-handler] 	Worker#1 finished Round#6
+2026.09.26-17:46:16.428 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-17:46:16.429 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-17:46:16.429 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-17:46:16.429 info  [caliper] [worker-message-handler] 	Worker#0 finished Round#6
+2026.09.26-17:46:21.430 info  [caliper] [default-observer] 	Resetting txCount indicator count
+2026.09.26-17:46:21.431 info  [caliper] [report-builder] 	### Test result ###
+2026.09.26-17:46:21.431 info  [caliper] [report-builder] 	
++-----------------------+------+------+-----------------+-----------------+-----------------+-----------------+------------------+
+| Name                  | Succ | Fail | Send Rate (TPS) | Max Latency (s) | Min Latency (s) | Avg Latency (s) | Throughput (TPS) |
+|-----------------------|------|------|-----------------|-----------------|-----------------|-----------------|------------------|
+| anchored-write-20-tps | 100  | 0    | 20.4            | 0.66            | 0.18            | 0.42            | 19.6             |
++-----------------------+------+------+-----------------+-----------------+-----------------+-----------------+------------------+
+
+2026.09.26-17:46:21.432 info  [caliper] [round-orchestrator] 	Finished round 7 (anchored-write-20-tps) in 5.203 seconds
+2026.09.26-17:46:21.432 info  [caliper] [monitor.js] 	Stopping all monitors
+2026.09.26-17:46:21.432 info  [caliper] [round-orchestrator] 	Waiting 5 seconds for the next round...
+2026.09.26-17:46:26.435 info  [caliper] [round-orchestrator] 	Started round 8 (claim-submit-5-tps)
+2026.09.26-17:46:26.435 info  [caliper] [worker-message-handler] 	Preparing Worker#0 for Round#7
+2026.09.26-17:46:26.436 info  [caliper] [worker-message-handler] 	Preparing Worker#1 for Round#7
+2026.09.26-17:46:26.458 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-17:46:26.458 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-17:46:26.458 info  [caliper] [caliper-worker] 	Info: worker 0 prepare test phase for round 7 is starting...
+2026.09.26-17:46:26.458 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-17:46:26.459 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-17:46:26.459 info  [caliper] [caliper-worker] 	Info: worker 1 prepare test phase for round 7 is starting...
+2026.09.26-17:46:26.460 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-17:46:26.460 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-17:46:26.460 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-17:46:26.460 info  [caliper] [caliper-worker] 	Info: worker 0 prepare test phase for round 7 is completed
+2026.09.26-17:46:26.460 info  [caliper] [worker-message-handler] 	Worker#0 prepared for Round#7
+2026.09.26-17:46:26.461 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-17:46:26.461 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-17:46:26.461 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-17:46:26.461 info  [caliper] [caliper-worker] 	Info: worker 1 prepare test phase for round 7 is completed
+2026.09.26-17:46:26.461 info  [caliper] [worker-message-handler] 	Worker#1 prepared for Round#7
+2026.09.26-17:46:26.462 info  [caliper] [worker-orchestrator] 	2 workers prepared, progressing to test phase.
+2026.09.26-17:46:26.462 info  [caliper] [round-orchestrator] 	Monitors successfully started
+2026.09.26-17:46:26.463 info  [caliper] [worker-message-handler] 	Worker#0 is starting Round#7
+2026.09.26-17:46:26.464 info  [caliper] [worker-message-handler] 	Worker#1 is starting Round#7
+2026.09.26-17:46:26.471 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-17:46:26.471 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-17:46:26.471 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-17:46:26.471 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-17:46:26.472 info  [caliper] [caliper-worker] 	Worker #0 starting workload loop
+2026.09.26-17:46:26.472 info  [caliper] [caliper-worker] 	Worker #1 starting workload loop
+2026.09.26-17:46:26.679 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444786474-0-1,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:26.681 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444786474-1-1,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:26.897 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444786873-1-2,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:26.898 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444786873-0-2,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:27.291 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444787273-0-3,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:27.291 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444787273-1-3,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:27.692 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444787673-1-4,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:27.692 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444787673-0-4,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:28.092 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444788072-0-5,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:28.092 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444788072-1-5,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:28.494 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444788473-0-6,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:28.498 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444788474-1-6,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:28.895 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444788873-0-7,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:28.895 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444788873-1-7,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:29.303 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444789272-0-8,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:29.303 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444789272-1-8,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:29.693 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444789673-0-9,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:29.693 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444789673-1-9,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:30.138 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444790072-0-10,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:30.142 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444790073-1-10,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:30.512 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444790473-0-11,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:30.514 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444790473-1-11,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:30.891 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444790873-1-12,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:30.891 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444790872-0-12,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:31.294 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444791272-1-13,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:31.296 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444791273-0-13,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:31.465 info  [caliper] [default-observer] 	[claim-submit-5-tps Round 7 Transaction Info] - Submitted: 22 Succ: 0 Fail:20 Unfinished:2
+2026.09.26-17:46:31.711 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444791673-1-14,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:31.721 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444791673-0-14,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:32.094 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444792073-1-15,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:32.094 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444792073-0-15,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:32.491 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444792472-1-16,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:32.491 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444792473-0-16,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:32.891 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444792873-0-17,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:32.893 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444792873-1-17,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:33.297 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444793273-1-18,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:33.297 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444793272-0-18,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:33.694 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444793672-0-19,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:33.707 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444793673-1-19,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:34.090 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444794071-1-20,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:34.090 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444794073-0-20,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:34.489 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444794473-0-21,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:34.498 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444794471-1-21,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:34.892 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444794873-1-22,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:34.892 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444794873-0-22,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:35.298 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444795273-0-23,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:35.298 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444795273-1-23,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:35.690 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444795672-1-24,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:35.690 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444795673-0-24,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:36.088 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444796072-0-25,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:36.089 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444796072-1-25,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:36.465 info  [caliper] [default-observer] 	[claim-submit-5-tps Round 7 Transaction Info] - Submitted: 46 Succ: 0 Fail:46 Unfinished:0
+2026.09.26-17:46:36.491 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444796472-0-26,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:36.491 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444796472-1-26,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:36.898 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444796873-1-27,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:36.899 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444796873-0-27,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:37.291 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444797273-0-28,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:37.291 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444797272-1-28,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:37.689 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444797672-0-29,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:37.690 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444797671-1-29,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:38.092 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444798071-0-30,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:38.092 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444798072-1-30,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:38.488 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444798472-0-31,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:38.490 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444798473-1-31,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:38.889 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444798872-0-32,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:38.891 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444798873-1-32,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:39.294 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444799273-0-33,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:39.295 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444799272-1-33,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:39.692 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444799672-0-34,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:39.692 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444799672-1-34,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:40.119 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444800072-0-35,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:40.121 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444800073-1-35,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:40.497 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444800472-0-36,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:40.497 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444800472-1-36,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:40.898 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444800873-1-37,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:40.898 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444800873-0-37,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:41.298 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444801272-1-38,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:41.298 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444801273-0-38,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:41.466 info  [caliper] [default-observer] 	[claim-submit-5-tps Round 7 Transaction Info] - Submitted: 72 Succ: 0 Fail:70 Unfinished:2
+2026.09.26-17:46:41.695 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444801673-0-39,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:41.695 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444801672-1-39,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:42.099 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444802073-0-40,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:42.099 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444802073-1-40,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:42.495 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444802473-1-41,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:42.495 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444802473-0-41,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:42.890 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444802873-0-42,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:42.890 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444802872-1-42,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:43.291 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444803272-0-43,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:43.291 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444803272-1-43,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:43.691 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444803673-0-44,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:43.691 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444803673-1-44,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:44.091 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444804073-0-45,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:44.091 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444804073-1-45,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:44.492 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444804472-0-46,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:44.492 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444804473-1-46,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:44.890 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444804873-1-47,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:44.889 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444804872-0-47,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:45.291 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444805272-1-48,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:45.291 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444805272-0-48,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:45.692 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444805673-0-49,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:45.693 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444805673-1-49,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:46.092 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444806073-1-50,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:46.092 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444806073-0-50,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:46.467 info  [caliper] [default-observer] 	[claim-submit-5-tps Round 7 Transaction Info] - Submitted: 100 Succ: 0 Fail:100 Unfinished:0
+2026.09.26-17:46:47.184 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-17:46:47.185 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-17:46:47.185 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-17:46:47.185 info  [caliper] [worker-message-handler] 	Worker#1 finished Round#7
+2026.09.26-17:46:47.187 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-17:46:47.187 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-17:46:47.187 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-17:46:47.188 info  [caliper] [worker-message-handler] 	Worker#0 finished Round#7
+2026.09.26-17:46:52.192 info  [caliper] [default-observer] 	Resetting txCount indicator count
+2026.09.26-17:46:52.193 info  [caliper] [report-builder] 	### Test result ###
+2026.09.26-17:46:52.194 info  [caliper] [report-builder] 	
++--------------------+------+------+-----------------+-----------------+-----------------+-----------------+------------------+
+| Name               | Succ | Fail | Send Rate (TPS) | Max Latency (s) | Min Latency (s) | Avg Latency (s) | Throughput (TPS) |
+|--------------------|------|------|-----------------|-----------------|-----------------|-----------------|------------------|
+| claim-submit-5-tps | 0    | 100  | 5.1             | -               | -               | -               | 5.1              |
++--------------------+------+------+-----------------+-----------------+-----------------+-----------------+------------------+
+
+2026.09.26-17:46:52.198 info  [caliper] [round-orchestrator] 	Finished round 8 (claim-submit-5-tps) in 19.705 seconds
+2026.09.26-17:46:52.198 info  [caliper] [monitor.js] 	Stopping all monitors
+2026.09.26-17:46:52.198 info  [caliper] [round-orchestrator] 	Waiting 5 seconds for the next round...
+2026.09.26-17:46:57.204 info  [caliper] [round-orchestrator] 	Started round 9 (claim-submit-10-tps)
+2026.09.26-17:46:57.205 info  [caliper] [worker-message-handler] 	Preparing Worker#0 for Round#8
+2026.09.26-17:46:57.206 info  [caliper] [worker-message-handler] 	Preparing Worker#1 for Round#8
+2026.09.26-17:46:57.212 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-17:46:57.212 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-17:46:57.212 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-17:46:57.212 info  [caliper] [caliper-worker] 	Info: worker 0 prepare test phase for round 8 is starting...
+2026.09.26-17:46:57.213 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-17:46:57.213 info  [caliper] [caliper-worker] 	Info: worker 1 prepare test phase for round 8 is starting...
+2026.09.26-17:46:57.214 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-17:46:57.214 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-17:46:57.214 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-17:46:57.214 info  [caliper] [caliper-worker] 	Info: worker 0 prepare test phase for round 8 is completed
+2026.09.26-17:46:57.214 info  [caliper] [worker-message-handler] 	Worker#0 prepared for Round#8
+2026.09.26-17:46:57.214 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-17:46:57.214 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-17:46:57.214 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-17:46:57.215 info  [caliper] [caliper-worker] 	Info: worker 1 prepare test phase for round 8 is completed
+2026.09.26-17:46:57.216 info  [caliper] [worker-message-handler] 	Worker#1 prepared for Round#8
+2026.09.26-17:46:57.217 info  [caliper] [worker-orchestrator] 	2 workers prepared, progressing to test phase.
+2026.09.26-17:46:57.217 info  [caliper] [round-orchestrator] 	Monitors successfully started
+2026.09.26-17:46:57.218 info  [caliper] [worker-message-handler] 	Worker#0 is starting Round#8
+2026.09.26-17:46:57.218 info  [caliper] [worker-message-handler] 	Worker#1 is starting Round#8
+2026.09.26-17:46:57.224 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-17:46:57.224 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-17:46:57.224 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-17:46:57.224 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-17:46:57.225 info  [caliper] [caliper-worker] 	Worker #1 starting workload loop
+2026.09.26-17:46:57.225 info  [caliper] [caliper-worker] 	Worker #0 starting workload loop
+2026.09.26-17:46:57.260 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444817226-0-1,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:57.260 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444817226-1-1,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:57.441 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444817424-0-2,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:57.441 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444817424-1-2,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:57.644 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444817624-0-3,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:57.644 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444817624-1-3,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:57.843 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444817825-0-4,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:57.843 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444817826-1-4,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:58.043 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444818025-1-5,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:58.043 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444818024-0-5,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:58.243 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444818225-1-6,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:58.243 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444818225-0-6,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:58.442 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444818424-1-7,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:58.449 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444818424-0-7,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:58.645 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444818626-1-8,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:58.645 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444818626-0-8,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:58.845 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444818824-0-9,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:58.845 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444818824-1-9,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:59.045 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444819024-1-10,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:59.046 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444819024-0-10,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:59.249 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444819225-0-11,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:59.249 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444819225-1-11,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:59.450 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444819424-0-12,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:59.450 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444819424-1-12,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:59.643 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444819624-1-13,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:59.643 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444819624-0-13,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:59.851 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444819825-1-14,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:46:59.853 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444819824-0-14,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:47:00.060 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444820025-1-15,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:47:00.060 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444820025-0-15,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:47:00.252 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444820224-0-16,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:47:00.252 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444820224-1-16,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:47:00.446 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444820424-1-17,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:47:00.448 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444820426-0-17,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:47:00.648 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444820624-0-18,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:47:00.648 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444820626-1-18,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:47:00.846 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444820825-0-19,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:47:00.848 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444820824-1-19,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:47:01.048 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444821025-1-20,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:47:01.048 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444821025-0-20,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:47:01.242 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444821224-1-21,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:47:01.242 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444821224-0-21,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:47:01.501 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444821425-1-22,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:47:01.510 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444821424-0-22,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:47:01.651 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444821624-1-23,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:47:01.657 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444821624-0-23,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:47:01.846 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444821824-0-24,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:47:01.850 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444821825-1-24,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:47:02.054 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444822024-1-25,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:47:02.054 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444822024-0-25,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:47:02.217 info  [caliper] [default-observer] 	[claim-submit-10-tps Round 8 Transaction Info] - Submitted: 42 Succ: 0 Fail:40 Unfinished:2
+2026.09.26-17:47:02.259 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444822225-0-26,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:47:02.260 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444822225-1-26,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:47:02.450 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444822426-0-27,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:47:02.450 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444822425-1-27,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:47:02.648 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444822625-1-28,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:47:02.648 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444822625-0-28,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:47:02.849 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444822824-0-29,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:47:02.851 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444822825-1-29,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:47:03.044 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444823025-1-30,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:47:03.045 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444823025-0-30,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:47:03.242 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444823224-1-31,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:47:03.242 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444823224-0-31,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:47:03.445 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444823424-0-32,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:47:03.445 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444823424-1-32,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:47:03.642 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444823624-1-33,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:47:03.643 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444823625-0-33,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:47:03.842 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444823824-1-34,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:47:03.842 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444823824-0-34,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:47:04.043 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444824025-1-35,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:47:04.043 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444824025-0-35,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:47:04.244 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444824224-1-36,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:47:04.245 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444824224-0-36,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:47:04.446 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444824425-0-37,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:47:04.446 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444824424-1-37,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:47:04.644 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444824625-1-38,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:47:04.644 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444824625-0-38,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:47:04.844 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444824824-1-39,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:47:04.844 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444824824-0-39,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:47:05.042 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444825024-1-40,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:47:05.042 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444825024-0-40,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:47:05.241 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444825224-0-41,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:47:05.241 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444825224-1-41,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:47:05.442 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444825424-1-42,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:47:05.442 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444825425-0-42,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:47:05.647 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444825625-1-43,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:47:05.647 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444825625-0-43,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:47:05.843 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444825825-0-44,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:47:05.843 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444825824-1-44,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:47:06.041 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444826024-1-45,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:47:06.042 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444826024-0-45,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:47:06.248 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444826225-0-46,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:47:06.248 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444826224-1-46,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:47:06.504 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444826424-0-47,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:47:06.504 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444826424-1-47,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:47:06.714 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444826624-1-48,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:47:06.726 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444826624-0-48,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:47:06.875 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444826824-0-49,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:47:06.887 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444826825-1-49,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:47:07.064 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444827024-1-50,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:47:07.066 error [caliper] [connectors/peer-gateway/PeerGateway] 	Failed to perform submit transaction [SubmitInvoiceClaim] using arguments [caliper-claim-1790444827024-0-50,phase2-load-policy,hospital-demo,showcase-invoice-hospital-1,50000,2026-06-15,aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa],  with error: EndorseError: 10 ABORTED: failed to endorse transaction, see attached details for more info
+Details:
+-  peer0.insurer.blockinsure.test:7051:chaincode response 500, hospitalInvoice showcase-invoice-hospital-1 does not exist
+2026.09.26-17:47:07.218 info  [caliper] [default-observer] 	[claim-submit-10-tps Round 8 Transaction Info] - Submitted: 100 Succ: 0 Fail:100 Unfinished:0
+2026.09.26-17:47:08.150 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-17:47:08.150 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-17:47:08.151 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-17:47:08.152 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-17:47:08.152 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-17:47:08.152 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-17:47:08.156 info  [caliper] [worker-message-handler] 	Worker#0 finished Round#8
+2026.09.26-17:47:08.158 info  [caliper] [worker-message-handler] 	Worker#1 finished Round#8
+2026.09.26-17:47:13.171 info  [caliper] [default-observer] 	Resetting txCount indicator count
+2026.09.26-17:47:13.180 info  [caliper] [report-builder] 	### Test result ###
+2026.09.26-17:47:13.191 info  [caliper] [report-builder] 	
++---------------------+------+------+-----------------+-----------------+-----------------+-----------------+------------------+
+| Name                | Succ | Fail | Send Rate (TPS) | Max Latency (s) | Min Latency (s) | Avg Latency (s) | Throughput (TPS) |
+|---------------------|------|------|-----------------|-----------------|-----------------|-----------------|------------------|
+| claim-submit-10-tps | 0    | 100  | 10.2            | -               | -               | -               | 10.2             |
++---------------------+------+------+-----------------+-----------------+-----------------+-----------------+------------------+
+
+2026.09.26-17:47:13.197 info  [caliper] [round-orchestrator] 	Finished round 9 (claim-submit-10-tps) in 9.902 seconds
+2026.09.26-17:47:13.197 info  [caliper] [monitor.js] 	Stopping all monitors
+2026.09.26-17:47:13.198 info  [caliper] [round-orchestrator] 	Waiting 5 seconds for the next round...
