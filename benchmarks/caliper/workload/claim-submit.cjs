@@ -15,7 +15,7 @@ class ClaimSubmitWorkload extends LatencySampledWorkload {
       contractId: this.roundArguments.contractId,
       contractFunction: 'SubmitInvoiceClaim',
       contractArguments: [
-        id, 'phase2-load-policy', 'hospital-demo', 'showcase-invoice-hospital-1',
+        id, 'phase2-load-policy', 'hospital-demo', 'showcase-invoice-hospital-demo',
         '50000', '2026-06-15', 'a'.repeat(64),
       ],
       invokerIdentity: 'policyholder1',

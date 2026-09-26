@@ -24,7 +24,7 @@ class MixedPolicyClaimWorkload extends LatencySampledWorkload {
       contractFunction: 'SubmitInvoiceClaim',
       contractArguments: [
         `caliper-mixed-claim-${Date.now()}-${this.workerIndex}-${this.sequence}`,
-        'phase2-load-policy', 'hospital-demo', 'showcase-invoice-hospital-1',
+        'phase2-load-policy', 'hospital-demo', 'showcase-invoice-hospital-demo',
         '50000', '2026-06-15', 'a'.repeat(64),
       ],
       invokerIdentity: 'policyholder1',

@@ -1,0 +1,5 @@
+# Phase 2 measurement exclusions and corrections
+
+The first Caliper attempt on 26 September 2026 was stopped after its first claim-write rounds failed. The workload used invoice ID `showcase-invoice-hospital-1`; the deterministic seed actually creates `showcase-invoice-hospital-demo` for `hospital-demo`. The peer returned endorsement failures for the nonexistent invoice. This was a fixture typo, not a finding about system load tolerance. The failed pilot log, partial resource samples, and per-transaction latency files are archived under `docs/results/phase2-caliper/pilot-invalid-invoice*` and `docs/results/phase2-caliper/samples/pilot-invalid-invoice-*`.
+
+The invoice ID was corrected in both claim and mixed workloads before the three numbered Caliper repetitions. No pilot transactions are included in the final load aggregates. The first seven pilot rounds had already issued valid schema, threshold, and registry operations on the Phase 2 channel; those writes remain in its ledger and are part of the starting state for the numbered runs. This state accumulation is a validity limit, not an excluded ledger event.
