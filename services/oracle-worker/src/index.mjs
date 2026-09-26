@@ -237,6 +237,10 @@ async function consumeEvents() {
     checkpoint,
     startBlock: BigInt(cursor.nextBlock),
   });
+  // A transient stream failure marks the worker DEGRADED. Reaching this point
+  // proves that the subscription has been re-established, even when there is
+  // no new request available to trigger a later health update.
+  await updateHealth({ status: "ONLINE", lastError: null });
   try {
     for await (const event of activeEvents) {
       if (stopping) break;

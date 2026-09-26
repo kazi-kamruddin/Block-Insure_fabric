@@ -50,6 +50,11 @@ test("liveness, dependency readiness, public catalog, and not-found behavior are
   expect(live.status()).toBe(200);
   expect(await live.json()).toMatchObject({ status: "alive", service: "block-insure-web" });
 
+  await expect.poll(async () => (await request.get("/api/health/ready")).status(), {
+    timeout: 15_000,
+    intervals: [250, 500, 1_000],
+    message: "all Fabric and Oracle dependencies should recover to readiness",
+  }).toBe(200);
   const ready = await request.get("/api/health/ready");
   const readiness = await ready.json();
   expect(ready.status(), JSON.stringify(readiness)).toBe(200);

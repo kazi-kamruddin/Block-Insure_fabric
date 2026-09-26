@@ -28,6 +28,10 @@ export type OracleWorkerHealth = {
 
 export type OracleId = "oracle1" | "oracle2" | "oracle3";
 
+export function isOracleWorkerOperational(status: string) {
+  return status === "ONLINE" || status === "PROCESSING";
+}
+
 type HealthReadOptions = {
   environment?: NodeJS.ProcessEnv;
   startDirectory?: string;
