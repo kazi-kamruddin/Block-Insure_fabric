@@ -1,0 +1,1075 @@
+2026.09.26-18:04:39.719 info  [caliper] [cli-launch-manager] 	Binding specification is present, performing binding for "fabric:fabric-gateway"
+2026.09.26-18:04:39.723 warn  [caliper] [bind] 	Working directory is not specified. Current path: "/hyperledger/caliper/workspace"
+2026.09.26-18:04:39.724 info  [caliper] [bind] 	User-provided arguments for npm: "-g"
+2026.09.26-18:04:39.724 info  [caliper] [bind] 	Binding for fabric@fabric-gateway. This might take some time...
+2026.09.26-18:04:39.725 info  [caliper] [bind] 	Using working directory: /hyperledger/caliper/workspace
+2026.09.26-18:04:39.726 info  [caliper] [bind] 	Calling npm with: install -g @hyperledger/fabric-gateway@1.7.1 @grpc/grpc-js@1.13.1
+
+added 39 packages in 13s
+
+6 packages are looking for funding
+  run `npm fund` for details
+npm notice
+npm notice New minor version of npm available! 11.6.1 -> 11.20.0
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v11.20.0
+npm notice To update run: npm install -g npm@11.20.0
+npm notice
+2026.09.26-18:04:52.782 info  [caliper] [cli-launch-manager] 	Set workspace path: /hyperledger/caliper/workspace
+2026.09.26-18:04:52.812 info  [caliper] [cli-launch-manager] 	Set benchmark configuration path: /hyperledger/caliper/workspace/benchmarks/caliper/benchmark.yaml
+2026.09.26-18:04:52.817 info  [caliper] [cli-launch-manager] 	Set network configuration path: /hyperledger/caliper/workspace/benchmarks/caliper/generated/network.yaml
+2026.09.26-18:04:52.821 info  [caliper] [cli-launch-manager] 	Set SUT type: fabric
+2026.09.26-18:04:53.006 info  [caliper] [benchmark-validator] 	No observer specified, will default to `none`
+2026.09.26-18:04:53.006 info  [caliper] [caliper-engine] 	Starting benchmark flow
+2026.09.26-18:04:53.007 info  [caliper] [caliper-engine] 	Skipping start commands due to benchmark flow conditioning
+2026.09.26-18:04:53.008 info  [caliper] [caliper-engine] 	Skipping initialization phase due to benchmark flow conditioning
+2026.09.26-18:04:53.008 info  [caliper] [caliper-engine] 	Skipping install smart contract phase due to benchmark flow conditioning
+2026.09.26-18:04:53.478 info  [caliper] [FabricConnectorFactory] 	Initializing peer gateway connector compatible with installed fabric-gateway SDK: 1.7.1
+2026.09.26-18:04:53.530 info  [caliper] [IdentityManager] 	Adding insurerAdmin (admin=false) as insurerAdmin for organization InsurerMSP
+2026.09.26-18:04:53.560 info  [caliper] [IdentityManager] 	Adding policyholder1 (admin=false) as policyholder1 for organization InsurerMSP
+2026.09.26-18:04:53.583 info  [caliper] [monitor.js] 	No resource monitors specified
+2026.09.26-18:04:53.590 info  [caliper] [default-observer] 	Observer interval set to 5000 milliseconds
+2026.09.26-18:04:53.616 info  [caliper] [round-orchestrator] 	Preparing worker connections
+2026.09.26-18:04:53.623 info  [caliper] [worker-orchestrator] 	Launching worker 1 of 2
+2026.09.26-18:04:53.645 info  [caliper] [worker-orchestrator] 	Launching worker 2 of 2
+2026.09.26-18:04:53.652 info  [caliper] [worker-orchestrator] 	Messenger not configured, entering configure phase...
+2026.09.26-18:04:53.658 info  [caliper] [worker-orchestrator] 	No existing workers detected, entering worker launch phase...
+2026.09.26-18:04:53.659 info  [caliper] [worker-orchestrator] 	Waiting for 2 workers to be connected...
+2026.09.26-18:04:56.066 info  [caliper] [cli-launch-worker] 	Worker is a locally forked process, skipping the binding step, already performed by the manager process
+2026.09.26-18:04:56.068 info  [caliper] [cli-launch-worker] 	Set workspace path: /hyperledger/caliper/workspace
+2026.09.26-18:04:56.068 info  [caliper] [cli-launch-worker] 	Set benchmark configuration path: /hyperledger/caliper/workspace/benchmarks/caliper/benchmark.yaml
+2026.09.26-18:04:56.068 info  [caliper] [cli-launch-worker] 	Set network configuration path: /hyperledger/caliper/workspace/benchmarks/caliper/generated/network.yaml
+2026.09.26-18:04:56.069 info  [caliper] [cli-launch-worker] 	Set SUT type: fabric
+2026.09.26-18:04:56.068 info  [caliper] [cli-launch-worker] 	Worker is a locally forked process, skipping the binding step, already performed by the manager process
+2026.09.26-18:04:56.073 info  [caliper] [cli-launch-worker] 	Set workspace path: /hyperledger/caliper/workspace
+2026.09.26-18:04:56.073 info  [caliper] [cli-launch-worker] 	Set benchmark configuration path: /hyperledger/caliper/workspace/benchmarks/caliper/benchmark.yaml
+2026.09.26-18:04:56.073 info  [caliper] [cli-launch-worker] 	Set network configuration path: /hyperledger/caliper/workspace/benchmarks/caliper/generated/network.yaml
+2026.09.26-18:04:56.079 info  [caliper] [cli-launch-worker] 	Set SUT type: fabric
+2026.09.26-18:04:56.255 info  [caliper] [worker-orchestrator] 	2 workers connected, progressing to worker assignment phase.
+2026.09.26-18:04:56.255 info  [caliper] [worker-orchestrator] 	Workers currently unassigned, awaiting index assignment...
+2026.09.26-18:04:56.256 info  [caliper] [worker-orchestrator] 	Waiting for 2 workers to be assigned...
+2026.09.26-18:04:56.599 info  [caliper] [worker-orchestrator] 	2 workers assigned, progressing to worker initialization phase.
+2026.09.26-18:04:56.599 info  [caliper] [worker-orchestrator] 	Waiting for 2 workers to be ready...
+2026.09.26-18:04:56.600 info  [caliper] [worker-message-handler] 	Initializing Worker#0...
+2026.09.26-18:04:56.601 info  [caliper] [worker-message-handler] 	Initializing Worker#1...
+2026.09.26-18:04:56.901 info  [caliper] [FabricConnectorFactory] 	Initializing peer gateway connector compatible with installed fabric-gateway SDK: 1.7.1
+2026.09.26-18:04:56.916 info  [caliper] [FabricConnectorFactory] 	Initializing peer gateway connector compatible with installed fabric-gateway SDK: 1.7.1
+2026.09.26-18:04:56.948 info  [caliper] [IdentityManager] 	Adding insurerAdmin (admin=false) as insurerAdmin for organization InsurerMSP
+2026.09.26-18:04:56.957 info  [caliper] [IdentityManager] 	Adding insurerAdmin (admin=false) as insurerAdmin for organization InsurerMSP
+2026.09.26-18:04:56.966 info  [caliper] [IdentityManager] 	Adding policyholder1 (admin=false) as policyholder1 for organization InsurerMSP
+2026.09.26-18:04:56.973 info  [caliper] [IdentityManager] 	Adding policyholder1 (admin=false) as policyholder1 for organization InsurerMSP
+2026.09.26-18:04:56.985 info  [caliper] [worker-message-handler] 	Worker#0 initialized
+2026.09.26-18:04:56.999 info  [caliper] [worker-message-handler] 	Worker#1 initialized
+2026.09.26-18:04:57.006 info  [caliper] [worker-orchestrator] 	2 workers ready, progressing to test preparation phase.
+2026.09.26-18:04:57.006 info  [caliper] [round-orchestrator] 	Started round 1 (schema-read)
+2026.09.26-18:04:57.009 info  [caliper] [worker-message-handler] 	Preparing Worker#0 for Round#0
+2026.09.26-18:04:57.010 info  [caliper] [worker-message-handler] 	Preparing Worker#1 for Round#0
+2026.09.26-18:04:57.086 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-18:04:57.087 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-18:04:57.087 info  [caliper] [caliper-worker] 	Info: worker 1 prepare test phase for round 0 is starting...
+2026.09.26-18:04:57.089 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-18:04:57.089 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-18:04:57.089 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-18:04:57.089 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-18:04:57.090 info  [caliper] [caliper-worker] 	Info: worker 1 prepare test phase for round 0 is completed
+2026.09.26-18:04:57.090 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-18:04:57.090 info  [caliper] [caliper-worker] 	Info: worker 0 prepare test phase for round 0 is starting...
+2026.09.26-18:04:57.092 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-18:04:57.092 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-18:04:57.092 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-18:04:57.090 info  [caliper] [worker-message-handler] 	Worker#1 prepared for Round#0
+2026.09.26-18:04:57.093 info  [caliper] [caliper-worker] 	Info: worker 0 prepare test phase for round 0 is completed
+2026.09.26-18:04:57.093 info  [caliper] [worker-message-handler] 	Worker#0 prepared for Round#0
+2026.09.26-18:04:57.096 info  [caliper] [worker-orchestrator] 	2 workers prepared, progressing to test phase.
+2026.09.26-18:04:57.097 info  [caliper] [round-orchestrator] 	Monitors successfully started
+2026.09.26-18:04:57.102 info  [caliper] [worker-message-handler] 	Worker#0 is starting Round#0
+2026.09.26-18:04:57.103 info  [caliper] [worker-message-handler] 	Worker#1 is starting Round#0
+2026.09.26-18:04:57.116 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-18:04:57.117 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-18:04:57.122 info  [caliper] [caliper-worker] 	Worker #1 starting workload loop
+2026.09.26-18:04:57.122 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-18:04:57.123 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-18:04:57.125 info  [caliper] [caliper-worker] 	Worker #0 starting workload loop
+2026.09.26-18:05:02.185 info  [caliper] [default-observer] 	[schema-read Round 0 Transaction Info] - Submitted: 81 Succ: 80 Fail:0 Unfinished:1
+2026.09.26-18:05:07.099 info  [caliper] [default-observer] 	[schema-read Round 0 Transaction Info] - Submitted: 182 Succ: 182 Fail:0 Unfinished:0
+2026.09.26-18:05:08.122 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-18:05:08.122 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-18:05:08.122 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-18:05:08.123 info  [caliper] [worker-message-handler] 	Worker#1 finished Round#0
+2026.09.26-18:05:08.129 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-18:05:08.130 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-18:05:08.130 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-18:05:08.130 info  [caliper] [worker-message-handler] 	Worker#0 finished Round#0
+2026.09.26-18:05:13.135 info  [caliper] [default-observer] 	Resetting txCount indicator count
+2026.09.26-18:05:13.137 info  [caliper] [report-builder] 	### Test result ###
+2026.09.26-18:05:13.157 info  [caliper] [report-builder] 	
++-------------+------+------+-----------------+-----------------+-----------------+-----------------+------------------+
+| Name        | Succ | Fail | Send Rate (TPS) | Max Latency (s) | Min Latency (s) | Avg Latency (s) | Throughput (TPS) |
+|-------------|------|------|-----------------|-----------------|-----------------|-----------------|------------------|
+| schema-read | 200  | 0    | 20.2            | 0.35            | 0.01            | 0.02            | 20.2             |
++-------------+------+------+-----------------+-----------------+-----------------+-----------------+------------------+
+
+2026.09.26-18:05:13.158 info  [caliper] [round-orchestrator] 	Finished round 1 (schema-read) in 10.008 seconds
+2026.09.26-18:05:13.158 info  [caliper] [monitor.js] 	Stopping all monitors
+2026.09.26-18:05:13.158 info  [caliper] [round-orchestrator] 	Waiting 5 seconds for the next round...
+2026.09.26-18:05:18.164 info  [caliper] [round-orchestrator] 	Started round 2 (oracle-1-of-1)
+2026.09.26-18:05:18.166 info  [caliper] [worker-message-handler] 	Preparing Worker#0 for Round#1
+2026.09.26-18:05:18.166 info  [caliper] [worker-message-handler] 	Preparing Worker#1 for Round#1
+2026.09.26-18:05:18.196 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-18:05:18.196 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-18:05:18.197 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-18:05:18.197 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-18:05:18.197 info  [caliper] [caliper-worker] 	Info: worker 0 prepare test phase for round 1 is starting...
+2026.09.26-18:05:18.197 info  [caliper] [caliper-worker] 	Info: worker 1 prepare test phase for round 1 is starting...
+2026.09.26-18:05:18.199 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-18:05:18.199 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-18:05:18.199 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-18:05:18.199 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-18:05:18.199 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-18:05:18.199 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-18:05:18.199 info  [caliper] [caliper-worker] 	Info: worker 1 prepare test phase for round 1 is completed
+2026.09.26-18:05:18.199 info  [caliper] [caliper-worker] 	Info: worker 0 prepare test phase for round 1 is completed
+2026.09.26-18:05:18.199 info  [caliper] [worker-message-handler] 	Worker#0 prepared for Round#1
+2026.09.26-18:05:18.199 info  [caliper] [worker-message-handler] 	Worker#1 prepared for Round#1
+2026.09.26-18:05:18.201 info  [caliper] [worker-orchestrator] 	2 workers prepared, progressing to test phase.
+2026.09.26-18:05:18.201 info  [caliper] [round-orchestrator] 	Monitors successfully started
+2026.09.26-18:05:18.202 info  [caliper] [worker-message-handler] 	Worker#0 is starting Round#1
+2026.09.26-18:05:18.202 info  [caliper] [worker-message-handler] 	Worker#1 is starting Round#1
+2026.09.26-18:05:18.207 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-18:05:18.207 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-18:05:18.207 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-18:05:18.208 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-18:05:18.208 info  [caliper] [caliper-worker] 	Worker #1 starting workload loop
+2026.09.26-18:05:18.209 info  [caliper] [caliper-worker] 	Worker #0 starting workload loop
+2026.09.26-18:05:23.200 info  [caliper] [default-observer] 	[oracle-1-of-1 Round 1 Transaction Info] - Submitted: 81 Succ: 80 Fail:0 Unfinished:1
+2026.09.26-18:05:28.201 info  [caliper] [default-observer] 	[oracle-1-of-1 Round 1 Transaction Info] - Submitted: 181 Succ: 180 Fail:0 Unfinished:1
+2026.09.26-18:05:29.211 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-18:05:29.211 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-18:05:29.211 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-18:05:29.212 info  [caliper] [worker-message-handler] 	Worker#0 finished Round#1
+2026.09.26-18:05:29.212 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-18:05:29.213 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-18:05:29.213 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-18:05:29.213 info  [caliper] [worker-message-handler] 	Worker#1 finished Round#1
+2026.09.26-18:05:34.216 info  [caliper] [default-observer] 	Resetting txCount indicator count
+2026.09.26-18:05:34.216 info  [caliper] [report-builder] 	### Test result ###
+2026.09.26-18:05:34.219 info  [caliper] [report-builder] 	
++---------------+------+------+-----------------+-----------------+-----------------+-----------------+------------------+
+| Name          | Succ | Fail | Send Rate (TPS) | Max Latency (s) | Min Latency (s) | Avg Latency (s) | Throughput (TPS) |
+|---------------|------|------|-----------------|-----------------|-----------------|-----------------|------------------|
+| oracle-1-of-1 | 200  | 0    | 20.2            | 0.05            | 0.01            | 0.01            | 20.2             |
++---------------+------+------+-----------------+-----------------+-----------------+-----------------+------------------+
+
+2026.09.26-18:05:34.219 info  [caliper] [round-orchestrator] 	Finished round 2 (oracle-1-of-1) in 10.003 seconds
+2026.09.26-18:05:34.219 info  [caliper] [monitor.js] 	Stopping all monitors
+2026.09.26-18:05:34.219 info  [caliper] [round-orchestrator] 	Waiting 5 seconds for the next round...
+2026.09.26-18:05:39.223 info  [caliper] [round-orchestrator] 	Started round 3 (oracle-2-of-2)
+2026.09.26-18:05:39.224 info  [caliper] [worker-message-handler] 	Preparing Worker#0 for Round#2
+2026.09.26-18:05:39.225 info  [caliper] [worker-message-handler] 	Preparing Worker#1 for Round#2
+2026.09.26-18:05:39.233 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-18:05:39.233 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-18:05:39.234 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-18:05:39.234 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-18:05:39.234 info  [caliper] [caliper-worker] 	Info: worker 0 prepare test phase for round 2 is starting...
+2026.09.26-18:05:39.234 info  [caliper] [caliper-worker] 	Info: worker 1 prepare test phase for round 2 is starting...
+2026.09.26-18:05:39.235 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-18:05:39.235 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-18:05:39.236 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-18:05:39.236 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-18:05:39.236 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-18:05:39.236 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-18:05:39.236 info  [caliper] [caliper-worker] 	Info: worker 0 prepare test phase for round 2 is completed
+2026.09.26-18:05:39.236 info  [caliper] [caliper-worker] 	Info: worker 1 prepare test phase for round 2 is completed
+2026.09.26-18:05:39.236 info  [caliper] [worker-message-handler] 	Worker#0 prepared for Round#2
+2026.09.26-18:05:39.236 info  [caliper] [worker-message-handler] 	Worker#1 prepared for Round#2
+2026.09.26-18:05:39.237 info  [caliper] [worker-orchestrator] 	2 workers prepared, progressing to test phase.
+2026.09.26-18:05:39.237 info  [caliper] [round-orchestrator] 	Monitors successfully started
+2026.09.26-18:05:39.238 info  [caliper] [worker-message-handler] 	Worker#0 is starting Round#2
+2026.09.26-18:05:39.238 info  [caliper] [worker-message-handler] 	Worker#1 is starting Round#2
+2026.09.26-18:05:39.242 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-18:05:39.242 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-18:05:39.243 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-18:05:39.243 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-18:05:39.243 info  [caliper] [caliper-worker] 	Worker #0 starting workload loop
+2026.09.26-18:05:39.243 info  [caliper] [caliper-worker] 	Worker #1 starting workload loop
+2026.09.26-18:05:44.238 info  [caliper] [default-observer] 	[oracle-2-of-2 Round 2 Transaction Info] - Submitted: 81 Succ: 80 Fail:0 Unfinished:1
+2026.09.26-18:05:49.240 info  [caliper] [default-observer] 	[oracle-2-of-2 Round 2 Transaction Info] - Submitted: 182 Succ: 180 Fail:0 Unfinished:2
+2026.09.26-18:05:50.245 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-18:05:50.245 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-18:05:50.245 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-18:05:50.245 info  [caliper] [worker-message-handler] 	Worker#0 finished Round#2
+2026.09.26-18:05:50.245 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-18:05:50.245 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-18:05:50.245 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-18:05:50.246 info  [caliper] [worker-message-handler] 	Worker#1 finished Round#2
+2026.09.26-18:05:55.249 info  [caliper] [default-observer] 	Resetting txCount indicator count
+2026.09.26-18:05:55.250 info  [caliper] [report-builder] 	### Test result ###
+2026.09.26-18:05:55.251 info  [caliper] [report-builder] 	
++---------------+------+------+-----------------+-----------------+-----------------+-----------------+------------------+
+| Name          | Succ | Fail | Send Rate (TPS) | Max Latency (s) | Min Latency (s) | Avg Latency (s) | Throughput (TPS) |
+|---------------|------|------|-----------------|-----------------|-----------------|-----------------|------------------|
+| oracle-2-of-2 | 200  | 0    | 20.2            | 0.08            | 0.00            | 0.01            | 20.2             |
++---------------+------+------+-----------------+-----------------+-----------------+-----------------+------------------+
+
+2026.09.26-18:05:55.251 info  [caliper] [round-orchestrator] 	Finished round 3 (oracle-2-of-2) in 10.003 seconds
+2026.09.26-18:05:55.251 info  [caliper] [monitor.js] 	Stopping all monitors
+2026.09.26-18:05:55.251 info  [caliper] [round-orchestrator] 	Waiting 5 seconds for the next round...
+2026.09.26-18:06:00.254 info  [caliper] [round-orchestrator] 	Started round 4 (oracle-2-of-3)
+2026.09.26-18:06:00.255 info  [caliper] [worker-message-handler] 	Preparing Worker#0 for Round#3
+2026.09.26-18:06:00.256 info  [caliper] [worker-message-handler] 	Preparing Worker#1 for Round#3
+2026.09.26-18:06:00.261 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-18:06:00.261 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-18:06:00.261 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-18:06:00.261 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-18:06:00.262 info  [caliper] [caliper-worker] 	Info: worker 0 prepare test phase for round 3 is starting...
+2026.09.26-18:06:00.262 info  [caliper] [caliper-worker] 	Info: worker 1 prepare test phase for round 3 is starting...
+2026.09.26-18:06:00.263 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-18:06:00.263 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-18:06:00.263 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-18:06:00.263 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-18:06:00.263 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-18:06:00.263 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-18:06:00.263 info  [caliper] [caliper-worker] 	Info: worker 0 prepare test phase for round 3 is completed
+2026.09.26-18:06:00.263 info  [caliper] [caliper-worker] 	Info: worker 1 prepare test phase for round 3 is completed
+2026.09.26-18:06:00.263 info  [caliper] [worker-message-handler] 	Worker#0 prepared for Round#3
+2026.09.26-18:06:00.263 info  [caliper] [worker-message-handler] 	Worker#1 prepared for Round#3
+2026.09.26-18:06:00.264 info  [caliper] [worker-orchestrator] 	2 workers prepared, progressing to test phase.
+2026.09.26-18:06:00.265 info  [caliper] [round-orchestrator] 	Monitors successfully started
+2026.09.26-18:06:00.265 info  [caliper] [worker-message-handler] 	Worker#0 is starting Round#3
+2026.09.26-18:06:00.266 info  [caliper] [worker-message-handler] 	Worker#1 is starting Round#3
+2026.09.26-18:06:00.271 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-18:06:00.271 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-18:06:00.271 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-18:06:00.272 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-18:06:00.272 info  [caliper] [caliper-worker] 	Worker #1 starting workload loop
+2026.09.26-18:06:00.272 info  [caliper] [caliper-worker] 	Worker #0 starting workload loop
+2026.09.26-18:06:05.266 info  [caliper] [default-observer] 	[oracle-2-of-3 Round 3 Transaction Info] - Submitted: 80 Succ: 80 Fail:0 Unfinished:0
+2026.09.26-18:06:10.268 info  [caliper] [default-observer] 	[oracle-2-of-3 Round 3 Transaction Info] - Submitted: 181 Succ: 180 Fail:0 Unfinished:1
+2026.09.26-18:06:11.274 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-18:06:11.274 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-18:06:11.274 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-18:06:11.275 info  [caliper] [worker-message-handler] 	Worker#1 finished Round#3
+2026.09.26-18:06:11.275 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-18:06:11.275 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-18:06:11.275 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-18:06:11.276 info  [caliper] [worker-message-handler] 	Worker#0 finished Round#3
+2026.09.26-18:06:16.277 info  [caliper] [default-observer] 	Resetting txCount indicator count
+2026.09.26-18:06:16.277 info  [caliper] [report-builder] 	### Test result ###
+2026.09.26-18:06:16.278 info  [caliper] [report-builder] 	
++---------------+------+------+-----------------+-----------------+-----------------+-----------------+------------------+
+| Name          | Succ | Fail | Send Rate (TPS) | Max Latency (s) | Min Latency (s) | Avg Latency (s) | Throughput (TPS) |
+|---------------|------|------|-----------------|-----------------|-----------------|-----------------|------------------|
+| oracle-2-of-3 | 200  | 0    | 20.2            | 0.04            | 0.01            | 0.01            | 20.2             |
++---------------+------+------+-----------------+-----------------+-----------------+-----------------+------------------+
+
+2026.09.26-18:06:16.279 info  [caliper] [round-orchestrator] 	Finished round 4 (oracle-2-of-3) in 10.002 seconds
+2026.09.26-18:06:16.279 info  [caliper] [monitor.js] 	Stopping all monitors
+2026.09.26-18:06:16.279 info  [caliper] [round-orchestrator] 	Waiting 5 seconds for the next round...
+2026.09.26-18:06:21.283 info  [caliper] [round-orchestrator] 	Started round 5 (anchored-write-5-tps)
+2026.09.26-18:06:21.284 info  [caliper] [worker-message-handler] 	Preparing Worker#0 for Round#4
+2026.09.26-18:06:21.285 info  [caliper] [worker-message-handler] 	Preparing Worker#1 for Round#4
+2026.09.26-18:06:21.328 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-18:06:21.329 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-18:06:21.329 info  [caliper] [caliper-worker] 	Info: worker 0 prepare test phase for round 4 is starting...
+2026.09.26-18:06:21.331 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-18:06:21.331 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-18:06:21.331 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-18:06:21.331 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-18:06:21.332 info  [caliper] [caliper-worker] 	Info: worker 0 prepare test phase for round 4 is completed
+2026.09.26-18:06:21.332 info  [caliper] [worker-message-handler] 	Worker#0 prepared for Round#4
+2026.09.26-18:06:21.333 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-18:06:21.334 info  [caliper] [caliper-worker] 	Info: worker 1 prepare test phase for round 4 is starting...
+2026.09.26-18:06:21.335 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-18:06:21.335 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-18:06:21.335 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-18:06:21.336 info  [caliper] [caliper-worker] 	Info: worker 1 prepare test phase for round 4 is completed
+2026.09.26-18:06:21.336 info  [caliper] [worker-message-handler] 	Worker#1 prepared for Round#4
+2026.09.26-18:06:21.337 info  [caliper] [worker-orchestrator] 	2 workers prepared, progressing to test phase.
+2026.09.26-18:06:21.337 info  [caliper] [round-orchestrator] 	Monitors successfully started
+2026.09.26-18:06:21.339 info  [caliper] [worker-message-handler] 	Worker#0 is starting Round#4
+2026.09.26-18:06:21.339 info  [caliper] [worker-message-handler] 	Worker#1 is starting Round#4
+2026.09.26-18:06:21.348 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-18:06:21.348 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-18:06:21.349 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-18:06:21.349 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-18:06:21.350 info  [caliper] [caliper-worker] 	Worker #0 starting workload loop
+2026.09.26-18:06:21.350 info  [caliper] [caliper-worker] 	Worker #1 starting workload loop
+2026.09.26-18:06:26.339 info  [caliper] [default-observer] 	[anchored-write-5-tps Round 4 Transaction Info] - Submitted: 20 Succ: 20 Fail:0 Unfinished:0
+2026.09.26-18:06:31.340 info  [caliper] [default-observer] 	[anchored-write-5-tps Round 4 Transaction Info] - Submitted: 46 Succ: 40 Fail:0 Unfinished:6
+2026.09.26-18:06:36.340 info  [caliper] [default-observer] 	[anchored-write-5-tps Round 4 Transaction Info] - Submitted: 72 Succ: 70 Fail:0 Unfinished:2
+2026.09.26-18:06:41.341 info  [caliper] [default-observer] 	[anchored-write-5-tps Round 4 Transaction Info] - Submitted: 100 Succ: 100 Fail:0 Unfinished:0
+2026.09.26-18:06:42.262 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-18:06:42.262 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-18:06:42.262 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-18:06:42.262 info  [caliper] [worker-message-handler] 	Worker#0 finished Round#4
+2026.09.26-18:06:42.263 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-18:06:42.263 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-18:06:42.264 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-18:06:42.264 info  [caliper] [worker-message-handler] 	Worker#1 finished Round#4
+2026.09.26-18:06:47.266 info  [caliper] [default-observer] 	Resetting txCount indicator count
+2026.09.26-18:06:47.267 info  [caliper] [report-builder] 	### Test result ###
+2026.09.26-18:06:47.267 info  [caliper] [report-builder] 	
++----------------------+------+------+-----------------+-----------------+-----------------+-----------------+------------------+
+| Name                 | Succ | Fail | Send Rate (TPS) | Max Latency (s) | Min Latency (s) | Avg Latency (s) | Throughput (TPS) |
+|----------------------|------|------|-----------------|-----------------|-----------------|-----------------|------------------|
+| anchored-write-5-tps | 100  | 0    | 5.1             | 2.28            | 0.24            | 1.14            | 5.0              |
++----------------------+------+------+-----------------+-----------------+-----------------+-----------------+------------------+
+
+2026.09.26-18:06:47.268 info  [caliper] [round-orchestrator] 	Finished round 5 (anchored-write-5-tps) in 19.905 seconds
+2026.09.26-18:06:47.268 info  [caliper] [monitor.js] 	Stopping all monitors
+2026.09.26-18:06:47.268 info  [caliper] [round-orchestrator] 	Waiting 5 seconds for the next round...
+2026.09.26-18:06:52.270 info  [caliper] [round-orchestrator] 	Started round 6 (anchored-write-10-tps)
+2026.09.26-18:06:52.271 info  [caliper] [worker-message-handler] 	Preparing Worker#0 for Round#5
+2026.09.26-18:06:52.272 info  [caliper] [worker-message-handler] 	Preparing Worker#1 for Round#5
+2026.09.26-18:06:52.286 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-18:06:52.286 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-18:06:52.286 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-18:06:52.287 info  [caliper] [caliper-worker] 	Info: worker 0 prepare test phase for round 5 is starting...
+2026.09.26-18:06:52.287 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-18:06:52.287 info  [caliper] [caliper-worker] 	Info: worker 1 prepare test phase for round 5 is starting...
+2026.09.26-18:06:52.287 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-18:06:52.287 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-18:06:52.287 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-18:06:52.288 info  [caliper] [caliper-worker] 	Info: worker 1 prepare test phase for round 5 is completed
+2026.09.26-18:06:52.288 info  [caliper] [worker-message-handler] 	Worker#1 prepared for Round#5
+2026.09.26-18:06:52.288 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-18:06:52.288 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-18:06:52.288 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-18:06:52.289 info  [caliper] [caliper-worker] 	Info: worker 0 prepare test phase for round 5 is completed
+2026.09.26-18:06:52.289 info  [caliper] [worker-message-handler] 	Worker#0 prepared for Round#5
+2026.09.26-18:06:52.295 info  [caliper] [worker-orchestrator] 	2 workers prepared, progressing to test phase.
+2026.09.26-18:06:52.296 info  [caliper] [round-orchestrator] 	Monitors successfully started
+2026.09.26-18:06:52.297 info  [caliper] [worker-message-handler] 	Worker#0 is starting Round#5
+2026.09.26-18:06:52.297 info  [caliper] [worker-message-handler] 	Worker#1 is starting Round#5
+2026.09.26-18:06:52.302 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-18:06:52.303 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-18:06:52.303 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-18:06:52.303 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-18:06:52.304 info  [caliper] [caliper-worker] 	Worker #1 starting workload loop
+2026.09.26-18:06:52.304 info  [caliper] [caliper-worker] 	Worker #0 starting workload loop
+2026.09.26-18:06:57.295 info  [caliper] [default-observer] 	[anchored-write-10-tps Round 5 Transaction Info] - Submitted: 41 Succ: 30 Fail:0 Unfinished:11
+2026.09.26-18:07:02.297 info  [caliper] [default-observer] 	[anchored-write-10-tps Round 5 Transaction Info] - Submitted: 91 Succ: 80 Fail:0 Unfinished:11
+2026.09.26-18:07:03.518 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-18:07:03.518 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-18:07:03.519 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-18:07:03.519 info  [caliper] [worker-message-handler] 	Worker#1 finished Round#5
+2026.09.26-18:07:03.536 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-18:07:03.537 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-18:07:03.537 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-18:07:03.537 info  [caliper] [worker-message-handler] 	Worker#0 finished Round#5
+2026.09.26-18:07:08.553 info  [caliper] [default-observer] 	Resetting txCount indicator count
+2026.09.26-18:07:08.563 info  [caliper] [report-builder] 	### Test result ###
+2026.09.26-18:07:08.583 info  [caliper] [report-builder] 	
++-----------------------+------+------+-----------------+-----------------+-----------------+-----------------+------------------+
+| Name                  | Succ | Fail | Send Rate (TPS) | Max Latency (s) | Min Latency (s) | Avg Latency (s) | Throughput (TPS) |
+|-----------------------|------|------|-----------------|-----------------|-----------------|-----------------|------------------|
+| anchored-write-10-tps | 100  | 0    | 10.2            | 1.22            | 0.21            | 0.67            | 10.0             |
++-----------------------+------+------+-----------------+-----------------+-----------------+-----------------+------------------+
+
+2026.09.26-18:07:08.583 info  [caliper] [round-orchestrator] 	Finished round 6 (anchored-write-10-tps) in 10.105 seconds
+2026.09.26-18:07:08.583 info  [caliper] [monitor.js] 	Stopping all monitors
+2026.09.26-18:07:08.583 info  [caliper] [round-orchestrator] 	Waiting 5 seconds for the next round...
+2026.09.26-18:07:13.598 info  [caliper] [round-orchestrator] 	Started round 7 (anchored-write-20-tps)
+2026.09.26-18:07:13.628 info  [caliper] [worker-message-handler] 	Preparing Worker#0 for Round#6
+2026.09.26-18:07:13.629 info  [caliper] [worker-message-handler] 	Preparing Worker#1 for Round#6
+2026.09.26-18:07:13.814 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-18:07:13.814 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-18:07:13.816 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-18:07:13.816 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-18:07:13.817 info  [caliper] [caliper-worker] 	Info: worker 0 prepare test phase for round 6 is starting...
+2026.09.26-18:07:13.817 info  [caliper] [caliper-worker] 	Info: worker 1 prepare test phase for round 6 is starting...
+2026.09.26-18:07:13.817 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-18:07:13.818 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-18:07:13.818 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-18:07:13.819 info  [caliper] [caliper-worker] 	Info: worker 1 prepare test phase for round 6 is completed
+2026.09.26-18:07:13.819 info  [caliper] [worker-message-handler] 	Worker#1 prepared for Round#6
+2026.09.26-18:07:13.819 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-18:07:13.819 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-18:07:13.819 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-18:07:13.820 info  [caliper] [caliper-worker] 	Info: worker 0 prepare test phase for round 6 is completed
+2026.09.26-18:07:13.820 info  [caliper] [worker-message-handler] 	Worker#0 prepared for Round#6
+2026.09.26-18:07:13.825 info  [caliper] [worker-orchestrator] 	2 workers prepared, progressing to test phase.
+2026.09.26-18:07:13.826 info  [caliper] [round-orchestrator] 	Monitors successfully started
+2026.09.26-18:07:13.828 info  [caliper] [worker-message-handler] 	Worker#0 is starting Round#6
+2026.09.26-18:07:13.829 info  [caliper] [worker-message-handler] 	Worker#1 is starting Round#6
+2026.09.26-18:07:13.842 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-18:07:13.844 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-18:07:13.847 info  [caliper] [caliper-worker] 	Worker #0 starting workload loop
+2026.09.26-18:07:13.864 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-18:07:13.865 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-18:07:13.867 info  [caliper] [caliper-worker] 	Worker #1 starting workload loop
+2026.09.26-18:07:18.881 info  [caliper] [default-observer] 	[anchored-write-20-tps Round 6 Transaction Info] - Submitted: 83 Succ: 65 Fail:0 Unfinished:18
+2026.09.26-18:07:20.374 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-18:07:20.374 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-18:07:20.374 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-18:07:20.375 info  [caliper] [worker-message-handler] 	Worker#0 finished Round#6
+2026.09.26-18:07:20.376 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-18:07:20.376 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-18:07:20.376 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-18:07:20.378 info  [caliper] [worker-message-handler] 	Worker#1 finished Round#6
+2026.09.26-18:07:25.384 info  [caliper] [default-observer] 	Resetting txCount indicator count
+2026.09.26-18:07:25.386 info  [caliper] [report-builder] 	### Test result ###
+2026.09.26-18:07:25.399 info  [caliper] [report-builder] 	
++-----------------------+------+------+-----------------+-----------------+-----------------+-----------------+------------------+
+| Name                  | Succ | Fail | Send Rate (TPS) | Max Latency (s) | Min Latency (s) | Avg Latency (s) | Throughput (TPS) |
+|-----------------------|------|------|-----------------|-----------------|-----------------|-----------------|------------------|
+| anchored-write-20-tps | 100  | 0    | 20.4            | 1.92            | 0.59            | 1.14            | 18.2             |
++-----------------------+------+------+-----------------+-----------------+-----------------+-----------------+------------------+
+
+2026.09.26-18:07:25.404 info  [caliper] [round-orchestrator] 	Finished round 7 (anchored-write-20-tps) in 5.528 seconds
+2026.09.26-18:07:25.405 info  [caliper] [monitor.js] 	Stopping all monitors
+2026.09.26-18:07:25.405 info  [caliper] [round-orchestrator] 	Waiting 5 seconds for the next round...
+2026.09.26-18:07:30.411 info  [caliper] [round-orchestrator] 	Started round 8 (claim-submit-5-tps)
+2026.09.26-18:07:30.414 info  [caliper] [worker-message-handler] 	Preparing Worker#0 for Round#7
+2026.09.26-18:07:30.414 info  [caliper] [worker-message-handler] 	Preparing Worker#1 for Round#7
+2026.09.26-18:07:30.498 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-18:07:30.499 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-18:07:30.499 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-18:07:30.499 info  [caliper] [caliper-worker] 	Info: worker 0 prepare test phase for round 7 is starting...
+2026.09.26-18:07:30.500 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-18:07:30.500 info  [caliper] [caliper-worker] 	Info: worker 1 prepare test phase for round 7 is starting...
+2026.09.26-18:07:30.501 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-18:07:30.501 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-18:07:30.501 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-18:07:30.501 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-18:07:30.501 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-18:07:30.501 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-18:07:30.501 info  [caliper] [caliper-worker] 	Info: worker 1 prepare test phase for round 7 is completed
+2026.09.26-18:07:30.501 info  [caliper] [worker-message-handler] 	Worker#1 prepared for Round#7
+2026.09.26-18:07:30.501 info  [caliper] [caliper-worker] 	Info: worker 0 prepare test phase for round 7 is completed
+2026.09.26-18:07:30.502 info  [caliper] [worker-message-handler] 	Worker#0 prepared for Round#7
+2026.09.26-18:07:30.504 info  [caliper] [worker-orchestrator] 	2 workers prepared, progressing to test phase.
+2026.09.26-18:07:30.504 info  [caliper] [round-orchestrator] 	Monitors successfully started
+2026.09.26-18:07:30.506 info  [caliper] [worker-message-handler] 	Worker#0 is starting Round#7
+2026.09.26-18:07:30.507 info  [caliper] [worker-message-handler] 	Worker#1 is starting Round#7
+2026.09.26-18:07:30.521 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-18:07:30.521 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-18:07:30.522 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-18:07:30.522 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-18:07:30.522 info  [caliper] [caliper-worker] 	Worker #1 starting workload loop
+2026.09.26-18:07:30.522 info  [caliper] [caliper-worker] 	Worker #0 starting workload loop
+2026.09.26-18:07:35.507 info  [caliper] [default-observer] 	[claim-submit-5-tps Round 7 Transaction Info] - Submitted: 20 Succ: 10 Fail:0 Unfinished:10
+2026.09.26-18:07:40.507 info  [caliper] [default-observer] 	[claim-submit-5-tps Round 7 Transaction Info] - Submitted: 46 Succ: 40 Fail:0 Unfinished:6
+2026.09.26-18:07:45.509 info  [caliper] [default-observer] 	[claim-submit-5-tps Round 7 Transaction Info] - Submitted: 72 Succ: 60 Fail:0 Unfinished:12
+2026.09.26-18:07:50.511 info  [caliper] [default-observer] 	[claim-submit-5-tps Round 7 Transaction Info] - Submitted: 100 Succ: 100 Fail:0 Unfinished:0
+2026.09.26-18:07:51.436 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-18:07:51.436 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-18:07:51.436 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-18:07:51.436 info  [caliper] [worker-message-handler] 	Worker#0 finished Round#7
+2026.09.26-18:07:51.438 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-18:07:51.438 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-18:07:51.438 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-18:07:51.438 info  [caliper] [worker-message-handler] 	Worker#1 finished Round#7
+2026.09.26-18:07:56.443 info  [caliper] [default-observer] 	Resetting txCount indicator count
+2026.09.26-18:07:56.444 info  [caliper] [report-builder] 	### Test result ###
+2026.09.26-18:07:56.445 info  [caliper] [report-builder] 	
++--------------------+------+------+-----------------+-----------------+-----------------+-----------------+------------------+
+| Name               | Succ | Fail | Send Rate (TPS) | Max Latency (s) | Min Latency (s) | Avg Latency (s) | Throughput (TPS) |
+|--------------------|------|------|-----------------|-----------------|-----------------|-----------------|------------------|
+| claim-submit-5-tps | 100  | 0    | 5.1             | 2.42            | 0.28            | 1.22            | 5.0              |
++--------------------+------+------+-----------------+-----------------+-----------------+-----------------+------------------+
+
+2026.09.26-18:07:56.447 info  [caliper] [round-orchestrator] 	Finished round 8 (claim-submit-5-tps) in 19.904 seconds
+2026.09.26-18:07:56.447 info  [caliper] [monitor.js] 	Stopping all monitors
+2026.09.26-18:07:56.447 info  [caliper] [round-orchestrator] 	Waiting 5 seconds for the next round...
+2026.09.26-18:08:01.449 info  [caliper] [round-orchestrator] 	Started round 9 (claim-submit-10-tps)
+2026.09.26-18:08:01.451 info  [caliper] [worker-message-handler] 	Preparing Worker#0 for Round#8
+2026.09.26-18:08:01.451 info  [caliper] [worker-message-handler] 	Preparing Worker#1 for Round#8
+2026.09.26-18:08:01.464 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-18:08:01.464 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-18:08:01.465 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-18:08:01.465 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-18:08:01.465 info  [caliper] [caliper-worker] 	Info: worker 0 prepare test phase for round 8 is starting...
+2026.09.26-18:08:01.465 info  [caliper] [caliper-worker] 	Info: worker 1 prepare test phase for round 8 is starting...
+2026.09.26-18:08:01.465 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-18:08:01.465 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-18:08:01.465 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-18:08:01.465 info  [caliper] [caliper-worker] 	Info: worker 1 prepare test phase for round 8 is completed
+2026.09.26-18:08:01.466 info  [caliper] [worker-message-handler] 	Worker#1 prepared for Round#8
+2026.09.26-18:08:01.466 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-18:08:01.466 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-18:08:01.467 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-18:08:01.467 info  [caliper] [caliper-worker] 	Info: worker 0 prepare test phase for round 8 is completed
+2026.09.26-18:08:01.467 info  [caliper] [worker-message-handler] 	Worker#0 prepared for Round#8
+2026.09.26-18:08:01.467 info  [caliper] [worker-orchestrator] 	2 workers prepared, progressing to test phase.
+2026.09.26-18:08:01.468 info  [caliper] [round-orchestrator] 	Monitors successfully started
+2026.09.26-18:08:01.468 info  [caliper] [worker-message-handler] 	Worker#0 is starting Round#8
+2026.09.26-18:08:01.469 info  [caliper] [worker-message-handler] 	Worker#1 is starting Round#8
+2026.09.26-18:08:01.475 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-18:08:01.476 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-18:08:01.476 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-18:08:01.476 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-18:08:01.476 info  [caliper] [caliper-worker] 	Worker #1 starting workload loop
+2026.09.26-18:08:01.477 info  [caliper] [caliper-worker] 	Worker #0 starting workload loop
+2026.09.26-18:08:06.469 info  [caliper] [default-observer] 	[claim-submit-10-tps Round 8 Transaction Info] - Submitted: 41 Succ: 30 Fail:0 Unfinished:11
+2026.09.26-18:08:11.470 info  [caliper] [default-observer] 	[claim-submit-10-tps Round 8 Transaction Info] - Submitted: 92 Succ: 80 Fail:0 Unfinished:12
+2026.09.26-18:08:12.686 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-18:08:12.686 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-18:08:12.686 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-18:08:12.687 info  [caliper] [worker-message-handler] 	Worker#0 finished Round#8
+2026.09.26-18:08:12.688 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-18:08:12.689 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-18:08:12.689 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-18:08:12.689 info  [caliper] [worker-message-handler] 	Worker#1 finished Round#8
+2026.09.26-18:08:17.702 info  [caliper] [default-observer] 	Resetting txCount indicator count
+2026.09.26-18:08:17.702 info  [caliper] [report-builder] 	### Test result ###
+2026.09.26-18:08:17.703 info  [caliper] [report-builder] 	
++---------------------+------+------+-----------------+-----------------+-----------------+-----------------+------------------+
+| Name                | Succ | Fail | Send Rate (TPS) | Max Latency (s) | Min Latency (s) | Avg Latency (s) | Throughput (TPS) |
+|---------------------|------|------|-----------------|-----------------|-----------------|-----------------|------------------|
+| claim-submit-10-tps | 100  | 0    | 10.2            | 1.82            | 0.28            | 0.84            | 9.9              |
++---------------------+------+------+-----------------+-----------------+-----------------+-----------------+------------------+
+
+2026.09.26-18:08:17.703 info  [caliper] [round-orchestrator] 	Finished round 9 (claim-submit-10-tps) in 10.204 seconds
+2026.09.26-18:08:17.704 info  [caliper] [monitor.js] 	Stopping all monitors
+2026.09.26-18:08:17.704 info  [caliper] [round-orchestrator] 	Waiting 5 seconds for the next round...
+2026.09.26-18:08:22.706 info  [caliper] [round-orchestrator] 	Started round 10 (claim-submit-20-tps)
+2026.09.26-18:08:22.708 info  [caliper] [worker-message-handler] 	Preparing Worker#0 for Round#9
+2026.09.26-18:08:22.708 info  [caliper] [worker-message-handler] 	Preparing Worker#1 for Round#9
+2026.09.26-18:08:22.722 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-18:08:22.722 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-18:08:22.723 info  [caliper] [caliper-worker] 	Info: worker 1 prepare test phase for round 9 is starting...
+2026.09.26-18:08:22.723 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-18:08:22.724 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-18:08:22.724 info  [caliper] [caliper-worker] 	Info: worker 0 prepare test phase for round 9 is starting...
+2026.09.26-18:08:22.724 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-18:08:22.724 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-18:08:22.724 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-18:08:22.725 info  [caliper] [caliper-worker] 	Info: worker 1 prepare test phase for round 9 is completed
+2026.09.26-18:08:22.725 info  [caliper] [worker-message-handler] 	Worker#1 prepared for Round#9
+2026.09.26-18:08:22.725 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-18:08:22.725 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-18:08:22.725 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-18:08:22.726 info  [caliper] [caliper-worker] 	Info: worker 0 prepare test phase for round 9 is completed
+2026.09.26-18:08:22.726 info  [caliper] [worker-message-handler] 	Worker#0 prepared for Round#9
+2026.09.26-18:08:22.727 info  [caliper] [worker-orchestrator] 	2 workers prepared, progressing to test phase.
+2026.09.26-18:08:22.727 info  [caliper] [round-orchestrator] 	Monitors successfully started
+2026.09.26-18:08:22.728 info  [caliper] [worker-message-handler] 	Worker#0 is starting Round#9
+2026.09.26-18:08:22.728 info  [caliper] [worker-message-handler] 	Worker#1 is starting Round#9
+2026.09.26-18:08:22.734 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-18:08:22.734 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-18:08:22.734 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-18:08:22.735 info  [caliper] [caliper-worker] 	Worker #1 starting workload loop
+2026.09.26-18:08:22.735 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-18:08:22.735 info  [caliper] [caliper-worker] 	Worker #0 starting workload loop
+2026.09.26-18:08:27.728 info  [caliper] [default-observer] 	[claim-submit-20-tps Round 9 Transaction Info] - Submitted: 82 Succ: 70 Fail:0 Unfinished:12
+2026.09.26-18:08:29.045 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-18:08:29.046 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-18:08:29.046 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-18:08:29.046 info  [caliper] [worker-message-handler] 	Worker#0 finished Round#9
+2026.09.26-18:08:29.048 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-18:08:29.048 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-18:08:29.048 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-18:08:29.048 info  [caliper] [worker-message-handler] 	Worker#1 finished Round#9
+2026.09.26-18:08:34.052 info  [caliper] [default-observer] 	Resetting txCount indicator count
+2026.09.26-18:08:34.052 info  [caliper] [report-builder] 	### Test result ###
+2026.09.26-18:08:34.055 info  [caliper] [report-builder] 	
++---------------------+------+------+-----------------+-----------------+-----------------+-----------------+------------------+
+| Name                | Succ | Fail | Send Rate (TPS) | Max Latency (s) | Min Latency (s) | Avg Latency (s) | Throughput (TPS) |
+|---------------------|------|------|-----------------|-----------------|-----------------|-----------------|------------------|
+| claim-submit-20-tps | 100  | 0    | 20.4            | 0.78            | 0.30            | 0.54            | 19.2             |
++---------------------+------+------+-----------------+-----------------+-----------------+-----------------+------------------+
+
+2026.09.26-18:08:34.056 info  [caliper] [round-orchestrator] 	Finished round 10 (claim-submit-20-tps) in 5.305 seconds
+2026.09.26-18:08:34.056 info  [caliper] [monitor.js] 	Stopping all monitors
+2026.09.26-18:08:34.056 info  [caliper] [round-orchestrator] 	Waiting 5 seconds for the next round...
+2026.09.26-18:08:39.060 info  [caliper] [round-orchestrator] 	Started round 11 (claim-submit-40-tps)
+2026.09.26-18:08:39.061 info  [caliper] [worker-message-handler] 	Preparing Worker#0 for Round#10
+2026.09.26-18:08:39.068 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-18:08:39.068 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-18:08:39.068 info  [caliper] [caliper-worker] 	Info: worker 0 prepare test phase for round 10 is starting...
+2026.09.26-18:08:39.068 info  [caliper] [worker-message-handler] 	Preparing Worker#1 for Round#10
+2026.09.26-18:08:39.070 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-18:08:39.070 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-18:08:39.070 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-18:08:39.070 info  [caliper] [caliper-worker] 	Info: worker 0 prepare test phase for round 10 is completed
+2026.09.26-18:08:39.070 info  [caliper] [worker-message-handler] 	Worker#0 prepared for Round#10
+2026.09.26-18:08:39.073 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-18:08:39.074 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-18:08:39.074 info  [caliper] [caliper-worker] 	Info: worker 1 prepare test phase for round 10 is starting...
+2026.09.26-18:08:39.075 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-18:08:39.075 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-18:08:39.075 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-18:08:39.075 info  [caliper] [caliper-worker] 	Info: worker 1 prepare test phase for round 10 is completed
+2026.09.26-18:08:39.075 info  [caliper] [worker-message-handler] 	Worker#1 prepared for Round#10
+2026.09.26-18:08:39.077 info  [caliper] [worker-orchestrator] 	2 workers prepared, progressing to test phase.
+2026.09.26-18:08:39.077 info  [caliper] [round-orchestrator] 	Monitors successfully started
+2026.09.26-18:08:39.077 info  [caliper] [worker-message-handler] 	Worker#1 is starting Round#10
+2026.09.26-18:08:39.077 info  [caliper] [worker-message-handler] 	Worker#0 is starting Round#10
+2026.09.26-18:08:39.082 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-18:08:39.083 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-18:08:39.083 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-18:08:39.083 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-18:08:39.083 info  [caliper] [caliper-worker] 	Worker #1 starting workload loop
+2026.09.26-18:08:39.083 info  [caliper] [caliper-worker] 	Worker #0 starting workload loop
+2026.09.26-18:08:43.988 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-18:08:43.988 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-18:08:43.988 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-18:08:43.988 info  [caliper] [worker-message-handler] 	Worker#0 finished Round#10
+2026.09.26-18:08:44.055 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-18:08:44.055 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-18:08:44.055 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-18:08:44.055 info  [caliper] [worker-message-handler] 	Worker#1 finished Round#10
+2026.09.26-18:08:49.062 info  [caliper] [default-observer] 	Resetting txCount indicator count
+2026.09.26-18:08:49.062 info  [caliper] [report-builder] 	### Test result ###
+2026.09.26-18:08:49.062 info  [caliper] [report-builder] 	
++---------------------+------+------+-----------------+-----------------+-----------------+-----------------+------------------+
+| Name                | Succ | Fail | Send Rate (TPS) | Max Latency (s) | Min Latency (s) | Avg Latency (s) | Throughput (TPS) |
+|---------------------|------|------|-----------------|-----------------|-----------------|-----------------|------------------|
+| claim-submit-40-tps | 100  | 0    | 40.3            | 1.89            | 0.40            | 1.23            | 25.8             |
++---------------------+------+------+-----------------+-----------------+-----------------+-----------------+------------------+
+
+2026.09.26-18:08:49.063 info  [caliper] [round-orchestrator] 	Finished round 11 (claim-submit-40-tps) in 3.96 seconds
+2026.09.26-18:08:49.063 info  [caliper] [monitor.js] 	Stopping all monitors
+2026.09.26-18:08:49.063 info  [caliper] [round-orchestrator] 	Waiting 5 seconds for the next round...
+2026.09.26-18:08:54.066 info  [caliper] [round-orchestrator] 	Started round 12 (claim-submit-80-tps)
+2026.09.26-18:08:54.068 info  [caliper] [worker-message-handler] 	Preparing Worker#0 for Round#11
+2026.09.26-18:08:54.068 info  [caliper] [worker-message-handler] 	Preparing Worker#1 for Round#11
+2026.09.26-18:08:54.084 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-18:08:54.084 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-18:08:54.085 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-18:08:54.085 info  [caliper] [caliper-worker] 	Info: worker 0 prepare test phase for round 11 is starting...
+2026.09.26-18:08:54.085 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-18:08:54.085 info  [caliper] [caliper-worker] 	Info: worker 1 prepare test phase for round 11 is starting...
+2026.09.26-18:08:54.086 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-18:08:54.086 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-18:08:54.086 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-18:08:54.086 info  [caliper] [caliper-worker] 	Info: worker 0 prepare test phase for round 11 is completed
+2026.09.26-18:08:54.086 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-18:08:54.087 info  [caliper] [worker-message-handler] 	Worker#0 prepared for Round#11
+2026.09.26-18:08:54.087 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-18:08:54.087 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-18:08:54.087 info  [caliper] [caliper-worker] 	Info: worker 1 prepare test phase for round 11 is completed
+2026.09.26-18:08:54.087 info  [caliper] [worker-message-handler] 	Worker#1 prepared for Round#11
+2026.09.26-18:08:54.088 info  [caliper] [worker-orchestrator] 	2 workers prepared, progressing to test phase.
+2026.09.26-18:08:54.088 info  [caliper] [round-orchestrator] 	Monitors successfully started
+2026.09.26-18:08:54.089 info  [caliper] [worker-message-handler] 	Worker#0 is starting Round#11
+2026.09.26-18:08:54.089 info  [caliper] [worker-message-handler] 	Worker#1 is starting Round#11
+2026.09.26-18:08:54.094 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-18:08:54.094 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-18:08:54.095 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-18:08:54.095 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-18:08:54.095 info  [caliper] [caliper-worker] 	Worker #1 starting workload loop
+2026.09.26-18:08:54.095 info  [caliper] [caliper-worker] 	Worker #0 starting workload loop
+2026.09.26-18:08:59.088 info  [caliper] [default-observer] 	[claim-submit-80-tps Round 11 Transaction Info] - Submitted: 100 Succ: 100 Fail:0 Unfinished:0
+2026.09.26-18:08:59.853 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-18:08:59.853 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-18:08:59.853 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-18:08:59.854 info  [caliper] [worker-message-handler] 	Worker#1 finished Round#11
+2026.09.26-18:08:59.873 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-18:08:59.873 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-18:08:59.873 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-18:08:59.873 info  [caliper] [worker-message-handler] 	Worker#0 finished Round#11
+2026.09.26-18:09:04.875 info  [caliper] [default-observer] 	Resetting txCount indicator count
+2026.09.26-18:09:04.876 info  [caliper] [report-builder] 	### Test result ###
+2026.09.26-18:09:04.877 info  [caliper] [report-builder] 	
++---------------------+------+------+-----------------+-----------------+-----------------+-----------------+------------------+
+| Name                | Succ | Fail | Send Rate (TPS) | Max Latency (s) | Min Latency (s) | Avg Latency (s) | Throughput (TPS) |
+|---------------------|------|------|-----------------|-----------------|-----------------|-----------------|------------------|
+| claim-submit-80-tps | 100  | 0    | 60.4            | 3.64            | 1.47            | 2.76            | 21.2             |
++---------------------+------+------+-----------------+-----------------+-----------------+-----------------+------------------+
+
+2026.09.26-18:09:04.877 info  [caliper] [round-orchestrator] 	Finished round 12 (claim-submit-80-tps) in 4.767 seconds
+2026.09.26-18:09:04.877 info  [caliper] [monitor.js] 	Stopping all monitors
+2026.09.26-18:09:04.877 info  [caliper] [round-orchestrator] 	Waiting 5 seconds for the next round...
+2026.09.26-18:09:09.882 info  [caliper] [round-orchestrator] 	Started round 13 (claim-submit-160-tps)
+2026.09.26-18:09:09.883 info  [caliper] [worker-message-handler] 	Preparing Worker#0 for Round#12
+2026.09.26-18:09:09.884 info  [caliper] [worker-message-handler] 	Preparing Worker#1 for Round#12
+2026.09.26-18:09:09.891 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-18:09:09.891 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-18:09:09.892 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-18:09:09.892 info  [caliper] [caliper-worker] 	Info: worker 1 prepare test phase for round 12 is starting...
+2026.09.26-18:09:09.892 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-18:09:09.892 info  [caliper] [caliper-worker] 	Info: worker 0 prepare test phase for round 12 is starting...
+2026.09.26-18:09:09.893 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-18:09:09.893 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-18:09:09.893 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-18:09:09.893 info  [caliper] [caliper-worker] 	Info: worker 1 prepare test phase for round 12 is completed
+2026.09.26-18:09:09.893 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-18:09:09.893 info  [caliper] [worker-message-handler] 	Worker#1 prepared for Round#12
+2026.09.26-18:09:09.893 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-18:09:09.894 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-18:09:09.894 info  [caliper] [caliper-worker] 	Info: worker 0 prepare test phase for round 12 is completed
+2026.09.26-18:09:09.894 info  [caliper] [worker-message-handler] 	Worker#0 prepared for Round#12
+2026.09.26-18:09:09.894 info  [caliper] [worker-orchestrator] 	2 workers prepared, progressing to test phase.
+2026.09.26-18:09:09.894 info  [caliper] [round-orchestrator] 	Monitors successfully started
+2026.09.26-18:09:09.895 info  [caliper] [worker-message-handler] 	Worker#0 is starting Round#12
+2026.09.26-18:09:09.895 info  [caliper] [worker-message-handler] 	Worker#1 is starting Round#12
+2026.09.26-18:09:09.901 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-18:09:09.901 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-18:09:09.901 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-18:09:09.901 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-18:09:09.901 info  [caliper] [caliper-worker] 	Worker #0 starting workload loop
+2026.09.26-18:09:09.902 info  [caliper] [caliper-worker] 	Worker #1 starting workload loop
+2026.09.26-18:09:14.896 info  [caliper] [default-observer] 	[claim-submit-160-tps Round 12 Transaction Info] - Submitted: 100 Succ: 100 Fail:0 Unfinished:0
+2026.09.26-18:09:14.916 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-18:09:14.916 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-18:09:14.916 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-18:09:14.917 info  [caliper] [worker-message-handler] 	Worker#1 finished Round#12
+2026.09.26-18:09:14.920 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-18:09:14.920 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-18:09:14.920 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-18:09:14.921 info  [caliper] [worker-message-handler] 	Worker#0 finished Round#12
+2026.09.26-18:09:19.920 info  [caliper] [default-observer] 	Resetting txCount indicator count
+2026.09.26-18:09:19.921 info  [caliper] [report-builder] 	### Test result ###
+2026.09.26-18:09:19.922 info  [caliper] [report-builder] 	
++----------------------+------+------+-----------------+-----------------+-----------------+-----------------+------------------+
+| Name                 | Succ | Fail | Send Rate (TPS) | Max Latency (s) | Min Latency (s) | Avg Latency (s) | Throughput (TPS) |
+|----------------------|------|------|-----------------|-----------------|-----------------|-----------------|------------------|
+| claim-submit-160-tps | 100  | 0    | 129.0           | 3.27            | 1.76            | 2.50            | 25.4             |
++----------------------+------+------+-----------------+-----------------+-----------------+-----------------+------------------+
+
+2026.09.26-18:09:19.923 info  [caliper] [round-orchestrator] 	Finished round 13 (claim-submit-160-tps) in 4.008 seconds
+2026.09.26-18:09:19.923 info  [caliper] [monitor.js] 	Stopping all monitors
+2026.09.26-18:09:19.923 info  [caliper] [round-orchestrator] 	Waiting 5 seconds for the next round...
+2026.09.26-18:09:24.928 info  [caliper] [round-orchestrator] 	Started round 14 (mixed-policy-claim-5-tps)
+2026.09.26-18:09:24.930 info  [caliper] [worker-message-handler] 	Preparing Worker#0 for Round#13
+2026.09.26-18:09:24.930 info  [caliper] [worker-message-handler] 	Preparing Worker#1 for Round#13
+2026.09.26-18:09:24.980 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-18:09:24.980 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-18:09:24.981 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-18:09:24.981 info  [caliper] [caliper-worker] 	Info: worker 1 prepare test phase for round 13 is starting...
+2026.09.26-18:09:24.981 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-18:09:24.981 info  [caliper] [caliper-worker] 	Info: worker 0 prepare test phase for round 13 is starting...
+2026.09.26-18:09:24.983 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-18:09:24.983 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-18:09:24.983 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-18:09:24.983 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-18:09:24.983 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-18:09:24.983 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-18:09:24.983 info  [caliper] [caliper-worker] 	Info: worker 0 prepare test phase for round 13 is completed
+2026.09.26-18:09:24.983 info  [caliper] [caliper-worker] 	Info: worker 1 prepare test phase for round 13 is completed
+2026.09.26-18:09:24.983 info  [caliper] [worker-message-handler] 	Worker#0 prepared for Round#13
+2026.09.26-18:09:24.983 info  [caliper] [worker-message-handler] 	Worker#1 prepared for Round#13
+2026.09.26-18:09:24.985 info  [caliper] [worker-orchestrator] 	2 workers prepared, progressing to test phase.
+2026.09.26-18:09:24.985 info  [caliper] [round-orchestrator] 	Monitors successfully started
+2026.09.26-18:09:24.986 info  [caliper] [worker-message-handler] 	Worker#0 is starting Round#13
+2026.09.26-18:09:24.986 info  [caliper] [worker-message-handler] 	Worker#1 is starting Round#13
+2026.09.26-18:09:24.993 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-18:09:24.994 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-18:09:24.994 info  [caliper] [caliper-worker] 	Worker #0 starting workload loop
+2026.09.26-18:09:24.995 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-18:09:24.996 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-18:09:24.996 info  [caliper] [caliper-worker] 	Worker #1 starting workload loop
+2026.09.26-18:09:29.989 info  [caliper] [default-observer] 	[mixed-policy-claim-5-tps Round 13 Transaction Info] - Submitted: 21 Succ: 16 Fail:0 Unfinished:5
+2026.09.26-18:09:34.988 info  [caliper] [default-observer] 	[mixed-policy-claim-5-tps Round 13 Transaction Info] - Submitted: 46 Succ: 42 Fail:0 Unfinished:4
+2026.09.26-18:09:39.990 info  [caliper] [default-observer] 	[mixed-policy-claim-5-tps Round 13 Transaction Info] - Submitted: 72 Succ: 66 Fail:0 Unfinished:6
+2026.09.26-18:09:44.990 info  [caliper] [default-observer] 	[mixed-policy-claim-5-tps Round 13 Transaction Info] - Submitted: 96 Succ: 90 Fail:0 Unfinished:6
+2026.09.26-18:09:47.915 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-18:09:47.915 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-18:09:47.915 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-18:09:47.917 info  [caliper] [worker-message-handler] 	Worker#1 finished Round#13
+2026.09.26-18:09:47.917 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-18:09:47.917 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-18:09:47.917 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-18:09:47.918 info  [caliper] [worker-message-handler] 	Worker#0 finished Round#13
+2026.09.26-18:09:52.952 info  [caliper] [default-observer] 	Resetting txCount indicator count
+2026.09.26-18:09:52.974 info  [caliper] [report-builder] 	### Test result ###
+2026.09.26-18:09:53.004 info  [caliper] [report-builder] 	
++--------------------------+------+------+-----------------+-----------------+-----------------+-----------------+------------------+
+| Name                     | Succ | Fail | Send Rate (TPS) | Max Latency (s) | Min Latency (s) | Avg Latency (s) | Throughput (TPS) |
+|--------------------------|------|------|-----------------|-----------------|-----------------|-----------------|------------------|
+| mixed-policy-claim-5-tps | 100  | 0    | 5.1             | 2.39            | 0.01            | 0.77            | 4.6              |
++--------------------------+------+------+-----------------+-----------------+-----------------+-----------------+------------------+
+
+2026.09.26-18:09:53.016 info  [caliper] [round-orchestrator] 	Finished round 14 (mixed-policy-claim-5-tps) in 21.911 seconds
+2026.09.26-18:09:53.016 info  [caliper] [monitor.js] 	Stopping all monitors
+2026.09.26-18:09:53.017 info  [caliper] [round-orchestrator] 	Waiting 5 seconds for the next round...
+2026.09.26-18:09:58.069 info  [caliper] [round-orchestrator] 	Started round 15 (mixed-policy-claim-10-tps)
+2026.09.26-18:09:58.093 info  [caliper] [worker-message-handler] 	Preparing Worker#0 for Round#14
+2026.09.26-18:09:58.093 info  [caliper] [worker-message-handler] 	Preparing Worker#1 for Round#14
+2026.09.26-18:09:58.229 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-18:09:58.230 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-18:09:58.231 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-18:09:58.231 info  [caliper] [caliper-worker] 	Info: worker 0 prepare test phase for round 14 is starting...
+2026.09.26-18:09:58.231 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-18:09:58.232 info  [caliper] [caliper-worker] 	Info: worker 1 prepare test phase for round 14 is starting...
+2026.09.26-18:09:58.234 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-18:09:58.234 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-18:09:58.234 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-18:09:58.234 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-18:09:58.234 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-18:09:58.234 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-18:09:58.235 info  [caliper] [caliper-worker] 	Info: worker 0 prepare test phase for round 14 is completed
+2026.09.26-18:09:58.235 info  [caliper] [caliper-worker] 	Info: worker 1 prepare test phase for round 14 is completed
+2026.09.26-18:09:58.235 info  [caliper] [worker-message-handler] 	Worker#0 prepared for Round#14
+2026.09.26-18:09:58.235 info  [caliper] [worker-message-handler] 	Worker#1 prepared for Round#14
+2026.09.26-18:09:58.239 info  [caliper] [worker-orchestrator] 	2 workers prepared, progressing to test phase.
+2026.09.26-18:09:58.240 info  [caliper] [round-orchestrator] 	Monitors successfully started
+2026.09.26-18:09:58.242 info  [caliper] [worker-message-handler] 	Worker#0 is starting Round#14
+2026.09.26-18:09:58.243 info  [caliper] [worker-message-handler] 	Worker#1 is starting Round#14
+2026.09.26-18:09:58.251 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-18:09:58.251 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-18:09:58.252 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-18:09:58.252 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-18:09:58.254 info  [caliper] [caliper-worker] 	Worker #1 starting workload loop
+2026.09.26-18:09:58.254 info  [caliper] [caliper-worker] 	Worker #0 starting workload loop
+2026.09.26-18:10:03.243 info  [caliper] [default-observer] 	[mixed-policy-claim-10-tps Round 14 Transaction Info] - Submitted: 42 Succ: 30 Fail:0 Unfinished:12
+2026.09.26-18:10:08.243 info  [caliper] [default-observer] 	[mixed-policy-claim-10-tps Round 14 Transaction Info] - Submitted: 92 Succ: 86 Fail:0 Unfinished:6
+2026.09.26-18:10:09.369 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-18:10:09.369 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-18:10:09.369 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-18:10:09.370 info  [caliper] [worker-message-handler] 	Worker#1 finished Round#14
+2026.09.26-18:10:09.388 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-18:10:09.388 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-18:10:09.388 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-18:10:09.388 info  [caliper] [worker-message-handler] 	Worker#0 finished Round#14
+2026.09.26-18:10:14.391 info  [caliper] [default-observer] 	Resetting txCount indicator count
+2026.09.26-18:10:14.391 info  [caliper] [report-builder] 	### Test result ###
+2026.09.26-18:10:14.394 info  [caliper] [report-builder] 	
++---------------------------+------+------+-----------------+-----------------+-----------------+-----------------+------------------+
+| Name                      | Succ | Fail | Send Rate (TPS) | Max Latency (s) | Min Latency (s) | Avg Latency (s) | Throughput (TPS) |
+|---------------------------|------|------|-----------------|-----------------|-----------------|-----------------|------------------|
+| mixed-policy-claim-10-tps | 100  | 0    | 10.2            | 2.08            | 0.01            | 0.61            | 9.9              |
++---------------------------+------+------+-----------------+-----------------+-----------------+-----------------+------------------+
+
+2026.09.26-18:10:14.396 info  [caliper] [round-orchestrator] 	Finished round 15 (mixed-policy-claim-10-tps) in 10.106 seconds
+2026.09.26-18:10:14.396 info  [caliper] [monitor.js] 	Stopping all monitors
+2026.09.26-18:10:14.396 info  [caliper] [round-orchestrator] 	Waiting 5 seconds for the next round...
+2026.09.26-18:10:19.404 info  [caliper] [round-orchestrator] 	Started round 16 (mixed-policy-claim-20-tps)
+2026.09.26-18:10:19.408 info  [caliper] [worker-message-handler] 	Preparing Worker#1 for Round#15
+2026.09.26-18:10:19.409 info  [caliper] [worker-message-handler] 	Preparing Worker#0 for Round#15
+2026.09.26-18:10:19.421 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-18:10:19.422 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-18:10:19.422 info  [caliper] [caliper-worker] 	Info: worker 0 prepare test phase for round 15 is starting...
+2026.09.26-18:10:19.424 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-18:10:19.425 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-18:10:19.425 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-18:10:19.425 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-18:10:19.425 info  [caliper] [caliper-worker] 	Info: worker 0 prepare test phase for round 15 is completed
+2026.09.26-18:10:19.425 info  [caliper] [worker-message-handler] 	Worker#0 prepared for Round#15
+2026.09.26-18:10:19.426 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-18:10:19.426 info  [caliper] [caliper-worker] 	Info: worker 1 prepare test phase for round 15 is starting...
+2026.09.26-18:10:19.427 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-18:10:19.428 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-18:10:19.428 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-18:10:19.428 info  [caliper] [caliper-worker] 	Info: worker 1 prepare test phase for round 15 is completed
+2026.09.26-18:10:19.428 info  [caliper] [worker-message-handler] 	Worker#1 prepared for Round#15
+2026.09.26-18:10:19.429 info  [caliper] [worker-orchestrator] 	2 workers prepared, progressing to test phase.
+2026.09.26-18:10:19.429 info  [caliper] [round-orchestrator] 	Monitors successfully started
+2026.09.26-18:10:19.431 info  [caliper] [worker-message-handler] 	Worker#0 is starting Round#15
+2026.09.26-18:10:19.431 info  [caliper] [worker-message-handler] 	Worker#1 is starting Round#15
+2026.09.26-18:10:19.439 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-18:10:19.439 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-18:10:19.439 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-18:10:19.440 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-18:10:19.440 info  [caliper] [caliper-worker] 	Worker #0 starting workload loop
+2026.09.26-18:10:19.440 info  [caliper] [caliper-worker] 	Worker #1 starting workload loop
+2026.09.26-18:10:24.433 info  [caliper] [default-observer] 	[mixed-policy-claim-20-tps Round 15 Transaction Info] - Submitted: 82 Succ: 70 Fail:0 Unfinished:12
+2026.09.26-18:10:25.753 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-18:10:25.753 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-18:10:25.753 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-18:10:25.753 info  [caliper] [worker-message-handler] 	Worker#1 finished Round#15
+2026.09.26-18:10:25.756 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-18:10:25.757 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-18:10:25.757 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-18:10:25.757 info  [caliper] [worker-message-handler] 	Worker#0 finished Round#15
+2026.09.26-18:10:30.761 info  [caliper] [default-observer] 	Resetting txCount indicator count
+2026.09.26-18:10:30.761 info  [caliper] [report-builder] 	### Test result ###
+2026.09.26-18:10:30.764 info  [caliper] [report-builder] 	
++---------------------------+------+------+-----------------+-----------------+-----------------+-----------------+------------------+
+| Name                      | Succ | Fail | Send Rate (TPS) | Max Latency (s) | Min Latency (s) | Avg Latency (s) | Throughput (TPS) |
+|---------------------------|------|------|-----------------|-----------------|-----------------|-----------------|------------------|
+| mixed-policy-claim-20-tps | 100  | 0    | 20.4            | 1.30            | 0.01            | 0.39            | 19.2             |
++---------------------------+------+------+-----------------+-----------------+-----------------+-----------------+------------------+
+
+2026.09.26-18:10:30.765 info  [caliper] [round-orchestrator] 	Finished round 16 (mixed-policy-claim-20-tps) in 5.307 seconds
+2026.09.26-18:10:30.766 info  [caliper] [monitor.js] 	Stopping all monitors
+2026.09.26-18:10:30.766 info  [caliper] [round-orchestrator] 	Waiting 5 seconds for the next round...
+2026.09.26-18:10:35.772 info  [caliper] [round-orchestrator] 	Started round 17 (mixed-policy-claim-40-tps)
+2026.09.26-18:10:35.773 info  [caliper] [worker-message-handler] 	Preparing Worker#0 for Round#16
+2026.09.26-18:10:35.773 info  [caliper] [worker-message-handler] 	Preparing Worker#1 for Round#16
+2026.09.26-18:10:35.779 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-18:10:35.779 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-18:10:35.779 info  [caliper] [caliper-worker] 	Info: worker 1 prepare test phase for round 16 is starting...
+2026.09.26-18:10:35.781 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-18:10:35.781 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-18:10:35.781 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-18:10:35.781 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-18:10:35.781 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-18:10:35.781 info  [caliper] [caliper-worker] 	Info: worker 0 prepare test phase for round 16 is starting...
+2026.09.26-18:10:35.781 info  [caliper] [caliper-worker] 	Info: worker 1 prepare test phase for round 16 is completed
+2026.09.26-18:10:35.781 info  [caliper] [worker-message-handler] 	Worker#1 prepared for Round#16
+2026.09.26-18:10:35.782 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-18:10:35.783 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-18:10:35.783 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-18:10:35.783 info  [caliper] [caliper-worker] 	Info: worker 0 prepare test phase for round 16 is completed
+2026.09.26-18:10:35.783 info  [caliper] [worker-message-handler] 	Worker#0 prepared for Round#16
+2026.09.26-18:10:35.784 info  [caliper] [worker-orchestrator] 	2 workers prepared, progressing to test phase.
+2026.09.26-18:10:35.784 info  [caliper] [round-orchestrator] 	Monitors successfully started
+2026.09.26-18:10:35.785 info  [caliper] [worker-message-handler] 	Worker#0 is starting Round#16
+2026.09.26-18:10:35.785 info  [caliper] [worker-message-handler] 	Worker#1 is starting Round#16
+2026.09.26-18:10:35.791 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-18:10:35.791 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-18:10:35.791 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-18:10:35.791 info  [caliper] [caliper-worker] 	Worker #1 starting workload loop
+2026.09.26-18:10:35.792 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-18:10:35.792 info  [caliper] [caliper-worker] 	Worker #0 starting workload loop
+2026.09.26-18:10:39.655 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-18:10:39.656 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-18:10:39.656 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-18:10:39.656 info  [caliper] [worker-message-handler] 	Worker#0 finished Round#16
+2026.09.26-18:10:39.659 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-18:10:39.659 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-18:10:39.659 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-18:10:39.659 info  [caliper] [worker-message-handler] 	Worker#1 finished Round#16
+2026.09.26-18:10:44.664 info  [caliper] [default-observer] 	Resetting txCount indicator count
+2026.09.26-18:10:44.665 info  [caliper] [report-builder] 	### Test result ###
+2026.09.26-18:10:44.665 info  [caliper] [report-builder] 	
++---------------------------+------+------+-----------------+-----------------+-----------------+-----------------+------------------+
+| Name                      | Succ | Fail | Send Rate (TPS) | Max Latency (s) | Min Latency (s) | Avg Latency (s) | Throughput (TPS) |
+|---------------------------|------|------|-----------------|-----------------|-----------------|-----------------|------------------|
+| mixed-policy-claim-40-tps | 100  | 0    | 40.7            | 0.91            | 0.01            | 0.33            | 35.2             |
++---------------------------+------+------+-----------------+-----------------+-----------------+-----------------+------------------+
+
+2026.09.26-18:10:44.666 info  [caliper] [round-orchestrator] 	Finished round 17 (mixed-policy-claim-40-tps) in 2.859 seconds
+2026.09.26-18:10:44.666 info  [caliper] [monitor.js] 	Stopping all monitors
+2026.09.26-18:10:44.666 info  [caliper] [round-orchestrator] 	Waiting 5 seconds for the next round...
+2026.09.26-18:10:49.671 info  [caliper] [round-orchestrator] 	Started round 18 (mixed-policy-claim-80-tps)
+2026.09.26-18:10:49.672 info  [caliper] [worker-message-handler] 	Preparing Worker#0 for Round#17
+2026.09.26-18:10:49.673 info  [caliper] [worker-message-handler] 	Preparing Worker#1 for Round#17
+2026.09.26-18:10:49.677 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-18:10:49.677 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-18:10:49.677 info  [caliper] [caliper-worker] 	Info: worker 1 prepare test phase for round 17 is starting...
+2026.09.26-18:10:49.679 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-18:10:49.679 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-18:10:49.679 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-18:10:49.679 info  [caliper] [caliper-worker] 	Info: worker 1 prepare test phase for round 17 is completed
+2026.09.26-18:10:49.679 info  [caliper] [worker-message-handler] 	Worker#1 prepared for Round#17
+2026.09.26-18:10:49.681 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-18:10:49.681 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-18:10:49.681 info  [caliper] [caliper-worker] 	Info: worker 0 prepare test phase for round 17 is starting...
+2026.09.26-18:10:49.683 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-18:10:49.683 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-18:10:49.683 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-18:10:49.683 info  [caliper] [caliper-worker] 	Info: worker 0 prepare test phase for round 17 is completed
+2026.09.26-18:10:49.683 info  [caliper] [worker-message-handler] 	Worker#0 prepared for Round#17
+2026.09.26-18:10:49.684 info  [caliper] [worker-orchestrator] 	2 workers prepared, progressing to test phase.
+2026.09.26-18:10:49.684 info  [caliper] [round-orchestrator] 	Monitors successfully started
+2026.09.26-18:10:49.684 info  [caliper] [worker-message-handler] 	Worker#0 is starting Round#17
+2026.09.26-18:10:49.685 info  [caliper] [worker-message-handler] 	Worker#1 is starting Round#17
+2026.09.26-18:10:49.689 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-18:10:49.690 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-18:10:49.690 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-18:10:49.690 info  [caliper] [caliper-worker] 	Worker #1 starting workload loop
+2026.09.26-18:10:49.690 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-18:10:49.690 info  [caliper] [caliper-worker] 	Worker #0 starting workload loop
+2026.09.26-18:10:53.170 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-18:10:53.170 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-18:10:53.170 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-18:10:53.170 info  [caliper] [worker-message-handler] 	Worker#1 finished Round#17
+2026.09.26-18:10:53.175 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-18:10:53.175 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-18:10:53.175 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-18:10:53.175 info  [caliper] [worker-message-handler] 	Worker#0 finished Round#17
+2026.09.26-18:10:58.178 info  [caliper] [default-observer] 	Resetting txCount indicator count
+2026.09.26-18:10:58.179 info  [caliper] [report-builder] 	### Test result ###
+2026.09.26-18:10:58.180 info  [caliper] [report-builder] 	
++---------------------------+------+------+-----------------+-----------------+-----------------+-----------------+------------------+
+| Name                      | Succ | Fail | Send Rate (TPS) | Max Latency (s) | Min Latency (s) | Avg Latency (s) | Throughput (TPS) |
+|---------------------------|------|------|-----------------|-----------------|-----------------|-----------------|------------------|
+| mixed-policy-claim-80-tps | 100  | 0    | 81.6            | 1.50            | 0.01            | 0.59            | 41.2             |
++---------------------------+------+------+-----------------+-----------------+-----------------+-----------------+------------------+
+
+2026.09.26-18:10:58.181 info  [caliper] [round-orchestrator] 	Finished round 18 (mixed-policy-claim-80-tps) in 2.47 seconds
+2026.09.26-18:10:58.182 info  [caliper] [monitor.js] 	Stopping all monitors
+2026.09.26-18:10:58.182 info  [caliper] [round-orchestrator] 	Waiting 5 seconds for the next round...
+2026.09.26-18:11:03.187 info  [caliper] [round-orchestrator] 	Started round 19 (mixed-policy-claim-160-tps)
+2026.09.26-18:11:03.188 info  [caliper] [worker-message-handler] 	Preparing Worker#0 for Round#18
+2026.09.26-18:11:03.188 info  [caliper] [worker-message-handler] 	Preparing Worker#1 for Round#18
+2026.09.26-18:11:03.194 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-18:11:03.194 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-18:11:03.194 info  [caliper] [caliper-worker] 	Info: worker 0 prepare test phase for round 18 is starting...
+2026.09.26-18:11:03.195 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-18:11:03.195 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-18:11:03.195 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-18:11:03.195 info  [caliper] [caliper-worker] 	Info: worker 0 prepare test phase for round 18 is completed
+2026.09.26-18:11:03.196 info  [caliper] [worker-message-handler] 	Worker#0 prepared for Round#18
+2026.09.26-18:11:03.196 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-18:11:03.197 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-18:11:03.197 info  [caliper] [caliper-worker] 	Info: worker 1 prepare test phase for round 18 is starting...
+2026.09.26-18:11:03.198 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-18:11:03.198 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-18:11:03.198 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-18:11:03.198 info  [caliper] [caliper-worker] 	Info: worker 1 prepare test phase for round 18 is completed
+2026.09.26-18:11:03.198 info  [caliper] [worker-message-handler] 	Worker#1 prepared for Round#18
+2026.09.26-18:11:03.199 info  [caliper] [worker-orchestrator] 	2 workers prepared, progressing to test phase.
+2026.09.26-18:11:03.199 info  [caliper] [round-orchestrator] 	Monitors successfully started
+2026.09.26-18:11:03.199 info  [caliper] [worker-message-handler] 	Worker#1 is starting Round#18
+2026.09.26-18:11:03.199 info  [caliper] [worker-message-handler] 	Worker#0 is starting Round#18
+2026.09.26-18:11:03.204 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-18:11:03.205 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-18:11:03.205 info  [caliper] [caliper-worker] 	Worker #0 starting workload loop
+2026.09.26-18:11:03.205 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user insurerAdmin
+2026.09.26-18:11:03.205 info  [caliper] [connectors/peer-gateway/PeerGateway] 	Generating contract map for user policyholder1
+2026.09.26-18:11:03.206 info  [caliper] [caliper-worker] 	Worker #1 starting workload loop
+2026.09.26-18:11:06.528 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-18:11:06.528 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-18:11:06.528 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-18:11:06.529 info  [caliper] [worker-message-handler] 	Worker#0 finished Round#18
+2026.09.26-18:11:06.563 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user insurerAdmin
+2026.09.26-18:11:06.563 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gateway for user policyholder1
+2026.09.26-18:11:06.563 info  [caliper] [connectors/peer-gateway/PeerGateway] 	disconnecting gRpc client at peer peer0.insurer.blockinsure.test
+2026.09.26-18:11:06.563 info  [caliper] [worker-message-handler] 	Worker#1 finished Round#18
+2026.09.26-18:11:11.568 info  [caliper] [default-observer] 	Resetting txCount indicator count
+2026.09.26-18:11:11.568 info  [caliper] [report-builder] 	### Test result ###
+2026.09.26-18:11:11.568 info  [caliper] [report-builder] 	
++----------------------------+------+------+-----------------+-----------------+-----------------+-----------------+------------------+
+| Name                       | Succ | Fail | Send Rate (TPS) | Max Latency (s) | Min Latency (s) | Avg Latency (s) | Throughput (TPS) |
+|----------------------------|------|------|-----------------|-----------------|-----------------|-----------------|------------------|
+| mixed-policy-claim-160-tps | 100  | 0    | 133.5           | 1.86            | 0.02            | 0.73            | 44.5             |
++----------------------------+------+------+-----------------+-----------------+-----------------+-----------------+------------------+
+
+2026.09.26-18:11:11.569 info  [caliper] [round-orchestrator] 	Finished round 19 (mixed-policy-claim-160-tps) in 2.345 seconds
+2026.09.26-18:11:11.569 info  [caliper] [monitor.js] 	Stopping all monitors
+2026.09.26-18:11:11.623 info  [caliper] [report-builder] 	### All test results ###
+2026.09.26-18:11:11.632 info  [caliper] [report-builder] 	
++----------------------------+------+------+-----------------+-----------------+-----------------+-----------------+------------------+
+| Name                       | Succ | Fail | Send Rate (TPS) | Max Latency (s) | Min Latency (s) | Avg Latency (s) | Throughput (TPS) |
+|----------------------------|------|------|-----------------|-----------------|-----------------|-----------------|------------------|
+| schema-read                | 200  | 0    | 20.2            | 0.35            | 0.01            | 0.02            | 20.2             |
+|----------------------------|------|------|-----------------|-----------------|-----------------|-----------------|------------------|
+| oracle-1-of-1              | 200  | 0    | 20.2            | 0.05            | 0.01            | 0.01            | 20.2             |
+|----------------------------|------|------|-----------------|-----------------|-----------------|-----------------|------------------|
+| oracle-2-of-2              | 200  | 0    | 20.2            | 0.08            | 0.00            | 0.01            | 20.2             |
+|----------------------------|------|------|-----------------|-----------------|-----------------|-----------------|------------------|
+| oracle-2-of-3              | 200  | 0    | 20.2            | 0.04            | 0.01            | 0.01            | 20.2             |
+|----------------------------|------|------|-----------------|-----------------|-----------------|-----------------|------------------|
+| anchored-write-5-tps       | 100  | 0    | 5.1             | 2.28            | 0.24            | 1.14            | 5.0              |
+|----------------------------|------|------|-----------------|-----------------|-----------------|-----------------|------------------|
+| anchored-write-10-tps      | 100  | 0    | 10.2            | 1.22            | 0.21            | 0.67            | 10.0             |
+|----------------------------|------|------|-----------------|-----------------|-----------------|-----------------|------------------|
+| anchored-write-20-tps      | 100  | 0    | 20.4            | 1.92            | 0.59            | 1.14            | 18.2             |
+|----------------------------|------|------|-----------------|-----------------|-----------------|-----------------|------------------|
+| claim-submit-5-tps         | 100  | 0    | 5.1             | 2.42            | 0.28            | 1.22            | 5.0              |
+|----------------------------|------|------|-----------------|-----------------|-----------------|-----------------|------------------|
+| claim-submit-10-tps        | 100  | 0    | 10.2            | 1.82            | 0.28            | 0.84            | 9.9              |
+|----------------------------|------|------|-----------------|-----------------|-----------------|-----------------|------------------|
+| claim-submit-20-tps        | 100  | 0    | 20.4            | 0.78            | 0.30            | 0.54            | 19.2             |
+|----------------------------|------|------|-----------------|-----------------|-----------------|-----------------|------------------|
+| claim-submit-40-tps        | 100  | 0    | 40.3            | 1.89            | 0.40            | 1.23            | 25.8             |
+|----------------------------|------|------|-----------------|-----------------|-----------------|-----------------|------------------|
+| claim-submit-80-tps        | 100  | 0    | 60.4            | 3.64            | 1.47            | 2.76            | 21.2             |
+|----------------------------|------|------|-----------------|-----------------|-----------------|-----------------|------------------|
+| claim-submit-160-tps       | 100  | 0    | 129.0           | 3.27            | 1.76            | 2.50            | 25.4             |
+|----------------------------|------|------|-----------------|-----------------|-----------------|-----------------|------------------|
+| mixed-policy-claim-5-tps   | 100  | 0    | 5.1             | 2.39            | 0.01            | 0.77            | 4.6              |
+|----------------------------|------|------|-----------------|-----------------|-----------------|-----------------|------------------|
+| mixed-policy-claim-10-tps  | 100  | 0    | 10.2            | 2.08            | 0.01            | 0.61            | 9.9              |
+|----------------------------|------|------|-----------------|-----------------|-----------------|-----------------|------------------|
+| mixed-policy-claim-20-tps  | 100  | 0    | 20.4            | 1.30            | 0.01            | 0.39            | 19.2             |
+|----------------------------|------|------|-----------------|-----------------|-----------------|-----------------|------------------|
+| mixed-policy-claim-40-tps  | 100  | 0    | 40.7            | 0.91            | 0.01            | 0.33            | 35.2             |
+|----------------------------|------|------|-----------------|-----------------|-----------------|-----------------|------------------|
+| mixed-policy-claim-80-tps  | 100  | 0    | 81.6            | 1.50            | 0.01            | 0.59            | 41.2             |
+|----------------------------|------|------|-----------------|-----------------|-----------------|-----------------|------------------|
+| mixed-policy-claim-160-tps | 100  | 0    | 133.5           | 1.86            | 0.02            | 0.73            | 44.5             |
++----------------------------+------+------+-----------------+-----------------+-----------------+-----------------+------------------+
+
+2026.09.26-18:11:11.909 info  [caliper] [report-builder] 	Generated report with path /hyperledger/caliper/workspace/docs/results/phase2-caliper/run2.html
+2026.09.26-18:11:11.911 info  [caliper] [monitor.js] 	Stopping all monitors
+2026.09.26-18:11:11.912 info  [caliper] [worker-orchestrator] 	Sending exit message to connected workers
+2026.09.26-18:11:11.914 info  [caliper] [round-orchestrator] 	Benchmark finished in 374.908 seconds. Total rounds: 19. Successful rounds: 19. Failed rounds: 0.
+2026.09.26-18:11:11.914 info  [caliper] [caliper-engine] 	Skipping end command due to benchmark flow conditioning
+2026.09.26-18:11:11.915 info  [caliper] [worker-message-handler] 	Worker#1 is exiting
+2026.09.26-18:11:11.915 info  [caliper] [worker-message-handler] 	Worker#0 is exiting
+2026.09.26-18:11:11.915 info  [caliper] [cli-launch-manager] 	Benchmark successfully finished!

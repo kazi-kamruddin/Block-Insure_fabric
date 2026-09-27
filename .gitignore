@@ -53,6 +53,9 @@ network/vars/
 # Logs and temporary files
 logs/
 *.log
+!/docs/results/phase2-caliper/*.log
+!/docs/results/artifacts/**/
+!/docs/results/artifacts/**/*.log
 .DS_Store
 Thumbs.db
 

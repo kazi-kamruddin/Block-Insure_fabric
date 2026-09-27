@@ -11,6 +11,7 @@ const inputs = {
   security: "phase2-security/latest.json",
   protocol: "phase2-protocol/protocol-matrix.json",
   faults: "phase2-faults.json",
+  liveLedger: "phase2-live-ledger.json",
   caliper1: "phase2-caliper/run1.log",
   caliper2: "phase2-caliper/run2.log",
   caliper3: "phase2-caliper/run3.log",
@@ -21,12 +22,16 @@ const comparative = JSON.parse(raw.comparative);
 const security = JSON.parse(raw.security);
 const protocol = JSON.parse(raw.protocol);
 const faults = JSON.parse(raw.faults);
+const liveLedger = JSON.parse(raw.liveLedger);
 assert.equal(comparative.design.repetitions, 30);
 assert.equal(security.metrics.threatsPassed, 8);
 assert.equal(protocol.stateSpace.total, 64);
 assert.equal(protocol.commonSourceAssessment.classification, "UNSAFE_AUTOMATIC_UNDER_SYNTHETIC_SOURCE_ERROR");
 assert.equal(faults.channel, "insurance-phase2-20260926");
 assert.equal(faults.measurements.length, 15);
+assert.equal(liveLedger.claims.length, 15);
+assert.equal(liveLedger.requests.length, 15);
+assert.equal(liveLedger.reviews.length, 9);
 
 function round(value, digits = 3) { return Number(value.toFixed(digits)); }
 function mean(values) { return values.reduce((sum, value) => sum + value, 0) / values.length; }
@@ -43,6 +48,38 @@ const live = profileNames.map((profile) => {
     rangeWholeTestSeconds: [round(Math.min(...elapsedSeconds), 1), round(Math.max(...elapsedSeconds), 1)],
   };
 });
+const profilePrefix = { baseline: "success", negative: "negative", "one-unavailable": "available-quorum", conflict: "conflict", timeout: "timeout" };
+function durationSeconds(start, end) {
+  const value = (Date.parse(end) - Date.parse(start)) / 1_000;
+  assert.ok(Number.isFinite(value) && value >= 0, `invalid ledger duration ${start} to ${end}`);
+  return value;
+}
+const liveDecisionTimes = profileNames.map((profile) => {
+  const prefix = `oracle-claim-${profilePrefix[profile]}-`;
+  const claims = liveLedger.claims.filter((item) => item.id.startsWith(prefix));
+  assert.equal(claims.length, 3, `${profile} ledger claim count`);
+  const ids = new Set(claims.map((item) => item.id));
+  const requests = liveLedger.requests.filter((item) => ids.has(item.claimId));
+  const reviews = liveLedger.reviews.filter((item) => ids.has(item.claimId));
+  assert.equal(requests.length, 3, `${profile} ledger request count`);
+  assert.equal(reviews.length, ["negative", "conflict", "timeout"].includes(profile) ? 3 : 0, `${profile} review count`);
+  const oracleSeconds = requests.map((item) => durationSeconds(item.requestedAt, item.finalizedAt));
+  const claimSeconds = claims.map((item) => durationSeconds(item.createdAt, item.updatedAt));
+  const reviewSeconds = reviews.map((item) => durationSeconds(item.openedAt, item.closedAt));
+  return {
+    profile,
+    claims: claims.length,
+    oracleFinalizationMeanSeconds: round(mean(oracleSeconds), 2),
+    oracleFinalizationRangeSeconds: [round(Math.min(...oracleSeconds), 2), round(Math.max(...oracleSeconds), 2)],
+    claimToObservedFinalStateMeanSeconds: round(mean(claimSeconds), 2),
+    claimToObservedFinalStateRangeSeconds: [round(Math.min(...claimSeconds), 2), round(Math.max(...claimSeconds), 2)],
+    reviewClosureMeanSeconds: reviewSeconds.length ? round(mean(reviewSeconds), 2) : null,
+    reviewClosureRangeSeconds: reviewSeconds.length ? [round(Math.min(...reviewSeconds), 2), round(Math.max(...reviewSeconds), 2)] : null,
+    finalizationCodes: [...new Set(requests.map((item) => item.finalizationCode))],
+    claimStatuses: [...new Set(claims.map((item) => item.status))],
+    reviewStatuses: [...new Set(reviews.map((item) => item.status))],
+  };
+});
 
 const expectedRounds = [
   "schema-read", "oracle-1-of-1", "oracle-2-of-2", "oracle-2-of-3",
@@ -55,17 +92,18 @@ function parseCaliper(content, run) {
   assert.match(log, /Successful rounds:\s+19\. Failed rounds:\s+0/);
   const section = log.slice(log.lastIndexOf("### All test results ###"), log.lastIndexOf("Generated report with path"));
   assert.ok(section.length > 0, `${run} final report`);
-  const pattern = /\|\s*([\w-]+)\s*\|\s*(\d+)\s*\|\s*(\d+)\s*\|\s*([\d.]+)\s*\|\s*([\d.]+)\s*\|\s*([\d.]+)\s*\|\s*([\d.]+)\s*\|\s*([\d.]+)\s*\|/g;
+  const pattern = /\|\s*([\w-]+)\s*\|\s*(\d+)\s*\|\s*(\d+)\s*\|\s*([\d.]+|-)\s*\|\s*([\d.]+|-)\s*\|\s*([\d.]+|-)\s*\|\s*([\d.]+|-)\s*\|\s*([\d.]+|-)\s*\|/g;
+  const numeric = (value) => value === "-" ? null : Number(value);
   const rows = [...section.matchAll(pattern)].map((match) => ({
     run,
     label: match[1],
     successful: Number(match[2]),
     failed: Number(match[3]),
-    offeredTpsObserved: Number(match[4]),
-    maxLatencySeconds: Number(match[5]),
-    minLatencySeconds: Number(match[6]),
-    averageLatencySeconds: Number(match[7]),
-    achievedTps: Number(match[8]),
+    offeredTpsObserved: numeric(match[4]),
+    maxLatencySeconds: numeric(match[5]),
+    minLatencySeconds: numeric(match[6]),
+    averageLatencySeconds: numeric(match[7]),
+    achievedTps: numeric(match[8]),
   }));
   assert.deepEqual(rows.map((row) => row.label), expectedRounds, `${run} round names`);
   return rows;
@@ -122,6 +160,7 @@ const resources = [...new Set(resourceSamples.map((item) => item.name))].map((na
 });
 const caliper = expectedRounds.map((label) => {
   const rows = caliperTrials.filter((item) => item.label === label);
+  const observedLatencies = rows.map((row) => row.averageLatencySeconds).filter(Number.isFinite);
   return {
     label,
     runs: rows.length,
@@ -130,8 +169,8 @@ const caliper = expectedRounds.map((label) => {
     meanObservedSendTps: round(mean(rows.map((row) => row.offeredTpsObserved)), 2),
     meanAchievedTps: round(mean(rows.map((row) => row.achievedTps)), 2),
     achievedTpsRange: [Math.min(...rows.map((row) => row.achievedTps)), Math.max(...rows.map((row) => row.achievedTps))],
-    meanAverageLatencySeconds: round(mean(rows.map((row) => row.averageLatencySeconds)), 3),
-    averageLatencyRangeSeconds: [Math.min(...rows.map((row) => row.averageLatencySeconds)), Math.max(...rows.map((row) => row.averageLatencySeconds))],
+    meanAverageLatencySeconds: observedLatencies.length ? round(mean(observedLatencies), 3) : null,
+    averageLatencyRangeSeconds: observedLatencies.length ? [Math.min(...observedLatencies), Math.max(...observedLatencies)] : null,
     workloadP95MsRange: rows[0].workloadLatency ? [Math.min(...rows.map((row) => row.workloadLatency.all.p95Ms)), Math.max(...rows.map((row) => row.workloadLatency.all.p95Ms))] : null,
   };
 });
@@ -143,6 +182,7 @@ const report = {
   protocol: { stateSpace: protocol.stateSpace, commonSourceAssessment: protocol.commonSourceAssessment },
   security: security.metrics,
   live,
+  liveDecisionTimes,
   caliperTrials,
   caliper,
   resources,
@@ -168,11 +208,17 @@ const lines = [
   "| --- | ---: | ---: | ---: |",
   ...live.map((item) => `| ${item.profile} | ${item.passed}/${item.trials} | ${item.meanWholeTestSeconds} | ${item.rangeWholeTestSeconds.join("–")} |`),
   "",
+  "## Ledger-derived decision intervals",
+  "",
+  "| Profile | Oracle request-to-finalization mean (range), s | Claim creation-to-observed-final-state mean (range), s | Review open-to-close mean (range), s |",
+  "| --- | ---: | ---: | ---: |",
+  ...liveDecisionTimes.map((item) => `| ${item.profile} | ${item.oracleFinalizationMeanSeconds} (${item.oracleFinalizationRangeSeconds.join("–")}) | ${item.claimToObservedFinalStateMeanSeconds} (${item.claimToObservedFinalStateRangeSeconds.join("–")}) | ${item.reviewClosureMeanSeconds === null ? "—" : `${item.reviewClosureMeanSeconds} (${item.reviewClosureRangeSeconds.join("–")})`} |`),
+  "",
   "## Fabric Gateway and ledger",
   "",
   "| Round | Success | Fail | Observed send TPS | Achieved TPS, mean (range) | Caliper mean latency, s | Workload P95 range, ms |",
   "| --- | ---: | ---: | ---: | ---: | ---: | ---: |",
-  ...caliper.map((item) => `| ${item.label} | ${item.successful} | ${item.failed} | ${item.meanObservedSendTps} | ${item.meanAchievedTps} (${item.achievedTpsRange.join("–")}) | ${item.meanAverageLatencySeconds} (${item.averageLatencyRangeSeconds.join("–")}) | ${item.workloadP95MsRange?.join("–") ?? "—"} |`),
+  ...caliper.map((item) => `| ${item.label} | ${item.successful} | ${item.failed} | ${item.meanObservedSendTps} | ${item.meanAchievedTps} (${item.achievedTpsRange.join("–")}) | ${item.meanAverageLatencySeconds === null ? "—" : `${item.meanAverageLatencySeconds} (${item.averageLatencyRangeSeconds.join("–")})`} | ${item.workloadP95MsRange?.join("–") ?? "—"} |`),
   "",
   "## Docker resource samples during Caliper",
   "",

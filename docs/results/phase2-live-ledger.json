@@ -1,0 +1,386 @@
+{
+  "schemaVersion": 1,
+  "channel": "insurance-phase2-20260926",
+  "method": "Read-only filtered ledger queries; synthetic Phase 2 browser claim IDs",
+  "claims": [
+    {
+      "id": "oracle-claim-available-quorum-1790442799270-607252",
+      "status": "APPROVED",
+      "oracleOutcome": "EXACT_CONSENSUS",
+      "createdAt": "2026-09-26T17:13:38.077Z",
+      "updatedAt": "2026-09-26T17:14:07.083Z",
+      "version": 1
+    },
+    {
+      "id": "oracle-claim-available-quorum-1790443378804-609275",
+      "status": "APPROVED",
+      "oracleOutcome": "EXACT_CONSENSUS",
+      "createdAt": "2026-09-26T17:23:19.638Z",
+      "updatedAt": "2026-09-26T17:23:49.061Z",
+      "version": 1
+    },
+    {
+      "id": "oracle-claim-available-quorum-1790443921504-955233",
+      "status": "APPROVED",
+      "oracleOutcome": "EXACT_CONSENSUS",
+      "createdAt": "2026-09-26T17:32:23.376Z",
+      "updatedAt": "2026-09-26T17:32:53.42Z",
+      "version": 1
+    },
+    {
+      "id": "oracle-claim-conflict-1790442928569-492036",
+      "status": "SETTLED",
+      "oracleOutcome": "CONFLICT",
+      "createdAt": "2026-09-26T17:15:48.387Z",
+      "updatedAt": "2026-09-26T17:16:34.543Z",
+      "version": 1
+    },
+    {
+      "id": "oracle-claim-conflict-1790443512505-250159",
+      "status": "SETTLED",
+      "oracleOutcome": "CONFLICT",
+      "createdAt": "2026-09-26T17:25:31.124Z",
+      "updatedAt": "2026-09-26T17:26:11.153Z",
+      "version": 1
+    },
+    {
+      "id": "oracle-claim-conflict-1790444066286-906914",
+      "status": "SETTLED",
+      "oracleOutcome": "CONFLICT",
+      "createdAt": "2026-09-26T17:34:50.468Z",
+      "updatedAt": "2026-09-26T17:35:32.688Z",
+      "version": 1
+    },
+    {
+      "id": "oracle-claim-negative-1790442661067-712555",
+      "status": "SETTLED",
+      "oracleOutcome": "NEGATIVE_RESULT",
+      "createdAt": "2026-09-26T17:11:20.295Z",
+      "updatedAt": "2026-09-26T17:11:56.364Z",
+      "version": 1
+    },
+    {
+      "id": "oracle-claim-negative-1790443222014-646731",
+      "status": "SETTLED",
+      "oracleOutcome": "NEGATIVE_RESULT",
+      "createdAt": "2026-09-26T17:20:40.993Z",
+      "updatedAt": "2026-09-26T17:21:16.924Z",
+      "version": 1
+    },
+    {
+      "id": "oracle-claim-negative-1790444490948-818274",
+      "status": "SETTLED",
+      "oracleOutcome": "NEGATIVE_RESULT",
+      "createdAt": "2026-09-26T17:41:49.466Z",
+      "updatedAt": "2026-09-26T17:42:25.938Z",
+      "version": 1
+    },
+    {
+      "id": "oracle-claim-success-1790442530647-625853",
+      "status": "SETTLED",
+      "oracleOutcome": "EXACT_CONSENSUS",
+      "createdAt": "2026-09-26T17:09:11.25Z",
+      "updatedAt": "2026-09-26T17:09:38.985Z",
+      "version": 1
+    },
+    {
+      "id": "oracle-claim-success-1790443792447-633077",
+      "status": "SETTLED",
+      "oracleOutcome": "EXACT_CONSENSUS",
+      "createdAt": "2026-09-26T17:30:11.281Z",
+      "updatedAt": "2026-09-26T17:30:38.604Z",
+      "version": 1
+    },
+    {
+      "id": "oracle-claim-success-1790444362820-969518",
+      "status": "SETTLED",
+      "oracleOutcome": "EXACT_CONSENSUS",
+      "createdAt": "2026-09-26T17:39:41.244Z",
+      "updatedAt": "2026-09-26T17:40:08.961Z",
+      "version": 1
+    },
+    {
+      "id": "oracle-claim-timeout-1790443078388-651364",
+      "status": "SETTLED",
+      "oracleOutcome": "TIMEOUT",
+      "createdAt": "2026-09-26T17:18:20.249Z",
+      "updatedAt": "2026-09-26T17:18:59.884Z",
+      "version": 1
+    },
+    {
+      "id": "oracle-claim-timeout-1790443652268-533513",
+      "status": "SETTLED",
+      "oracleOutcome": "TIMEOUT",
+      "createdAt": "2026-09-26T17:27:50.788Z",
+      "updatedAt": "2026-09-26T17:28:29.258Z",
+      "version": 1
+    },
+    {
+      "id": "oracle-claim-timeout-1790444216107-992527",
+      "status": "SETTLED",
+      "oracleOutcome": "TIMEOUT",
+      "createdAt": "2026-09-26T17:37:18.686Z",
+      "updatedAt": "2026-09-26T17:38:00.504Z",
+      "version": 1
+    }
+  ],
+  "requests": [
+    {
+      "id": "oracle-request-available-quorum-1790442799270-607252",
+      "claimId": "oracle-claim-available-quorum-1790442799270-607252",
+      "status": "CONSENSUS",
+      "finalizationCode": "EXACT_CONSENSUS",
+      "verifiedResult": true,
+      "requestedAt": "2026-09-26T17:13:44.744Z",
+      "finalizedAt": "2026-09-26T17:14:07.083Z",
+      "commitmentCount": 2,
+      "revealCount": 2
+    },
+    {
+      "id": "oracle-request-available-quorum-1790443378804-609275",
+      "claimId": "oracle-claim-available-quorum-1790443378804-609275",
+      "status": "CONSENSUS",
+      "finalizationCode": "EXACT_CONSENSUS",
+      "verifiedResult": true,
+      "requestedAt": "2026-09-26T17:23:26.619Z",
+      "finalizedAt": "2026-09-26T17:23:49.061Z",
+      "commitmentCount": 2,
+      "revealCount": 2
+    },
+    {
+      "id": "oracle-request-available-quorum-1790443921504-955233",
+      "claimId": "oracle-claim-available-quorum-1790443921504-955233",
+      "status": "CONSENSUS",
+      "finalizationCode": "EXACT_CONSENSUS",
+      "verifiedResult": true,
+      "requestedAt": "2026-09-26T17:32:30.26Z",
+      "finalizedAt": "2026-09-26T17:32:53.42Z",
+      "commitmentCount": 2,
+      "revealCount": 2
+    },
+    {
+      "id": "oracle-request-conflict-1790442928569-492036",
+      "claimId": "oracle-claim-conflict-1790442928569-492036",
+      "status": "FAILED",
+      "finalizationCode": "CONFLICT",
+      "verifiedResult": false,
+      "requestedAt": "2026-09-26T17:15:56.559Z",
+      "finalizedAt": "2026-09-26T17:16:12.936Z",
+      "commitmentCount": 3,
+      "revealCount": 3
+    },
+    {
+      "id": "oracle-request-conflict-1790443512505-250159",
+      "claimId": "oracle-claim-conflict-1790443512505-250159",
+      "status": "FAILED",
+      "finalizationCode": "CONFLICT",
+      "verifiedResult": false,
+      "requestedAt": "2026-09-26T17:25:37.771Z",
+      "finalizedAt": "2026-09-26T17:25:53.803Z",
+      "commitmentCount": 3,
+      "revealCount": 3
+    },
+    {
+      "id": "oracle-request-conflict-1790444066286-906914",
+      "claimId": "oracle-claim-conflict-1790444066286-906914",
+      "status": "FAILED",
+      "finalizationCode": "CONFLICT",
+      "verifiedResult": false,
+      "requestedAt": "2026-09-26T17:34:57.861Z",
+      "finalizedAt": "2026-09-26T17:35:15.316Z",
+      "commitmentCount": 3,
+      "revealCount": 3
+    },
+    {
+      "id": "oracle-request-negative-1790442661067-712555",
+      "claimId": "oracle-claim-negative-1790442661067-712555",
+      "status": "FAILED",
+      "finalizationCode": "NEGATIVE_RESULT",
+      "verifiedResult": false,
+      "requestedAt": "2026-09-26T17:11:26.973Z",
+      "finalizedAt": "2026-09-26T17:11:39.892Z",
+      "commitmentCount": 3,
+      "revealCount": 2
+    },
+    {
+      "id": "oracle-request-negative-1790443222014-646731",
+      "claimId": "oracle-claim-negative-1790443222014-646731",
+      "status": "FAILED",
+      "finalizationCode": "NEGATIVE_RESULT",
+      "verifiedResult": false,
+      "requestedAt": "2026-09-26T17:20:47.648Z",
+      "finalizedAt": "2026-09-26T17:21:00.58Z",
+      "commitmentCount": 3,
+      "revealCount": 2
+    },
+    {
+      "id": "oracle-request-negative-1790444490948-818274",
+      "claimId": "oracle-claim-negative-1790444490948-818274",
+      "status": "FAILED",
+      "finalizationCode": "NEGATIVE_RESULT",
+      "verifiedResult": false,
+      "requestedAt": "2026-09-26T17:41:56.147Z",
+      "finalizedAt": "2026-09-26T17:42:09.267Z",
+      "commitmentCount": 3,
+      "revealCount": 2
+    },
+    {
+      "id": "oracle-request-success-1790442530647-625853",
+      "claimId": "oracle-claim-success-1790442530647-625853",
+      "status": "CONSENSUS",
+      "finalizationCode": "EXACT_CONSENSUS",
+      "verifiedResult": true,
+      "requestedAt": "2026-09-26T17:09:18.189Z",
+      "finalizedAt": "2026-09-26T17:09:31.261Z",
+      "commitmentCount": 3,
+      "revealCount": 2
+    },
+    {
+      "id": "oracle-request-success-1790443792447-633077",
+      "claimId": "oracle-claim-success-1790443792447-633077",
+      "status": "CONSENSUS",
+      "finalizationCode": "EXACT_CONSENSUS",
+      "verifiedResult": true,
+      "requestedAt": "2026-09-26T17:30:17.931Z",
+      "finalizedAt": "2026-09-26T17:30:30.937Z",
+      "commitmentCount": 3,
+      "revealCount": 2
+    },
+    {
+      "id": "oracle-request-success-1790444362820-969518",
+      "claimId": "oracle-claim-success-1790444362820-969518",
+      "status": "CONSENSUS",
+      "finalizationCode": "EXACT_CONSENSUS",
+      "verifiedResult": true,
+      "requestedAt": "2026-09-26T17:39:48.039Z",
+      "finalizedAt": "2026-09-26T17:40:01.193Z",
+      "commitmentCount": 3,
+      "revealCount": 2
+    },
+    {
+      "id": "oracle-request-timeout-1790443078388-651364",
+      "claimId": "oracle-claim-timeout-1790443078388-651364",
+      "status": "FAILED",
+      "finalizationCode": "TIMEOUT",
+      "verifiedResult": false,
+      "requestedAt": "2026-09-26T17:18:27.291Z",
+      "finalizedAt": "2026-09-26T17:18:43.801Z",
+      "commitmentCount": 1,
+      "revealCount": 1
+    },
+    {
+      "id": "oracle-request-timeout-1790443652268-533513",
+      "claimId": "oracle-claim-timeout-1790443652268-533513",
+      "status": "FAILED",
+      "finalizationCode": "TIMEOUT",
+      "verifiedResult": false,
+      "requestedAt": "2026-09-26T17:27:57.433Z",
+      "finalizedAt": "2026-09-26T17:28:13.937Z",
+      "commitmentCount": 1,
+      "revealCount": 1
+    },
+    {
+      "id": "oracle-request-timeout-1790444216107-992527",
+      "claimId": "oracle-claim-timeout-1790444216107-992527",
+      "status": "FAILED",
+      "finalizationCode": "TIMEOUT",
+      "verifiedResult": false,
+      "requestedAt": "2026-09-26T17:37:26.085Z",
+      "finalizedAt": "2026-09-26T17:37:42.591Z",
+      "commitmentCount": 1,
+      "revealCount": 1
+    }
+  ],
+  "reviews": [
+    {
+      "id": "oracle-fallback-review-conflict-1790442928569-492036",
+      "claimId": "oracle-claim-conflict-1790442928569-492036",
+      "status": "APPROVED",
+      "openedAt": "2026-09-26T17:16:17.207Z",
+      "closedAt": "2026-09-26T17:16:25.832Z",
+      "votesCast": 3,
+      "approvals": 3,
+      "rejections": 0
+    },
+    {
+      "id": "oracle-fallback-review-conflict-1790443512505-250159",
+      "claimId": "oracle-claim-conflict-1790443512505-250159",
+      "status": "APPROVED",
+      "openedAt": "2026-09-26T17:25:58.006Z",
+      "closedAt": "2026-09-26T17:26:04.501Z",
+      "votesCast": 3,
+      "approvals": 3,
+      "rejections": 0
+    },
+    {
+      "id": "oracle-fallback-review-conflict-1790444066286-906914",
+      "claimId": "oracle-claim-conflict-1790444066286-906914",
+      "status": "APPROVED",
+      "openedAt": "2026-09-26T17:35:18.709Z",
+      "closedAt": "2026-09-26T17:35:25.651Z",
+      "votesCast": 3,
+      "approvals": 3,
+      "rejections": 0
+    },
+    {
+      "id": "oracle-fallback-review-negative-1790442661067-712555",
+      "claimId": "oracle-claim-negative-1790442661067-712555",
+      "status": "APPROVED",
+      "openedAt": "2026-09-26T17:11:43.203Z",
+      "closedAt": "2026-09-26T17:11:49.788Z",
+      "votesCast": 3,
+      "approvals": 3,
+      "rejections": 0
+    },
+    {
+      "id": "oracle-fallback-review-negative-1790443222014-646731",
+      "claimId": "oracle-claim-negative-1790443222014-646731",
+      "status": "APPROVED",
+      "openedAt": "2026-09-26T17:21:03.766Z",
+      "closedAt": "2026-09-26T17:21:10.316Z",
+      "votesCast": 3,
+      "approvals": 3,
+      "rejections": 0
+    },
+    {
+      "id": "oracle-fallback-review-negative-1790444490948-818274",
+      "claimId": "oracle-claim-negative-1790444490948-818274",
+      "status": "APPROVED",
+      "openedAt": "2026-09-26T17:42:12.367Z",
+      "closedAt": "2026-09-26T17:42:18.957Z",
+      "votesCast": 3,
+      "approvals": 3,
+      "rejections": 0
+    },
+    {
+      "id": "oracle-fallback-review-timeout-1790443078388-651364",
+      "claimId": "oracle-claim-timeout-1790443078388-651364",
+      "status": "APPROVED",
+      "openedAt": "2026-09-26T17:18:46.135Z",
+      "closedAt": "2026-09-26T17:18:52.955Z",
+      "votesCast": 3,
+      "approvals": 3,
+      "rejections": 0
+    },
+    {
+      "id": "oracle-fallback-review-timeout-1790443652268-533513",
+      "claimId": "oracle-claim-timeout-1790443652268-533513",
+      "status": "APPROVED",
+      "openedAt": "2026-09-26T17:28:16.148Z",
+      "closedAt": "2026-09-26T17:28:22.637Z",
+      "votesCast": 3,
+      "approvals": 3,
+      "rejections": 0
+    },
+    {
+      "id": "oracle-fallback-review-timeout-1790444216107-992527",
+      "claimId": "oracle-claim-timeout-1790444216107-992527",
+      "status": "APPROVED",
+      "openedAt": "2026-09-26T17:37:45.008Z",
+      "closedAt": "2026-09-26T17:37:52.03Z",
+      "votesCast": 3,
+      "approvals": 3,
+      "rejections": 0
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+Local package ID: insurance-contract_1.4.0-phase2:8141d7f8edeb64f819e682354c0c46dc8b312245c1f2c3ccbfb36005bab8b27c
+Packaged runtime matches 22 source files byte-for-byte
+insurer: insurance-phase2-20260926 committed 1.4.0-phase2/1, approved and installed local package ID
+hospital: insurance-phase2-20260926 committed 1.4.0-phase2/1, approved and installed local package ID
+auditor: insurance-phase2-20260926 committed 1.4.0-phase2/1, approved and installed local package ID
+bank: insurance-phase2-20260926 committed 1.4.0-phase2/1, approved and installed local package ID
+oracle: insurance-phase2-20260926 committed 1.4.0-phase2/1, approved and installed local package ID

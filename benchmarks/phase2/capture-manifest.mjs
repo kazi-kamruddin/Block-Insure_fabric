@@ -36,11 +36,17 @@ for (const name of ["insurance-channel", "insurance-phase1-20260926"]) {
 }
 assert.ok(after["insurance-phase2-20260926"], "Phase 2 ledger state missing");
 const sourceCommit = execFileSync("git", ["-c", "safe.directory=E:/4-1/4100 thesis/project/Block-Insure_fabric", "rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
+const worktreeStatus = execFileSync("git", ["-c", "safe.directory=E:/4-1/4100 thesis/project/Block-Insure_fabric", "status", "--porcelain", "--untracked-files=normal"], { cwd: root, encoding: "utf8" }).trim();
+const audit = await readFile(path.join(results, "phase2-package-audit.txt"), "utf8");
+const packageId = /^Local package ID:\s*(\S+)$/m.exec(audit)?.[1];
+assert.ok(packageId, "audited runtime package ID missing");
 const manifest = {
   schemaVersion: 1,
   generatedAt: new Date().toISOString(),
   sourceCommit,
-  runtimePackageId: `insurance-contract_1.4.0-phase2:${sha256[files[0]]}`,
+  worktreeModified: worktreeStatus.length > 0,
+  worktreeStatus,
+  runtimePackageId: packageId,
   channel: "insurance-phase2-20260926",
   environment: { node: process.version, platform: process.platform, architecture: process.arch, cpuModel: os.cpus()[0]?.model, logicalCpuCount: os.cpus().length, memoryBytes: os.totalmem() },
   sha256,

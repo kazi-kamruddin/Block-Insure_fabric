@@ -14,12 +14,16 @@ The output includes operation-level mean, median, and P95 latency; a 95% confide
 
 This is a controlled **protocol computation** benchmark. It measures registry assessment, request/result binding, commitment generation, threshold evaluation, and optional Merkle-proof verification. It does not represent production network capacity. The existing Hyperledger Caliper suite separately measures Fabric Gateway and ledger overhead, while the live fault matrix measures full workflow recovery time.
 
-Run a paper experiment on an otherwise idle, documented machine:
+The Phase 2 protocol report, raw trial data, and deployed experiment are archived under `docs/results/phase2-comparative`, `docs/results/phase2-caliper`, and `docs/results/phase2-faults.json`. Run a new experiment on an otherwise idle, documented machine:
 
 ```powershell
 node ./benchmarks/comparative/run-experiment.mjs --repetitions=30 --operations=1000 --warmup=200
-./benchmarks/caliper/run.ps1
-./benchmarks/oracle-faults/run-matrix.ps1
+$env:FABRIC_CHANNEL_NAME = 'insurance-phase2-20260926'
+# Seed the synthetic policy once with seed-load-fixture.sh in the Fabric CLI environment.
+./benchmarks/caliper/run.ps1 -RunId run1
+./benchmarks/caliper/run.ps1 -RunId run2
+./benchmarks/caliper/run.ps1 -RunId run3
+./benchmarks/oracle-faults/run-matrix.ps1 -Repetitions 3
 ```
 
 ## Threat model
@@ -34,7 +38,7 @@ Run the complete matrix with:
 node ./benchmarks/security-evaluation/run-evaluation.mjs
 ```
 
-The runner executes attack simulations and exact Go chaincode tests, caches shared test evidence, and emits JSON and Markdown reports under `benchmarks/security-evaluation/reports`. A passing test demonstrates that the implemented control produces the declared safe outcome under the modeled attack; it does not eliminate the explicitly recorded residual risks.
+The runner executes attack simulations and exact Go chaincode tests, caches shared test evidence, and emits JSON and Markdown reports under `benchmarks/security-evaluation/reports`. A passing test demonstrates that the implemented control produces the declared safe outcome under the modeled attack; it does not eliminate the explicitly recorded residual risks. The Phase 2 snapshot is in `docs/results/phase2-security`.
 
 ## Interpretation boundaries
 
