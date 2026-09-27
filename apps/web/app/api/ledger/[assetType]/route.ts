@@ -202,6 +202,9 @@ export async function GET(_request: Request, context: RouteContext) {
         result = await ledger.listEvidenceAccessRecords();
         break;
       case "account": {
+        if (!["bankOfficer", "insurerAdmin", "policyholder"].includes(session.role)) {
+          return NextResponse.json({ message: "Private Bank accounts are visible only to the Bank, insurer, and owning policyholder" }, { status: 403 });
+        }
         const accounts = await ledger.listBankAccountReferences();
         result = session.role === "policyholder" ? accounts.filter((item) => item.ownerId === session.subjectId) : accounts;
         break;

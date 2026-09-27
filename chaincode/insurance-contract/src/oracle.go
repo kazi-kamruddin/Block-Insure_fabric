@@ -34,6 +34,7 @@ var oracleVerificationCodes = map[string]bool{
 	"PRIVACY_PRESENTATION_MISSING": true,
 	"PRIVACY_PROOF_INVALID":        true,
 	"PRIVACY_PRESENTATION_EXPIRED": true,
+	"PRIVACY_CREDENTIAL_INACTIVE":  true,
 }
 
 func canonicalProtocolHash(domain string, values ...string) string {
@@ -364,6 +365,9 @@ func (c *Contract) RequestOracleVerification(
 		if presentation.Status != "VERIFIED" || presentation.ClaimID != claim.ID || presentation.ClaimVersion != claim.Version {
 			return nil, fmt.Errorf("privacy presentation %s is stale for claim %s", presentation.ID, claim.ID)
 		}
+		if err := c.validatePresentationCredentials(ctx, presentation, requestTime); err != nil {
+			return nil, err
+		}
 		privacyPresentationID = presentation.ID
 		privacyPresentationHash = presentation.PresentationHash
 		privacyProtocol = presentation.ProtocolVersion
@@ -523,6 +527,15 @@ func (c *Contract) RevealOracleResult(
 	}
 	if txTime.AsTime().After(revealDeadline) {
 		return nil, fmt.Errorf("Oracle request %s reveal phase has ended", requestID)
+	}
+	if verified && request.PrivacyPresentationID != "" {
+		presentation, err := c.ReadSelectiveDisclosurePresentation(ctx, request.PrivacyPresentationID)
+		if err != nil {
+			return nil, err
+		}
+		if err := c.validatePresentationCredentials(ctx, presentation, txTime.AsTime()); err != nil {
+			return nil, err
+		}
 	}
 	commitment, err := c.ReadOracleCommitment(ctx, oracleSubmissionID(requestID, oracleID))
 	if err != nil {

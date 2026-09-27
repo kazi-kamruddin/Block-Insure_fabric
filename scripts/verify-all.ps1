@@ -205,6 +205,22 @@ try {
             }
             finally { $env:ORACLE_E2E_SCENARIO = $previousScenario }
         }
+        Invoke-VerificationStep "Live Oracle two-worker wrong majority" {
+            $previousScenario = $env:ORACLE_E2E_SCENARIO
+            try {
+                $env:ORACLE_E2E_SCENARIO = "majority-wrong"
+                npx playwright test --grep "@oracle-majority-wrong"
+            }
+            finally { $env:ORACLE_E2E_SCENARIO = $previousScenario }
+        }
+        Invoke-VerificationStep "Live Oracle common-source counterexample" {
+            $previousScenario = $env:ORACLE_E2E_SCENARIO
+            try {
+                $env:ORACLE_E2E_SCENARIO = "common-source"
+                npx playwright test --grep "@oracle-common-source"
+            }
+            finally { $env:ORACLE_E2E_SCENARIO = $previousScenario }
+        }
         Invoke-VerificationStep "Live Oracle one-worker fault tolerance" {
             $previousScenario = $env:ORACLE_E2E_SCENARIO
             try {

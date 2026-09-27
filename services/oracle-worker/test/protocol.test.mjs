@@ -68,6 +68,24 @@ test("selective-disclosure Merkle proofs reject altered values and missing priva
   );
 });
 
+test("a revoked credential invalidates an already registered presentation", () => {
+  const expiresAt = "2026-09-07T00:00:00Z";
+  const publicPresentation = {
+    id: "presentation-1", claimId: "claim-1", claimVersion: 1,
+    protocolVersion: "block-insure-selective-disclosure-v1", presentationHash: "a".repeat(64),
+    invoiceCredentialId: "invoice-credential-1", invoiceRootHash: "b".repeat(64),
+    policyCredentialId: "policy-credential-1", policyRootHash: "c".repeat(64), expiresAt,
+  };
+  const privatePresentation = { presentationId: publicPresentation.id, claimId: "claim-1", claimVersion: 1, expiresAt };
+  const invoiceCredential = { id: publicPresentation.invoiceCredentialId, rootHash: publicPresentation.invoiceRootHash, status: "REVOKED", expiresAt };
+  const policyCredential = { id: publicPresentation.policyCredentialId, rootHash: publicPresentation.policyRootHash, status: "ACTIVE", expiresAt };
+  assert.deepEqual(verifySelectiveDisclosurePresentation({
+    request: { privacyPresentationId: publicPresentation.id, privacyPresentationHash: publicPresentation.presentationHash, privacyProtocolVersion: publicPresentation.protocolVersion, claimId: "claim-1", claimVersion: 1 },
+    claim: {}, publicPresentation, privatePresentation, invoiceCredential, policyCredential,
+    now: Date.parse("2026-09-06T12:00:00Z"),
+  }), { valid: false, code: "PRIVACY_CREDENTIAL_INACTIVE" });
+});
+
 test("three baseline snapshots have distinct replica sources but identical canonical roots", async () => {
   const root = path.resolve(import.meta.dirname, "..");
   const [oracle1, oracle2, oracle3, conflict] = await Promise.all([

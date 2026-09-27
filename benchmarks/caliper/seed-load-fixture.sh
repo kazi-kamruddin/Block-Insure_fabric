@@ -19,11 +19,12 @@ export CORE_PEER_TLS_ROOTCERT_FILE="${organizations}/peerOrganizations/${domain}
 export CORE_PEER_MSPCONFIGPATH="${organizations}/peerOrganizations/${domain}/users/insurerAdmin@${domain}/msp"
 export CORE_PEER_ADDRESS=localhost:7051
 
-if peer chaincode query -C "${channel_name}" -n insurance-contract -c '{"Args":["ReadPolicy","phase2-load-policy"]}' >/dev/null 2>&1; then
-  echo "Synthetic Phase 2 load policy already exists."
-  exit 0
-fi
-peer chaincode invoke \
+issue_policy() {
+  local policy_id="$1"
+  if peer chaincode query -C "${channel_name}" -n insurance-contract -c "{\"Args\":[\"ReadPolicy\",\"${policy_id}\"]}" >/dev/null 2>&1; then
+    return
+  fi
+  peer chaincode invoke \
   -o localhost:7050 --ordererTLSHostnameOverride orderer.blockinsure.test \
   --tls --cafile "${organizations}/ordererOrganizations/blockinsure.test/orderers/orderer.blockinsure.test/tls/ca.crt" \
   -C "${channel_name}" -n insurance-contract \
@@ -32,5 +33,11 @@ peer chaincode invoke \
   --peerAddresses localhost:8051 \
   --tlsRootCertFiles "${organizations}/peerOrganizations/hospital.blockinsure.test/peers/peer0.hospital.blockinsure.test/tls/ca.crt" \
   --waitForEvent --waitForEventTimeout 90s \
-  -c '{"Args":["IssuePolicy","phase2-load-policy","showcase-health-v1","policyholder1","2026-01-01","2026-12-31"]}'
-echo "Synthetic active policy phase2-load-policy issued for policyholder1; premium workflow is outside this load fixture."
+  -c "{\"Args\":[\"IssuePolicy\",\"${policy_id}\",\"showcase-health-v1\",\"policyholder1\",\"2026-01-01\",\"2026-12-31\"]}"
+}
+
+issue_policy phase2-load-policy
+for index in 1 2 3 4 5; do
+  issue_policy "phase2-load-policy-${index}"
+done
+echo "Six synthetic active load policies are ready for policyholder1; the robustness profile rotates five showcase Hospital invoices."

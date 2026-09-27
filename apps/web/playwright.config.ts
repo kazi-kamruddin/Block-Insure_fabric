@@ -3,12 +3,14 @@ import { defineConfig, devices } from "@playwright/test";
 const port = 3200;
 const baseURL = `http://127.0.0.1:${port}`;
 const oracleScenario = process.env.ORACLE_E2E_SCENARIO ?? "baseline";
-const oracle2Environment = oracleScenario === "conflict"
+const oracle2Environment = oracleScenario === "conflict" || oracleScenario === "majority-wrong"
   ? "../../services/oracle-worker/.env.oracle2-conflict.example"
   : "../../services/oracle-worker/.env.oracle2.example";
 const oracle3Environment = oracleScenario === "conflict"
   ? "../../services/oracle-worker/.env.oracle3-model-mismatch.example"
-  : "../../services/oracle-worker/.env.oracle3.example";
+  : oracleScenario === "majority-wrong"
+    ? "../../services/oracle-worker/.env.oracle3-conflict.example"
+    : "../../services/oracle-worker/.env.oracle3.example";
 
 const oracleServers = [
   {

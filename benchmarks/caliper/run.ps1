@@ -1,5 +1,8 @@
 [CmdletBinding()]
-param([ValidatePattern('^[a-zA-Z0-9_-]+$')][string]$RunId = "latest")
+param(
+  [ValidatePattern('^[a-zA-Z0-9_-]+$')][string]$RunId = "latest",
+  [ValidateSet("baseline", "robustness")][string]$Profile = "baseline"
+)
 
 $ErrorActionPreference = "Stop"
 $projectRoot = (Resolve-Path (Join-Path $PSScriptRoot "../..")).Path
@@ -13,6 +16,8 @@ $reportRoot = Join-Path $projectRoot "docs/results/phase2-caliper"
 New-Item -ItemType Directory -Force -Path $reportRoot | Out-Null
 $logPath = Join-Path $reportRoot "$RunId.log"
 $reportPath = "docs/results/phase2-caliper/$RunId.html"
+$benchmarkConfig = if ($Profile -eq "robustness") { "benchmarks/caliper/robustness.yaml" } else { "benchmarks/caliper/benchmark.yaml" }
+$expectedRounds = if ($Profile -eq "robustness") { 10 } else { 19 }
 $resourcePath = Join-Path $reportRoot "$RunId-resources.jsonl"
 $stopMarker = Join-Path $reportRoot "$RunId-sampling.marker"
 Set-Content -LiteralPath $stopMarker -Value "running"
@@ -26,7 +31,7 @@ try {
   -e CALIPER_PHASE2_RUN_ID=$RunId `
   hyperledger/caliper:0.7.1 launch manager `
   --caliper-workspace . `
-  --caliper-benchconfig benchmarks/caliper/benchmark.yaml `
+  --caliper-benchconfig $benchmarkConfig `
   --caliper-networkconfig benchmarks/caliper/generated/network.yaml `
   --caliper-report-path $reportPath `
   --caliper-flow-only-test 2>&1 | Tee-Object -LiteralPath $logPath
@@ -40,5 +45,5 @@ finally {
   $resourceJob | Remove-Job
 }
 $log = Get-Content -LiteralPath $logPath -Raw
-if ($dockerExit -ne 0 -or $log -notmatch "Successful rounds:\s+19") { throw "Caliper benchmark failed; inspect $logPath" }
+if ($dockerExit -ne 0 -or $log -notmatch "Successful rounds:\s+$expectedRounds(?!\d)") { throw "Caliper benchmark failed; inspect $logPath" }
 if (-not (Test-Path -LiteralPath $resourcePath -PathType Leaf)) { throw "Resource sampling failed; inspect $resourcePath" }

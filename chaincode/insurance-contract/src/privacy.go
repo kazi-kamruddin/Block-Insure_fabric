@@ -284,6 +284,31 @@ func (c *Contract) ReadPrivacyCredential(ctx contractapi.TransactionContextInter
 	return getState[PrivacyCredential](ctx, "privacyCredential", id)
 }
 
+// A presentation is an immutable record of a successful registration. Its
+// credentials must still be active when the presentation is used for a new
+// Oracle decision; revocation does not rewrite historical presentation state.
+func (c *Contract) validatePresentationCredentials(ctx contractapi.TransactionContextInterface, presentation *SelectiveDisclosurePresentation, at time.Time) error {
+	for _, bound := range []struct {
+		id, root string
+	}{
+		{presentation.InvoiceCredentialID, presentation.InvoiceRootHash},
+		{presentation.PolicyCredentialID, presentation.PolicyRootHash},
+	} {
+		credential, err := c.ReadPrivacyCredential(ctx, bound.id)
+		if err != nil {
+			return err
+		}
+		if credential.Status != "ACTIVE" || credential.RootHash != bound.root {
+			return fmt.Errorf("privacy credential %s is inactive for presentation %s", bound.id, presentation.ID)
+		}
+		expiry, err := time.Parse(time.RFC3339, credential.ExpiresAt)
+		if err != nil || !expiry.After(at) {
+			return fmt.Errorf("privacy credential %s is expired for presentation %s", bound.id, presentation.ID)
+		}
+	}
+	return nil
+}
+
 func (c *Contract) ListPrivacyCredentials(ctx contractapi.TransactionContextInterface) ([]PrivacyCredential, error) {
 	return listState[PrivacyCredential](ctx, "privacyCredential")
 }
@@ -293,8 +318,12 @@ func (c *Contract) RevokePrivacyCredential(ctx contractapi.TransactionContextInt
 	if err != nil {
 		return nil, err
 	}
-	if _, err := requireIdentity(ctx, credential.IssuerMSP, map[string]string{"HospitalMSP": "hospitalOfficer", "InsurerMSP": "insurerAdmin"}[credential.IssuerMSP]); err != nil {
+	issuer, err := requireIdentity(ctx, credential.IssuerMSP, map[string]string{"HospitalMSP": "hospitalOfficer", "InsurerMSP": "insurerAdmin"}[credential.IssuerMSP])
+	if err != nil {
 		return nil, err
+	}
+	if issuer != credential.IssuerIdentity {
+		return nil, fmt.Errorf("access denied: only credential issuer %s may revoke it", credential.IssuerIdentity)
 	}
 	if credential.Status != "ACTIVE" {
 		return nil, fmt.Errorf("credential %s is not active", id)
@@ -539,6 +568,23 @@ func (c *Contract) ReadSelectiveDisclosurePresentationPrivate(ctx contractapi.Tr
 	allowed := (mspID == "OracleMSP" && role == "oracle") || (mspID == "InsurerMSP" && (role == "insurerAdmin" || role == "policyholder"))
 	if !allowed {
 		return nil, fmt.Errorf("access denied: verified InsurerMSP or OracleMSP identity is required")
+	}
+	if mspID == "InsurerMSP" && role == "policyholder" {
+		presentation, err := c.ReadSelectiveDisclosurePresentation(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		claim, err := c.ReadClaim(ctx, presentation.ClaimID)
+		if err != nil {
+			return nil, err
+		}
+		subject, err := callerSubject(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if claim.ClaimantID != subject {
+			return nil, fmt.Errorf("access denied: presentation %s belongs to another policyholder", id)
+		}
 	}
 	return getPrivateState[SelectiveDisclosurePresentationPrivate](ctx, "selectiveDisclosurePresentationPrivate", id)
 }

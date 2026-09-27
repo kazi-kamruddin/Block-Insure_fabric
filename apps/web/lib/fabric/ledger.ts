@@ -700,6 +700,14 @@ export const ledger = {
     );
   },
 
+  revokeInvoicePrivacyCredential(id: string, hospitalUserName?: string) {
+    return submitAsHospital<PrivacyCredential>(hospitalUserName, "RevokePrivacyCredential", id);
+  },
+
+  revokePolicyPrivacyCredential(id: string) {
+    return submit<PrivacyCredential>("insurerAdmin", "RevokePrivacyCredential", id);
+  },
+
   registerClaimPrivacyPresentation(input: { id: string; claimId: string; invoiceCredentialId: string; policyCredentialId: string; challenge: string; expiresAt: string }) {
     return submit<SelectiveDisclosurePresentation>(
       "policyholder", "RegisterClaimPrivacyPresentation", input.id, input.claimId,

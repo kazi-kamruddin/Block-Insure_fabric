@@ -262,6 +262,12 @@ func TestBankAccountPrivateDataBoundary(t *testing.T) {
 	setIdentity(ctx, "hospital", "HospitalMSP", "hospitalOfficer", nil)
 	_, err = contract.ReadBankAccountReference(ctx, account.ID)
 	requireError(t, err, "shared only with BankMSP and InsurerMSP")
+	setIdentity(ctx, "auditor", "AuditorMSP", "auditor", nil)
+	_, err = contract.ReadBankAccountReference(ctx, account.ID)
+	requireError(t, err, "shared only with BankMSP and InsurerMSP")
+	setIdentity(ctx, "different-policyholder", "InsurerMSP", "policyholder", map[string]string{"subjectId": "policyholder2"})
+	_, err = contract.ReadBankAccountReference(ctx, account.ID)
+	requireError(t, err, "owning policyholder is required")
 	setIdentity(ctx, "policyholder", "InsurerMSP", "policyholder", map[string]string{"subjectId": "policyholder1"})
 	owned, err := contract.ReadBankAccountReference(ctx, account.ID)
 	requireNoError(t, err)
@@ -457,6 +463,10 @@ func TestDistributedReviewAppealAndFraudDecisionSupport(t *testing.T) {
 	_, err = contract.RecordAuditorDecision(ctx, "review-initial", "decision-r1-duplicate", "REJECT", hashC)
 	requireError(t, err, "already voted")
 	setIdentity(ctx, "auditor2-cert", "AuditorMSP", "auditor", map[string]string{"subjectId": "auditor2"})
+	ctx.stub.timestamp = timestamppb.New(time.Date(2026, time.September, 9, 12, 0, 0, 0, time.UTC))
+	_, err = contract.RecordAuditorDecision(ctx, "review-initial", "decision-r1-late", "REJECT", hashC)
+	requireError(t, err, "deadline has passed")
+	ctx.stub.timestamp = timestamppb.New(time.Date(2026, time.September, 5, 12, 0, 0, 0, time.UTC))
 	_, err = contract.RecordAuditorDecision(ctx, "review-initial", "decision-r1-a2", "REJECT", hashC)
 	requireNoError(t, err)
 	claim, err = contract.ReadClaim(ctx, "claim-review")
@@ -1396,6 +1406,15 @@ func TestSelectiveDisclosureCredentialAndPresentationLifecycle(t *testing.T) {
 	if strings.Contains(string(publicJSON), invoice.TreatmentHash) || strings.Contains(string(publicJSON), invoice.PatientReferenceHash) {
 		t.Fatalf("public presentation leaked undisclosed medical fields: %s", publicJSON)
 	}
+	setIdentity(ctx, "different-policyholder-cert", "InsurerMSP", "policyholder", map[string]string{"subjectId": "policyholder2"})
+	_, err = contract.ReadSelectiveDisclosurePresentationPrivate(ctx, presentation.ID)
+	requireError(t, err, "belongs to another policyholder")
+	setIdentity(ctx, "auditor-cert", "AuditorMSP", "auditor", map[string]string{"subjectId": "auditor1"})
+	_, err = contract.ReadSelectiveDisclosurePresentationPrivate(ctx, presentation.ID)
+	requireError(t, err, "access denied")
+	setIdentity(ctx, "policyholder-cert", "InsurerMSP", "policyholder", map[string]string{"subjectId": "policyholder1"})
+	_, err = contract.ReadSelectiveDisclosurePresentationPrivate(ctx, presentation.ID)
+	requireNoError(t, err)
 
 	setIdentity(ctx, "oracle1-cert", "OracleMSP", "oracle", map[string]string{"subjectId": "oracle1"})
 	private, err := contract.ReadSelectiveDisclosurePresentationPrivate(ctx, presentation.ID)
@@ -1419,6 +1438,9 @@ func TestSelectiveDisclosureCredentialAndPresentationLifecycle(t *testing.T) {
 		t.Fatal("tampered selective disclosure was accepted")
 	}
 
+	setIdentity(ctx, "hospital2-cert", "HospitalMSP", "hospitalOfficer", map[string]string{"subjectId": "hospital2"})
+	_, err = contract.RevokePrivacyCredential(ctx, invoiceCredential.ID)
+	requireError(t, err, "only credential issuer")
 	setIdentity(ctx, "hospital1-cert", "HospitalMSP", "hospitalOfficer", map[string]string{"subjectId": "hospital1"})
 	revoked, err := contract.RevokePrivacyCredential(ctx, invoiceCredential.ID)
 	requireNoError(t, err)
@@ -1432,5 +1454,8 @@ func TestSelectiveDisclosureCredentialAndPresentationLifecycle(t *testing.T) {
 	requireNoError(t, err)
 	if unchanged.Status != "VERIFIED" {
 		t.Fatalf("existing presentation changed after credential revocation: %+v", unchanged)
+	}
+	if err := contract.validatePresentationCredentials(ctx, unchanged, time.Date(2026, 9, 6, 12, 0, 0, 0, time.UTC)); err == nil || !strings.Contains(err.Error(), "inactive") {
+		t.Fatalf("revoked credential remained usable through an old presentation: %v", err)
 	}
 }

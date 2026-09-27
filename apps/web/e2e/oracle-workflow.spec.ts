@@ -195,6 +195,125 @@ test("matching negative Oracle results fall back to fixed four-auditor governanc
   }
 });
 
+test("a revoked credential invalidates an already registered presentation for new Oracle requests", async ({ baseURL }) => {
+  test.setTimeout(120_000);
+  if (!baseURL) throw new Error("Playwright baseURL is required");
+  const suffix = `revoked-${Date.now()}-${Math.floor(Math.random() * 1_000_000)}`;
+  const insurer = await actor(baseURL, "insurer-admin");
+  const policyholder = await actor(baseURL, "policyholder-1");
+  const hospital = await actor(baseURL, "hospital-officer");
+  try {
+    await ensureRegistry(insurer);
+    const claimId = await createHospitalVerifiedClaim(insurer, policyholder, hospital, suffix, hashA, "1".repeat(64));
+    const presentationId = `oracle-presentation-${suffix}`;
+    const before = await (await policyholder.get(`/api/ledger/privacy-presentation/${presentationId}`)).json();
+    expect(before.result.status).toBe("VERIFIED");
+    await command(hospital, { operation: "revokeInvoicePrivacyCredential", id: `oracle-invoice-credential-${suffix}` });
+    const revoked = await (await hospital.get(`/api/ledger/privacy-credential/oracle-invoice-credential-${suffix}`)).json();
+    expect(revoked.result.status).toBe("REVOKED");
+    const blocked = await insurer.post("/api/workflows", { data: {
+      operation: "requestOracleVerification", requestId: `oracle-request-${suffix}`, claimId,
+      snapshotId: "registry-demo-v1", modelVersion: "model-v1", modelHash: hashC,
+      assignedOracleIdsJson: '["oracle1","oracle2","oracle3"]', requiredConfirmations: 2,
+      commitDeadline: new Date(Date.now() + 60_000).toISOString(),
+      revealDeadline: new Date(Date.now() + 120_000).toISOString(),
+    } });
+    expect(blocked.status(), await blocked.text()).toBe(409);
+    const after = await (await policyholder.get(`/api/ledger/privacy-presentation/${presentationId}`)).json();
+    expect(after.result.status).toBe("VERIFIED"); // Historical registration remains an audit fact.
+  } finally {
+    await Promise.all([insurer.dispose(), policyholder.dispose(), hospital.dispose()]);
+  }
+});
+
+test("an insufficient settlement balance records a bounce and can be retried after funding", async ({ baseURL }) => {
+  test.setTimeout(180_000);
+  if (!baseURL) throw new Error("Playwright baseURL is required");
+  const suffix = `settlement-retry-${Date.now()}-${Math.floor(Math.random() * 1_000_000)}`;
+  const insurer = await actor(baseURL, "insurer-admin");
+  const policyholder = await actor(baseURL, "policyholder-1");
+  const hospital = await actor(baseURL, "hospital-officer");
+  const bank = await actor(baseURL, "bank-officer");
+  try {
+    await ensureRegistry(insurer);
+    const claimId = await createHospitalVerifiedClaim(insurer, policyholder, hospital, suffix, hashA, "1".repeat(64));
+    await requestOracle(insurer, claimId, suffix);
+    await waitForClaimStatus(policyholder, claimId, "APPROVED");
+    const sourceAccountId = `oracle-insurer-account-${suffix}`;
+    await command(bank, {
+      operation: "openBankAccount", id: sourceAccountId, bankId: "bank-demo", ownerId: "insurer",
+      accountType: "INSURER", accountLabel: "Settlement retry reserve", maskedAccount: "**** **** 9002",
+      accountTokenHash: createHash("sha256").update(`oracle-insurer-vault-${suffix}`).digest("hex"), openingBalanceMinor: 10_000,
+    });
+    const settlementId = `oracle-settlement-${suffix}`;
+    await command(insurer, { operation: "authorizeSettlement", settlementId, claimId, sourceAccountId, destinationAccountId: "showcase-customer-account" });
+    await command(bank, { operation: "confirmSettlement", settlementId, transferId: `payout-failed-${suffix}`, bankReferenceHash: createHash("sha256").update(`failed-${suffix}`).digest("hex") });
+    const failed = await (await insurer.get(`/api/ledger/settlement/${settlementId}`)).json();
+    expect(failed.result).toMatchObject({ status: "PAYMENT_FAILED", failureCode: "INSUFFICIENT_FUNDS" });
+    await waitForClaimStatus(policyholder, claimId, "SETTLEMENT_AUTHORIZED");
+    await command(bank, { operation: "adjustBankAccountBalance", transferId: `fund-retry-${suffix}`, accountId: sourceAccountId,
+      direction: "CREDIT", amountMinor: 50_000, externalReferenceHash: createHash("sha256").update(`fund-retry-${suffix}`).digest("hex") });
+    await command(bank, { operation: "confirmSettlement", settlementId, transferId: `payout-retry-${suffix}`, bankReferenceHash: createHash("sha256").update(`retry-${suffix}`).digest("hex") });
+    await waitForClaimStatus(policyholder, claimId, "SETTLED");
+    const settled = await (await insurer.get(`/api/ledger/settlement/${settlementId}`)).json();
+    expect(settled.result).toMatchObject({ status: "CONFIRMED", transferId: `payout-retry-${suffix}`, failureCode: "" });
+  } finally {
+    await Promise.all([insurer.dispose(), policyholder.dispose(), hospital.dispose(), bank.dispose()]);
+  }
+});
+
+test("@oracle-majority-wrong two workers sharing a divergent source can reject a valid synthetic claim", async ({ baseURL }) => {
+  test.skip(oracleScenario !== "majority-wrong", "requires two workers with the same divergent source");
+  test.setTimeout(180_000);
+  if (!baseURL) throw new Error("Playwright baseURL is required");
+  const suffix = `majority-wrong-${Date.now()}-${Math.floor(Math.random() * 1_000_000)}`;
+  const insurer = await actor(baseURL, "insurer-admin");
+  const policyholder = await actor(baseURL, "policyholder-1");
+  const hospital = await actor(baseURL, "hospital-officer");
+  try {
+    await ensureRegistry(insurer);
+    const claimId = await createHospitalVerifiedClaim(insurer, policyholder, hospital, suffix, hashA, "1".repeat(64));
+    const requestId = await requestOracle(insurer, claimId, suffix);
+    await waitForClaimStatus(policyholder, claimId, "ORACLE_FAILED");
+    const oracleRequest = await (await insurer.get(`/api/ledger/oracle-request/${requestId}`)).json();
+    expect(oracleRequest.result).toMatchObject({ status: "FAILED", finalizationCode: "NEGATIVE_RESULT", verifiedResult: false, requiredConfirmations: 2 });
+    const results = await (await insurer.get("/api/ledger/oracle-result")).json();
+    const requestResults = results.result.filter((item: { requestId: string }) => item.requestId === requestId);
+    expect(requestResults).toEqual(expect.arrayContaining([
+      expect.objectContaining({ oracleId: "oracle2", verified: false, verificationCode: "REGISTRY_ROOT_MISMATCH" }),
+      expect.objectContaining({ oracleId: "oracle3", verified: false, verificationCode: "REGISTRY_ROOT_MISMATCH" }),
+    ]));
+    expect(requestResults.filter((item: { verificationCode: string }) => item.verificationCode === "REGISTRY_ROOT_MISMATCH").length).toBe(2);
+  } finally {
+    await Promise.all([insurer.dispose(), policyholder.dispose(), hospital.dispose()]);
+  }
+});
+
+test("@oracle-common-source an anchored but externally mislabelled source can yield automatic approval", async ({ baseURL }) => {
+  test.skip(oracleScenario !== "common-source", "requires the common-source counterexample profile");
+  test.setTimeout(120_000);
+  if (!baseURL) throw new Error("Playwright baseURL is required");
+  const suffix = `common-source-${Date.now()}-${Math.floor(Math.random() * 1_000_000)}`;
+  const insurer = await actor(baseURL, "insurer-admin");
+  const policyholder = await actor(baseURL, "policyholder-1");
+  const hospital = await actor(baseURL, "hospital-officer");
+  try {
+    await ensureRegistry(insurer);
+    // This external INVALID label is a synthetic test premise, not a clinical finding.
+    const externalTruth = { lookupHash: "1".repeat(64), status: "INVALID" };
+    const claimId = await createHospitalVerifiedClaim(insurer, policyholder, hospital, suffix, hashA, externalTruth.lookupHash);
+    const requestId = await requestOracle(insurer, claimId, suffix);
+    await waitForClaimStatus(policyholder, claimId, "APPROVED");
+    const oracleRequest = await (await insurer.get(`/api/ledger/oracle-request/${requestId}`)).json();
+    expect(oracleRequest.result).toMatchObject({ status: "CONSENSUS", finalizationCode: "EXACT_CONSENSUS", verifiedResult: true });
+    expect(externalTruth.status).toBe("INVALID");
+    const results = await (await insurer.get("/api/ledger/oracle-result")).json();
+    expect(results.result.filter((item: { requestId: string }) => item.requestId === requestId).filter((item: { verified: boolean }) => item.verified).length).toBeGreaterThanOrEqual(2);
+  } finally {
+    await Promise.all([insurer.dispose(), policyholder.dispose(), hospital.dispose()]);
+  }
+});
+
 test("@oracle-one-unavailable a 2-of-3 quorum succeeds while one Oracle is unavailable", async ({ baseURL }) => {
   test.skip(oracleScenario !== "one-unavailable", "requires the isolated two-worker availability profile");
   test.setTimeout(120_000);

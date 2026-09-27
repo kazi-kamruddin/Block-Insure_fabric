@@ -13,7 +13,7 @@ export async function loadRoleDashboard(session: Session) {
     ledger.listSettlements(),
     ledger.listEvidenceAccessRecords(),
     ledger.listBankMandates(),
-    ledger.listBankAccountReferences(),
+    ["bankOfficer", "insurerAdmin", "policyholder"].includes(session.role) ? ledger.listBankAccountReferences() : Promise.resolve([]),
     ledger.listBankTransfers(),
     ledger.listPremiumPayments(),
     ledger.listPremiumCollections(),

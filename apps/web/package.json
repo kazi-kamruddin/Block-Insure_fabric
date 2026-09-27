@@ -9,7 +9,7 @@
     "start": "node scripts/start-standalone.mjs",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit --incremental false",
-    "test": "vitest run",
+    "test": "vitest run --configLoader runner",
     "test:e2e": "playwright test",
     "check:worker": "node --check scripts/load-environment.mjs && node --check scripts/start-standalone.mjs && node --check scripts/sync-events.mjs && node --check scripts/process-premium-collections.mjs",
     "events:sync": "node scripts/sync-events.mjs",

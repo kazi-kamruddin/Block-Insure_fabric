@@ -60,7 +60,7 @@ function validSemantics(claim, invoice, policy) {
     && claim.incidentDate >= policy.startDate && claim.incidentDate <= policy.endDate;
 }
 
-export function verifySelectiveDisclosurePresentation({ request, claim, publicPresentation, privatePresentation, now = Date.now() }) {
+export function verifySelectiveDisclosurePresentation({ request, claim, publicPresentation, privatePresentation, invoiceCredential, policyCredential, now = Date.now() }) {
   if (!request.privacyPresentationId) return { valid: true, code: "LEGACY_NO_PRESENTATION" };
   if (!publicPresentation || !privatePresentation) return { valid: false, code: "PRIVACY_PRESENTATION_MISSING" };
   if (publicPresentation.id !== request.privacyPresentationId
@@ -76,6 +76,15 @@ export function verifySelectiveDisclosurePresentation({ request, claim, publicPr
   }
   if (now >= Date.parse(publicPresentation.expiresAt) || now >= Date.parse(privatePresentation.expiresAt)) {
     return { valid: false, code: "PRIVACY_PRESENTATION_EXPIRED" };
+  }
+  if (!invoiceCredential || !policyCredential
+    || invoiceCredential.id !== publicPresentation.invoiceCredentialId
+    || policyCredential.id !== publicPresentation.policyCredentialId
+    || invoiceCredential.rootHash !== publicPresentation.invoiceRootHash
+    || policyCredential.rootHash !== publicPresentation.policyRootHash
+    || invoiceCredential.status !== "ACTIVE" || policyCredential.status !== "ACTIVE"
+    || now >= Date.parse(invoiceCredential.expiresAt) || now >= Date.parse(policyCredential.expiresAt)) {
+    return { valid: false, code: "PRIVACY_CREDENTIAL_INACTIVE" };
   }
   const serialized = JSON.stringify(privatePresentation);
   const presentationHash = createHash("sha256").update(serialized, "utf8").digest("hex");

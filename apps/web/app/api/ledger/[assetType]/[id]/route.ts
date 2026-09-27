@@ -242,6 +242,9 @@ export async function GET(_request: Request, context: RouteContext) {
         break;
       }
       case "account": {
+        if (!["bankOfficer", "insurerAdmin", "policyholder"].includes(session.role)) {
+          return NextResponse.json({ message: "Private Bank accounts are visible only to the Bank, insurer, and owning policyholder" }, { status: 403 });
+        }
         const account = await ledger.readBankAccountReference(id);
         if (session.role === "policyholder" && account.ownerId !== session.subjectId) return NextResponse.json({ message: "Asset is not owned by this account" }, { status: 403 });
         result = account;

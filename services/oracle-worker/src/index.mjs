@@ -149,6 +149,12 @@ async function processRequest(requestId) {
     request.privacyPresentationId ? evaluate("ReadSelectiveDisclosurePresentation", request.privacyPresentationId) : Promise.resolve(null),
     request.privacyPresentationId ? evaluate("ReadSelectiveDisclosurePresentationPrivate", request.privacyPresentationId) : Promise.resolve(null),
   ]);
+  const [invoiceCredential, policyCredential] = publicPresentation
+    ? await Promise.all([
+      evaluate("ReadPrivacyCredential", publicPresentation.invoiceCredentialId),
+      evaluate("ReadPrivacyCredential", publicPresentation.policyCredentialId),
+    ])
+    : [null, null];
   const requestRegistry = await registryForRequest(request);
   if (claim.version !== request.claimVersion || claim.currentOracleRequestId !== request.id) {
     await updateHealth({ status: "ONLINE", lastProcessedRequestId: request.id, lastError: `Stale request rejected for claim ${request.claimId}` });
@@ -173,7 +179,7 @@ async function processRequest(requestId) {
     configuredModelHash: config.modelHash,
   });
   const privacyAssessment = privacy.verifySelectiveDisclosurePresentation({
-    request, claim, publicPresentation, privatePresentation,
+    request, claim, publicPresentation, privatePresentation, invoiceCredential, policyCredential,
   });
   if (!privacyAssessment.valid) {
     assessment = {

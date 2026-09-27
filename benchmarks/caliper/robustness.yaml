@@ -1,0 +1,46 @@
+test:
+  name: block-insure-robustness
+  description: Five policy and Hospital invoice fixtures with reversed and shuffled offered rates
+  workers:
+    number: 2
+  rounds:
+    - label: claim-submit-80-tps-first
+      txNumber: 200
+      rateControl: { type: fixed-rate, opts: { tps: 80 } }
+      workload: { module: ./benchmarks/caliper/workload/claim-submit.cjs, arguments: { contractId: insurance-contract, fixtureCount: 5 } }
+    - label: claim-submit-20-tps
+      txNumber: 200
+      rateControl: { type: fixed-rate, opts: { tps: 20 } }
+      workload: { module: ./benchmarks/caliper/workload/claim-submit.cjs, arguments: { contractId: insurance-contract, fixtureCount: 5 } }
+    - label: claim-submit-40-tps
+      txNumber: 200
+      rateControl: { type: fixed-rate, opts: { tps: 40 } }
+      workload: { module: ./benchmarks/caliper/workload/claim-submit.cjs, arguments: { contractId: insurance-contract, fixtureCount: 5 } }
+    - label: claim-submit-5-tps
+      txNumber: 200
+      rateControl: { type: fixed-rate, opts: { tps: 5 } }
+      workload: { module: ./benchmarks/caliper/workload/claim-submit.cjs, arguments: { contractId: insurance-contract, fixtureCount: 5 } }
+    - label: claim-submit-10-tps
+      txNumber: 200
+      rateControl: { type: fixed-rate, opts: { tps: 10 } }
+      workload: { module: ./benchmarks/caliper/workload/claim-submit.cjs, arguments: { contractId: insurance-contract, fixtureCount: 5 } }
+    - label: mixed-policy-claim-40-tps-first
+      txNumber: 200
+      rateControl: { type: fixed-rate, opts: { tps: 40 } }
+      workload: { module: ./benchmarks/caliper/workload/mixed-policy-claim.cjs, arguments: { contractId: insurance-contract, fixtureCount: 5 } }
+    - label: mixed-policy-claim-10-tps
+      txNumber: 200
+      rateControl: { type: fixed-rate, opts: { tps: 10 } }
+      workload: { module: ./benchmarks/caliper/workload/mixed-policy-claim.cjs, arguments: { contractId: insurance-contract, fixtureCount: 5 } }
+    - label: mixed-policy-claim-80-tps
+      txNumber: 200
+      rateControl: { type: fixed-rate, opts: { tps: 80 } }
+      workload: { module: ./benchmarks/caliper/workload/mixed-policy-claim.cjs, arguments: { contractId: insurance-contract, fixtureCount: 5 } }
+    - label: mixed-policy-claim-5-tps
+      txNumber: 200
+      rateControl: { type: fixed-rate, opts: { tps: 5 } }
+      workload: { module: ./benchmarks/caliper/workload/mixed-policy-claim.cjs, arguments: { contractId: insurance-contract, fixtureCount: 5 } }
+    - label: mixed-policy-claim-20-tps
+      txNumber: 200
+      rateControl: { type: fixed-rate, opts: { tps: 20 } }
+      workload: { module: ./benchmarks/caliper/workload/mixed-policy-claim.cjs, arguments: { contractId: insurance-contract, fixtureCount: 5 } }

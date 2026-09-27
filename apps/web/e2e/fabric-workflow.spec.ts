@@ -56,6 +56,10 @@ test("five organization sessions complete a Fabric insurance workflow", async ({
       accountTokenHash: createHash("sha256").update(`e2e-insurer-vault-${suffix}`).digest("hex"),
       openingBalanceMinor: 500_000,
     });
+    const auditorAccount = await auditor.get(`/api/ledger/account/${ids.insurerAccount}`);
+    expect(auditorAccount.status()).toBe(403);
+    const auditorAccounts = await auditor.get("/api/ledger/account");
+    expect(auditorAccounts.status()).toBe(403);
     await command(insurer, {
       operation: "createPolicyPackage", id: ids.package, name: "Browser Regression Plan",
       description: "Playwright multi-organization workflow", premiumMinor: 10_000,
@@ -112,6 +116,9 @@ test("five organization sessions complete a Fabric insurance workflow", async ({
       { claimId: ids.claim, evidenceId: ids.evidence },
     );
     expect(new TextDecoder().decode(downloadedPlaintext)).toBe(`private-e2e-evidence-${suffix}`);
+    const tamperedEnvelope = new Uint8Array(await ownerEvidence.body());
+    tamperedEnvelope[tamperedEnvelope.length - 1] ^= 1;
+    await expect(decryptEvidenceBytes(tamperedEnvelope, evidencePassphrase, { claimId: ids.claim, evidenceId: ids.evidence })).rejects.toThrow();
 
     const sharedEvidence = await auditor.post(`/api/evidence/${ids.evidence}`, { data: { grantId: ids.grant } });
     expect(sharedEvidence.ok(), await sharedEvidence.text()).toBe(true);
@@ -260,6 +267,8 @@ test("rejected claim requires a committed correction, matching Hospital invoice,
     const duplicate = await auditors[0].post("/api/workflows", { data: { operation: "recordAuditorDecision", reviewId: review1, decisionId: `decision-r1-duplicate-${suffix}`, outcome: "REJECT", reasonHash: hashA } });
     expect(duplicate.status()).toBe(409);
     await command(auditors[1], { operation: "recordAuditorDecision", reviewId: review1, decisionId: `decision-r1-a2-${suffix}`, outcome: "REJECT", reasonHash: hashA });
+    const lateVote = await auditors[2].post("/api/workflows", { data: { operation: "recordAuditorDecision", reviewId: review1, decisionId: `decision-r1-late-${suffix}`, outcome: "APPROVE", reasonHash: hashA } });
+    expect(lateVote.status(), await lateVote.text()).toBe(409);
     await command(hospital, { operation: "createHospitalInvoice", id: correctedInvoiceId, patientReferenceHash: hashA, invoiceReferenceHash: "1".repeat(64), treatmentHash: hashB, amountMinor: 50_000, admissionDate: "2026-06-10", dischargeDate: "2026-06-20", status: "FINALIZED" });
     await command(policyholder, {
       operation: "submitClaimAppeal", appealId, claimId, reasonCategory: "DOCUMENT_ERROR",
@@ -321,7 +330,8 @@ test("policy, premium, mandate, benefit, and banking lifecycles complete across 
     transfer1: `lifecycle-transfer-1-${suffix}`, transfer2: `lifecycle-transfer-2-${suffix}`, transfer3: `lifecycle-transfer-3-${suffix}`,
     payment1: `lifecycle-payment-1-${suffix}`, payment2: `lifecycle-payment-2-${suffix}`,
     payment3: `lifecycle-payment-3-${suffix}`, adjustment: `lifecycle-adjustment-${suffix}`,
-    collection: `lifecycle-collection-${suffix}`, benefit: `lifecycle-benefit-${suffix}`,
+    collection: `lifecycle-collection-${suffix}`, collectionApril: `lifecycle-collection-april-${suffix}`,
+    collectionBounce: `lifecycle-collection-bounce-${suffix}`, benefit: `lifecycle-benefit-${suffix}`,
   };
   const insurer = await actor(baseURL, "insurer-admin");
   const policyholder = await actor(baseURL, "policyholder-1");
@@ -358,6 +368,10 @@ test("policy, premium, mandate, benefit, and banking lifecycles complete across 
 
     await command(insurer, { operation: "queuePremiumCollection", id: ids.collection, mandateId: ids.mandate, dueDate: "2026-01-31" });
     await command(bank, { operation: "processPremiumCollection", collectionId: ids.collection, paymentId: ids.payment2, transferId: ids.transfer2, destinationAccountId: ids.insurerAccount, periodEndDate: "2026-03-01", externalReferenceHash: digest("eft-receipt") });
+    const replayedCollection = await bank.post("/api/workflows", { data: { operation: "processPremiumCollection", collectionId: ids.collection, paymentId: ids.payment2, transferId: ids.transfer2, destinationAccountId: ids.insurerAccount, periodEndDate: "2026-03-01", externalReferenceHash: digest("eft-receipt") } });
+    expect(replayedCollection.status(), await replayedCollection.text()).toBe(409);
+    const completedCollection = await (await bank.get(`/api/ledger/collection/${ids.collection}`)).json();
+    expect(completedCollection.result).toMatchObject({ status: "COMPLETED", attemptCount: 1, paymentId: ids.payment2, transferId: ids.transfer2 });
     await command(bank, { operation: "recordPremiumAdjustment", id: ids.adjustment, paymentId: ids.payment2, amountMinor: 2_000, externalReferenceHash: digest("reversal"), reasonHash: digest("reversal-reason") });
 
     await command(policyholder, { operation: "submitBenefitRequest", id: ids.benefit, policyId: ids.policy, benefitType: "DEATH", eventDate: "2026-06-15", evidenceHash: digest("benefit-evidence") });
@@ -376,12 +390,18 @@ test("policy, premium, mandate, benefit, and banking lifecycles complete across 
       periodStartDate: "2026-03-02", periodEndDate: "2026-03-31", amountMinor: 10_000, externalReferenceHash: digest("reinstatement-receipt"),
     } });
     expect(reinstatementPayment.ok(), await reinstatementPayment.text()).toBe(true);
+    await command(insurer, { operation: "queuePremiumCollection", id: ids.collectionApril, mandateId: ids.mandate, dueDate: "2026-04-01" });
+    await command(bank, { operation: "processPremiumCollection", collectionId: ids.collectionApril, paymentId: `payment-april-${suffix}`, transferId: `transfer-april-${suffix}`, destinationAccountId: ids.insurerAccount, periodEndDate: "2026-04-30", externalReferenceHash: digest("eft-april") });
+    await command(insurer, { operation: "queuePremiumCollection", id: ids.collectionBounce, mandateId: ids.mandate, dueDate: "2026-05-01" });
+    await command(bank, { operation: "processPremiumCollection", collectionId: ids.collectionBounce, paymentId: `payment-bounce-${suffix}`, transferId: `transfer-bounce-${suffix}`, destinationAccountId: ids.insurerAccount, periodEndDate: "2026-05-30", externalReferenceHash: digest("eft-bounce") });
+    const bouncedCollection = await (await bank.get(`/api/ledger/collection/${ids.collectionBounce}`)).json();
+    expect(bouncedCollection.result).toMatchObject({ status: "BOUNCED", failureCode: "INSUFFICIENT_FUNDS", attemptCount: 1, paymentId: "" });
     await command(insurer, { operation: "advancePolicyLifecycle", id: ids.policy, asOfDate: "2026-12-31" });
     await command(policyholder, { operation: "renewPolicy", newId: ids.renewal, existingId: ids.policy, newEndDate: "2027-12-31" });
     await command(policyholder, { operation: "cancelPolicy", id: ids.renewal, reasonHash: digest("renewal-cancel") });
 
     const policyResponse = await policyholder.get(`/api/ledger/policy/${ids.policy}`);
-    expect((await policyResponse.json()).result).toMatchObject({ id: ids.policy, status: "EXPIRED", paidThroughDate: "2026-03-31" });
+    expect((await policyResponse.json()).result).toMatchObject({ id: ids.policy, status: "EXPIRED", paidThroughDate: "2026-04-30" });
     const renewalResponse = await policyholder.get(`/api/ledger/policy/${ids.renewal}`);
     expect((await renewalResponse.json()).result).toMatchObject({ id: ids.renewal, status: "CANCELLED", renewedFromPolicyId: ids.policy });
     const benefitResponse = await policyholder.get(`/api/ledger/benefit-request/${ids.benefit}`);
@@ -390,11 +410,11 @@ test("policy, premium, mandate, benefit, and banking lifecycles complete across 
     expect((await liabilityResponse.json()).result).toMatchObject({ sourceId: ids.benefit, status: "PAID" });
     const statementResponse = await policyholder.get(`/api/policies/${ids.policy}/statement`);
     expect(statementResponse.ok(), await statementResponse.text()).toBe(true);
-    expect((await statementResponse.json()).summary).toMatchObject({ grossPremiumMinor: 30_000, adjustedPremiumMinor: 2_000, netPremiumMinor: 28_000 });
+    expect((await statementResponse.json()).summary).toMatchObject({ grossPremiumMinor: 40_000, adjustedPremiumMinor: 2_000, netPremiumMinor: 38_000 });
     const customerAccount = await (await policyholder.get(`/api/ledger/account/${ids.account}`)).json();
     const insurerAccount = await (await bank.get(`/api/ledger/account/${ids.insurerAccount}`)).json();
-    expect(customerAccount.result.balanceMinor).toBe(12_000);
-    expect(insurerAccount.result.balanceMinor).toBe(28_000);
+    expect(customerAccount.result.balanceMinor).toBe(2_000);
+    expect(insurerAccount.result.balanceMinor).toBe(38_000);
   } finally {
     await Promise.all([insurer.dispose(), policyholder.dispose(), bank.dispose()]);
   }

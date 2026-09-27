@@ -86,6 +86,10 @@ export async function executeWorkflowCommand(command: WorkflowCommand, session: 
       return ledger.issueInvoicePrivacyCredential(command, findDemoAccount(session.accountId)?.fabricUserName);
     case "issuePolicyPrivacyCredential":
       return ledger.issuePolicyPrivacyCredential(command);
+    case "revokeInvoicePrivacyCredential":
+      return ledger.revokeInvoicePrivacyCredential(command.id, findDemoAccount(session.accountId)?.fabricUserName);
+    case "revokePolicyPrivacyCredential":
+      return ledger.revokePolicyPrivacyCredential(command.id);
     case "registerClaimPrivacyPresentation":
       return ledger.registerClaimPrivacyPresentation(command);
     case "publishEvidenceMerkleBatch": {
