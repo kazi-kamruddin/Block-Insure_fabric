@@ -67,7 +67,7 @@ The launcher uses the Linux Docker CLI when its WSL socket is available and
 falls back to Docker Desktop's `docker.exe` integration when necessary.
 
 Host ports are `7051`, `8051`, `9051`, `12051`, and `13051` for the five peers;
-`7054`, `8054`, `9054`, `12054`, `13054`, and `11054` for the CAs; and `5984`, `6984`,
+`7054`, `8054`, `9054`, `12054`, `13054`, and `14054` for the CAs; and `5984`, `6984`,
 `7984`, `8984`, and `10084` for CouchDB. Credentials embedded in Compose are strictly
 local development defaults and must not be reused outside this disposable
 network.

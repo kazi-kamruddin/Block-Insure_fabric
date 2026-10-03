@@ -231,7 +231,7 @@ hospital 8054 ca-hospital
 auditor 9054 ca-auditor
 bank 12054 ca-bank
 oracle 13054 ca-oracle
-orderer 11054 ca-orderer
+orderer 14054 ca-orderer
 EOF
 
   for port in 5984 6984 7984 8984 10084; do

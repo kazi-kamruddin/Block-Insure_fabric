@@ -3,12 +3,13 @@ param(
     [Parameter(Position = 0)]
     [ValidateSet("Preflight", "Start", "Status", "Stop", "CleanBootstrap")]
     [string]$Action = "Status",
-    [ValidateSet("Baseline", "Conflict", "Oracle2Unavailable", "QuorumUnavailable")]
+    [ValidateSet("Baseline", "Conflict", "Oracle2Unavailable", "Oracle3Unavailable", "QuorumUnavailable")]
     [string]$OracleScenario = "Baseline",
     [switch]$ConfirmReset,
     [switch]$Development,
     [switch]$KeepNetwork,
-    [switch]$ExistingNetwork
+    [switch]$ExistingNetwork,
+    [switch]$LowMemory
 )
 
 $ErrorActionPreference = "Stop"
@@ -87,6 +88,12 @@ function Start-ManagedProcess {
 }
 
 function Invoke-Preflight {
+    if ($LowMemory -and -not $ExistingNetwork) {
+        throw "-LowMemory requires -ExistingNetwork; it only checks a preserved Fabric runtime."
+    }
+    if ($LowMemory -and $env:FABRIC_CHANNEL_NAME -ne "insurance-phase2-hardening-20260927") {
+        throw "-LowMemory requires FABRIC_CHANNEL_NAME=insurance-phase2-hardening-20260927."
+    }
     Write-Host "Checking Docker Desktop, source dependencies, and local configuration..." -ForegroundColor Cyan
     & docker info --format "Docker {{.ServerVersion}} is ready"
     if ($LASTEXITCODE -ne 0) { throw "Docker Desktop is not ready." }
@@ -94,13 +101,17 @@ function Invoke-Preflight {
     & npm --version
     if ($ExistingNetwork) {
         $expectedContainers = @(
-            "ca.insurer.blockinsure.test", "ca.hospital.blockinsure.test", "ca.auditor.blockinsure.test",
-            "ca.bank.blockinsure.test", "ca.oracle.blockinsure.test", "ca.orderer.blockinsure.test",
             "orderer.blockinsure.test", "peer0.insurer.blockinsure.test", "peer0.hospital.blockinsure.test",
             "peer0.auditor.blockinsure.test", "peer0.bank.blockinsure.test", "peer0.oracle.blockinsure.test",
             "couchdb.insurer.blockinsure.test", "couchdb.hospital.blockinsure.test",
             "couchdb.auditor.blockinsure.test", "couchdb.bank.blockinsure.test", "couchdb.oracle.blockinsure.test"
         )
+        if (-not $LowMemory) {
+            $expectedContainers += @(
+                "ca.insurer.blockinsure.test", "ca.hospital.blockinsure.test", "ca.auditor.blockinsure.test",
+                "ca.bank.blockinsure.test", "ca.oracle.blockinsure.test", "ca.orderer.blockinsure.test"
+            )
+        }
         $runningContainers = @(& docker ps --filter "network=block-insure" --format "{{.Names}}")
         if ($LASTEXITCODE -ne 0) { throw "Docker could not list the existing Fabric network." }
         $missingContainers = @($expectedContainers | Where-Object { $_ -notin $runningContainers })
@@ -137,7 +148,7 @@ function Start-DemoStack {
     if ($OracleScenario -in "Oracle2Unavailable", "QuorumUnavailable" -and (Test-HttpHealth "http://127.0.0.1:3302/health")) {
         throw "Oracle 2 is already running outside this managed stack. Stop it before demonstrating unavailability."
     }
-    if ($OracleScenario -eq "QuorumUnavailable" -and (Test-HttpHealth "http://127.0.0.1:3303/health")) {
+    if ($OracleScenario -in "Oracle3Unavailable", "QuorumUnavailable" -and (Test-HttpHealth "http://127.0.0.1:3303/health")) {
         throw "Oracle 3 is already running outside this managed stack. Stop it before demonstrating quorum loss."
     }
     $oracle2Environment = if ($OracleScenario -eq "Conflict") { ".env.oracle2-conflict.example" } else { ".env.oracle2.example" }
@@ -166,7 +177,7 @@ function Start-DemoStack {
     if ($OracleScenario -notin "Oracle2Unavailable", "QuorumUnavailable") {
         $records += Start-ManagedProcess "oracle2" $oracleRoot @("src/index.mjs", "--env=$oracle2Environment")
     }
-    if ($OracleScenario -ne "QuorumUnavailable") {
+    if ($OracleScenario -notin "Oracle3Unavailable", "QuorumUnavailable") {
         $records += Start-ManagedProcess "oracle3" $oracleRoot @("src/index.mjs", "--env=$oracle3Environment")
     }
     $records | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $processPath -Encoding utf8
@@ -176,8 +187,8 @@ function Start-DemoStack {
         $healthy = ($records | Where-Object { Test-ManagedProcess $_ }).Count -eq $records.Count -and
             (Test-HttpHealth "http://127.0.0.1:3301/health") -and
             ($OracleScenario -in "Oracle2Unavailable", "QuorumUnavailable" -or (Test-HttpHealth "http://127.0.0.1:3302/health")) -and
-            ($OracleScenario -eq "QuorumUnavailable" -or (Test-HttpHealth "http://127.0.0.1:3303/health")) -and
-            ($OracleScenario -in "Oracle2Unavailable", "QuorumUnavailable" -or (Test-HttpHealth "http://127.0.0.1:3000/api/health/ready"))
+            ($OracleScenario -in "Oracle3Unavailable", "QuorumUnavailable" -or (Test-HttpHealth "http://127.0.0.1:3303/health")) -and
+            ($OracleScenario -in "Oracle2Unavailable", "Oracle3Unavailable", "QuorumUnavailable" -or (Test-HttpHealth "http://127.0.0.1:3000/api/health/ready"))
         if (-not $healthy) { Start-Sleep -Seconds 1 }
     } until ($healthy -or [DateTimeOffset]::UtcNow -ge $deadline)
     if (-not $healthy) {

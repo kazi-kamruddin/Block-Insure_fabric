@@ -1,7 +1,8 @@
 import { defineConfig, devices } from "@playwright/test";
 
 const port = 3200;
-const baseURL = `http://127.0.0.1:${port}`;
+const externalBaseURL = process.env.PLAYWRIGHT_BASE_URL;
+const baseURL = externalBaseURL ?? `http://127.0.0.1:${port}`;
 const oracleScenario = process.env.ORACLE_E2E_SCENARIO ?? "baseline";
 const oracle2Environment = oracleScenario === "conflict" || oracleScenario === "majority-wrong"
   ? "../../services/oracle-worker/.env.oracle2-conflict.example"
@@ -52,7 +53,7 @@ export default defineConfig({
     screenshot: "only-on-failure",
   },
   webServer: [
-    {
+    ...(externalBaseURL ? [] : [{
       command: "npm run start",
       url: `${baseURL}/api/health`,
       reuseExistingServer: false,
@@ -68,7 +69,7 @@ export default defineConfig({
         FABRIC_EVENT_SYNC_DEADLINE_SECONDS: "5",
         FABRIC_EVALUATE_DEADLINE_SECONDS: "15",
       },
-    },
+    }]),
     ...oracleServers,
   ],
 });

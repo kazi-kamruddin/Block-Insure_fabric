@@ -30,18 +30,36 @@ same channel and healthy endpoints. Use `localhost` in the browser: local
 in Edge at desktop and phone widths. See
 `docs/results/hardening-live-20261003.md` for the verification record.
 
-To restart this same current-source display from the repository root in
-PowerShell after a stop, set the channel and separate local worker-data roots
-in that terminal before starting the supervisor:
+### Low-memory restart on this 8 GB Windows host
+
+The full 17-service `network.sh up` path checks the older main channel and can
+launch three legacy chaincode versions on every peer. For a supervisor display
+of the already deployed hardening channel, use the preserved-state Windows path
+below from the repository root. It starts the orderer, five CouchDBs, five peers,
+and the five current hardening runtimes in stages, stopping legacy runtimes as
+they appear. The six CAs stay stopped because the demo identities are already
+enrolled. No channel, volume, identity, or evidence file is removed.
 
 ```powershell
+.\scripts\low-memory-network.ps1 Start
 $env:FABRIC_CHANNEL_NAME = 'insurance-phase2-hardening-20260927'
 $env:ORACLE_STATE_ROOT = Join-Path (Get-Location) 'data/oracle-hardening'
 $env:EVENT_PROJECTION_ROOT = Join-Path (Get-Location) 'data/events-hardening'
 $env:EVIDENCE_STORAGE_ROOT = Join-Path (Get-Location) 'data/evidence-hardening'
-.\scripts\demo-stack.ps1 Start -ExistingNetwork
+.\scripts\demo-stack.ps1 Start -ExistingNetwork -LowMemory
 .\scripts\demo-stack.ps1 Status
 ```
+
+`low-memory-network.ps1 Status` checks that the 11 transaction services and five
+current chaincode runtimes are running and no legacy runtime remains. The web
+and worker health endpoints then check the actual Gateway and Oracle path.
+`demo-stack.ps1 Stop -ExistingNetwork` stops managed app processes while
+retaining Fabric. Start the baseline Oracle profile again after any fault demo.
+This profile cannot enroll new identities until the CAs are started. Do not use
+`network.sh verify` during the low-memory presentation: it checks the old main
+channel and can restart legacy runtimes. The prior full-topology and package
+audit remain separate dated evidence; this profile must pass its own health and
+live workflow checks.
 
 Do not omit the channel variable when restarting: local `.env.local` defaults to
 the older `insurance-channel` 1.4.0 definition. `Stop -ExistingNetwork` stops
@@ -68,13 +86,17 @@ cause, but the exact timeout cause is unproven. For a quick check from PowerShel
 
 ```powershell
 wsl.exe -d Ubuntu -- /bin/echo WSL_OK
-.\scripts\demo-stack.ps1 Preflight
+$env:FABRIC_CHANNEL_NAME = 'insurance-phase2-hardening-20260927'
+.\scripts\low-memory-network.ps1 Status
+.\scripts\demo-stack.ps1 Preflight -ExistingNetwork -LowMemory
 .\scripts\demo-stack.ps1 Status
 ```
 
 If Ubuntu times out again, check Windows available memory and the number of
-running experiment chaincode containers. Preserve the main 1.4.0 chaincode and
-17 core Fabric containers for the baseline presentation. `wsl --shutdown`
+running experiment chaincode containers. The current-channel low-memory path
+above can use the Windows Docker CLI without Ubuntu. Preserve the main 1.4.0
+ledger and all core container volumes for any later baseline verification.
+`wsl --shutdown`
 also stops Docker Desktop's WSL distribution, so first stop the demo gracefully
 and use that global reset only when a Docker interruption is acceptable.
 
