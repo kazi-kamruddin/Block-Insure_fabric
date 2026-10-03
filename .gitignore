@@ -12,6 +12,9 @@ coverage/
 /data/evidence-phase2/
 /data/events-phase2/
 /data/oracle-phase2/
+/data/evidence-hardening/
+/data/events-hardening/
+/data/oracle-hardening/
 /data/evidence-phase1/
 /data/events-phase1/
 /data/oracle-phase1/
@@ -21,6 +24,8 @@ coverage/
 /apps/web/playwright-report/
 /verification-results/*.json
 /verification-results/phase1-playwright/
+/verification-results/hardening-playwright/
+/verification-results/supervisor-*.png
 /verification-results/phase1-playwright/
 /benchmarks/caliper/generated/
 /benchmarks/caliper/reports/

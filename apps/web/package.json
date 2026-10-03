@@ -16,10 +16,10 @@
     "banking:collect": "node scripts/process-premium-collections.mjs"
   },
   "dependencies": {
-    "@grpc/grpc-js": "1.14.4",
+    "@grpc/grpc-js": "1.14.5",
     "@hyperledger/fabric-gateway": "1.12.1",
-    "@next/env": "16.3.4",
-    "next": "16.3.4",
+    "@next/env": "16.3.8",
+    "next": "16.3.8",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "server-only": "0.0.1",
@@ -32,7 +32,7 @@
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.7",
     "eslint": "^9.0.0",
-    "eslint-config-next": "16.3.4",
+    "eslint-config-next": "16.3.8",
     "typescript": "^5.9.0",
     "vitest": "^5.0.0"
   },

@@ -7,13 +7,104 @@ WSL2, Docker Desktop, Fabric, Go, and Node prerequisites are already available.
 
 ## 1. Confirm the network and contract
 
+**Current-source note (2 October 2026):** the archived 1.4.0 package differs
+from current `oracle.go` and `privacy.go`. A successful `Preflight` or an existing
+1.4.0 definition does not establish that the later privacy hardening is live.
+`deploy-chaincode.sh` now audits the existing package when the same version is
+already committed and fails if it differs from current source. Use an
+isolated channel and a new chaincode version, then audit package/source equality
+before demonstrating current-source revocation or finalization behavior. The
+2 October live startup attempt stopped at a peer timeout followed by Docker/WSL
+errors. A later manual web/three-Oracle start reached ready health and passed
+read-only browser smoke checks; it did not exercise current-source ledger writes.
+Consult `.project-context/03_CURRENT_STATE.md` for the dated check.
+
+**Current supervisor setup (3 October 2026):** the isolated
+`insurance-phase2-hardening-20260927` channel now runs audited current-source
+chaincode 1.4.1-hardening. All 17 steps of the full gate and a private-collection
+access probe passed there. The managed app and workers are currently running on
+that channel at **`http://localhost:3000/showcase`**; `Status` should print the
+same channel and healthy endpoints. Use `localhost` in the browser: local
+`APP_ORIGIN` is `http://localhost:3000`, so interactive sign-in from
+`127.0.0.1:3000` fails the exact-origin check. The corrected showcase was checked
+in Edge at desktop and phone widths. See
+`docs/results/hardening-live-20261003.md` for the verification record.
+
+To restart this same current-source display from the repository root in
+PowerShell after a stop, set the channel and separate local worker-data roots
+in that terminal before starting the supervisor:
+
+```powershell
+$env:FABRIC_CHANNEL_NAME = 'insurance-phase2-hardening-20260927'
+$env:ORACLE_STATE_ROOT = Join-Path (Get-Location) 'data/oracle-hardening'
+$env:EVENT_PROJECTION_ROOT = Join-Path (Get-Location) 'data/events-hardening'
+$env:EVIDENCE_STORAGE_ROOT = Join-Path (Get-Location) 'data/evidence-hardening'
+.\scripts\demo-stack.ps1 Start -ExistingNetwork
+.\scripts\demo-stack.ps1 Status
+```
+
+Do not omit the channel variable when restarting: local `.env.local` defaults to
+the older `insurance-channel` 1.4.0 definition. `Stop -ExistingNetwork` stops
+only managed app processes and keeps Fabric and both channel ledgers. For a
+short read-only evidence route, sign in as **Insurer Administrator**, choose
+**Export claim dossier**, and use these verified IDs:
+
+| Story | Claim ID | Expected result |
+| --- | --- | --- |
+| Exact Oracle agreement | `oracle-claim-success-1790963976036-156657` | `SETTLED`, `EXACT_CONSENSUS`, no review |
+| Negative Oracle result | `oracle-claim-negative-1790964023922-422178` | `SETTLED`, `NEGATIVE_RESULT`, one review |
+| Divergent Oracle result | `oracle-claim-conflict-1790964210145-643870` | `SETTLED`, `CONFLICT`, one review |
+
+These are synthetic test assets on the hardening channel. Use unique IDs for
+any new live transaction. Host available memory was low during verification;
+close unnecessary applications and avoid running the full gate during the talk.
+
+Ubuntu WSL later recovered without a configuration change. It had intermittently
+timed out with `Wsl/Service/0x8007274c` while Windows had roughly 0.5–0.9 GiB
+available memory and seven old experiment chaincode containers were running.
+After those seven containers were stopped, repeated Ubuntu commands, normal
+preflight, and `network.sh verify` passed. Resource pressure is a plausible
+cause, but the exact timeout cause is unproven. For a quick check from PowerShell:
+
+```powershell
+wsl.exe -d Ubuntu -- /bin/echo WSL_OK
+.\scripts\demo-stack.ps1 Preflight
+.\scripts\demo-stack.ps1 Status
+```
+
+If Ubuntu times out again, check Windows available memory and the number of
+running experiment chaincode containers. Preserve the main 1.4.0 chaincode and
+17 core Fabric containers for the baseline presentation. `wsl --shutdown`
+also stops Docker Desktop's WSL distribution, so first stop the demo gracefully
+and use that global reset only when a Docker interruption is acceptable.
+
+When all 17 core Fabric containers are already running but Ubuntu WSL cannot
+start, use the supervisor's existing-network path for the **baseline** demo:
+
+```powershell
+.\scripts\demo-stack.ps1 Preflight -ExistingNetwork
+.\scripts\demo-stack.ps1 Start -ExistingNetwork
+.\scripts\demo-stack.ps1 Status
+# After the presentation:
+.\scripts\demo-stack.ps1 Stop -ExistingNetwork
+```
+
+This validates the running container set and starts the web, event, banking,
+and three Oracle processes without invoking WSL. `Stop -ExistingNetwork` leaves
+Fabric containers and ledger volumes running. The option cannot create a
+channel, deploy changed chaincode, or substitute for the current-source live
+verification gate.
+
 From Ubuntu WSL at the repository root:
 
 ```bash
 bash network/scripts/network.sh up
-bash network/scripts/deploy-chaincode.sh
 bash network/scripts/network.sh verify
 ```
+
+The commands above check the preserved **baseline** channel. The hardening
+channel has already been created, deployed, audited, and live-tested as recorded
+above. Do not reuse the preserved 1.4.0 definition for current-source claims.
 
 The verifier should report 17 healthy services, six reachable CAs, five ready
 CouchDB instances, all five peers joined to `insurance-channel`, all three Oracle

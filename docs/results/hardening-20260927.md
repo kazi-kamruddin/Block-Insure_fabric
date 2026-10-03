@@ -1,5 +1,9 @@
 # Hardening follow-up — 2026-09-27
 
+**Later result:** the isolated current-source deployment and full live gate
+passed on 3 October 2026. See `hardening-live-20261003.md`. The verification
+limits below describe what was still pending on 27 September.
+
 This work follows the Phase 2 study. It changes the current source tree but does not revise the historical Phase 2 measurements. The preserved `insurance-channel` and `insurance-phase2-20260926` ledgers were not written during this follow-up.
 
 ## Implemented

@@ -103,5 +103,17 @@ export function buildPrivacyFixture() {
     privacyPresentationHash: presentationHash,
     privacyProtocolVersion: PRIVACY_PROTOCOL_VERSION,
   };
-  return { claim, publicPresentation, privatePresentation, requestBinding };
+  const invoiceCredential = {
+    id: invoiceCredentialId,
+    rootHash: invoice.rootHash,
+    status: "ACTIVE",
+    expiresAt: privatePresentation.expiresAt,
+  };
+  const policyCredential = {
+    id: policyCredentialId,
+    rootHash: policy.rootHash,
+    status: "ACTIVE",
+    expiresAt: privatePresentation.expiresAt,
+  };
+  return { claim, publicPresentation, privatePresentation, requestBinding, invoiceCredential, policyCredential };
 }

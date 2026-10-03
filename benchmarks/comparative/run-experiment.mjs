@@ -125,6 +125,8 @@ const configurations = [
           claim: privacyClaim,
           publicPresentation: privacyFixture.publicPresentation,
           privatePresentation: privacyFixture.privatePresentation,
+          invoiceCredential: privacyFixture.invoiceCredential,
+          policyCredential: privacyFixture.policyCredential,
           now: Date.parse("2026-09-19T00:00:00Z"),
         });
         if (!proof.valid) throw new Error(`benchmark privacy fixture failed: ${proof.code}`);

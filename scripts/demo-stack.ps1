@@ -7,7 +7,8 @@ param(
     [string]$OracleScenario = "Baseline",
     [switch]$ConfirmReset,
     [switch]$Development,
-    [switch]$KeepNetwork
+    [switch]$KeepNetwork,
+    [switch]$ExistingNetwork
 )
 
 $ErrorActionPreference = "Stop"
@@ -86,14 +87,32 @@ function Start-ManagedProcess {
 }
 
 function Invoke-Preflight {
-    Write-Host "Checking Docker Desktop, WSL, source dependencies, and local configuration..." -ForegroundColor Cyan
+    Write-Host "Checking Docker Desktop, source dependencies, and local configuration..." -ForegroundColor Cyan
     & docker info --format "Docker {{.ServerVersion}} is ready"
     if ($LASTEXITCODE -ne 0) { throw "Docker Desktop is not ready." }
     & node --version
     & npm --version
-    $wslRoot = Resolve-WslProjectRoot
-    & wsl.exe -d Ubuntu -- bash -lc "cd '$wslRoot' && test -x network/.fabric/fabric-samples/bin/peer && test -x network/.fabric/fabric-samples/bin/configtxgen && command -v jq >/dev/null"
-    if ($LASTEXITCODE -ne 0) { throw "Fabric CLI tools or jq are unavailable in the existing WSL workspace." }
+    if ($ExistingNetwork) {
+        $expectedContainers = @(
+            "ca.insurer.blockinsure.test", "ca.hospital.blockinsure.test", "ca.auditor.blockinsure.test",
+            "ca.bank.blockinsure.test", "ca.oracle.blockinsure.test", "ca.orderer.blockinsure.test",
+            "orderer.blockinsure.test", "peer0.insurer.blockinsure.test", "peer0.hospital.blockinsure.test",
+            "peer0.auditor.blockinsure.test", "peer0.bank.blockinsure.test", "peer0.oracle.blockinsure.test",
+            "couchdb.insurer.blockinsure.test", "couchdb.hospital.blockinsure.test",
+            "couchdb.auditor.blockinsure.test", "couchdb.bank.blockinsure.test", "couchdb.oracle.blockinsure.test"
+        )
+        $runningContainers = @(& docker ps --filter "network=block-insure" --format "{{.Names}}")
+        if ($LASTEXITCODE -ne 0) { throw "Docker could not list the existing Fabric network." }
+        $missingContainers = @($expectedContainers | Where-Object { $_ -notin $runningContainers })
+        if ($missingContainers.Count -gt 0) {
+            throw "The existing Fabric network is incomplete: $($missingContainers -join ', '). Start or repair it through WSL before using -ExistingNetwork."
+        }
+    }
+    else {
+        $wslRoot = Resolve-WslProjectRoot
+        & wsl.exe -d Ubuntu -- bash -lc "cd '$wslRoot' && test -x network/.fabric/fabric-samples/bin/peer && test -x network/.fabric/fabric-samples/bin/configtxgen && command -v jq >/dev/null"
+        if ($LASTEXITCODE -ne 0) { throw "Fabric CLI tools or jq are unavailable in the existing WSL workspace." }
+    }
     if (-not (Test-Path -LiteralPath (Join-Path $webRoot ".env.local"))) { throw "apps/web/.env.local is missing." }
     if (-not (Test-Path -LiteralPath (Join-Path $webRoot "node_modules"))) { throw "apps/web dependencies are missing." }
     if (-not $Development -and -not (Test-Path -LiteralPath (Join-Path $webRoot ".next/standalone/server.js"))) {
@@ -108,7 +127,7 @@ function Invoke-Preflight {
 
 function Start-DemoStack {
     Invoke-Preflight
-    Invoke-NetworkScript "network.sh up"
+    if (-not $ExistingNetwork) { Invoke-NetworkScript "network.sh up" }
     $existing = Read-ManagedProcesses
     if ($existing.Count -gt 0 -and ($existing | Where-Object { Test-ManagedProcess $_ }).Count -gt 0) {
         throw "Managed demo processes are already running. Use Status or Stop first."
@@ -168,7 +187,8 @@ function Start-DemoStack {
         if (Test-Path -LiteralPath $processPath) { Remove-Item -LiteralPath $processPath -Force }
         throw "The workers did not become healthy within 45 seconds. Started processes were stopped; inspect data/demo-stack/logs."
     }
-    Write-Host "Demo stack is healthy at http://127.0.0.1:3000 (Oracle scenario: $OracleScenario)." -ForegroundColor Green
+    $fabricHealth = Invoke-RestMethod -Uri "http://127.0.0.1:3000/api/fabric/health" -TimeoutSec 3
+    Write-Host "Demo stack is healthy at http://localhost:3000 (channel: $($fabricHealth.channel); Oracle scenario: $OracleScenario)." -ForegroundColor Green
 }
 
 function Stop-DemoStack {
@@ -176,8 +196,9 @@ function Stop-DemoStack {
         if (Test-ManagedProcess $record) { Stop-Process -Id ([int]$record.id) -ErrorAction Stop }
     }
     if (Test-Path -LiteralPath $processPath) { Remove-Item -LiteralPath $processPath -Force }
-    if (-not $KeepNetwork) { Invoke-NetworkScript "network.sh down" }
-    Write-Host "Managed application services stopped$(if ($KeepNetwork) { '; Fabric retained and running' } else { '; Fabric containers stopped with ledger volumes retained' })." -ForegroundColor Green
+    $retainNetwork = $KeepNetwork -or $ExistingNetwork
+    if (-not $retainNetwork) { Invoke-NetworkScript "network.sh down" }
+    Write-Host "Managed application services stopped$(if ($retainNetwork) { '; Fabric retained and running' } else { '; Fabric containers stopped with ledger volumes retained' })." -ForegroundColor Green
 }
 
 function Show-DemoStatus {
@@ -189,6 +210,11 @@ function Show-DemoStatus {
     foreach ($url in @("http://127.0.0.1:3000/api/health/live", "http://127.0.0.1:3000/api/health/ready", "http://127.0.0.1:3000/api/fabric/health", "http://127.0.0.1:3301/health", "http://127.0.0.1:3302/health", "http://127.0.0.1:3303/health")) {
         Write-Host ("{0,-52} {1}" -f $url, $(if (Test-HttpHealth $url) { "HEALTHY" } else { "UNAVAILABLE" }))
     }
+    try {
+        $fabricHealth = Invoke-RestMethod -Uri "http://127.0.0.1:3000/api/fabric/health" -TimeoutSec 3
+        Write-Host "Presentation URL: http://localhost:3000/showcase | Channel: $($fabricHealth.channel) | Schema: $($fabricHealth.schemaVersion)"
+    }
+    catch { Write-Host "Presentation URL: http://localhost:3000/showcase | Channel: unavailable" }
     & docker ps --filter "network=block-insure" --format "table {{.Names}}`t{{.Status}}"
 }
 
@@ -209,6 +235,7 @@ switch ($Action) {
     "Status" { Show-DemoStatus }
     "Stop" { Stop-DemoStack }
     "CleanBootstrap" {
+        if ($ExistingNetwork) { throw "CleanBootstrap cannot use -ExistingNetwork; it requires the WSL reset and deployment scripts." }
         if (-not $ConfirmReset) { throw "CleanBootstrap destroys only this project's local Fabric ledger/identities and ignored demo runtime data. Re-run with -ConfirmReset after deliberate approval." }
         if ((Read-ManagedProcesses | Where-Object { Test-ManagedProcess $_ }).Count -gt 0) { throw "Stop the managed demo processes before clean bootstrap." }
         Invoke-Preflight

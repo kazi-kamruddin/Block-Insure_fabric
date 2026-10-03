@@ -104,8 +104,12 @@ resolve_chaincode_sequence() {
     return
   fi
   if [[ "${definition_version}" == "${chaincode_version}" ]]; then
-    echo "${chaincode_name} ${chaincode_version} is already committed at sequence ${definition_sequence}."
-    echo "Set CHAINCODE_VERSION to a new version when the source changes."
+    echo "${chaincode_name} ${chaincode_version} is already committed at sequence ${definition_sequence}; auditing package and source before reuse."
+    if ! CHANNEL_NAME="${channel_name}" CHAINCODE_VERSION="${chaincode_version}" CHAINCODE_SEQUENCE="${definition_sequence}" \
+      bash "${project_root}/scripts/audit-chaincode-package.sh"; then
+      echo "Committed ${chaincode_version} does not match the current source/package on every peer. Set CHAINCODE_VERSION to a new version and deploy on a suitable channel." >&2
+      exit 1
+    fi
     exit 0
   fi
   chaincode_sequence="$((definition_sequence + 1))"

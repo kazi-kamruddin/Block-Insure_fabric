@@ -59,10 +59,10 @@ export default function ShowcasePage() {
       <section className="shell presenterChecklist">
         <div><span className="kicker">Close the demonstration</span><h2>Show the proof, not only the happy path.</h2></div>
         <ol>
-          <li><strong>Identity:</strong> point out the portal, MSP, role, and organization-specific visual language.</li>
-          <li><strong>Boundary:</strong> explain one action this organization is intentionally unable to perform.</li>
-          <li><strong>Failure:</strong> show insufficient-funds bounce or Oracle fallback without hidden manual overrides.</li>
-          <li><strong>Audit:</strong> finish with the linked ledger asset, policy statement, claim dossier, or reproducibility snapshot.</li>
+          <li><span><strong>Identity:</strong> point out the portal, MSP, role, and organization-specific visual language.</span></li>
+          <li><span><strong>Boundary:</strong> explain one action this organization is intentionally unable to perform.</span></li>
+          <li><span><strong>Failure:</strong> show insufficient-funds bounce or Oracle fallback without hidden manual overrides.</span></li>
+          <li><span><strong>Audit:</strong> finish with the linked ledger asset, policy statement, claim dossier, or reproducibility snapshot.</span></li>
         </ol>
       </section>
       <footer className="shell footer"><span>Block-Insure Fabric</span><span>Identity · Boundary · Failure · Proof</span></footer>

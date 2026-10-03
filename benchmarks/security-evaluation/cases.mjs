@@ -76,6 +76,7 @@ export const securityCases = {
     const valid = verifySelectiveDisclosurePresentation({
       request: fixture.requestBinding, claim: fixture.claim,
       publicPresentation: fixture.publicPresentation, privatePresentation: fixture.privatePresentation,
+      invoiceCredential: fixture.invoiceCredential, policyCredential: fixture.policyCredential,
       now: Date.parse("2026-09-19T00:00:00Z"),
     });
     assert.equal(valid.valid, true);
@@ -84,6 +85,7 @@ export const securityCases = {
     const rejected = verifySelectiveDisclosurePresentation({
       request: fixture.requestBinding, claim: fixture.claim,
       publicPresentation: fixture.publicPresentation, privatePresentation: altered,
+      invoiceCredential: fixture.invoiceCredential, policyCredential: fixture.policyCredential,
       now: Date.parse("2026-09-19T00:00:00Z"),
     });
     assert.deepEqual(rejected, { valid: false, code: "PRIVACY_PROOF_INVALID" });

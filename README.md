@@ -24,6 +24,14 @@ and fault-profile benchmarks. The clean local deployment runs
 `insurance-contract` 1.4.0 with schema 14. Its automated code gate and live Fabric
 workflow cover the Phase 1 partner and Hospital boundary.
 
+For the current supervisor demonstration, an isolated
+`insurance-phase2-hardening-20260927` channel runs audited current-source
+chaincode 1.4.1-hardening. Its full 17-step live gate passed on 3 October 2026;
+the managed application is configured to show it at
+`http://localhost:3000/showcase`. See [the dated live record](docs/results/hardening-live-20261003.md)
+and [the presentation runbook](docs/local-demonstration.md) before restarting,
+because the default local configuration still selects the older main channel.
+
 This is not a production deployment claim. Institutional authentication,
 durable encrypted object storage and key recovery, multi-node/orderer high
 availability, production monitoring, backup/restore operations, and deployment
@@ -45,9 +53,10 @@ Server-side Gateway, identity, evidence, fraud, event, and research modules are
 co-located under `apps/web/lib/`; cross-component browser tests live in
 `apps/web/e2e/`.
 
-`reference/` contains the prior Ethereum implementation for local study only.
-It is deliberately ignored by Git and must not be modified or committed as part
-of this Fabric project.
+`reference/` contains the prior Ethereum implementation and a dated Fabric
+context snapshot for local study. It is deliberately ignored by Git; edits to
+`reference/context_26sept.md` remain local unless explicitly added to version
+control. The nested Ethereum implementation is not the active runtime.
 
 ## Implemented architecture
 
