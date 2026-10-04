@@ -47,6 +47,10 @@ h1 { max-width: 900px; margin: 22px 0 26px; font-family: Georgia, serif; font-si
 h2 { margin: 12px 0 0; max-width: 560px; font-family: Georgia, serif; font-size: clamp(38px, 5vw, 62px); font-weight: 500; line-height: 1; letter-spacing: -.045em; }
 .sectionHeading > p { max-width: 480px; margin: 0; color: var(--muted); line-height: 1.65; }
 .capabilityGrid { display: grid; grid-template-columns: repeat(5, 1fr); border-top: 1px solid var(--line); border-left: 1px solid var(--line); }
+.featuredCatalog { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.catalogMore { margin-top: 20px; }
+.catalogMore summary { cursor: pointer; font-weight: 700; color: var(--ink); }
+.catalogMore .capabilityGrid { margin-top: 16px; }
 .capability { min-height: 245px; padding: 22px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); background: rgba(251, 250, 246, .45); }
 .capability .index { color: #78908c; font: 12px monospace; }
 .capability h3 { margin: 65px 0 12px; font-size: 18px; }
@@ -228,6 +232,7 @@ h2 { margin: 12px 0 0; max-width: 560px; font-family: Georgia, serif; font-size:
 @media (max-width: 850px) {
   .sectionHeading { grid-template-columns: 1fr; gap: 25px; }
   .capabilityGrid { grid-template-columns: repeat(2, 1fr); }
+  .featuredCatalog { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .accountGrid { grid-template-columns: repeat(2, 1fr); }
   .accountGroup { grid-template-columns: 1fr; gap: 16px; }
   .accountGroupHeader p { max-width: 420px; }
@@ -256,6 +261,7 @@ h2 { margin: 12px 0 0; max-width: 560px; font-family: Georgia, serif; font-size:
   .navLinks { gap: 12px; }
   .navLinks > a { font-size: 11px; }
   .capabilityGrid { grid-template-columns: 1fr; }
+  .featuredCatalog { grid-template-columns: 1fr; }
   .accountGrid { grid-template-columns: 1fr; }
   .metricGrid { grid-template-columns: 1fr; }
   .workspaceHeader { align-items: start; flex-direction: column; }

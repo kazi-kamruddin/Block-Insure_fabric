@@ -154,6 +154,15 @@ export function WorkspaceClient({
     }
   }, []);
 
+  useEffect(() => {
+    if (!account) return;
+    const timer = window.setTimeout(() => {
+      void refreshNotifications();
+      if (account.role === "bankOfficer") void refreshBankCommunications();
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [account, refreshNotifications, refreshBankCommunications]);
+
   async function synchronizeEvents() {
     setBusy(true);
     try {
@@ -226,8 +235,6 @@ export function WorkspaceClient({
       const signedInAccount = body.account as DemoAccount;
       setAccount(signedInAccount);
       setOutput(`Signed in as ${body.account.displayName}.`);
-      await refreshNotifications();
-      if (signedInAccount.role === "bankOfficer") await refreshBankCommunications();
       router.push(`/workspace/${workspaceForAccount(signedInAccount)}`);
     } catch (error) {
       setOutput(error instanceof Error ? error.message : "Sign-in failed");

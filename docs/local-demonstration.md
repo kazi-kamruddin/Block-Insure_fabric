@@ -55,6 +55,10 @@ current chaincode runtimes are running and no legacy runtime remains. The web
 and worker health endpoints then check the actual Gateway and Oracle path.
 `demo-stack.ps1 Stop -ExistingNetwork` stops managed app processes while
 retaining Fabric. Start the baseline Oracle profile again after any fault demo.
+For a code rebuild on Windows, stop the managed app first, run `npm run build`
+from `apps/web`, then start the stack again; the running standalone server locks
+`.next/standalone`. The public catalog on `/` now reads the active channel at
+request time, so rebuilding does not capture old main-channel data.
 This profile cannot enroll new identities until the CAs are started. Do not use
 `network.sh verify` during the low-memory presentation: it checks the old main
 channel and can restart legacy runtimes. The prior full-topology and package

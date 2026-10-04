@@ -24,8 +24,14 @@ function Get-RunningNames {
 }
 
 function Invoke-ComposeUp {
-    param([Parameter(Mandatory)][string[]]$Services)
-    & docker compose -f $composeCa -f $composeNetwork up -d @Services
+    param(
+        [Parameter(Mandatory)][string[]]$Services,
+        [switch]$NoDependencies
+    )
+    $arguments = @("-f", $composeCa, "-f", $composeNetwork, "up", "-d")
+    if ($NoDependencies) { $arguments += "--no-deps" }
+    $arguments += $Services
+    & docker compose @arguments
     if ($LASTEXITCODE -ne 0) { throw "Docker Compose could not start: $($Services -join ', ')." }
 }
 
@@ -76,7 +82,7 @@ if ($Action -eq "Start") {
 
     Invoke-ComposeUp @("orderer", "couchdb-insurer", "couchdb-hospital", "couchdb-auditor", "couchdb-bank", "couchdb-oracle")
     foreach ($organization in $organizations) {
-        Invoke-ComposeUp @("peer-$organization")
+        Invoke-ComposeUp @("peer-$organization") -NoDependencies
         for ($attempt = 0; $attempt -lt 30; $attempt++) {
             Stop-LegacyRuntimes $organization
             $prefix = "dev-peer0.$organization.blockinsure.test-insurance-contract_1.4.1-hardening-"

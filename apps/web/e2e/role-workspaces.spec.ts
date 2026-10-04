@@ -1,4 +1,12 @@
 import { expect, test, type Page } from "@playwright/test";
+import { loadEnvConfig } from "@next/env";
+
+function eventWorkerSecret() {
+  if (!process.env.PLAYWRIGHT_BASE_URL) return "browser-event-worker-secret-with-32-characters";
+  const secret = loadEnvConfig(process.cwd()).combinedEnv.EVENT_WORKER_SECRET;
+  if (!secret) throw new Error("EVENT_WORKER_SECRET is required for live-server worker authentication tests");
+  return secret;
+}
 
 const actors = [
   { account: "insurer-admin", workspace: "insurer", heading: "Portfolio oversight", action: "createPartnerAgreement" },
@@ -99,7 +107,7 @@ test("event worker requires its exact bearer credential", async ({ request }) =>
   expect(rejected.status()).toBe(401);
 
   const accepted = await request.post("/api/internal/events/sync", {
-    headers: { authorization: "Bearer browser-event-worker-secret-with-32-characters" },
+    headers: { authorization: `Bearer ${eventWorkerSecret()}` },
   });
   expect(accepted.ok(), await accepted.text()).toBe(true);
   expect(await accepted.json()).toMatchObject({ limitReached: expect.any(Boolean), processed: expect.any(Number) });

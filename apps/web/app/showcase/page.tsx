@@ -5,11 +5,11 @@ const organizations = [
   ["HospitalMSP", "Owns the independent patient invoice register", "Cannot approve or settle insurance claims"],
   ["BankMSP", "Owns balances, mandates, transfers, and bounce decisions", "Cannot approve claims or change policy terms"],
   ["AuditorMSP", "Casts assigned certificate-bound review votes", "One vote cannot finalize a governed review"],
-  ["OracleMSP", "Runs two subject-isolated commit/reveal workers", "Cannot settle a claim or expose unrevealed results"],
+  ["OracleMSP", "Runs three certificate-bound commit/reveal workers", "Cannot settle a claim or expose unrevealed results"],
 ] as const;
 
 const stories = [
-  { index: "A", title: "Premium integrity", flow: "Policyholder → Bank → Insurer", detail: "Manual email OTP or scheduled EFT creates one linked transfer and payment. Funds settle customer-to-insurer or bounce without changing coverage dates." },
+  { index: "A", title: "Premium integrity", flow: "Policyholder → Bank → Insurer", detail: "Demo OTP or scheduled EFT creates one linked transfer and payment. Simulated funds move customer-to-insurer or bounce without changing coverage dates." },
   { index: "B", title: "Claim integrity", flow: "Hospital → Policyholder → Insurer → Oracles", detail: "A claim binds to a finalized contracted-Hospital invoice, passes a read-only cross-check, then receives a version-bound 2-of-3 Oracle result." },
   { index: "C", title: "Governed fallback", flow: "Oracles → Auditors → Insurer → Bank", detail: "Negative, conflicting, or timed-out Oracle work enters fixed quorum review. Approval creates a liability; Bank confirmation closes it." },
 ] as const;
@@ -25,7 +25,7 @@ export default function ShowcasePage() {
       <section className="shell showcaseHero">
         <span className="eyebrow">Supervisor demonstration · Phase 3</span>
         <h1>One insurance journey. Five institutional boundaries.</h1>
-        <p className="lede">Block-Insure is the coordination layer. Hospitals keep invoices, Banks execute funds, Auditors vote independently, and Fabric preserves the shared proof.</p>
+        <p className="lede">Block-Insure is the coordination layer. Hospitals keep invoices, the Bank simulates transfers, assigned Auditors cast separate votes, and Fabric preserves the shared proof.</p>
         <div className="actions">
           <Link className="primary" href="/workspace">Start role demonstration</Link>
           <Link className="secondary" href="/#policies">View live policy network</Link>
