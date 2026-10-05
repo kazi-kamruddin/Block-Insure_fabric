@@ -63,6 +63,9 @@ func (c *Contract) submitClaim(ctx contractapi.TransactionContextInterface, id, 
 		if invoice.HospitalID != hospitalID {
 			return nil, fmt.Errorf("hospital invoice %s belongs to hospital %s", hospitalInvoiceID, invoice.HospitalID)
 		}
+		if invoice.Status != "FINALIZED" {
+			return nil, fmt.Errorf("hospital invoice %s must be finalized before a claim", hospitalInvoiceID)
+		}
 		if invoice.PatientReferenceHash != patientSubjectHash(claimantID) {
 			return nil, fmt.Errorf("hospital invoice patient does not match this policyholder")
 		}

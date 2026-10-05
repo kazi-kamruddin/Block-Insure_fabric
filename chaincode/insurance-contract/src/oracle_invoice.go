@@ -22,6 +22,9 @@ func (c *Contract) bindOracleInvoice(ctx contractapi.TransactionContextInterface
 	if invoice.PatientReferenceHash != patientSubjectHash(claim.ClaimantID) {
 		return nil, fmt.Errorf("hospital invoice patient does not match this policyholder")
 	}
+	if invoice.Status != "FINALIZED" {
+		return nil, fmt.Errorf("hospital invoice %s is not finalized", invoice.ID)
+	}
 	now, err := timestamp(ctx)
 	if err != nil {
 		return nil, err

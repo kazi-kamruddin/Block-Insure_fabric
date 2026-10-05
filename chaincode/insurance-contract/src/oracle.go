@@ -545,6 +545,15 @@ func (c *Contract) RevealOracleResult(
 	if txTime.AsTime().After(revealDeadline) {
 		return nil, fmt.Errorf("Oracle request %s reveal phase has ended", requestID)
 	}
+	if verified && request.RulesVersion == "hospital-invoice-rules-v2" {
+		invoice, err := c.ReadHospitalInvoice(ctx, claim.HospitalInvoiceID)
+		if err != nil {
+			return nil, err
+		}
+		if invoice.Status != "FINALIZED" || invoice.PatientReferenceHash != patientSubjectHash(claim.ClaimantID) {
+			return nil, fmt.Errorf("hospital invoice %s is no longer valid for a positive Oracle result", invoice.ID)
+		}
+	}
 	if verified && request.PrivacyPresentationID != "" {
 		presentation, err := c.ReadSelectiveDisclosurePresentation(ctx, request.PrivacyPresentationID)
 		if err != nil {

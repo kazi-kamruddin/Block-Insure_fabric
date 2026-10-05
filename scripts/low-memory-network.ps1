@@ -3,8 +3,9 @@ param(
     [Parameter(Position = 0)]
     [ValidateSet("Start", "Status")]
     [string]$Action = "Status",
-    [ValidateSet("1.4.1-hardening", "1.5.0-workflow")]
-    [string]$ChaincodeVersion = "1.4.1-hardening"
+    [ValidateSet("1.4.1-hardening", "1.5.1-workflow")]
+    [string]$ChaincodeVersion = "1.4.1-hardening",
+    [switch]$CoreOnly
 )
 
 $ErrorActionPreference = "Stop"
@@ -53,6 +54,10 @@ function Assert-Runtime {
     $running = @(Get-RunningNames)
     $missing = @($coreContainers | Where-Object { $_ -notin $running })
     if ($missing.Count -gt 0) { throw "Missing Fabric runtime containers: $($missing -join ', ')." }
+    if ($CoreOnly) {
+        Write-Host "Fabric core ready: 11 transaction services." -ForegroundColor Green
+        return
+    }
     foreach ($organization in $organizations) {
         $prefix = "dev-peer0.$organization.blockinsure.test-insurance-contract_${ChaincodeVersion}-"
         if (@($running | Where-Object { $_.StartsWith($prefix) }).Count -ne 1) {
@@ -85,6 +90,7 @@ if ($Action -eq "Start") {
     Invoke-ComposeUp @("orderer", "couchdb-insurer", "couchdb-hospital", "couchdb-auditor", "couchdb-bank", "couchdb-oracle")
     foreach ($organization in $organizations) {
         Invoke-ComposeUp @("peer-$organization") -NoDependencies
+        if ($CoreOnly) { continue }
         for ($attempt = 0; $attempt -lt 30; $attempt++) {
             Stop-LegacyRuntimes $organization
             $prefix = "dev-peer0.$organization.blockinsure.test-insurance-contract_${ChaincodeVersion}-"
@@ -92,7 +98,14 @@ if ($Action -eq "Start") {
             Start-Sleep -Seconds 1
         }
     }
-    foreach ($organization in $organizations) { Stop-LegacyRuntimes $organization }
+    if ($CoreOnly) {
+        $chaincodeRuntimes = @(Get-RunningNames | Where-Object { $_.StartsWith("dev-peer0.") })
+        if ($chaincodeRuntimes.Count -gt 0) {
+            & docker stop --timeout 2 $chaincodeRuntimes | Out-Null
+            if ($LASTEXITCODE -ne 0) { throw "Could not stop automatically restarted chaincode runtimes." }
+        }
+    }
+    else { foreach ($organization in $organizations) { Stop-LegacyRuntimes $organization } }
 }
 
 Assert-Runtime

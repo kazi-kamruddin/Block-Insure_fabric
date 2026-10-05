@@ -8,6 +8,10 @@ const registryRoot = "c6da6361115c611b091faa9f35836f9f5c8ee0fdbefb6bc0d8cc6fdde5
 const assignedAuditors = '["auditor1","auditor2","auditor3","auditor4"]';
 const oracleScenario = process.env.ORACLE_E2E_SCENARIO ?? "baseline";
 
+test.beforeEach(() => {
+  test.skip(process.env.FABRIC_CHANNEL_NAME === "insurance-workflow-20261005", "Historical Oracle fixture cases run on the Phase 2 channel; schema-15 invoice cases use invoice-oracle-journey.spec.ts.");
+});
+
 async function actor(baseURL: string, accountId: string) {
   const context = await request.newContext({ baseURL });
   const login = await context.post("/api/auth/demo-login", { data: { accountId } });

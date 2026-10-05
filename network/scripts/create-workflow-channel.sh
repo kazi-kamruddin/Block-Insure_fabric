@@ -47,6 +47,6 @@ for entry in "insurer InsurerMSP 7051" "hospital HospitalMSP 8051" "auditor Audi
   fi
 done
 
-CHANNEL_NAME="${channel_name}" CHAINCODE_VERSION="1.5.0-workflow" bash "${script_dir}/deploy-chaincode.sh"
+CHANNEL_NAME="${channel_name}" CHAINCODE_VERSION="1.5.1-workflow" bash "${script_dir}/deploy-chaincode.sh"
 CHANNEL_NAME="${channel_name}" bash "${script_dir}/seed-showcase.sh"
 echo "Workflow demonstration channel is ready: ${channel_name}. Preserved insurance-channel was not modified."

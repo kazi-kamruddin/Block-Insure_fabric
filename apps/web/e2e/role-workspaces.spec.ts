@@ -9,7 +9,7 @@ function eventWorkerSecret() {
 }
 
 const actors = [
-  { account: "insurer-admin", workspace: "insurer", heading: "Portfolio oversight", action: "createPartnerAgreement" },
+  { account: "insurer-admin", workspace: "insurer", heading: "Portfolio oversight", action: "startClaimProcessing" },
   { account: "policyholder-1", workspace: "policyholder", heading: "Coverage and claims overview", action: "acquirePolicy" },
   { account: "hospital-officer", workspace: "hospital", heading: "Independent Hospital billing register", action: "createHospitalInvoice" },
   { account: "hospital-officer-2", workspace: "hospital", heading: "Independent Hospital billing register", action: "createHospitalInvoice" },
@@ -68,7 +68,7 @@ test("liveness, dependency readiness, public catalog, and not-found behavior are
   expect(ready.status(), JSON.stringify(readiness)).toBe(200);
   expect(readiness).toMatchObject({
     status: "ready",
-    dependencies: { chaincode: "connected", schemaVersion: 14, oracle1: "connected", oracle2: "connected", oracle3: "connected" },
+    dependencies: { chaincode: "connected", schemaVersion: 15, oracle1: "connected", oracle2: "connected", oracle3: "connected" },
   });
 
   const catalog = await request.get("/api/public/policies");

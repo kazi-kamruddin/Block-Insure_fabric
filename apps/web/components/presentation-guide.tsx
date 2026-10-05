@@ -19,7 +19,7 @@ const stages: readonly PresentationStage[] = [
 const guides: Record<FabricRole, { title: string; show: string; proves: string; boundary: string; handoff: string }> = {
   insurerAdmin: {
     title: "Insurer orchestration",
-    show: "Partner agreements, policy packages, invoice cross-checks, Oracle requests, governed review, and settlement authorization.",
+    show: "Partner agreements, policy packages, starting Oracle claim processing, governed review, and settlement authorization.",
     proves: "The insurer coordinates the process but cannot rewrite Hospital invoices, cast auditor votes, or confirm Bank execution.",
     boundary: "InsurerMSP · insurerAdmin certificate role",
     handoff: "Hospital for invoice facts, Oracles for deterministic checks, Auditors for fallback, then Bank for payment.",
@@ -29,14 +29,14 @@ const guides: Record<FabricRole, { title: string; show: string; proves: string; 
     show: "Policy acquisition, email-OTP premium payment, EFT mandate control, claim/evidence submission, appeal, and final statement.",
     proves: "The customer owns coverage and evidence consent while private files remain encrypted outside Fabric.",
     boundary: "InsurerMSP · policyholder subject ownership",
-    handoff: "Bank authorizes premium execution; insurer and contracted Hospital verify the submitted claim.",
+    handoff: "Bank executes the premium; Oracle workers compare the claim with the contracted Hospital's invoice record.",
   },
   hospitalOfficer: {
     title: "Independent Hospital register",
     show: "Create and finalize the Hospital's own patient invoice before any insurance claim references it.",
     proves: "The Hospital maintains its operational record independently; the insurer receives agreement-scoped read-only facts.",
     boundary: "HospitalMSP · hospital subject scoped records",
-    handoff: "Give the finalized invoice reference to the policyholder; the insurer later performs a read-only cross-check.",
+    handoff: "Give the finalized invoice reference to the policyholder; Oracle workers later check it during claim processing.",
   },
   auditor: {
     title: "Independent manual review",

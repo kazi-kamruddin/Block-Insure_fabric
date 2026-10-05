@@ -5,6 +5,45 @@ InsurerMSP, HospitalMSP, AuditorMSP, BankMSP, and OracleMSP business network plu
 the development orderer. It assumes the documented
 WSL2, Docker Desktop, Fabric, Go, and Node prerequisites are already available.
 
+## Current workflow rehearsal (6 October 2026)
+
+From the repository root, use `./scripts/workflow-demo.ps1 Start` and open
+`http://localhost:3000/workspace`. The wrapper selects the isolated
+`insurance-workflow-20261005` channel and keeps the low-memory runtime. Check
+it with `./scripts/workflow-demo.ps1 Status`; stop the managed application with
+`./scripts/workflow-demo.ps1 Stop`. The earlier 1.4.1 hardening instructions
+below document the previous research rehearsal.
+
+The channel starts with the published `showcase-health-v1` package, Bank
+accounts, partner agreements, and five sample invoices dated for the local
+demonstration day. Their patient reference is `policyholder1`. Hospital staff
+may create a fresh invoice in the Hospital Billing Registry using that patient
+reference, a unique invoice reference, a treatment reference, an amount, and
+admission/discharge dates. Finalization creates a private invoice credential
+automatically; voiding an invoice revokes its automatic credential.
+
+For the customer journey, sign in as Policyholder One, acquire
+`showcase-health-v1`, and use the one-time premium payment panel to activate
+the policy. A Bank officer can separately review an EFT mandate. Submit a
+claim with a finalized Hospital invoice ID, an amount no greater than
+the invoice amount for the successful path, and an incident date within both
+policy coverage and the Hospital stay. Describe the case in your own words. The invoice patient
+reference must identify `policyholder1`.
+
+Sign in as Insurer Administrator and choose **Start claim processing** for the
+submitted claim. The three Oracle workers compare Hospital invoice facts;
+the admin does not issue a preliminary matching verdict. Two matching
+positive results approve the claim. An amount greater than the invoice total
+produces an Oracle failure that the insurer can route to assigned auditors.
+After an auditor rejection, Policyholder One may submit one corrected appeal;
+the insurer starts a new Oracle cycle. For an approved claim, the insurer
+authorizes settlement and the Bank officer confirms the payout.
+
+The three Oracle workers use replicas derived from the same Hospital records.
+Their agreement demonstrates quorum behavior and does not establish three
+independent clinical sources. The dated Phase 1/2 research results below refer
+to their original contract versions.
+
 ## 1. Confirm the network and contract
 
 **Current-source note (2 October 2026):** the archived 1.4.0 package differs
@@ -20,11 +59,11 @@ read-only browser smoke checks; it did not exercise current-source ledger writes
 Consult `.project-context/03_CURRENT_STATE.md` for the dated check.
 
 **Current supervisor setup (3 October 2026):** the isolated
-`insurance-phase2-hardening-20260927` channel now runs audited current-source
+`insurance-phase2-hardening-20260927` channel ran audited then-current-source
 chaincode 1.4.1-hardening. All 17 steps of the full gate and a private-collection
-access probe passed there. The managed app and workers are currently running on
-that channel at **`http://localhost:3000/showcase`**; `Status` should print the
-same channel and healthy endpoints. Use `localhost` in the browser: local
+access probe passed there. The managed app and workers ran on
+that channel at **`http://localhost:3000/showcase`** on 3 October; the current
+workflow rehearsal uses the separate channel above. Use `localhost` in the browser: local
 `APP_ORIGIN` is `http://localhost:3000`, so interactive sign-in from
 `127.0.0.1:3000` fails the exact-origin check. The corrected showcase was checked
 in Edge at desktop and phone widths. See

@@ -13,12 +13,14 @@ connect it to an independently governed hospital, policy, or regulator source.
 
 ## Version-bound 2-of-3 protocol
 
-After the insurer cross-checks a claim against the contracted Hospital's
-finalized invoice, an insurer administrator publishes an
-`OracleRegistrySnapshot` commitment and creates an `OracleRequest`. The request
+For current invoice claims, an insurer administrator starts processing and the
+application publishes a current `OracleRegistrySnapshot` commitment before
+creating an `OracleRequest`. The ledger records a `SOURCE_BOUND` invoice and
+claim-version binding without deciding whether their facts match. The three
+workers evaluate that match. The request
 binds all adjudication inputs:
 
-- claim ID and version, Hospital verification, query hash, and appeal commitment;
+- claim ID and version, invoice source binding, query hash, and appeal commitment;
 - registry ID, version, canonical root, rules version, and rules hash;
 - model version and model hash;
 - optional claim/version-bound selective-presentation ID, protocol, and hash;
@@ -45,6 +47,13 @@ Failure outcomes set the claim to `ORACLE_FAILED` and may be routed to the
 existing certificate-bound four-auditor review. Oracles cannot create
 settlements. Settlement still requires insurer authorization and `BankMSP`
 confirmation.
+
+The `hospital-invoice-rules-v2` registry contains invoice ID and hashed patient
+reference. Workers accept a positive claim up to the invoice amount within the
+admission/discharge dates; the customer's free-text narrative remains separate
+from the Hospital treatment reference. The ledger rejects a positive reveal if
+the source invoice has since been voided. Older fixture-based requests retain
+their original rules and hashes for historical test comparisons.
 
 Appeal submission increments the claim version and clears the active Oracle
 request. Old commitments and results therefore cannot authorize a corrected

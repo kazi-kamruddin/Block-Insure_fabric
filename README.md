@@ -11,7 +11,7 @@ identities and Fabric ledger controls.
 The original implementation areas and the policy/premium/benefit expansion are
 joined by a certificate-bound 2-of-3 Oracle consensus subsystem. The source now
 defines partner agreements, policy-specific provider networks, an independent
-Hospital invoice register, insurer read-only invoice cross-checking, and a
+Hospital invoice register, Oracle-led invoice checking, and a
 five-business-organization network with a Go contract, Next.js Gateway boundary, role-specific
 workflows/evidence, release verification, policy acquisition, premium collection,
 bank mandates, governed benefits, distributed adjudication, appeals, and advisory
@@ -20,17 +20,17 @@ ledger-derived research metrics, evidence Merkle inclusion proofs, a targeted
 Bank–Insurer private-data collection, independent Oracle workers, commit/reveal
 consensus, governed auditor fallback, issuer-bound selective-disclosure
 credentials, executable TLA+ workflow verification, and reproducible Caliper
-and fault-profile benchmarks. The clean local deployment runs
+and fault-profile benchmarks. The archived clean local baseline runs
 `insurance-contract` 1.4.0 with schema 14. Its automated code gate and live Fabric
 workflow cover the Phase 1 partner and Hospital boundary.
 
-For the current supervisor demonstration, an isolated
-`insurance-phase2-hardening-20260927` channel runs audited current-source
-chaincode 1.4.1-hardening. Its full 17-step live gate passed on 3 October 2026;
-the managed application is configured to show it at
-`http://localhost:3000/showcase`. See [the dated live record](docs/results/hardening-live-20261003.md)
-and [the presentation runbook](docs/local-demonstration.md) before restarting,
-because the default local configuration still selects the older main channel.
+The current workflow demonstration uses a separate
+`insurance-workflow-20261005` channel with schema-15 chaincode 1.5.1-workflow.
+Use [the presentation runbook](docs/local-demonstration.md) and
+`scripts/workflow-demo.ps1` to start it. The earlier 3 October hardening gate is
+recorded in [the dated live record](docs/results/hardening-live-20261003.md).
+The default local environment file still selects the older main channel; use
+the workflow wrapper for the current demonstration.
 
 This is not a production deployment claim. Institutional authentication,
 durable encrypted object storage and key recovery, multi-node/orderer high

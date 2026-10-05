@@ -21,6 +21,7 @@ async function command(context: APIRequestContext, payload: Record<string, unkno
 }
 
 test("five organization sessions complete a Fabric insurance workflow", async ({ baseURL }) => {
+  test.skip(process.env.FABRIC_CHANNEL_NAME === "insurance-workflow-20261005", "Schema-15 invoice claims use the Oracle-led journey test.");
   test.setTimeout(180_000);
   if (!baseURL) throw new Error("Playwright baseURL is required");
 
@@ -228,6 +229,7 @@ test("five organization sessions complete a Fabric insurance workflow", async ({
 });
 
 test("rejected claim requires a committed correction, matching Hospital invoice, fresh cross-check, and independent Oracle approval", async ({ baseURL }) => {
+  test.skip(process.env.FABRIC_CHANNEL_NAME === "insurance-workflow-20261005", "This is the historical insurer cross-check route.");
   test.setTimeout(180_000);
   if (!baseURL) throw new Error("Playwright baseURL is required");
   const suffix = `appeal-${Date.now()}-${Math.floor(Math.random() * 1_000_000)}`;

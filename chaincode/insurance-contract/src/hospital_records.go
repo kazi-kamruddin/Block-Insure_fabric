@@ -231,6 +231,9 @@ func (c *Contract) CrossCheckClaimInvoice(ctx contractapi.TransactionContextInte
 	if err != nil {
 		return nil, err
 	}
+	if invoice.SchemaVersion >= 15 {
+		return nil, fmt.Errorf("invoice claims use Oracle verification; start claim processing instead")
+	}
 	outcome := "VERIFIED"
 	incident, incidentErr := validateDate("incidentDate", claim.IncidentDate)
 	admission, admissionErr := validateDate("admissionDate", invoice.AdmissionDate)

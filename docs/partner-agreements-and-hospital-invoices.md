@@ -19,14 +19,24 @@ The shared ledger contains only the structured fields needed for verification:
 hashed patient and clinical references, the Oracle lookup reference, amount,
 admission/discharge dates, and status. It is not a complete hospital record.
 
-## Insurer cross-check
+## Current invoice and claim workflow
 
-A policyholder submits a claim against a finalized Hospital invoice. Chaincode
-requires the invoice Hospital to be in the policy's snapshotted network and to
-have an active agreement. The insurer then performs a deterministic, read-only
-cross-check: ownership, invoice status, clinical reference, amount, and incident
-date must agree. A successful result creates the version-bound verification
-record required by the existing Oracle and auditor workflow.
+A Hospital officer enters a patient reference equal to the covered policyholder's
+insurance subject ID. The browser hashes it before submission. Finalizing an
+invoice creates its private credential automatically. A finalized invoice is
+immutable; voiding it revokes that automatic credential.
 
-This design does not make a Hospital approve insurance claims. Hospitals own
-their invoice data; the insurer owns claim verification and adjudication.
+A policyholder binds a claim to a finalized invoice. Chaincode checks the
+contracted Hospital, policy ownership, and hashed patient reference. The
+insurer administrator starts claim processing without making an invoice-match
+verdict. The new `SOURCE_BOUND` record captures the claim version and invoice
+reference for the Oracle request; it is not a positive verification result.
+The three Oracle workers compare the invoice ID, Hospital, patient reference,
+amount, and incident date with a snapshot derived from the Hospital's Fabric
+record. A positive claim amount may be less than the invoice total. A claim
+narrative does not have to equal the Hospital's treatment reference. Two
+matching worker results finalize the Oracle outcome.
+
+The earlier insurer `CrossCheckClaimInvoice` transaction remains for historical
+claims. New schema-15 invoices use the Oracle path. The Hospital only maintains
+its records and does not receive claim, review, or settlement actions.

@@ -15,6 +15,9 @@ coverage/
 /data/evidence-hardening/
 /data/events-hardening/
 /data/oracle-hardening/
+/data/evidence-workflow/
+/data/events-workflow/
+/data/oracle-workflow/
 /data/evidence-phase1/
 /data/events-phase1/
 /data/oracle-phase1/

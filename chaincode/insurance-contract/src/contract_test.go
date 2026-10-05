@@ -619,15 +619,12 @@ func TestPartnerNetworkAndIndependentHospitalInvoiceCrossCheck(t *testing.T) {
 	requireError(t, err, "Hospital users only maintain invoices")
 
 	setIdentity(ctx, "insurer-admin", "InsurerMSP", "insurerAdmin", nil)
-	verification, err := contract.CrossCheckClaimInvoice(ctx, claim.ID, "invoice-check-1001")
-	requireNoError(t, err)
-	if verification.Outcome != "VERIFIED" || verification.HospitalIdentity != "hospital1" || verification.ClinicalReferenceHash != hashB {
-		t.Fatalf("insurer invoice cross-check did not retain Hospital provenance: %+v", verification)
-	}
+	_, err = contract.CrossCheckClaimInvoice(ctx, claim.ID, "invoice-check-1001")
+	requireError(t, err, "use Oracle verification")
 	claim, err = contract.ReadClaim(ctx, claim.ID)
 	requireNoError(t, err)
-	if claim.Status != "HOSPITAL_VERIFIED" {
-		t.Fatalf("verified invoice did not advance the claim: %+v", claim)
+	if claim.Status != "SUBMITTED" {
+		t.Fatalf("the insurer changed an invoice claim verdict: %+v", claim)
 	}
 }
 

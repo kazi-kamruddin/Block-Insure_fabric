@@ -20,7 +20,7 @@ type PartnerAgreement struct {
 }
 
 type HospitalInvoice struct {
-	PrivacyCredentialID  string `json:"privacyCredentialId,omitempty"`
+	PrivacyCredentialID  string `json:"privacyCredentialId"`
 	AssetType            string `json:"assetType"`
 	SchemaVersion        int    `json:"schemaVersion"`
 	ID                   string `json:"id"`
