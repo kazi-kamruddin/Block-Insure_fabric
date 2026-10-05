@@ -597,7 +597,7 @@ func TestPartnerNetworkAndIndependentHospitalInvoiceCrossCheck(t *testing.T) {
 	}
 
 	setIdentity(ctx, "hospital1-cert", "HospitalMSP", "hospitalOfficer", map[string]string{"subjectId": "hospital1"})
-	invoice, err := contract.CreateHospitalInvoice(ctx, "invoice-1001", hashA, hashB, hashC, 250_000, "2026-06-10", "2026-06-20", "FINALIZED")
+	invoice, err := contract.CreateHospitalInvoice(ctx, "invoice-1001", patientSubjectHash("policyholder1"), hashB, hashC, 250_000, "2026-06-10", "2026-06-20", "FINALIZED")
 	requireNoError(t, err)
 	if invoice.HospitalID != "hospital1" || invoice.Status != "FINALIZED" {
 		t.Fatalf("Hospital invoice ownership was not captured: %+v", invoice)
@@ -1351,7 +1351,7 @@ func TestSelectiveDisclosureCredentialAndPresentationLifecycle(t *testing.T) {
 
 	invoice := &HospitalInvoice{
 		AssetType: "hospitalInvoice", SchemaVersion: SchemaVersion, ID: "invoice-private-1", HospitalID: "hospital1",
-		PatientReferenceHash: hashA, InvoiceReferenceHash: hashB, TreatmentHash: hashC, AmountMinor: 50_000,
+		PatientReferenceHash: patientSubjectHash("policyholder1"), InvoiceReferenceHash: hashB, TreatmentHash: hashC, AmountMinor: 50_000,
 		AdmissionDate: "2026-06-10", DischargeDate: "2026-06-20", Status: "FINALIZED",
 	}
 	policy := &Policy{

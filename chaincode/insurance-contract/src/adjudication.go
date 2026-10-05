@@ -264,9 +264,11 @@ func (c *Contract) SubmitClaimAppeal(
 		}
 		effectiveInvoiceID = ""
 		for _, invoice := range invoices {
-			if invoice.HospitalID == effectiveHospitalID && invoice.Status == "FINALIZED" && strings.EqualFold(invoice.InvoiceReferenceHash, proposedClinicalReferenceHash) {
+			if invoice.HospitalID == effectiveHospitalID && invoice.Status == "FINALIZED" && invoice.PatientReferenceHash == patientSubjectHash(subject) && strings.EqualFold(invoice.InvoiceReferenceHash, proposedClinicalReferenceHash) {
+				if effectiveInvoiceID != "" {
+					return nil, fmt.Errorf("corrected invoice reference is ambiguous")
+				}
 				effectiveInvoiceID = invoice.ID
-				break
 			}
 		}
 		if effectiveInvoiceID == "" {

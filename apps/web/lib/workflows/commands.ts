@@ -89,6 +89,7 @@ export const workflowCommandSchema = z.discriminatedUnion("operation", [
   z.object({ operation: z.literal("openClaimReview"), claimId: id, reviewId: id, assignedAuditorIdsJson: z.string().trim().min(2).max(1_000), approvalThreshold: z.number().int().positive().max(9), rejectionThreshold: z.number().int().positive().max(9), deadline: z.string().datetime({ offset: true }) }),
   z.object({ operation: z.literal("publishOracleRegistrySnapshot"), id, version: z.number().int().positive(), rootHash: hash, rulesVersion: id, rulesHash: hash, recordCount: z.number().int().positive() }),
   z.object({ operation: z.literal("requestOracleVerification"), requestId: id, claimId: id, snapshotId: id, modelVersion: id, modelHash: hash, assignedOracleIdsJson: z.string().trim().min(2).max(500), requiredConfirmations: z.number().int().positive().max(9), commitDeadline: z.string().datetime({ offset: true }), revealDeadline: z.string().datetime({ offset: true }) }),
+  z.object({ operation: z.literal("startClaimProcessing"), claimId: id }),
   z.object({ operation: z.literal("finalizeOracleTimeout"), requestId: id }),
   z.object({ operation: z.literal("routeOracleFailureToReview"), requestId: id, reviewId: id, assignedAuditorIdsJson: z.string().trim().min(2).max(1_000), approvalThreshold: z.number().int().positive().max(9), rejectionThreshold: z.number().int().positive().max(9), deadline: z.string().datetime({ offset: true }) }),
   z.object({
@@ -131,6 +132,7 @@ export type WorkflowCommand = z.infer<typeof workflowCommandSchema>;
 export type WorkflowOperation = WorkflowCommand["operation"];
 
 export const requiredRoleByOperation = {
+  startClaimProcessing: "insurerAdmin",
   createPartnerAgreement: "insurerAdmin",
   setPartnerAgreementStatus: "insurerAdmin",
   configurePolicyPackagePartners: "insurerAdmin",

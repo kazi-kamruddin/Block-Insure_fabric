@@ -1,4 +1,5 @@
 import { promises as fs } from "node:fs";
+import { createHash } from "node:crypto";
 import { canonicalProtocolHash, ORACLE_PROTOCOL_VERSION } from "./protocol.mjs";
 
 function requireHash(name, value) {
@@ -29,7 +30,7 @@ function requireDate(name, value) {
 
 export function canonicalRecordHash(record) {
   return canonicalProtocolHash(
-    `${ORACLE_PROTOCOL_VERSION}:registry-record`,
+    `${ORACLE_PROTOCOL_VERSION}:registry-record${record.patientReferenceHash ? "-v2" : ""}`,
     requireHash("record.lookupHash", record.lookupHash),
     requireId("record.hospitalId", record.hospitalId),
     requireId("record.treatmentCode", record.treatmentCode),
@@ -39,6 +40,7 @@ export function canonicalRecordHash(record) {
     String(record.validThrough),
     requireHash("record.descriptionHash", record.descriptionHash),
     String(record.status).toUpperCase(),
+    ...(record.patientReferenceHash ? [requireId("record.invoiceId", record.invoiceId), requireHash("record.patientReferenceHash", record.patientReferenceHash)] : []),
   );
 }
 
@@ -132,6 +134,10 @@ export function validateRegistrySnapshot(snapshot) {
   }
   const lookupKeys = new Set();
   for (const record of normalized.records) {
+    if (normalized.rulesVersion === "hospital-invoice-rules-v2") {
+      record.patientReferenceHash = requireHash("record.patientReferenceHash", record.patientReferenceHash);
+      record.invoiceId = requireId("record.invoiceId", record.invoiceId);
+    }
     if (lookupKeys.has(record.lookupHash)) throw new Error(`Duplicate registry lookup hash ${record.lookupHash}`);
     lookupKeys.add(record.lookupHash);
     if (!Number.isSafeInteger(record.minimumAmountMinor) || !Number.isSafeInteger(record.maximumAmountMinor) || record.minimumAmountMinor < 0 || record.maximumAmountMinor < record.minimumAmountMinor) {
@@ -160,12 +166,15 @@ export function assessRegistryRecord({ snapshot, request, claim, hospitalVerific
   else if (snapshot.snapshotId !== request.registrySnapshotId || snapshot.version !== request.registryVersion) verificationCode = "SNAPSHOT_VERSION_MISMATCH";
   else if (snapshot.rootHash !== request.registryRootHash) verificationCode = "REGISTRY_ROOT_MISMATCH";
   else if (snapshot.rulesVersion !== request.rulesVersion || snapshot.rulesHash !== request.rulesHash) verificationCode = "RULES_VERSION_MISMATCH";
+  else if (hospitalVerification.outcome === "SOURCE_BOUND" && snapshot.rulesVersion !== "hospital-invoice-rules-v2") verificationCode = "RULES_VERSION_MISMATCH";
   else if (!record) verificationCode = "RECORD_NOT_FOUND";
   else if (record.status !== "VALID") verificationCode = "RECORD_INVALID";
   else if (String(claim.hospitalId) !== record.hospitalId) verificationCode = "HOSPITAL_MISMATCH";
+  else if (record.patientReferenceHash && record.invoiceId !== claim.hospitalInvoiceId) verificationCode = "RECORD_NOT_FOUND";
+  else if (record.patientReferenceHash && record.patientReferenceHash !== createHash("sha256").update(String(claim.claimantId).trim()).digest("hex")) verificationCode = "PATIENT_MISMATCH";
   else if (claim.amountMinor < record.minimumAmountMinor || claim.amountMinor > record.maximumAmountMinor) verificationCode = "AMOUNT_OUT_OF_RANGE";
   else if (claim.incidentDate < record.validFrom || claim.incidentDate > record.validThrough) verificationCode = "INCIDENT_DATE_MISMATCH";
-  else if (String(claim.descriptionHash).toLowerCase() !== record.descriptionHash) verificationCode = "DESCRIPTION_MISMATCH";
+  else if (!record.patientReferenceHash && String(claim.descriptionHash).toLowerCase() !== record.descriptionHash) verificationCode = "DESCRIPTION_MISMATCH";
   return {
     verified: verificationCode === "VERIFIED",
     verificationCode,

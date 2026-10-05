@@ -51,8 +51,8 @@ function validDate(value) {
 function validSemantics(claim, invoice, policy) {
   const amount = Number(invoice.amountMinor);
   const limit = Number(policy.coverageLimitMinor);
-  if (!Number.isSafeInteger(amount) || !Number.isSafeInteger(limit) || amount < 0 || limit < amount) return false;
-  if (invoice.invoiceId !== claim.hospitalInvoiceId || invoice.hospitalId !== claim.hospitalId || amount !== claim.amountMinor || invoice.status !== "FINALIZED") return false;
+  if (!Number.isSafeInteger(amount) || !Number.isSafeInteger(limit) || !Number.isSafeInteger(claim.amountMinor) || claim.amountMinor <= 0 || limit < claim.amountMinor) return false;
+  if (invoice.invoiceId !== claim.hospitalInvoiceId || invoice.hospitalId !== claim.hospitalId || amount < claim.amountMinor || invoice.status !== "FINALIZED") return false;
   if (policy.policyId !== claim.policyId || policy.policyholderId !== claim.claimantId || policy.status !== "ACTIVE") return false;
   const dates = [claim.incidentDate, invoice.admissionDate, invoice.dischargeDate, policy.startDate, policy.endDate];
   if (!dates.every(validDate)) return false;

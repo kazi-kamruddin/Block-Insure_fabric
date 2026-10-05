@@ -1,4 +1,5 @@
 import "server-only";
+import { randomUUID } from "node:crypto";
 
 import { ledger } from "@/lib/fabric/ledger";
 import { findDemoAccount } from "@/lib/auth/accounts";
@@ -104,8 +105,25 @@ export async function executeWorkflowCommand(command: WorkflowCommand, session: 
       return ledger.openClaimReview(command);
     case "publishOracleRegistrySnapshot":
       return ledger.publishOracleRegistrySnapshot(command);
-    case "requestOracleVerification":
-      return ledger.requestOracleVerification(command);
+    case "startClaimProcessing": {
+      const claim = await ledger.readClaim(command.claimId);
+      if (claim.status === "ORACLE_PENDING" && claim.currentOracleRequestId) return ledger.readOracleRequest(claim.currentOracleRequestId);
+      if (!["SUBMITTED", "APPEAL_SUBMITTED", "HOSPITAL_VERIFIED"].includes(claim.status)) throw new Error("This claim is not awaiting processing.");
+      const snapshot = await refreshHospitalRegistrySnapshot();
+      if (!snapshot) throw new Error("No Hospital invoice records are available.");
+      return ledger.requestOracleVerification({
+        requestId: `oracle-${randomUUID()}`, claimId: claim.id, snapshotId: snapshot.snapshotId,
+        modelVersion: "model-v1", modelHash: "c".repeat(64),
+        assignedOracleIdsJson: '["oracle1","oracle2","oracle3"]', requiredConfirmations: 2,
+        commitDeadline: new Date(Date.now() + 60_000).toISOString(),
+        revealDeadline: new Date(Date.now() + 180_000).toISOString(),
+      });
+    }
+    case "requestOracleVerification": {
+      const claim = await ledger.readClaim(command.claimId);
+      const snapshot = claim.hospitalInvoiceId ? await refreshHospitalRegistrySnapshot() : null;
+      return ledger.requestOracleVerification({ ...command, snapshotId: snapshot?.snapshotId ?? command.snapshotId });
+    }
     case "finalizeOracleTimeout":
       return ledger.finalizeOracleTimeout(command.requestId);
     case "routeOracleFailureToReview":

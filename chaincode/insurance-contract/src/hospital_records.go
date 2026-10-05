@@ -3,6 +3,7 @@ package insurance
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/hyperledger/fabric-contract-api-go/v2/contractapi"
 )
@@ -47,6 +48,14 @@ func (c *Contract) CreateHospitalInvoice(
 	id, patientReferenceHash, invoiceReferenceHash, treatmentHash string,
 	amountMinor int64, admissionDate, dischargeDate, status string,
 ) (*HospitalInvoice, error) {
+	return c.createHospitalInvoice(ctx, id, patientReferenceHash, invoiceReferenceHash, treatmentHash, amountMinor, admissionDate, dischargeDate, status, false)
+}
+
+func (c *Contract) CreateHospitalInvoiceWithCredential(ctx contractapi.TransactionContextInterface, id, patientReferenceHash, invoiceReferenceHash, treatmentHash string, amountMinor int64, admissionDate, dischargeDate, status string) (*HospitalInvoice, error) {
+	return c.createHospitalInvoice(ctx, id, patientReferenceHash, invoiceReferenceHash, treatmentHash, amountMinor, admissionDate, dischargeDate, status, true)
+}
+
+func (c *Contract) createHospitalInvoice(ctx contractapi.TransactionContextInterface, id, patientReferenceHash, invoiceReferenceHash, treatmentHash string, amountMinor int64, admissionDate, dischargeDate, status string, automaticCredential bool) (*HospitalInvoice, error) {
 	if _, err := requireIdentity(ctx, "HospitalMSP", "hospitalOfficer"); err != nil {
 		return nil, err
 	}
@@ -78,6 +87,11 @@ func (c *Contract) CreateHospitalInvoice(
 		AmountMinor: amountMinor, AdmissionDate: admissionDate, DischargeDate: dischargeDate,
 		Status: status, CreatedAt: now, UpdatedAt: now,
 	}
+	if automaticCredential && invoice.Status == "FINALIZED" {
+		if err := c.ensureInvoiceCredential(ctx, invoice); err != nil {
+			return nil, err
+		}
+	}
 	if err := putState(ctx, "hospitalInvoice", id, invoice); err != nil {
 		return nil, err
 	}
@@ -92,6 +106,14 @@ func (c *Contract) UpdateHospitalInvoice(
 	id, patientReferenceHash, invoiceReferenceHash, treatmentHash string,
 	amountMinor int64, admissionDate, dischargeDate, status string,
 ) (*HospitalInvoice, error) {
+	return c.updateHospitalInvoice(ctx, id, patientReferenceHash, invoiceReferenceHash, treatmentHash, amountMinor, admissionDate, dischargeDate, status, false)
+}
+
+func (c *Contract) UpdateHospitalInvoiceWithCredential(ctx contractapi.TransactionContextInterface, id, patientReferenceHash, invoiceReferenceHash, treatmentHash string, amountMinor int64, admissionDate, dischargeDate, status string) (*HospitalInvoice, error) {
+	return c.updateHospitalInvoice(ctx, id, patientReferenceHash, invoiceReferenceHash, treatmentHash, amountMinor, admissionDate, dischargeDate, status, true)
+}
+
+func (c *Contract) updateHospitalInvoice(ctx contractapi.TransactionContextInterface, id, patientReferenceHash, invoiceReferenceHash, treatmentHash string, amountMinor int64, admissionDate, dischargeDate, status string, automaticCredential bool) (*HospitalInvoice, error) {
 	if _, err := requireIdentity(ctx, "HospitalMSP", "hospitalOfficer"); err != nil {
 		return nil, err
 	}
@@ -131,6 +153,22 @@ func (c *Contract) UpdateHospitalInvoice(
 		invoice.DischargeDate = dischargeDate
 	}
 	invoice.Status = status
+	if automaticCredential && status == "FINALIZED" {
+		if err := c.ensureInvoiceCredential(ctx, invoice); err != nil {
+			return nil, err
+		}
+	}
+	if status == "VOID" && invoice.PrivacyCredentialID != "" {
+		credential, err := c.ReadPrivacyCredential(ctx, invoice.PrivacyCredentialID)
+		if err != nil {
+			return nil, err
+		}
+		if credential.Status == "ACTIVE" {
+			if _, err := c.RevokePrivacyCredential(ctx, credential.ID); err != nil {
+				return nil, err
+			}
+		}
+	}
 	invoice.UpdatedAt, err = timestamp(ctx)
 	if err != nil {
 		return nil, err
@@ -142,6 +180,26 @@ func (c *Contract) UpdateHospitalInvoice(
 		return nil, err
 	}
 	return invoice, nil
+}
+
+func (c *Contract) ensureInvoiceCredential(ctx contractapi.TransactionContextInterface, invoice *HospitalInvoice) error {
+	if invoice.PrivacyCredentialID != "" {
+		return nil
+	}
+	issuer, err := requireIdentity(ctx, "HospitalMSP", "hospitalOfficer")
+	if err != nil {
+		return err
+	}
+	tx, err := ctx.GetStub().GetTxTimestamp()
+	if err != nil {
+		return err
+	}
+	id := "invoice-credential-" + patientSubjectHash(invoice.ID)
+	_, err = c.issueInvoiceCredential(ctx, id, invoice, issuer, tx.AsTime().AddDate(1, 0, 0).UTC().Format(time.RFC3339))
+	if err == nil {
+		invoice.PrivacyCredentialID = id
+	}
+	return err
 }
 
 func (c *Contract) ReadHospitalInvoice(ctx contractapi.TransactionContextInterface, id string) (*HospitalInvoice, error) {

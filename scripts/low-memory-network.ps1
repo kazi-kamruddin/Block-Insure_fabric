@@ -2,7 +2,9 @@
 param(
     [Parameter(Position = 0)]
     [ValidateSet("Start", "Status")]
-    [string]$Action = "Status"
+    [string]$Action = "Status",
+    [ValidateSet("1.4.1-hardening", "1.5.0-workflow")]
+    [string]$ChaincodeVersion = "1.4.1-hardening"
 )
 
 $ErrorActionPreference = "Stop"
@@ -39,7 +41,7 @@ function Stop-LegacyRuntimes {
     param([Parameter(Mandatory)][string]$Organization)
     $prefix = "dev-peer0.$Organization.blockinsure.test-insurance-contract_"
     $legacy = @(Get-RunningNames | Where-Object {
-        $_.StartsWith($prefix) -and -not $_.Contains("_1.4.1-hardening-")
+        $_.StartsWith($prefix) -and -not $_.Contains("_${ChaincodeVersion}-")
     })
     if ($legacy.Count -eq 0) { return }
     & docker stop --timeout 2 $legacy | Out-Null
@@ -52,16 +54,16 @@ function Assert-Runtime {
     $missing = @($coreContainers | Where-Object { $_ -notin $running })
     if ($missing.Count -gt 0) { throw "Missing Fabric runtime containers: $($missing -join ', ')." }
     foreach ($organization in $organizations) {
-        $prefix = "dev-peer0.$organization.blockinsure.test-insurance-contract_1.4.1-hardening-"
+        $prefix = "dev-peer0.$organization.blockinsure.test-insurance-contract_${ChaincodeVersion}-"
         if (@($running | Where-Object { $_.StartsWith($prefix) }).Count -ne 1) {
-            throw "Current hardening chaincode is not running on $organization peer."
+            throw "Selected chaincode is not running on $organization peer."
         }
     }
     $legacy = @($running | Where-Object {
-        $_.StartsWith("dev-peer0.") -and -not $_.Contains("_1.4.1-hardening-")
+        $_.StartsWith("dev-peer0.") -and -not $_.Contains("_${ChaincodeVersion}-")
     })
     if ($legacy.Count -gt 0) { throw "Legacy chaincode runtimes are still running: $($legacy.Count)." }
-    Write-Host "Low-memory Fabric runtime ready: 11 transaction services and 5 hardening chaincode runtimes." -ForegroundColor Green
+    Write-Host "Low-memory Fabric runtime ready: 11 transaction services and 5 selected chaincode runtimes." -ForegroundColor Green
     Write-Host "CAs are stopped; existing enrolled identities are required."
 }
 
@@ -85,7 +87,7 @@ if ($Action -eq "Start") {
         Invoke-ComposeUp @("peer-$organization") -NoDependencies
         for ($attempt = 0; $attempt -lt 30; $attempt++) {
             Stop-LegacyRuntimes $organization
-            $prefix = "dev-peer0.$organization.blockinsure.test-insurance-contract_1.4.1-hardening-"
+            $prefix = "dev-peer0.$organization.blockinsure.test-insurance-contract_${ChaincodeVersion}-"
             if (@(Get-RunningNames | Where-Object { $_.StartsWith($prefix) }).Count -eq 1) { break }
             Start-Sleep -Seconds 1
         }

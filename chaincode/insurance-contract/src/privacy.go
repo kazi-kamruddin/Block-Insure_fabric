@@ -249,6 +249,10 @@ func (c *Contract) IssueInvoicePrivacyCredential(ctx contractapi.TransactionCont
 	if invoice.HospitalID != hospitalID || invoice.Status != "FINALIZED" {
 		return nil, fmt.Errorf("invoice %s is not a finalized invoice owned by this hospital", invoiceID)
 	}
+	return c.issueInvoiceCredential(ctx, id, invoice, issuer, expiresAt)
+}
+
+func (c *Contract) issueInvoiceCredential(ctx contractapi.TransactionContextInterface, id string, invoice *HospitalInvoice, issuer, expiresAt string) (*PrivacyCredential, error) {
 	values := map[string]string{
 		"admissionDate": invoice.AdmissionDate, "amountMinor": strconv.FormatInt(invoice.AmountMinor, 10),
 		"dischargeDate": invoice.DischargeDate, "hospitalId": invoice.HospitalID, "invoiceId": invoice.ID,
@@ -300,6 +304,15 @@ func (c *Contract) validatePresentationCredentials(ctx contractapi.TransactionCo
 		}
 		if credential.Status != "ACTIVE" || credential.RootHash != bound.root {
 			return fmt.Errorf("privacy credential %s is inactive for presentation %s", bound.id, presentation.ID)
+		}
+		if credential.CredentialType == "HOSPITAL_INVOICE" {
+			invoice, err := c.ReadHospitalInvoice(ctx, credential.SourceID)
+			if err != nil {
+				return err
+			}
+			if invoice.Status != "FINALIZED" {
+				return fmt.Errorf("invoice %s is no longer finalized", invoice.ID)
+			}
 		}
 		expiry, err := time.Parse(time.RFC3339, credential.ExpiresAt)
 		if err != nil || !expiry.After(at) {
@@ -400,10 +413,10 @@ func validatePresentationSemantics(claim *Claim, invoiceValues, policyValues map
 	if err != nil {
 		return err
 	}
-	if invoiceValues["invoiceId"] != claim.HospitalInvoiceID || invoiceValues["hospitalId"] != claim.HospitalID || amount != claim.AmountMinor || invoiceValues["status"] != "FINALIZED" {
+	if invoiceValues["invoiceId"] != claim.HospitalInvoiceID || invoiceValues["hospitalId"] != claim.HospitalID || claim.AmountMinor <= 0 || claim.AmountMinor > amount || invoiceValues["status"] != "FINALIZED" {
 		return fmt.Errorf("invoice disclosures do not match claim %s", claim.ID)
 	}
-	if policyValues["policyId"] != claim.PolicyID || policyValues["policyholderId"] != claim.ClaimantID || policyValues["status"] != "ACTIVE" || amount > limit {
+	if policyValues["policyId"] != claim.PolicyID || policyValues["policyholderId"] != claim.ClaimantID || policyValues["status"] != "ACTIVE" || claim.AmountMinor > limit {
 		return fmt.Errorf("policy disclosures do not authorize claim %s", claim.ID)
 	}
 	incident, err := validateDate("incidentDate", claim.IncidentDate)
@@ -438,7 +451,7 @@ func (c *Contract) RegisterClaimPrivacyPresentation(ctx contractapi.TransactionC
 	if err != nil {
 		return nil, err
 	}
-	if claim.ClaimantID != subject || (claim.Status != "HOSPITAL_VERIFIED" && claim.Status != "APPEAL_SUBMITTED") {
+	if claim.ClaimantID != subject || (claim.Status != "SUBMITTED" && claim.Status != "HOSPITAL_VERIFIED" && claim.Status != "APPEAL_SUBMITTED") {
 		return nil, fmt.Errorf("claim %s is not eligible for a presentation by this policyholder", claimID)
 	}
 	if !idPattern.MatchString(strings.TrimSpace(challenge)) {

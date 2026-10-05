@@ -91,8 +91,8 @@ function Invoke-Preflight {
     if ($LowMemory -and -not $ExistingNetwork) {
         throw "-LowMemory requires -ExistingNetwork; it only checks a preserved Fabric runtime."
     }
-    if ($LowMemory -and $env:FABRIC_CHANNEL_NAME -ne "insurance-phase2-hardening-20260927") {
-        throw "-LowMemory requires FABRIC_CHANNEL_NAME=insurance-phase2-hardening-20260927."
+    if ($LowMemory -and $env:FABRIC_CHANNEL_NAME -notin @("insurance-phase2-hardening-20260927", "insurance-workflow-20261005")) {
+        throw "-LowMemory requires a preserved hardening or workflow demonstration channel."
     }
     Write-Host "Checking Docker Desktop, source dependencies, and local configuration..." -ForegroundColor Cyan
     & docker info --format "Docker {{.ServerVersion}} is ready"

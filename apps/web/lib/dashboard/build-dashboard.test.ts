@@ -36,9 +36,9 @@ describe("role dashboards", () => {
     expect(buildRoleDashboard("bankOfficer", assets).queue[0]?.id).toBe("settlement-1");
   });
 
-  it("hands a submitted appeal to corrected-invoice cross-check before fresh Oracle work", () => {
+  it("starts fresh Oracle processing directly for a submitted appeal", () => {
     const appealedClaim = { ...assets.claims[0], id: "claim-appeal", status: "APPEAL_SUBMITTED" as const, currentAppealId: "appeal-1", appealCount: 1, version: 2 };
     const dashboard = buildRoleDashboard("insurerAdmin", { ...assets, claims: [appealedClaim] });
-    expect(dashboard.queue[0]).toMatchObject({ id: "claim-appeal", commandLabel: "Cross-check invoice", command: { operation: "crossCheckClaimInvoice" } });
+    expect(dashboard.queue[0]).toMatchObject({ id: "claim-appeal", commandLabel: "Start claim processing", command: { operation: "startClaimProcessing" } });
   });
 });

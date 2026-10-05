@@ -18,6 +18,7 @@ export type PartnerAgreement = {
 };
 
 export type HospitalInvoice = {
+  privacyCredentialId?: string;
   assetType: "hospitalInvoice";
   schemaVersion: number;
   id: string;
@@ -499,7 +500,7 @@ export type HospitalVerification = {
   claimVersion: number;
   appealId: string;
   hospitalIdentity: string;
-  outcome: "VERIFIED" | "INVALID";
+  outcome: "VERIFIED" | "INVALID" | "SOURCE_BOUND";
   clinicalReferenceHash: string;
   attestationHash: string;
   createdAt: LedgerTimestamp;

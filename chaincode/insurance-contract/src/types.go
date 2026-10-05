@@ -1,6 +1,6 @@
 package insurance
 
-const SchemaVersion = 14
+const SchemaVersion = 15
 
 type PartnerAgreement struct {
 	AssetType     string `json:"assetType"`
@@ -20,6 +20,7 @@ type PartnerAgreement struct {
 }
 
 type HospitalInvoice struct {
+	PrivacyCredentialID  string `json:"privacyCredentialId,omitempty"`
 	AssetType            string `json:"assetType"`
 	SchemaVersion        int    `json:"schemaVersion"`
 	ID                   string `json:"id"`

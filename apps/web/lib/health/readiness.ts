@@ -22,7 +22,7 @@ export async function buildReadinessPayload({
   oracle1Probe,
   oracle2Probe,
   oracle3Probe,
-  expectedSchemaVersion = 14,
+  expectedSchemaVersion = 15,
   now = () => new Date().toISOString(),
 }: {
   fabricProbe: Probe;

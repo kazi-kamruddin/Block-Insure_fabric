@@ -421,10 +421,12 @@ export const ledger = {
     dischargeDate: string;
     status: "DRAFT" | "FINALIZED";
   }, hospitalUserName?: string) {
-    return submitAsHospital<HospitalInvoice>(
-      hospitalUserName, "CreateHospitalInvoice", input.id, input.patientReferenceHash,
+    if (!hospitalUserName) throw new Error("This Hospital account has no Fabric identity");
+    return submitWithTransient<HospitalInvoice>(
+      "hospitalOfficer", "CreateHospitalInvoiceWithCredential", [input.id, input.patientReferenceHash,
       input.invoiceReferenceHash, input.treatmentHash, input.amountMinor,
-      input.admissionDate, input.dischargeDate, input.status,
+      input.admissionDate, input.dischargeDate, input.status],
+      { credentialSalts: randomSalts(["admissionDate", "amountMinor", "dischargeDate", "hospitalId", "invoiceId", "invoiceReferenceHash", "patientReferenceHash", "status", "treatmentHash"]) }, hospitalUserName,
     );
   },
 
@@ -438,10 +440,12 @@ export const ledger = {
     dischargeDate: string;
     status: "DRAFT" | "FINALIZED" | "VOID";
   }, hospitalUserName?: string) {
-    return submitAsHospital<HospitalInvoice>(
-      hospitalUserName, "UpdateHospitalInvoice", input.id, input.patientReferenceHash,
+    if (!hospitalUserName) throw new Error("This Hospital account has no Fabric identity");
+    return submitWithTransient<HospitalInvoice>(
+      "hospitalOfficer", "UpdateHospitalInvoiceWithCredential", [input.id, input.patientReferenceHash,
       input.invoiceReferenceHash, input.treatmentHash, input.amountMinor,
-      input.admissionDate, input.dischargeDate, input.status,
+      input.admissionDate, input.dischargeDate, input.status],
+      { credentialSalts: randomSalts(["admissionDate", "amountMinor", "dischargeDate", "hospitalId", "invoiceId", "invoiceReferenceHash", "patientReferenceHash", "status", "treatmentHash"]) }, hospitalUserName,
     );
   },
 

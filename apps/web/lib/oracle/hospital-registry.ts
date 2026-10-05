@@ -8,9 +8,11 @@ import type { HospitalInvoice } from "@/lib/fabric/types";
 import { persistJsonFile } from "@/lib/events/state-file";
 
 const protocolVersion = "block-insure-oracle-v1";
-const rulesVersion = "hospital-invoice-rules-v1";
+const rulesVersion = "hospital-invoice-rules-v2";
 
 export type HospitalRegistryRecord = {
+  invoiceId: string;
+  patientReferenceHash: string;
   lookupHash: string;
   hospitalId: string;
   treatmentCode: string;
@@ -19,7 +21,7 @@ export type HospitalRegistryRecord = {
   validFrom: string;
   validThrough: string;
   descriptionHash: string;
-  status: "VALID";
+  status: "VALID" | "INVALID";
 };
 
 export type HospitalRegistrySnapshotFile = {
@@ -42,9 +44,10 @@ function canonicalHash(domain: string, ...values: Array<string | number | boolea
 
 function recordHash(record: HospitalRegistryRecord) {
   return canonicalHash(
-    `${protocolVersion}:registry-record`, record.lookupHash, record.hospitalId,
+    `${protocolVersion}:registry-record-v2`, record.lookupHash, record.hospitalId,
     record.treatmentCode, record.minimumAmountMinor, record.maximumAmountMinor,
     record.validFrom, record.validThrough, record.descriptionHash, record.status,
+    record.invoiceId, record.patientReferenceHash,
   );
 }
 
@@ -57,18 +60,20 @@ function snapshotPath(id: string) {
 }
 
 function recordsFromInvoices(invoices: HospitalInvoice[]) {
-  const records = invoices.filter((invoice) => invoice.status === "FINALIZED")
+  const records = [...invoices]
     .sort((left, right) => left.invoiceReferenceHash.localeCompare(right.invoiceReferenceHash))
     .map((invoice): HospitalRegistryRecord => ({
+      invoiceId: invoice.id,
+      patientReferenceHash: invoice.patientReferenceHash.toLowerCase(),
       lookupHash: invoice.invoiceReferenceHash.toLowerCase(),
       hospitalId: invoice.hospitalId,
       treatmentCode: "HOSPITAL_INVOICE",
-      minimumAmountMinor: invoice.amountMinor,
+      minimumAmountMinor: 1,
       maximumAmountMinor: invoice.amountMinor,
       validFrom: invoice.admissionDate,
       validThrough: invoice.dischargeDate,
       descriptionHash: invoice.treatmentHash.toLowerCase(),
-      status: "VALID",
+      status: invoice.status === "FINALIZED" ? "VALID" : "INVALID",
     }));
 
   // Replayed/idempotent Hospital imports can describe the same invoice facts
@@ -97,7 +102,7 @@ export async function refreshHospitalRegistrySnapshot() {
   const version = published.filter((item) => item.id.startsWith("registry-hospital-v"))
     .reduce((maximum, item) => Math.max(maximum, item.version), 0) + 1;
   const snapshotId = `registry-hospital-v${version}`;
-  const rulesHash = createHash("sha256").update("Finalized Hospital invoice: exact hospital, amount, treatment hash, and admission/discharge window.").digest("hex");
+  const rulesHash = createHash("sha256").update("Hospital invoice v2: finalized source, invoice ID, hospital and patient binding; positive claim up to invoice total within admission/discharge dates; narrative is not a treatment identifier.").digest("hex");
   const rootHash = canonicalHash(
     `${protocolVersion}:registry`, version, rulesVersion, rulesHash,
     ...records.map(recordHash).sort((left, right) => left.localeCompare(right)),

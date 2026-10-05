@@ -31,6 +31,7 @@ var oracleVerificationCodes = map[string]bool{
 	"INCIDENT_DATE_MISMATCH":       true,
 	"DESCRIPTION_MISMATCH":         true,
 	"HOSPITAL_MISMATCH":            true,
+	"PATIENT_MISMATCH":             true,
 	"PRIVACY_PRESENTATION_MISSING": true,
 	"PRIVACY_PROOF_INVALID":        true,
 	"PRIVACY_PRESENTATION_EXPIRED": true,
@@ -293,17 +294,23 @@ func (c *Contract) RequestOracleVerification(
 	if err != nil {
 		return nil, err
 	}
-	if claim.Status != "HOSPITAL_VERIFIED" && claim.Status != "APPEAL_SUBMITTED" {
+	invoiceFlow := claim.HospitalInvoiceID != ""
+	if !invoiceFlow && claim.Status != "HOSPITAL_VERIFIED" && claim.Status != "APPEAL_SUBMITTED" {
 		return nil, fmt.Errorf("claim %s is not ready for Oracle verification", claimID)
 	}
-	if claim.HospitalVerificationID == "" {
+	if !invoiceFlow && claim.HospitalVerificationID == "" {
 		return nil, fmt.Errorf("claim %s requires a current verified hospital attestation", claimID)
 	}
-	verification, err := c.ReadHospitalVerification(ctx, claim.HospitalVerificationID)
+	var verification *HospitalVerification
+	if invoiceFlow {
+		verification, err = c.bindOracleInvoice(ctx, claim, requestID)
+	} else {
+		verification, err = c.ReadHospitalVerification(ctx, claim.HospitalVerificationID)
+	}
 	if err != nil {
 		return nil, err
 	}
-	if verification.Outcome != "VERIFIED" || verification.ClaimID != claimID || verification.ClaimVersion != claim.Version {
+	if (!invoiceFlow && verification.Outcome != "VERIFIED") || verification.ClaimID != claimID || verification.ClaimVersion != claim.Version {
 		return nil, fmt.Errorf("claim %s requires a current verified hospital attestation", claimID)
 	}
 	appealID := ""
@@ -316,7 +323,7 @@ func (c *Contract) RequestOracleVerification(
 		if readErr != nil {
 			return nil, readErr
 		}
-		if appeal.Status != "HOSPITAL_VERIFIED" || appeal.ClaimVersion != claim.Version || appeal.HospitalVerificationID != verification.ID {
+		if (!invoiceFlow && (appeal.Status != "HOSPITAL_VERIFIED" || appeal.HospitalVerificationID != verification.ID)) || appeal.ClaimVersion != claim.Version {
 			return nil, fmt.Errorf("appeal %s requires fresh hospital verification", appeal.ID)
 		}
 		if appeal.CommitmentHash == "" || appeal.CommitmentHash != appealCommitmentHash(appeal) {
@@ -324,12 +331,22 @@ func (c *Contract) RequestOracleVerification(
 		}
 		appealID = appeal.ID
 		appealHash = appeal.CommitmentHash
+		if invoiceFlow {
+			appeal.HospitalVerificationID = verification.ID
+			appeal.Status = "ORACLE_PENDING"
+			if err := overwriteAsset(ctx, "claimAppeal", appeal.ID, appeal); err != nil {
+				return nil, err
+			}
+		}
 	} else if verification.AppealID != "" {
 		return nil, fmt.Errorf("claim %s has an appeal-bound hospital attestation in its initial cycle", claimID)
 	}
 	snapshot, err := c.ReadOracleRegistrySnapshot(ctx, snapshotID)
 	if err != nil {
 		return nil, err
+	}
+	if invoiceFlow && snapshot.RulesVersion != "hospital-invoice-rules-v2" {
+		return nil, fmt.Errorf("invoice claims require a current Hospital registry using hospital-invoice-rules-v2")
 	}
 	if !idPattern.MatchString(strings.TrimSpace(modelVersion)) {
 		return nil, fmt.Errorf("modelVersion is invalid")
@@ -641,7 +658,7 @@ func (c *Contract) finalizeOracleRequest(ctx contractapi.TransactionContextInter
 			if err != nil {
 				return err
 			}
-			if appeal.Status == "HOSPITAL_VERIFIED" {
+			if appeal.Status == "HOSPITAL_VERIFIED" || appeal.Status == "ORACLE_PENDING" {
 				appeal.Status = "OVERTURNED"
 				appeal.ResolvedAt = now
 				if err := overwriteAsset(ctx, "claimAppeal", appeal.ID, appeal); err != nil {
@@ -731,7 +748,7 @@ func (c *Contract) RouteOracleFailureToReview(
 		if readErr != nil {
 			return nil, readErr
 		}
-		if appeal.Status == "HOSPITAL_VERIFIED" {
+		if appeal.Status == "HOSPITAL_VERIFIED" || appeal.Status == "ORACLE_PENDING" {
 			appealID = appeal.ID
 			kind = "APPEAL"
 		}

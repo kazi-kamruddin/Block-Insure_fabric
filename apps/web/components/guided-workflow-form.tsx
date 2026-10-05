@@ -34,7 +34,10 @@ export function GuidedWorkflowForm({
   prepared: PreparedWorkflow | null;
   onSubmit: (command: WorkflowCommand) => Promise<void>;
 }) {
-  const operations = operationsByRole[role];
+  const [maintenance, setMaintenance] = useState(false);
+  const operations: readonly WorkflowOperation[] = role === "hospitalOfficer" && maintenance
+    ? [...operationsByRole[role], "issueInvoicePrivacyCredential", "revokeInvoicePrivacyCredential"]
+    : operationsByRole[role];
   const preparedOperation = typeof prepared?.command.operation === "string"
     && operations.includes(prepared.command.operation as never)
     ? prepared.command.operation as WorkflowOperation
@@ -75,6 +78,10 @@ export function GuidedWorkflowForm({
     <article className="workCard guidedCard" id="guided-workflow">
       <span className="kicker">{portalCopy.kicker}</span>
       <h2>{portalCopy.heading}</h2>
+      {role === "hospitalOfficer" && <details><summary>Credential maintenance</summary>
+        <p>Credentials are issued automatically when an invoice is finalized. Voiding that invoice revokes its automatic credential.</p>
+        <label><input type="checkbox" checked={maintenance} onChange={(event) => { setMaintenance(event.target.checked); selectOperation("createHospitalInvoice"); }} />Show issuer maintenance actions</label>
+      </details>}
       <label>Action
         <select
           aria-label="Workflow action"
