@@ -1,9 +1,8 @@
 import { z } from "zod";
 import type { FabricRole } from "@/lib/fabric/config";
+import { ledgerDateSchema as date, ledgerIdSchema as id } from "@/lib/fabric/validation";
 
-const id = z.string().trim().min(1).max(100).regex(/^[a-zA-Z0-9._:-]+$/);
 const hash = z.string().trim().regex(/^[a-fA-F0-9]{64}$/).transform((value) => value.toLowerCase());
-const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const money = z.number().int().positive().safe();
 
 export const workflowCommandSchema = z.discriminatedUnion("operation", [

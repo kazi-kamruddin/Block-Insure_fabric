@@ -55,8 +55,9 @@ co-located under `apps/web/lib/`; cross-component browser tests live in
 
 `reference/` contains the prior Ethereum implementation and a dated Fabric
 context snapshot for local study. It is deliberately ignored by Git; edits to
-`reference/context_26sept.md` remain local unless explicitly added to version
-control. The nested Ethereum implementation is not the active runtime.
+`reference/context Block_Insure_Fabric 13oct.md` remain local unless
+explicitly added to version control. The nested Ethereum implementation is not
+the active runtime.
 
 ## Implemented architecture
 

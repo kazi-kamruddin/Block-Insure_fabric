@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { ledgerIdSchema } from "@/lib/fabric/validation";
 import { currentSession, sessionSecret } from "@/lib/auth/current-session";
 import { findDemoAccount } from "@/lib/auth/accounts";
 import { ledger } from "@/lib/fabric/ledger";
@@ -7,7 +8,7 @@ import { otpChallenges } from "@/lib/banking/otp";
 import { deliverBankOtp } from "@/lib/banking/email-gateway";
 import { checkMutationOrigin } from "@/lib/security/request-origin";
 
-const requestSchema = z.object({ policyId: z.string().min(3).max(128), sourceAccountId: z.string().min(3).max(128) });
+const requestSchema = z.object({ policyId: ledgerIdSchema, sourceAccountId: ledgerIdSchema });
 export const runtime = "nodejs";
 
 function otpSecret() {

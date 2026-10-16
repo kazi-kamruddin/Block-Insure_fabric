@@ -95,18 +95,30 @@ function recordsFromInvoices(invoices: HospitalInvoice[]) {
     .sort((left, right) => left.lookupHash.localeCompare(right.lookupHash));
 }
 
-export async function refreshHospitalRegistrySnapshot() {
+async function publishHospitalRegistrySnapshot() {
   const [invoices, published] = await Promise.all([ledger.listHospitalInvoices(), ledger.listOracleRegistrySnapshots()]);
   const records = recordsFromInvoices(invoices);
   if (records.length === 0) return null;
-  const version = published.filter((item) => item.id.startsWith("registry-hospital-v"))
-    .reduce((maximum, item) => Math.max(maximum, item.version), 0) + 1;
+  const latest = published.filter((item) => /^registry-hospital-v[1-9][0-9]*$/.test(item.id))
+    .reduce<(typeof published)[number] | undefined>((previous, item) => !previous || item.version > previous.version ? item : previous, undefined);
+  const version = (latest?.version ?? 0) + 1;
   const snapshotId = `registry-hospital-v${version}`;
   const rulesHash = createHash("sha256").update("Hospital invoice v2: finalized source, invoice ID, hospital and patient binding; positive claim up to invoice total within admission/discharge dates; narrative is not a treatment identifier.").digest("hex");
-  const rootHash = canonicalHash(
-    `${protocolVersion}:registry`, version, rulesVersion, rulesHash,
+  const rootForVersion = (value: number) => canonicalHash(
+    `${protocolVersion}:registry`, value, rulesVersion, rulesHash,
     ...records.map(recordHash).sort((left, right) => left.localeCompare(right)),
   );
+  // Reuse unchanged facts instead of adding a ledger transaction for every
+  // processing click. Recreate the local file if it was lost on restart.
+  if (latest && latest.rootHash === rootForVersion(latest.version)) {
+    const snapshot: HospitalRegistrySnapshotFile = {
+      sourceId: "fabric-hospital-invoice-register", snapshotId: latest.id,
+      version: latest.version, rulesVersion, rulesHash, rootHash: latest.rootHash, records,
+    };
+    await persistJsonFile(snapshotPath(snapshot.snapshotId), snapshot);
+    return snapshot;
+  }
+  const rootHash = rootForVersion(version);
   const snapshot: HospitalRegistrySnapshotFile = {
     sourceId: "fabric-hospital-invoice-register", snapshotId, version,
     rulesVersion, rulesHash, rootHash, records,
@@ -114,6 +126,16 @@ export async function refreshHospitalRegistrySnapshot() {
   await persistJsonFile(snapshotPath(snapshotId), snapshot);
   await ledger.publishOracleRegistrySnapshot({ id: snapshotId, version, rootHash, rulesVersion, rulesHash, recordCount: records.length });
   return snapshot;
+}
+
+let publicationQueue = Promise.resolve();
+
+export function refreshHospitalRegistrySnapshot() {
+  // Concurrent Hospital edits and insurer requests share a version allocator.
+  // Always read the ledger after the preceding publication has committed.
+  const operation = publicationQueue.then(publishHospitalRegistrySnapshot);
+  publicationQueue = operation.then(() => undefined, () => undefined);
+  return operation;
 }
 
 export async function readHospitalRegistrySnapshot(id: string) {

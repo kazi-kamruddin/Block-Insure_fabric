@@ -2,6 +2,30 @@ import { describe, expect, it } from "vitest";
 import { applyFabricEvent, emptyEventProjection, notificationsFor } from "./projection";
 
 describe("Fabric event projection", () => {
+  it("keeps subjectless policyholder notices scoped to owned assets", () => {
+    const projection = applyFabricEvent(emptyEventProjection(), {
+      id: "9:tx-private:ClaimHospitalVerified", blockNumber: "9", transactionId: "tx-private", eventName: "ClaimHospitalVerified",
+      payload: { claimId: "claim-private" },
+    }, "2026-09-06T12:00:00Z");
+    expect(notificationsFor(projection, "policyholder", "another-holder")).toHaveLength(0);
+    expect(notificationsFor(projection, "policyholder", "owner", new Set(["claim-private"]))).toHaveLength(1);
+    expect(notificationsFor(projection, "insurerAdmin")).toHaveLength(1);
+  });
+
+  it.each([
+    ["PremiumPaymentRecorded", { id: "receipt-1", method: "OTP" }, "SETTLED", "OTP"],
+    ["PremiumAdjustmentRecorded", { id: "adjustment-1" }, "SETTLED", "REVERSAL"],
+    ["PremiumCollectionProcessed", { id: "collection-1", status: "COMPLETED" }, "SETTLED", "EFT"],
+    ["PremiumCollectionProcessed", { id: "collection-1", status: "BOUNCED", failureCode: "INSUFFICIENT_FUNDS" }, "BOUNCED", "EFT"],
+    ["SettlementConfirmed", { id: "settlement-1", status: "CONFIRMED" }, "SETTLED", "CLAIM_PAYOUT"],
+    ["SettlementPaymentFailed", { id: "settlement-1", status: "PAYMENT_FAILED" }, "BOUNCED", "CLAIM_PAYOUT"],
+  ])("projects communication from the single committed %s event", (eventName, payload, status, method) => {
+    const event = { id: `12:tx-final:${eventName}`, blockNumber: "12", transactionId: "tx-final", eventName,
+      payload: { ...payload, transferId: "transfer-final", policyId: "policy-1", amountMinor: 10_000 } };
+    const projected = applyFabricEvent(emptyEventProjection(), event, "2026-09-06T12:00:00Z");
+    expect(projected.communications[0]).toMatchObject({ assetId: "transfer-final", variables: { status, method, amountMinor: 10_000 } });
+    expect(applyFabricEvent(projected, event, "2026-09-06T12:00:01Z").communications).toHaveLength(1);
+  });
   it("deduplicates replayed events and advances a transaction checkpoint", () => {
     const event = { id: "7:tx-1:ClaimSubmitted", blockNumber: "7", transactionId: "tx-1", eventName: "ClaimSubmitted", payload: { id: "claim-1" } };
     const once = applyFabricEvent(emptyEventProjection(), event, "2026-09-06T12:00:00Z");

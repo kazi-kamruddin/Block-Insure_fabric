@@ -109,7 +109,7 @@ export const demoAccounts = {
 } as const satisfies Record<string, Omit<DemoAccount, "id"> & { id: string }>;
 
 export function findDemoAccount(id: string): DemoAccount | undefined {
-  return demoAccounts[id as DemoAccountId] as DemoAccount | undefined;
+  return Object.hasOwn(demoAccounts, id) ? demoAccounts[id as DemoAccountId] : undefined;
 }
 
 export function findDemoAccountBySubject(subjectId: string): DemoAccount | undefined {

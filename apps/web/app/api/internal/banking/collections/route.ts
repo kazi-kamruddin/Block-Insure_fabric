@@ -1,16 +1,17 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { ledgerDateSchema, ledgerIdSchema } from "@/lib/fabric/validation";
 import { createHmac } from "node:crypto";
 import { ledger } from "@/lib/fabric/ledger";
 import { verifyBearerToken } from "@/lib/security/bearer-token";
 
 const commandSchema = z.discriminatedUnion("action", [
-  z.object({ action: z.literal("listDue"), asOfDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) }),
-  z.object({ action: z.literal("run"), asOfDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) }),
+  z.object({ action: z.literal("listDue"), asOfDate: ledgerDateSchema }),
+  z.object({ action: z.literal("run"), asOfDate: ledgerDateSchema }),
   z.object({
-    action: z.literal("process"), collectionId: z.string().min(3), paymentId: z.string().min(3),
-    transferId: z.string().min(3), destinationAccountId: z.string().min(3),
-    periodEndDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    action: z.literal("process"), collectionId: ledgerIdSchema, paymentId: ledgerIdSchema,
+    transferId: ledgerIdSchema, destinationAccountId: ledgerIdSchema,
+    periodEndDate: ledgerDateSchema,
     externalReferenceHash: z.string().regex(/^[a-fA-F0-9]{64}$/).transform((value) => value.toLowerCase()),
   }),
 ]);

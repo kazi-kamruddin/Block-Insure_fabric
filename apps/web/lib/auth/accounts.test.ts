@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { demoAccounts, workspaceForAccount } from "./accounts";
+import { demoAccounts, findDemoAccount, workspaceForAccount } from "./accounts";
 
 describe("canonical role workspaces", () => {
+  it("does not treat inherited object properties as demo accounts", () => {
+    for (const id of ["__proto__", "constructor", "toString", "unknown"]) {
+      expect(findDemoAccount(id)).toBeUndefined();
+    }
+    expect(findDemoAccount("policyholder-1")).toBe(demoAccounts["policyholder-1"]);
+  });
   it("maps each server-owned account role to one route", () => {
     expect(workspaceForAccount(demoAccounts["insurer-admin"])).toBe("insurer");
     expect(workspaceForAccount(demoAccounts["policyholder-1"])).toBe("policyholder");

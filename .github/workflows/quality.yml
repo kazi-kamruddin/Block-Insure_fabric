@@ -81,3 +81,18 @@ jobs:
         run: npm run check
       - name: Test independent Oracle behavior
         run: npm test
+
+  research:
+    name: Workflow model and research regression checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+      - name: Check workflow invariants
+        run: node formal/insurance-workflow/check-model.mjs
+      - name: Test research statistics and security cases
+        run: node --test benchmarks/comparative/statistics.test.mjs benchmarks/security-evaluation/cases.test.mjs

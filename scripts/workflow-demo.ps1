@@ -16,7 +16,22 @@ $env:EVIDENCE_STORAGE_ROOT = Join-Path $projectRoot "data/evidence-workflow"
 if ($Action -eq "Start") {
     & "$PSScriptRoot/low-memory-network.ps1" Start -ChaincodeVersion "1.5.1-workflow"
     if ($LASTEXITCODE -notin 0, $null) { throw "Workflow Fabric runtime failed to start." }
-    & "$PSScriptRoot/demo-stack.ps1" Start -ExistingNetwork -LowMemory
+    $alreadyReady = $false
+    try {
+        $readiness = Invoke-RestMethod -Uri "http://127.0.0.1:3000/api/health/ready" -TimeoutSec 3
+        $fabric = Invoke-RestMethod -Uri "http://127.0.0.1:3000/api/fabric/health" -TimeoutSec 3
+        $alreadyReady = $readiness.status -eq "ready" -and
+            $fabric.channel -eq $env:FABRIC_CHANNEL_NAME -and
+            $fabric.schemaVersion -eq 15
+    }
+    catch { $alreadyReady = $false }
+    if ($alreadyReady) {
+        Write-Host "Workflow demo is already healthy at http://localhost:3000." -ForegroundColor Green
+    }
+    else {
+        & "$PSScriptRoot/demo-stack.ps1" Stop -ExistingNetwork
+        & "$PSScriptRoot/demo-stack.ps1" Start -ExistingNetwork -LowMemory
+    }
 }
 elseif ($Action -eq "Stop") {
     & "$PSScriptRoot/demo-stack.ps1" Stop -ExistingNetwork

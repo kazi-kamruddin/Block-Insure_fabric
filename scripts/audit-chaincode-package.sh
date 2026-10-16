@@ -32,6 +32,15 @@ with tarfile.open(package_path) as package:
         runtime_files = [entry for entry in code if entry.isfile() and
                          (entry.name.endswith(".go") and not entry.name.endswith("_test.go") or
                           entry.name in {"src/go.mod", "src/go.sum"})]
+        packaged_paths = {entry.name.removeprefix("src/") for entry in runtime_files}
+        source_paths = {source.relative_to(source_root).as_posix()
+                        for source in source_root.rglob("*.go")
+                        if not source.name.endswith("_test.go") and
+                        "vendor" not in source.relative_to(source_root).parts}
+        source_paths.update({"go.mod", "go.sum"})
+        missing = sorted(source_paths - packaged_paths)
+        if missing:
+            raise SystemExit("Runtime source files missing from package: " + ", ".join(missing))
         mismatches = []
         for entry in runtime_files:
             source = source_root / entry.name.removeprefix("src/")

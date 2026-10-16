@@ -40,8 +40,9 @@ export function createSessionToken(
 export function verifySessionToken(token: string, secret: string, now = Date.now()): Session | null {
   if (secret.length < 32) return null;
 
-  const [payload, suppliedSignature, extra] = token.split(".");
-  if (!payload || !suppliedSignature || extra) return null;
+  const parts = token.split(".");
+  const [payload, suppliedSignature] = parts;
+  if (parts.length !== 2 || !payload || !suppliedSignature) return null;
 
   const expected = Buffer.from(signature(payload, secret));
   const supplied = Buffer.from(suppliedSignature);

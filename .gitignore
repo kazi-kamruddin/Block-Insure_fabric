@@ -18,9 +18,6 @@ coverage/
 /data/evidence-workflow/
 /data/events-workflow/
 /data/oracle-workflow/
-/data/evidence-phase1/
-/data/events-phase1/
-/data/oracle-phase1/
 /data/demo-stack/
 /apps/web/data/
 /apps/web/test-results/
@@ -29,7 +26,6 @@ coverage/
 /verification-results/phase1-playwright/
 /verification-results/hardening-playwright/
 /verification-results/supervisor-*.png
-/verification-results/phase1-playwright/
 /benchmarks/caliper/generated/
 /benchmarks/caliper/reports/
 /benchmarks/oracle-faults/reports/

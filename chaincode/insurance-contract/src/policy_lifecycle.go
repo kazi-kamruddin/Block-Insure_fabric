@@ -80,14 +80,17 @@ func (c *Contract) AdvancePolicyLifecycle(ctx contractapi.TransactionContextInte
 	if err != nil {
 		return nil, err
 	}
-	if policy.Status == "CANCELLED" || policy.Status == "EXPIRED" || policy.Status == "PENDING_PAYMENT" {
+	if policy.Status == "CANCELLED" || policy.Status == "EXPIRED" {
 		return nil, fmt.Errorf("policy %s cannot advance from %s", id, policy.Status)
 	}
 	end, _ := validateDate("endDate", policy.EndDate)
 	previous := policy.Status
-	if !asOf.Before(end) {
+	if asOf.After(end) {
 		policy.Status = "EXPIRED"
 	} else {
+		if policy.Status == "PENDING_PAYMENT" {
+			return nil, fmt.Errorf("policy %s cannot advance from %s before expiry", id, policy.Status)
+		}
 		due, err := validateDate("nextPremiumDueDate", policy.NextPremiumDueDate)
 		if err != nil {
 			return nil, err

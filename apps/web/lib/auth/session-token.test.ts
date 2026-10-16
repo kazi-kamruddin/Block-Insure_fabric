@@ -26,6 +26,8 @@ describe("signed application sessions", () => {
     const tampered = `${token.slice(0, -1)}x`;
 
     expect(verifySessionToken(tampered, secret, start + 1_000)).toBeNull();
+    expect(verifySessionToken(`${token}.`, secret, start + 1_000)).toBeNull();
+    expect(verifySessionToken(`${token}..extra`, secret, start + 1_000)).toBeNull();
     expect(verifySessionToken(token, secret, start + 61_000)).toBeNull();
   });
 });

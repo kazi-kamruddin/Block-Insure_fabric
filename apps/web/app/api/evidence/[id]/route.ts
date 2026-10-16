@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
+import { ledgerIdSchema as idSchema } from "@/lib/fabric/validation";
 import { currentSession } from "@/lib/auth/current-session";
 import { findDemoAccount } from "@/lib/auth/accounts";
 import {
@@ -12,7 +13,6 @@ import {
 import { ledger } from "@/lib/fabric/ledger";
 import { checkMutationOrigin } from "@/lib/security/request-origin";
 
-const idSchema = z.string().trim().min(1).max(100).regex(/^[a-zA-Z0-9._:-]+$/);
 const retrievalSchema = z.object({ grantId: idSchema.optional() });
 type RouteContext = { params: Promise<{ id: string }> };
 

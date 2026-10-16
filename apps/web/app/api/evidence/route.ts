@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { ledgerIdSchema } from "@/lib/fabric/validation";
 import { currentSession } from "@/lib/auth/current-session";
 import {
   evidenceStorageRoot,
@@ -10,8 +11,8 @@ import { ledger } from "@/lib/fabric/ledger";
 import { checkMutationOrigin } from "@/lib/security/request-origin";
 
 const metadataSchema = z.object({
-  claimId: z.string().trim().min(1).max(100).regex(/^[a-zA-Z0-9._:-]+$/),
-  evidenceId: z.string().trim().min(1).max(100).regex(/^[a-zA-Z0-9._:-]+$/),
+  claimId: ledgerIdSchema,
+  evidenceId: ledgerIdSchema,
   documentType: z.string().trim().min(1).max(100),
   contentHash: z.string().trim().regex(/^[a-fA-F0-9]{64}$/).transform((value) => value.toLowerCase()),
 });

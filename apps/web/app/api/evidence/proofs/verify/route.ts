@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { ledgerIdSchema } from "@/lib/fabric/validation";
 import { currentSession } from "@/lib/auth/current-session";
 import { ledger } from "@/lib/fabric/ledger";
 
 export const runtime = "nodejs";
 const requestSchema = z.object({
-  batchId: z.string().trim().min(1).max(128),
-  evidenceId: z.string().trim().min(1).max(128),
+  batchId: ledgerIdSchema,
+  evidenceId: ledgerIdSchema,
   proof: z.array(z.object({ hash: z.string().regex(/^[a-fA-F0-9]{64}$/), position: z.enum(["LEFT", "RIGHT"]) })).max(16),
 });
 

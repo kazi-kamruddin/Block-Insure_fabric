@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createHmac } from "node:crypto";
 import { z } from "zod";
+import { ledgerDateSchema, ledgerIdSchema } from "@/lib/fabric/validation";
 import { currentSession, sessionSecret } from "@/lib/auth/current-session";
 import { ledger } from "@/lib/fabric/ledger";
 import { otpChallenges } from "@/lib/banking/otp";
@@ -9,9 +10,9 @@ import { checkMutationOrigin } from "@/lib/security/request-origin";
 const hash = z.string().regex(/^[a-fA-F0-9]{64}$/).transform((value) => value.toLowerCase());
 const requestSchema = z.object({
   challengeId: z.string().uuid(), otp: z.string().regex(/^\d{6}$/),
-  transferId: z.string().min(3).max(128), paymentId: z.string().min(3).max(128), policyId: z.string().min(3).max(128),
-  sourceAccountId: z.string().min(3).max(128), destinationAccountId: z.string().min(3).max(128),
-  periodStartDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), periodEndDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  transferId: ledgerIdSchema, paymentId: ledgerIdSchema, policyId: ledgerIdSchema,
+  sourceAccountId: ledgerIdSchema, destinationAccountId: ledgerIdSchema,
+  periodStartDate: ledgerDateSchema, periodEndDate: ledgerDateSchema,
   amountMinor: z.number().int().positive().safe(), externalReferenceHash: hash,
 });
 export const runtime = "nodejs";

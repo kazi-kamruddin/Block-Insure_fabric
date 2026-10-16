@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
-import { z } from "zod";
+import { ledgerIdSchema as idSchema } from "@/lib/fabric/validation";
 import { currentSession } from "@/lib/auth/current-session";
 import { loadClaimAuditDossier } from "@/lib/audit/load-claim-dossier";
 
-const idSchema = z.string().trim().min(1).max(100).regex(/^[a-zA-Z0-9._:-]+$/);
 type RouteContext = { params: Promise<{ id: string }> };
 
 export const runtime = "nodejs";

@@ -33,4 +33,4 @@ fi
   -v block-insure-go-cache:/go/pkg/mod \
   -v "${mount_path}:/workspace" \
   -w /workspace golang:1.25 \
-  bash -c '/usr/local/go/bin/gofmt -w . && /usr/local/go/bin/go vet ./... && /usr/local/go/bin/go test ./...'
+  bash -c 'test -z "$(/usr/local/go/bin/gofmt -l .)" && /usr/local/go/bin/go vet ./... && /usr/local/go/bin/go test ./...'

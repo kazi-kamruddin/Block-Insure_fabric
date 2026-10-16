@@ -244,13 +244,20 @@ export function WorkspaceClient({
   }
 
   async function logout() {
-    await fetch("/api/auth/logout", { method: "POST" });
-    setAccount(null);
-    setDashboard(null);
-    setCommand("");
-    setOutput("Signed out.");
-    router.push("/workspace");
-    router.refresh();
+    setBusy(true);
+    try {
+      await responseJson(await fetch("/api/auth/logout", { method: "POST" }));
+      setAccount(null);
+      setDashboard(null);
+      setCommand("");
+      setOutput("Signed out.");
+      router.push("/workspace");
+      router.refresh();
+    } catch (error) {
+      setOutput(error instanceof Error ? error.message : "Sign-out failed");
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function submitWorkflow(payload: WorkflowCommand) {
@@ -307,7 +314,9 @@ export function WorkspaceClient({
   }
 
   function updateManualPayment(name: keyof typeof manualPayment, value: string) {
-    setManualPayment((current) => ({ ...current, [name]: value }));
+    setManualPayment((current) => ({ ...current, [name]: value,
+      ...(name === "policyId" || name === "sourceAccountId" ? { challengeId: "", otp: "", demoCode: "" } : {}),
+    }));
   }
 
   async function requestPremiumOtp() {
@@ -750,12 +759,12 @@ export function WorkspaceClient({
             <h2>Encrypt, store, and anchor evidence</h2>
             <p className="cardNote">Encryption happens in this browser with AES-256-GCM. The passphrase and plaintext never reach the server; only the generated <code>.enc</code> envelope is stored, and Fabric receives integrity hashes.</p>
             <div className="evidenceFields">
-              <label>Claim ID<input value={evidenceClaimId} onChange={(event) => setEvidenceClaimId(event.target.value)} placeholder="claim-1" /></label>
-              <label>Evidence ID<input value={evidenceId} onChange={(event) => setEvidenceId(event.target.value)} placeholder="evidence-1" /></label>
+              <label>Claim ID<input disabled={busy || encrypting} value={evidenceClaimId} onChange={(event) => { setEvidenceClaimId(event.target.value); setCiphertext(null); setContentHash(""); }} placeholder="claim-1" /></label>
+              <label>Evidence ID<input disabled={busy || encrypting} value={evidenceId} onChange={(event) => { setEvidenceId(event.target.value); setCiphertext(null); setContentHash(""); }} placeholder="evidence-1" /></label>
               <label>Document type<input value={documentType} onChange={(event) => setDocumentType(event.target.value)} /></label>
-              <label>Original file<input type="file" onChange={(event) => { setPlaintextEvidence(event.target.files?.[0] ?? null); setCiphertext(null); setContentHash(""); }} /></label>
-              <label>Evidence passphrase<input type="password" autoComplete="new-password" value={evidencePassphrase} onChange={(event) => setEvidencePassphrase(event.target.value)} placeholder="At least 12 characters" /></label>
-              <label>Confirm passphrase<input type="password" autoComplete="new-password" value={evidencePassphraseConfirmation} onChange={(event) => setEvidencePassphraseConfirmation(event.target.value)} /></label>
+              <label>Original file<input disabled={busy || encrypting} type="file" onChange={(event) => { setPlaintextEvidence(event.target.files?.[0] ?? null); setCiphertext(null); setContentHash(""); }} /></label>
+              <label>Evidence passphrase<input disabled={busy || encrypting} type="password" autoComplete="new-password" value={evidencePassphrase} onChange={(event) => setEvidencePassphrase(event.target.value)} placeholder="At least 12 characters" /></label>
+              <label>Confirm passphrase<input disabled={busy || encrypting} type="password" autoComplete="new-password" value={evidencePassphraseConfirmation} onChange={(event) => setEvidencePassphraseConfirmation(event.target.value)} /></label>
               <label>Original content SHA-256<input value={contentHash} readOnly placeholder="Calculated after encryption" /></label>
               <div className="encryptionStatus">
                 <strong>{ciphertext ? "Ciphertext ready" : "Not encrypted yet"}</strong>

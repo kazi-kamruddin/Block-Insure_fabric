@@ -239,14 +239,14 @@ async function consumeEvents() {
     getBlockNumber: () => BigInt(cursor.nextBlock),
     getTransactionId: () => cursor.transactionId,
   } : undefined;
+  // Persist health before opening the stream. Awaiting filesystem work between
+  // opening a gRPC stream and attaching its async iterator leaves early stream
+  // errors unhandled and can terminate the worker instead of reconnecting.
+  await updateHealth({ status: "ONLINE", lastError: null });
   activeEvents = await runtime.network.getChaincodeEvents(config.fabric.chaincodeName, {
     checkpoint,
     startBlock: BigInt(cursor.nextBlock),
   });
-  // A transient stream failure marks the worker DEGRADED. Reaching this point
-  // proves that the subscription has been re-established, even when there is
-  // no new request available to trigger a later health update.
-  await updateHealth({ status: "ONLINE", lastError: null });
   try {
     for await (const event of activeEvents) {
       if (stopping) break;

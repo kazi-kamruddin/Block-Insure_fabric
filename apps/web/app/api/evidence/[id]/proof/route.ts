@@ -1,12 +1,11 @@
 import { NextResponse } from "next/server";
-import { z } from "zod";
+import { ledgerIdSchema as idSchema } from "@/lib/fabric/validation";
 import { currentSession } from "@/lib/auth/current-session";
 import { buildEvidenceMerkleTree, evidenceLeafHash } from "@/lib/evidence/merkle";
 import { ledger } from "@/lib/fabric/ledger";
 
 export const runtime = "nodejs";
 type RouteContext = { params: Promise<{ id: string }> };
-const idSchema = z.string().trim().min(1).max(128).regex(/^[A-Za-z0-9][A-Za-z0-9._:-]+$/);
 
 export async function GET(request: Request, context: RouteContext) {
   const session = await currentSession().catch(() => null);

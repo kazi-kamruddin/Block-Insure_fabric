@@ -14,6 +14,11 @@ it with `./scripts/workflow-demo.ps1 Status`; stop the managed application with
 `./scripts/workflow-demo.ps1 Stop`. The earlier 1.4.1 hardening instructions
 below document the previous research rehearsal.
 
+`Start` is safe to rerun: it keeps an already healthy workflow running, or
+restarts the managed web and workers if any dependency is down. It retains the
+Fabric ledger and enrolled identities. Use `http://localhost:3000`, not
+`127.0.0.1`, for interactive sign-in.
+
 The channel starts with the published `showcase-health-v1` package, Bank
 accounts, partner agreements, and five sample invoices dated for the local
 demonstration day. Their patient reference is `policyholder1`. Hospital staff

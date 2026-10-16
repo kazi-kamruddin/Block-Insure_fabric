@@ -1,15 +1,17 @@
 import { NextResponse } from "next/server";
-import { z } from "zod";
+import { ledgerIdSchema as idSchema } from "@/lib/fabric/validation";
 import { currentSession } from "@/lib/auth/current-session";
 import { ledger } from "@/lib/fabric/ledger";
 
-const idSchema = z.string().min(3).max(128).regex(/^[a-zA-Z0-9._:-]+$/);
 type RouteContext = { params: Promise<{ id: string }> };
 export const runtime = "nodejs";
 
 export async function GET(_request: Request, context: RouteContext) {
   const session = await currentSession().catch(() => null);
   if (!session) return NextResponse.json({ message: "Authentication required" }, { status: 401 });
+  if (!["policyholder", "insurerAdmin", "auditor"].includes(session.role)) {
+    return NextResponse.json({ message: "This role cannot download policy statements" }, { status: 403 });
+  }
   const id = idSchema.safeParse((await context.params).id);
   if (!id.success) return NextResponse.json({ message: "Invalid policy ID" }, { status: 400 });
   try {

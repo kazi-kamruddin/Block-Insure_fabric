@@ -239,7 +239,10 @@ test("cursor persistence is identity-bound and restart-idempotent", async () => 
     assert.deepEqual(await loadCursor(filePath, "identity-a", 7), emptyCursor(7));
     await persistCursor(filePath, "identity-a", { nextBlock: 42, transactionId: "tx-1" });
     assert.deepEqual(await loadCursor(filePath, "identity-a", 7), { nextBlock: 42, transactionId: "tx-1" });
+    assert.deepEqual(await loadCursor(filePath, "identity-a", 50), emptyCursor(50));
     assert.deepEqual(await loadCursor(filePath, "identity-b", 7), emptyCursor(7));
+    await persistCursor(filePath, "identity-a", { nextBlock: -1, transactionId: "invalid" });
+    assert.deepEqual(await loadCursor(filePath, "identity-a", 7), emptyCursor(7));
   } finally {
     await fs.rm(directory, { recursive: true, force: true });
   }

@@ -174,6 +174,11 @@ try {
     Invoke-VerificationStep "Oracle worker unit tests" { npm run test }
     Pop-Location
 
+    Invoke-VerificationStep "Workflow model invariants" { node (Join-Path $projectRoot "formal/insurance-workflow/check-model.mjs") }
+    Invoke-VerificationStep "Research statistics and security regressions" {
+        node --test (Join-Path $projectRoot "benchmarks/comparative/statistics.test.mjs") (Join-Path $projectRoot "benchmarks/security-evaluation/cases.test.mjs")
+    }
+
     if (-not $SkipNetwork) {
         $wslProjectRoot = Resolve-WslProjectRoot
         Invoke-VerificationStep "Go chaincode suite" {

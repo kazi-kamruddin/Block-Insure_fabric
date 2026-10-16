@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { ledgerIdSchema } from "@/lib/fabric/validation";
 import { currentSession } from "@/lib/auth/current-session";
 import { findDemoAccount } from "@/lib/auth/accounts";
 import { ledger } from "@/lib/fabric/ledger";
 
 const routeSchema = z.object({
   assetType: z.enum(["partner-agreement", "hospital-invoice", "package", "policy", "claim", "evidence", "evidence-batch", "evidence-grant", "verification", "decision", "review", "appeal", "fraud-assessment", "settlement", "claim-history", "account", "bank-transfer", "mandate", "premium-payment", "premium-adjustment", "collection", "benefit-plan", "beneficiaries", "benefit-request", "liability", "oracle-snapshot", "oracle-request", "oracle-commitment", "oracle-result", "oracle-history", "privacy-credential", "privacy-presentation"]),
-  id: z.string().trim().min(1).max(100).regex(/^[a-zA-Z0-9._:-]+$/),
+  id: ledgerIdSchema,
 });
 
 type RouteContext = { params: Promise<{ assetType: string; id: string }> };
