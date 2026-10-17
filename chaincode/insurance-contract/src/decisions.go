@@ -129,7 +129,7 @@ func (c *Contract) ConfirmSettlement(ctx contractapi.TransactionContextInterface
 		if err := overwriteAsset(ctx, "settlement", settlementID, settlement); err != nil {
 			return nil, err
 		}
-		if err := emit(ctx, "SettlementPaymentFailed", settlement); err != nil {
+		if err := emitSettlementOutcome(ctx, "SettlementPaymentFailed", settlement, claim); err != nil {
 			return nil, err
 		}
 		return settlement, nil
@@ -155,10 +155,20 @@ func (c *Contract) ConfirmSettlement(ctx contractapi.TransactionContextInterface
 	if err := overwriteAsset(ctx, "liability", liability.ID, liability); err != nil {
 		return nil, err
 	}
-	if err := emit(ctx, "SettlementConfirmed", settlement); err != nil {
+	if err := emitSettlementOutcome(ctx, "SettlementConfirmed", settlement, claim); err != nil {
 		return nil, err
 	}
 	return settlement, nil
+}
+
+func emitSettlementOutcome(ctx contractapi.TransactionContextInterface, name string, settlement *Settlement, claim *Claim) error {
+	// The terminal settlement event replaces BankTransferProcessed in this
+	// transaction, so it must carry the policy and recipient for delivery.
+	return emit(ctx, name, struct {
+		*Settlement
+		PolicyID   string `json:"policyId"`
+		ClaimantID string `json:"claimantId"`
+	}{settlement, claim.PolicyID, claim.ClaimantID})
 }
 
 func (c *Contract) ReadClaim(ctx contractapi.TransactionContextInterface, id string) (*Claim, error) {

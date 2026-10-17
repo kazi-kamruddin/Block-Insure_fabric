@@ -9,7 +9,7 @@ const assignedAuditors = '["auditor1","auditor2","auditor3","auditor4"]';
 const oracleScenario = process.env.ORACLE_E2E_SCENARIO ?? "baseline";
 
 test.beforeEach(() => {
-  test.skip(process.env.FABRIC_CHANNEL_NAME === "insurance-workflow-20261005", "Historical Oracle fixture cases run on the Phase 2 channel; schema-15 invoice cases use invoice-oracle-journey.spec.ts.");
+  test.skip(process.env.FABRIC_CHANNEL_NAME?.startsWith("insurance-workflow-") === true, "Historical Oracle fixture cases run on the Phase 2 channel; schema-15 invoice cases use invoice-oracle-journey.spec.ts.");
 });
 
 async function actor(baseURL: string, accountId: string) {

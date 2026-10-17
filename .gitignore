@@ -69,3 +69,16 @@ Thumbs.db
 
 # Permanent local-only Ethereum reference implementation
 /reference/
+
+# ==========================================
+# AI Agent files and local skill packages
+# ==========================================
+.agents/
+.agent/
+_agents/
+_agent/
+skills/
+AGENTS.md
+AGENT.md
+agent.md
+GEMINI.md

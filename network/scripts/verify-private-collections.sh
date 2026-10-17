@@ -3,8 +3,8 @@ set -euo pipefail
 
 channel_name="${FABRIC_CHANNEL_NAME:-}"
 presentation_id="${1:-}"
-if [[ ! "${channel_name}" =~ ^insurance-phase2-[a-z0-9-]+$ || -z "${presentation_id}" ]]; then
-  echo "Usage: FABRIC_CHANNEL_NAME=insurance-phase2-* $0 <registered-presentation-id>" >&2
+if [[ ! "${channel_name}" =~ ^insurance-(phase2|workflow)-[a-z0-9-]+$ || ! "${presentation_id}" =~ ^[A-Za-z0-9][A-Za-z0-9._:-]{2,127}$ ]]; then
+  echo "Usage: FABRIC_CHANNEL_NAME=insurance-{phase2,workflow}-* $0 <registered-presentation-id>" >&2
   exit 2
 fi
 

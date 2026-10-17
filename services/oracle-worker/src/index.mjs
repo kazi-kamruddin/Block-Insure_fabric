@@ -86,6 +86,8 @@ async function submitCommitment(request, commitmentHash) {
       if (current.commitmentHash !== commitmentHash) throw new Error(`Stored commitment differs for ${request.id}`);
       return current;
     }
+    const latest = await evaluate("ReadOracleRequest", request.id);
+    if (latest.status !== "PENDING" || Date.now() > Date.parse(latest.commitDeadline)) return null;
     const result = await submit("SubmitOracleCommitment", request.id, commitmentHash);
     const health = healthState.snapshot();
     await updateHealth({ counts: { commitments: health.counts.commitments + 1 } });
@@ -112,6 +114,10 @@ async function submitReveal(request, assessment, resultHash, salt) {
       if (current.resultHash !== resultHash) throw new Error(`Stored result differs for ${request.id}`);
       return current;
     }
+    // Another worker may have finalized the quorum since our last read or
+    // failed submission. Do not retry a completed request and delay later work.
+    const latest = await evaluate("ReadOracleRequest", request.id);
+    if (latest.status !== "PENDING" || Date.now() > Date.parse(latest.revealDeadline)) return null;
     const result = await submit(
       "RevealOracleResult",
       request.id,
@@ -206,9 +212,10 @@ async function processRequest(requestId) {
     lastError: null,
     counts: { requests: health.counts.requests + 1 },
   });
-  await submitCommitment(request, commitmentHash);
-  request = await waitForRevealPhase(request.id);
-  if (request.status === "PENDING" && Date.now() <= Date.parse(request.revealDeadline)) await submitReveal(request, assessment, resultHash, salt);
+  if (await submitCommitment(request, commitmentHash)) {
+    request = await waitForRevealPhase(request.id);
+    if (request.status === "PENDING" && Date.now() <= Date.parse(request.revealDeadline)) await submitReveal(request, assessment, resultHash, salt);
+  }
   await updateHealth({
     status: "ONLINE",
     lastProcessedRequestId: request.id,

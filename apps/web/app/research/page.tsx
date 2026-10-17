@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { currentSession } from "@/lib/auth/current-session";
 import { loadResearchSnapshot } from "@/lib/research/load-snapshot";
 
@@ -15,8 +16,23 @@ export default async function ResearchPage() {
   const session = await currentSession().catch(() => null);
   if (!session || (session.role !== "insurerAdmin" && session.role !== "auditor")) redirect("/workspace");
   const snapshot = await loadResearchSnapshot();
-  return <main className="shell workspace">
-    <header className="workspaceHeader"><div><span className="kicker">Ledger-derived research</span><h1 className="workspaceTitle">Block-Insure thesis dashboard</h1><p>Descriptive measurements with explicit provenance and interpretation boundaries.</p></div><Link className="secondary button" href="/workspace">Back to workspace</Link></header>
+  return (
+    <main className="workspacePage">
+      <header className="floatingNavWrapper">
+        <nav className="shell nav">
+          <Link className="brand" href="/">
+            <span className="brandMark">BI</span>
+            <span>Block-Insure</span>
+          </Link>
+          <div className="navLinks">
+            <Link href="/workspace">Workspaces</Link>
+            <Link className="networkPill" href="/showcase"><span className="status-dot-pulse" aria-hidden="true" /> presentation</Link>
+            <ThemeToggle />
+          </div>
+        </nav>
+      </header>
+      <div className="shell workspace">
+        <header className="workspaceHeader"><div><span className="kicker">Ledger-derived research</span><h1 className="workspaceTitle">Block-Insure thesis dashboard</h1><p>Descriptive measurements with explicit provenance and interpretation boundaries.</p></div><Link className="secondary button" href="/workspace">Back to workspace</Link></header>
     <section className="roleDashboard">
       <div className="dashboardIntro"><div><span className="kicker">Reproducible snapshot</span><h2>Fabric schema {snapshot.provenance.ledgerSchemaVersion}</h2></div><p>Hash <code>{snapshot.reproducibilityHash}</code></p></div>
       <div className="metricGrid">
@@ -45,5 +61,7 @@ export default async function ResearchPage() {
       <Breakdown title="Evidence access purposes" values={snapshot.evidenceGovernance.accessPurpose} />
     </div>
     <article className="workCard"><span className="kicker">Interpretation contract</span><h2>What these numbers do not prove</h2><ul>{snapshot.interpretationBoundaries.map((boundary) => <li key={boundary}>{boundary}</li>)}</ul><div className="evidenceActions"><a className="primary button" download href="/api/research/snapshot?download=1">Download machine-readable snapshot</a><a className="secondary button" href="/api/operations/events">Inspect projected events</a></div></article>
-  </main>;
+      </div>
+    </main>
+  );
 }

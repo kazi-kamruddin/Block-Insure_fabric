@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 const organizations = [
   ["InsurerMSP", "Coordinates policies, verification, and liabilities", "Cannot edit Hospital records or confirm Bank execution"],
@@ -17,10 +18,17 @@ const stories = [
 export default function ShowcasePage() {
   return (
     <main className="showcasePage">
-      <nav className="shell nav">
-        <Link className="brand" href="/"><span className="brandMark">BI</span><span>Block-Insure</span></Link>
-        <div className="navLinks"><Link href="/">Home</Link><Link href="/workspace">Workspaces</Link><span className="networkPill"><i /> presentation board</span></div>
-      </nav>
+      <header className="floatingNavWrapper">
+        <nav className="shell nav">
+          <Link className="brand" href="/"><span className="brandMark">BI</span><span>Block-Insure</span></Link>
+          <div className="navLinks">
+            <Link href="/">Home</Link>
+            <Link href="/workspace">Workspaces</Link>
+            <span className="networkPill"><span className="status-dot-pulse" aria-hidden="true" /> presentation board</span>
+            <ThemeToggle />
+          </div>
+        </nav>
+      </header>
 
       <section className="shell showcaseHero">
         <span className="eyebrow">Supervisor demonstration · Phase 3</span>

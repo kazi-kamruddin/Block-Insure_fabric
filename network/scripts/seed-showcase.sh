@@ -8,7 +8,7 @@ organizations="${network_root}/organizations"
 channel_name="${CHANNEL_NAME:-insurance-channel}"
 invoice_date_from="2026-06-10"
 invoice_date_through="2026-06-20"
-if [[ "${channel_name}" == "insurance-workflow-20261005" ]]; then
+if [[ "${channel_name}" == insurance-workflow-* ]]; then
   invoice_date_from="$(TZ=Asia/Dhaka date +%F)"
   invoice_date_through="${invoice_date_from}"
 fi

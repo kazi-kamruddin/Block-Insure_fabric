@@ -21,7 +21,7 @@ async function command(context: APIRequestContext, payload: Record<string, unkno
 }
 
 test("five organization sessions complete a Fabric insurance workflow", async ({ baseURL }) => {
-  test.skip(process.env.FABRIC_CHANNEL_NAME === "insurance-workflow-20261005", "Schema-15 invoice claims use the Oracle-led journey test.");
+  test.skip(process.env.FABRIC_CHANNEL_NAME?.startsWith("insurance-workflow-") === true, "Schema-15 invoice claims use the Oracle-led journey test.");
   test.setTimeout(180_000);
   if (!baseURL) throw new Error("Playwright baseURL is required");
 
@@ -229,7 +229,7 @@ test("five organization sessions complete a Fabric insurance workflow", async ({
 });
 
 test("rejected claim requires a committed correction, matching Hospital invoice, fresh cross-check, and independent Oracle approval", async ({ baseURL }) => {
-  test.skip(process.env.FABRIC_CHANNEL_NAME === "insurance-workflow-20261005", "This is the historical insurer cross-check route.");
+  test.skip(process.env.FABRIC_CHANNEL_NAME?.startsWith("insurance-workflow-") === true, "This is the historical insurer cross-check route.");
   test.setTimeout(180_000);
   if (!baseURL) throw new Error("Playwright baseURL is required");
   const suffix = `appeal-${Date.now()}-${Math.floor(Math.random() * 1_000_000)}`;
@@ -398,7 +398,7 @@ test("policy, premium, mandate, benefit, and banking lifecycles complete across 
     await command(bank, { operation: "processPremiumCollection", collectionId: ids.collectionBounce, paymentId: `payment-bounce-${suffix}`, transferId: `transfer-bounce-${suffix}`, destinationAccountId: ids.insurerAccount, periodEndDate: "2026-05-30", externalReferenceHash: digest("eft-bounce") });
     const bouncedCollection = await (await bank.get(`/api/ledger/collection/${ids.collectionBounce}`)).json();
     expect(bouncedCollection.result).toMatchObject({ status: "BOUNCED", failureCode: "INSUFFICIENT_FUNDS", attemptCount: 1, paymentId: "" });
-    await command(insurer, { operation: "advancePolicyLifecycle", id: ids.policy, asOfDate: "2026-12-31" });
+    await command(insurer, { operation: "advancePolicyLifecycle", id: ids.policy, asOfDate: "2027-01-01" });
     await command(policyholder, { operation: "renewPolicy", newId: ids.renewal, existingId: ids.policy, newEndDate: "2027-12-31" });
     await command(policyholder, { operation: "cancelPolicy", id: ids.renewal, reasonHash: digest("renewal-cancel") });
 

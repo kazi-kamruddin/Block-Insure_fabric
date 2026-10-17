@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { ledger } from "@/lib/fabric/ledger";
 
 export const dynamic = "force-dynamic";
@@ -38,17 +39,20 @@ export default async function Home() {
   );
   return (
     <main>
-      <nav className="shell nav">
-        <a className="brand" href="#top" aria-label="Block-Insure home">
-          <span className="brandMark">BI</span>
-          <span>Block-Insure</span>
-        </a>
-        <div className="navLinks">
-          <Link href="/showcase">Presentation</Link>
-          <Link href="/workspace">Workspaces</Link>
-          <span className="networkPill"><i /> {channelName}</span>
-        </div>
-      </nav>
+      <header className="floatingNavWrapper">
+        <nav className="shell nav">
+          <a className="brand" href="#top" aria-label="Block-Insure home">
+            <span className="brandMark">BI</span>
+            <span>Block-Insure</span>
+          </a>
+          <div className="navLinks">
+            <Link href="/showcase">Presentation</Link>
+            <Link href="/workspace">Workspaces</Link>
+            <span className="networkPill"><span className="status-dot-pulse" aria-hidden="true" /> {channelName}</span>
+            <ThemeToggle />
+          </div>
+        </nav>
+      </header>
 
       <section className="shell hero" id="top">
         <div className="eyebrow">Hyperledger Fabric · Permissioned by design</div>

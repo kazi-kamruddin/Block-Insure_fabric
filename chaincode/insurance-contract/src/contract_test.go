@@ -360,6 +360,11 @@ func TestPolicyToSettlementWorkflow(t *testing.T) {
 	setIdentity(ctx, "bank-officer", "BankMSP", "bankOfficer", nil)
 	_, err = contract.ConfirmSettlement(ctx, "settlement-001", "payout-settlement-001", hashC)
 	requireNoError(t, err)
+	var payoutEvent map[string]any
+	requireNoError(t, json.Unmarshal(ctx.stub.eventValue, &payoutEvent))
+	if ctx.stub.eventName != "SettlementConfirmed" || payoutEvent["policyId"] != "policy-001" || payoutEvent["claimantId"] != "policyholder1" || payoutEvent["transferId"] != "payout-settlement-001" {
+		t.Fatalf("committed payout event lost delivery context: %s %s", ctx.stub.eventName, ctx.stub.eventValue)
+	}
 	sourceAccount, err := contract.ReadBankAccountReference(ctx, "settlement-insurer")
 	requireNoError(t, err)
 	destinationAccount, err := contract.ReadBankAccountReference(ctx, "settlement-customer")

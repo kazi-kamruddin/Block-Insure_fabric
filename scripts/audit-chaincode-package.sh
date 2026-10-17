@@ -29,7 +29,7 @@ import tarfile
 package_path, source_root = sys.argv[1], pathlib.Path(sys.argv[2])
 with tarfile.open(package_path) as package:
     with tarfile.open(fileobj=io.BytesIO(package.extractfile("code.tar.gz").read())) as code:
-        runtime_files = [entry for entry in code if entry.isfile() and
+        runtime_files = [entry for entry in code if entry.isfile() and not entry.name.startswith("src/vendor/") and
                          (entry.name.endswith(".go") and not entry.name.endswith("_test.go") or
                           entry.name in {"src/go.mod", "src/go.sum"})]
         packaged_paths = {entry.name.removeprefix("src/") for entry in runtime_files}

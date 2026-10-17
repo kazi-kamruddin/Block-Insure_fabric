@@ -24,13 +24,12 @@ export FABRIC_CFG_PATH="${samples_root}/config"
 
 package_chaincode() {
   if command -v go >/dev/null 2>&1; then
-    peer lifecycle chaincode package "${package_file}" \
-      --path "${chaincode_root}" --lang golang --label "${chaincode_label}"
+    bash "${script_dir}/package-chaincode.sh" "${chaincode_root}" "${package_file}" "${chaincode_label}"
     return
   fi
 
   local docker_command="" chaincode_mount="${chaincode_root}" artifacts_mount="${artifacts}"
-  local bin_mount="${samples_root}/bin" config_mount="${samples_root}/config"
+  local bin_mount="${samples_root}/bin" config_mount="${samples_root}/config" scripts_mount="${script_dir}"
   local attempt
   for attempt in {1..10}; do
     if command -v docker >/dev/null && docker info >/dev/null 2>&1; then
@@ -42,6 +41,7 @@ package_chaincode() {
       artifacts_mount="$(wslpath -w "${artifacts}")"
       bin_mount="$(wslpath -w "${samples_root}/bin")"
       config_mount="$(wslpath -w "${samples_root}/config")"
+      scripts_mount="$(wslpath -w "${script_dir}")"
       break
     fi
     if [ "${attempt}" -lt 10 ]; then
@@ -59,9 +59,10 @@ package_chaincode() {
     -v "${artifacts_mount}:/artifacts" \
     -v "${bin_mount}:/fabric-bin:ro" \
     -v "${config_mount}:/fabric-config:ro" \
+    -v "${scripts_mount}:/package-scripts:ro" \
+    -v block-insure-go-cache:/go/pkg/mod \
     -e FABRIC_CFG_PATH=/fabric-config \
-    golang:1.25 /fabric-bin/peer lifecycle chaincode package "/artifacts/${chaincode_label}.tar.gz" \
-      --path /chaincode --lang golang --label "${chaincode_label}"
+    golang:1.25 bash /package-scripts/package-chaincode.sh /chaincode "/artifacts/${chaincode_label}.tar.gz" "${chaincode_label}" /fabric-bin/peer
   "${docker_command}" run --rm -v "${artifacts_mount}:/artifacts" \
     golang:1.25 chmod 0644 "/artifacts/${chaincode_label}.tar.gz"
 }

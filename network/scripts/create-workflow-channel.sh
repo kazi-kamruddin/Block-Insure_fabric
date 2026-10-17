@@ -6,7 +6,12 @@ network_root="$(cd -- "${script_dir}/.." && pwd -P)"
 samples_root="${network_root}/.fabric/fabric-samples"
 organizations="${network_root}/organizations"
 artifacts="${network_root}/channel-artifacts"
-channel_name="insurance-workflow-20261005"
+channel_name="${CHANNEL_NAME:-insurance-workflow-20261005}"
+chaincode_version="${CHAINCODE_VERSION:-1.5.1-workflow}"
+if [[ ! "${channel_name}" =~ ^insurance-workflow-[a-z0-9-]+$ ]]; then
+  echo "Workflow channel names must start with insurance-workflow- and contain lowercase letters, digits, or hyphens." >&2
+  exit 2
+fi
 block="${artifacts}/${channel_name}.block"
 orderer_ca="${organizations}/ordererOrganizations/blockinsure.test/orderers/orderer.blockinsure.test/tls/ca.crt"
 
@@ -47,6 +52,6 @@ for entry in "insurer InsurerMSP 7051" "hospital HospitalMSP 8051" "auditor Audi
   fi
 done
 
-CHANNEL_NAME="${channel_name}" CHAINCODE_VERSION="1.5.1-workflow" bash "${script_dir}/deploy-chaincode.sh"
+CHANNEL_NAME="${channel_name}" CHAINCODE_VERSION="${chaincode_version}" bash "${script_dir}/deploy-chaincode.sh"
 CHANNEL_NAME="${channel_name}" bash "${script_dir}/seed-showcase.sh"
 echo "Workflow demonstration channel is ready: ${channel_name}. Preserved insurance-channel was not modified."

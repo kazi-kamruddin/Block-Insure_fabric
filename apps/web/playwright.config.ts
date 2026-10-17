@@ -4,6 +4,7 @@ const port = 3200;
 const externalBaseURL = process.env.PLAYWRIGHT_BASE_URL;
 const baseURL = externalBaseURL ?? `http://127.0.0.1:${port}`;
 const oracleScenario = process.env.ORACLE_E2E_SCENARIO ?? "baseline";
+const reuseOracleServers = Boolean(externalBaseURL) && oracleScenario === "baseline";
 const oracle2Environment = oracleScenario === "conflict" || oracleScenario === "majority-wrong"
   ? "../../services/oracle-worker/.env.oracle2-conflict.example"
   : "../../services/oracle-worker/.env.oracle2.example";
@@ -17,19 +18,19 @@ const oracleServers = [
   {
     command: "node ../../services/oracle-worker/src/index.mjs --env=../../services/oracle-worker/.env.oracle1.example",
     url: "http://127.0.0.1:3301/health",
-    reuseExistingServer: true,
+    reuseExistingServer: reuseOracleServers,
     timeout: 30_000,
   },
   ...(oracleScenario === "timeout" ? [] : [{
     command: `node ../../services/oracle-worker/src/index.mjs --env=${oracle2Environment}`,
     url: "http://127.0.0.1:3302/health",
-    reuseExistingServer: true,
+    reuseExistingServer: reuseOracleServers,
     timeout: 30_000,
   }]),
   ...(oracleScenario === "timeout" || oracleScenario === "one-unavailable" ? [] : [{
     command: `node ../../services/oracle-worker/src/index.mjs --env=${oracle3Environment}`,
     url: "http://127.0.0.1:3303/health",
-    reuseExistingServer: true,
+    reuseExistingServer: reuseOracleServers,
     timeout: 30_000,
   }]),
 ];
@@ -70,6 +71,9 @@ export default defineConfig({
         FABRIC_EVALUATE_DEADLINE_SECONDS: "15",
       },
     }]),
-    ...oracleServers,
+    ...oracleServers.map((server) => ({
+      ...server,
+      env: { ORACLE_REGISTRY_API_URL: `${baseURL}/api/public/oracle-registries` },
+    })),
   ],
 });
