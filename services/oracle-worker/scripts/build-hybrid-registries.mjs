@@ -11,7 +11,8 @@ function options(argv) {
 
 const args = options(process.argv.slice(2));
 const serviceRoot = path.resolve(import.meta.dirname, "..");
-const inputPath = path.resolve(serviceRoot, args.input ?? "../../reference/Block-Insure/backEnd/datasets/hybrid-v1/runtime/hybrid-primary.jsonl");
+if (!args.input) throw new Error("An explicit --input=<JSONL dataset> is required; no reference-repository fallback is used");
+const inputPath = path.resolve(serviceRoot, args.input);
 const outputDirectory = path.resolve(serviceRoot, args.output ?? "../../data/oracle/generated-hybrid");
 const manifest = await buildHybridRegistryReplicas({
   inputPath,

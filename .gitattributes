@@ -4,3 +4,10 @@
 *.yml text eol=lf
 *.env text eol=lf
 
+# Preserve bytes used by the frozen model and evaluator identity hashes.
+services/oracle-worker/frozen/* -text
+services/oracle-worker/src/xgboost.mjs -text
+services/oracle-worker/src/registry.mjs -text
+services/oracle-worker/src/protocol.mjs -text
+services/oracle-worker/src/privacy.mjs -text
+

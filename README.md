@@ -44,6 +44,11 @@ governance remain environment-specific work outside the local release.
 
 ## Workspace layout
 
+This repository is standalone: runtime, build, tests and operational tooling do
+not require the Solidity implementation or an imported copy. Shared methodology
+is represented by Fabric-owned frozen assets and source-hashed test fixtures.
+Other implementations serve only as read-only development references.
+
 - `network/` — local Fabric topology, channel configuration, and lifecycle scripts.
 - `chaincode/insurance-contract/` — insurance domain chaincode and its tests.
 - `apps/web/` — Next.js web application.
@@ -137,6 +142,16 @@ defines the selective-disclosure protocol, checked invariants, experiment matrix
 and interpretation limits.
 
 ## Complete verification
+
+Code checks require only this checkout. Use Node.js 22.12 or newer within the
+22.x line, or a supported 24.x release, for the web test toolchain. Run
+`npm --prefix apps/web ci`, then its lint, typecheck, test, audit and build
+scripts. Oracle checks use `npm --prefix services/oracle-worker run check`,
+`npm --prefix services/oracle-worker run check:xgboost` and
+`npm --prefix services/oracle-worker test`. No sibling repository, imported
+reference directory, Fabric network or private environment file is needed for
+these code gates. The live verification below additionally requires this
+project's own network and enrolled identities.
 
 With Docker Desktop and the Fabric network running, create the isolated Phase 1
 channel once from Ubuntu WSL:

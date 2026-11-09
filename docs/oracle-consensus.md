@@ -70,10 +70,11 @@ that divergent results are observable and repeatable.
 For the larger experiment, run this from `services/oracle-worker`:
 
 ```powershell
-npm run build:hybrid-registries
+npm run build:hybrid-registries -- --input="C:/datasets/hybrid-primary.jsonl"
 ```
 
-The adapter reads the existing Kaggle-derived hybrid JSONL and writes three
+Supply an independently available JSONL dataset explicitly; the tool never searches
+another repository or an imported reference pack. The adapter reads that JSONL and writes three
 isolated registry replicas plus a controlled corrupt replica under ignored
 `data/oracle/generated-hybrid/`. Its manifest records the input SHA-256, dataset
 identifier/version, transformation version, record count, generation time, and

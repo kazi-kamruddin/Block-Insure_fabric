@@ -3,6 +3,7 @@ import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { spawnSync } from "node:child_process";
 import { loadOracleConfig } from "../src/config.mjs";
 import { emptyCursor, loadCursor, persistCursor } from "../src/cursor.mjs";
 import { buildCommitmentDigest, buildDeterministicSalt, buildResultDigest, oracleRequestPhase } from "../src/protocol.mjs";
@@ -119,6 +120,14 @@ test("three baseline snapshots have distinct replica sources but identical canon
   );
 });
 
+test("hybrid registry CLI requires explicit input without any repository fallback", () => {
+  const result = spawnSync(process.execPath, [path.resolve(import.meta.dirname, "../scripts/build-hybrid-registries.mjs")], { cwd: os.tmpdir(), encoding: "utf8", timeout: 10000 });
+  assert.equal(result.error, undefined);
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /explicit --input=<JSONL dataset> is required/);
+  assert.doesNotMatch(result.stderr, /ENOENT/);
+});
+
 test("Kaggle-derived JSONL creates three provenance-bound replicas and a controlled corrupt profile", async () => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), "block-insure-hybrid-registry-"));
   const inputPath = path.join(directory, "hybrid.jsonl");
@@ -140,6 +149,12 @@ test("Kaggle-derived JSONL creates three provenance-bound replicas and a control
     const [first, second, third] = await Promise.all(["oracle1", "oracle2", "oracle3"].map((id) => loadRegistrySnapshot(path.join(outputDirectory, `${id}-hybrid-v1.json`))));
     assert.deepEqual([first.rootHash, second.rootHash, third.rootHash], [manifest.baselineRootHash, manifest.baselineRootHash, manifest.baselineRootHash]);
     assert.equal(first.provenance.inputSha256, manifest.inputSha256);
+    const cli = spawnSync(process.execPath, [path.resolve(import.meta.dirname, "../scripts/build-hybrid-registries.mjs"), `--input=${inputPath}`, `--output=${path.join(directory, "cli-output")}`], { cwd: directory, encoding: "utf8", timeout: 10000 });
+    assert.equal(cli.error, undefined);
+    assert.equal(cli.status, 0, cli.stderr);
+    const cliManifest = JSON.parse(cli.stdout);
+    assert.equal(cliManifest.recordCount, 1);
+    assert.equal(cliManifest.inputSha256, manifest.inputSha256);
     assert.deepEqual(hybridRecordToRegistryRecord(record), {
       lookupHash: "1".repeat(64), hospitalId: "PRV-TEST001", treatmentCode: "DIAGNOSTIC",
       minimumAmountMinor: 5_000, maximumAmountMinor: 15_000, validFrom: "2009-01-01", validThrough: "2009-01-02",

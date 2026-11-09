@@ -79,6 +79,8 @@ jobs:
           node-version: 22
       - name: Check worker source
         run: npm run check
+      - name: Verify frozen evaluator identity
+        run: npm run check:xgboost
       - name: Test independent Oracle behavior
         run: npm test
 

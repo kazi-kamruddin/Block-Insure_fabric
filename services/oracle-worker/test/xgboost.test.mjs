@@ -1,38 +1,21 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createRequire } from "node:module";
-import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { adapterContract, evaluatorHash, evaluatorVersion, normalizeRecord, prepareObservation, inferContext, routeModel } from "../src/xgboost.mjs";
 import { validateRegistrySnapshot } from "../src/registry.mjs";
-const require = createRequire(import.meta.url);
-const unit = adapterContract.amountMinorPerModelUnit;
-const source = {
-  invoiceId: "inv-current", invoiceHash: "a".repeat(64), hospitalMsp: "HospitalMSP", hospitalId: "hospital1",
-  patientIssuerMsp: "InsurerMSP", patientReferenceHash: createHash("sha256").update("holder1").digest("hex"),
-  treatmentType: "SURGERY", diagnosisCode: "D1", treatmentHash: "b".repeat(64),
-  admissionDate: "2026-06-10", dischargeDate: "2026-06-11", invoiceDate: "2026-06-12",
-  amountMinor: unit, expectedMinMinor: unit / 2, expectedMaxMinor: unit * 2,
-  invoiceStatus: "VALID", recordStatus: "VALID", licenseStatus: "ACTIVE",
-};
-const claim = { hospitalInvoiceId: source.invoiceId, hospitalId: "hospital1", hospitalMsp: "HospitalMSP", claimantId: "holder1", claimantMsp: "InsurerMSP",
-  amountMinor: unit / 2, invoiceHash: source.invoiceHash, treatmentType: "SURGERY", incidentDate: "2026-06-10", createdAt: "2026-06-15T00:00:00Z" };
-const prior = { ...source, invoiceId: "inv-prior", invoiceHash: "c".repeat(64), admissionDate: "2026-06-01", dischargeDate: "2026-06-02", invoiceDate: "2026-06-03" };
-const context = { records: [source, prior], claim, snapshotTimestamp: "2026-06-15T00:00:00Z" };
+import { unit, source, claim, prior, context, pairedCases } from "./fixtures/xgboost-inputs.mjs";
 
-test("frozen feature and inference parity with current sibling on paired synthetic cases", () => {
-  const { prepareAdvisoryObservation } = require("../../../../Block-Insure/backEnd/services/advisoryContextService.js");
-  const referenceEngine = require("../../../../Block-Insure/oracle/xgboostAssessment.js").compile(require("../../../../Block-Insure/backEnd/artifacts/xgboost-advisory-v1.json"));
-  for (const changes of [{}, { amountMinor: unit * 10 }, { licenseStatus: "SUSPENDED" }, { recordStatus: "INVALID" }, { expectedMaxMinor: unit / 4, expectedMinMinor: unit / 8 }]) {
-    const records = [{ ...source, ...changes }, prior];
-    const actual = inferContext({ ...context, records });
-    const normalized = records.map(normalizeRecord);
-    const reference = prepareAdvisoryObservation({ records: normalized, claim: {
-      invoiceHash: source.invoiceHash, hospitalId: normalized[0].hospitalId,
-      claimantWallet: normalized[0].authorizedClaimants[0], claimAmountEth: claim.amountMinor / unit,
-      incidentDate: Date.parse(claim.incidentDate) / 1000, claimType: claim.treatmentType, submittedAt: Date.parse(claim.createdAt) / 1000,
-    }, snapshotTimestamp: Date.parse(context.snapshotTimestamp) / 1000 });
-    assert.deepEqual(actual.prepared.observation, reference.observation);
-    assert.deepEqual(actual.assessment, referenceEngine.score(reference.observation));
+test("frozen feature and inference parity with source-hashed reference fixtures", () => {
+  const fixture = JSON.parse(readFileSync(new URL("./fixtures/xgboost-reference.json", import.meta.url), "utf8"));
+  assert.equal(fixture.schemaVersion, 1);
+  assert.equal(fixture.reference.modelSha256, "e83eab8c8df7c9996471c754d352d9201ffd30246184c72cd1943c612d2ab380");
+  assert.equal(adapterContract.amountMinorPerModelUnit, unit);
+  assert.deepEqual(fixture.cases.map(row => ({ name: row.name, input: row.input })), pairedCases);
+  for (const row of fixture.cases) {
+    const actual = inferContext(row.input);
+    assert.deepEqual(row.input.records.map(normalizeRecord), row.normalizedRecords, row.name);
+    assert.deepEqual(actual.prepared.observation, row.observation, row.name);
+    assert.deepEqual(actual.assessment, row.assessment, row.name);
     assert.ok(actual.assessment.explanation.additivityError < 1e-5);
   }
 });
