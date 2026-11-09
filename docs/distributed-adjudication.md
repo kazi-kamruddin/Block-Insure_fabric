@@ -6,7 +6,7 @@ votes, thresholds, deadlines, and appeal history on the shared ledger so every
 member organization can audit how a decision was reached.
 
 In the supervisor workflow, this review system is the governed fallback after a
-negative, conflicting, or timed-out two-Oracle request. The legacy
+negative, conflicting, or timed-out threshold-Oracle request. The legacy
 `OpenClaimReview` transaction remains available for an explicitly manual initial
 review, while `RouteOracleFailureToReview` proves and records that the normal
 Oracle path failed before opening the same fixed-quorum machinery. Oracle

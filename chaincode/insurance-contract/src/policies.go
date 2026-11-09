@@ -121,14 +121,18 @@ func (c *Contract) IssuePolicy(ctx contractapi.TransactionContextInterface, id, 
 	if err != nil {
 		return nil, err
 	}
+	paidThrough := start.AddDate(0, 0, defaultPremiumIntervalDays-1)
+	if paidThrough.After(end) {
+		paidThrough = end
+	}
 	policy := &Policy{
 		AssetType: "policy", SchemaVersion: SchemaVersion, ID: id,
 		PackageID: packageID, PackageVersion: policyPackage.Version, PolicyholderID: policyholderID,
 		StartDate: startDate, EndDate: endDate, PremiumMinor: policyPackage.PremiumMinor,
 		CoverageLimitMinor: policyPackage.CoverageLimitMinor, TermsHash: policyPackage.TermsHash,
 		HospitalIDs: append([]string{}, policyPackage.HospitalIDs...), BankIDs: append([]string{}, policyPackage.BankIDs...),
-		Status: "ACTIVE", PremiumIntervalDays: 30, GracePeriodDays: 15,
-		PaidThroughDate: startDate, NextPremiumDueDate: start.AddDate(0, 0, 30).Format("2006-01-02"),
+		Status: "ACTIVE", PremiumIntervalDays: defaultPremiumIntervalDays, GracePeriodDays: defaultGracePeriodDays,
+		PaidThroughDate: paidThrough.Format("2006-01-02"), NextPremiumDueDate: paidThrough.AddDate(0, 0, 1).Format("2006-01-02"),
 		CreatedAt: now, UpdatedAt: now,
 	}
 	if err := c.snapshotBenefitPlan(ctx, policy); err != nil {

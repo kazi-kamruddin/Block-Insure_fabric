@@ -3,7 +3,6 @@ package insurance
 import (
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"slices"
 	"strings"
@@ -64,6 +63,9 @@ func (c *Contract) RequestBankMandate(ctx contractapi.TransactionContextInterfac
 	due := policy.NextPremiumDueDate
 	if due == "" {
 		due = policy.StartDate
+	}
+	if expiryDate < due {
+		return nil, fmt.Errorf("mandate expiry cannot precede the next premium due date")
 	}
 	now, err := timestamp(ctx)
 	if err != nil {
@@ -191,123 +193,6 @@ func paymentMarkerKey(ctx contractapi.TransactionContextInterface, externalRefer
 	return ctx.GetStub().CreateCompositeKey("premiumPaymentExternalReference", []string{strings.ToLower(externalReferenceHash)})
 }
 
-func (c *Contract) recordPremiumPayment(ctx contractapi.TransactionContextInterface, id, policyID, mandateID, periodStartDate, periodEndDate string, amountMinor int64, externalReferenceHash, method string) (*PremiumPayment, error) {
-	if err := validateHash("externalReferenceHash", externalReferenceHash); err != nil {
-		return nil, err
-	}
-	method = strings.ToUpper(strings.TrimSpace(method))
-	if method != "OTP" && method != "AUTODEBIT" {
-		return nil, fmt.Errorf("method must be OTP or AUTODEBIT")
-	}
-	policy, err := c.ReadPolicy(ctx, policyID)
-	if err != nil {
-		return nil, err
-	}
-	if policy.Status == "CANCELLED" || policy.Status == "EXPIRED" {
-		return nil, fmt.Errorf("policy %s cannot accept a premium from %s", policyID, policy.Status)
-	}
-	mandate, err := c.ReadBankMandate(ctx, mandateID)
-	if err != nil {
-		return nil, err
-	}
-	if mandate.Status != "ACTIVE" || mandate.PolicyID != policyID {
-		return nil, fmt.Errorf("bank mandate %s is not active for policy %s", mandateID, policyID)
-	}
-	start, err := validateDate("periodStartDate", periodStartDate)
-	if err != nil {
-		return nil, err
-	}
-	end, err := validateDate("periodEndDate", periodEndDate)
-	if err != nil {
-		return nil, err
-	}
-	if end.Before(start) {
-		return nil, fmt.Errorf("periodEndDate must not be before periodStartDate")
-	}
-	expectedStart := policy.NextPremiumDueDate
-	if expectedStart == "" {
-		expectedStart = policy.StartDate
-	}
-	if periodStartDate != expectedStart {
-		return nil, fmt.Errorf("premium period must start on the next due date %s", expectedStart)
-	}
-	policyEnd, _ := validateDate("policy.endDate", policy.EndDate)
-	if end.After(policyEnd) {
-		return nil, fmt.Errorf("premium period cannot exceed policy end date")
-	}
-	mandateExpiry, _ := validateDate("mandate.expiryDate", mandate.ExpiryDate)
-	if end.After(mandateExpiry) {
-		return nil, fmt.Errorf("premium period cannot exceed mandate expiry")
-	}
-	if amountMinor != policy.PremiumMinor || amountMinor != mandate.AmountMinor {
-		return nil, fmt.Errorf("premium amount must equal the policy and mandate amount")
-	}
-
-	paymentKey, err := stateKey(ctx, "premiumPayment", id)
-	if err != nil {
-		return nil, err
-	}
-	existingPayload, err := ctx.GetStub().GetState(paymentKey)
-	if err != nil {
-		return nil, fmt.Errorf("check premium payment: %w", err)
-	}
-	if existingPayload != nil {
-		var existing PremiumPayment
-		if err := json.Unmarshal(existingPayload, &existing); err != nil {
-			return nil, fmt.Errorf("decode premium payment: %w", err)
-		}
-		if existing.PolicyID == policyID && existing.MandateID == mandateID &&
-			existing.PeriodStartDate == periodStartDate && existing.PeriodEndDate == periodEndDate &&
-			existing.AmountMinor == amountMinor && existing.Method == method &&
-			existing.ExternalReferenceHash == strings.ToLower(externalReferenceHash) {
-			return &existing, nil
-		}
-		return nil, fmt.Errorf("premium payment %s already exists with different details", id)
-	}
-	markerKey, err := paymentMarkerKey(ctx, externalReferenceHash)
-	if err != nil {
-		return nil, err
-	}
-	if marker, err := ctx.GetStub().GetState(markerKey); err != nil {
-		return nil, fmt.Errorf("check external payment reference: %w", err)
-	} else if marker != nil {
-		return nil, fmt.Errorf("external payment reference has already been recorded")
-	}
-
-	now, err := timestamp(ctx)
-	if err != nil {
-		return nil, err
-	}
-	payment := &PremiumPayment{
-		AssetType: "premiumPayment", SchemaVersion: SchemaVersion, ID: id,
-		PolicyID: policyID, MandateID: mandateID, PeriodStartDate: periodStartDate,
-		PeriodEndDate: periodEndDate, AmountMinor: amountMinor,
-		ExternalReferenceHash: strings.ToLower(externalReferenceHash), Method: method, RecordedAt: now,
-	}
-	if err := putState(ctx, "premiumPayment", id, payment); err != nil {
-		return nil, err
-	}
-	if err := ctx.GetStub().PutState(markerKey, []byte(id)); err != nil {
-		return nil, fmt.Errorf("reserve external payment reference: %w", err)
-	}
-	policy.Status = "ACTIVE"
-	policy.PaidThroughDate = periodEndDate
-	policy.NextPremiumDueDate = end.AddDate(0, 0, 1).Format("2006-01-02")
-	policy.UpdatedAt = now
-	if err := overwriteAsset(ctx, "policy", policyID, policy); err != nil {
-		return nil, err
-	}
-	mandate.NextDebitDate = policy.NextPremiumDueDate
-	mandate.UpdatedAt = now
-	if err := overwriteAsset(ctx, "bankMandate", mandateID, mandate); err != nil {
-		return nil, err
-	}
-	if err := emit(ctx, "PremiumPaymentRecorded", payment); err != nil {
-		return nil, err
-	}
-	return payment, nil
-}
-
 func (c *Contract) RecordPremiumPayment(ctx contractapi.TransactionContextInterface, id, policyID, mandateID, periodStartDate, periodEndDate string, amountMinor int64, externalReferenceHash, method string) (*PremiumPayment, error) {
 	if _, err := requireIdentity(ctx, "BankMSP", "bankOfficer"); err != nil {
 		return nil, err
@@ -342,7 +227,7 @@ func (c *Contract) RecordPremiumAdjustment(ctx contractapi.TransactionContextInt
 			adjusted += adjustment.AmountMinor
 		}
 	}
-	if adjusted+amountMinor > payment.AmountMinor {
+	if amountMinor > payment.AmountMinor-adjusted {
 		return nil, fmt.Errorf("adjustments cannot exceed the original premium payment")
 	}
 	markerKey, err := paymentMarkerKey(ctx, externalReferenceHash)

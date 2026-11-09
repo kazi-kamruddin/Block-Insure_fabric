@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { WorkspaceClient } from "@/components/workspace-client";
 import { findDemoAccount, workspaceForAccount } from "@/lib/auth/accounts";
 import { currentSession } from "@/lib/auth/current-session";
@@ -30,13 +31,18 @@ export default async function RoleWorkspacePage({ params }: PageContext) {
   const portalMark = canonicalWorkspace === "hospital" ? "HC" : canonicalWorkspace === "bank" ? "DB" : "BI";
   return (
     <main className={`workspacePage workspacePage-${canonicalWorkspace}`}>
-      <nav className="shell nav" aria-label={`${account.displayName} navigation`}>
-        <Link className="brand" href="/">
-          <span className="brandMark">{portalMark}</span>
-          <span>{portalName}</span>
-        </Link>
-        <Link className="networkPill" href="/showcase"><i /> {canonicalWorkspace} · presentation</Link>
-      </nav>
+      <header className="floatingNavWrapper">
+        <nav className="shell nav" aria-label={`${account.displayName} navigation`}>
+          <Link className="brand" href="/">
+            <span className="brandMark">{portalMark}</span>
+            <span>{portalName}</span>
+          </Link>
+          <div className="navLinks">
+            <Link className="networkPill" href="/showcase"><span className="status-dot-pulse" aria-hidden="true" /> {canonicalWorkspace} · presentation</Link>
+            <ThemeToggle />
+          </div>
+        </nav>
+      </header>
       <WorkspaceClient initialAccount={account} initialDashboard={dashboard} />
     </main>
   );

@@ -2,36 +2,47 @@ import "server-only";
 
 import { ledger } from "@/lib/fabric/ledger";
 import type { Session } from "@/lib/auth/session-token";
-import { buildRoleDashboard } from "./build-dashboard";
+import type { FabricRole } from "@/lib/fabric/config";
+import { buildRoleDashboard, type DashboardAssets } from "./build-dashboard";
+
+const loaders = {
+  packages: ledger.listPolicyPackages,
+  policies: ledger.listPolicies,
+  claims: ledger.listClaims,
+  evidence: ledger.listEvidenceReferences,
+  settlements: ledger.listSettlements,
+  evidenceAccess: ledger.listEvidenceAccessRecords,
+  mandates: ledger.listBankMandates,
+  bankAccounts: ledger.listBankAccountReferences,
+  bankTransfers: ledger.listBankTransfers,
+  premiumPayments: ledger.listPremiumPayments,
+  premiumCollections: ledger.listPremiumCollections,
+  benefitRequests: ledger.listBenefitRequests,
+  liabilities: ledger.listLiabilities,
+  reviews: ledger.listClaimReviews,
+  appeals: ledger.listClaimAppeals,
+  decisions: ledger.listAuditorDecisions,
+  fraudAssessments: ledger.listFraudAssessments,
+  oracleRequests: ledger.listOracleRequests,
+  oracleSnapshots: ledger.listOracleRegistrySnapshots,
+  partnerAgreements: ledger.listPartnerAgreements,
+  hospitalInvoices: ledger.listHospitalInvoices,
+} satisfies { [K in keyof DashboardAssets]-?: () => Promise<NonNullable<DashboardAssets[K]>> };
+
+const assetsByRole = {
+  insurerAdmin: ["packages", "policies", "claims", "benefitRequests", "oracleRequests", "partnerAgreements", "fraudAssessments"],
+  policyholder: ["policies", "claims", "mandates", "bankAccounts", "premiumPayments", "benefitRequests", "appeals"],
+  hospitalOfficer: ["partnerAgreements", "hospitalInvoices"],
+  auditor: ["claims", "evidenceAccess", "reviews", "decisions"],
+  bankOfficer: ["settlements", "mandates", "bankAccounts", "bankTransfers", "premiumCollections", "benefitRequests"],
+} as const satisfies Record<FabricRole, readonly (keyof DashboardAssets)[]>;
 
 export async function loadRoleDashboard(session: Session) {
-  const [packages, policies, claims, evidence, settlements, evidenceAccess, mandates, bankAccounts, bankTransfers, premiumPayments, premiumCollections, benefitRequests, liabilities, reviews, appeals, decisions, fraudAssessments, oracleRequests, oracleSnapshots, partnerAgreements, hospitalInvoices] = await Promise.all([
-    ledger.listPolicyPackages(),
-    ledger.listPolicies(),
-    ledger.listClaims(),
-    ledger.listEvidenceReferences(),
-    ledger.listSettlements(),
-    ledger.listEvidenceAccessRecords(),
-    ledger.listBankMandates(),
-    ledger.listBankAccountReferences(),
-    ledger.listBankTransfers(),
-    ledger.listPremiumPayments(),
-    ledger.listPremiumCollections(),
-    ledger.listBenefitRequests(),
-    ledger.listLiabilities(),
-    ledger.listClaimReviews(),
-    ledger.listClaimAppeals(),
-    ledger.listAuditorDecisions(),
-    ledger.listFraudAssessments(),
-    ledger.listOracleRequests(),
-    ledger.listOracleRegistrySnapshots(),
-    ledger.listPartnerAgreements(),
-    ledger.listHospitalInvoices(),
-  ]);
-
-  return buildRoleDashboard(
-    session.role,
-    { packages, policies, claims, evidence, settlements, evidenceAccess, mandates, bankAccounts, bankTransfers, premiumPayments, premiumCollections, benefitRequests, liabilities, reviews, appeals, decisions, fraudAssessments, oracleRequests, oracleSnapshots, partnerAgreements, hospitalInvoices },
-    session.subjectId,
-  );
+  const assets: DashboardAssets = {
+    packages: [], policies: [], claims: [], evidence: [], settlements: [], evidenceAccess: [],
+  };
+  await Promise.all(assetsByRole[session.role].map(async (key) => {
+    Object.assign(assets, { [key]: await loaders[key]() });
+  }));
+  return buildRoleDashboard(session.role, assets, session.subjectId);
 }

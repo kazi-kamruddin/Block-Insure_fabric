@@ -110,8 +110,12 @@ SUBMITTED -> REJECTED
 Approval creates an explicit benefit liability. The insurer must anchor an
 external funding authorization before BankMSP can confirm a payout. Settlement
 authorization likewise creates a claim liability, and bank confirmation closes
-both settlement and liability. Allocation records and transfer hashes provide
-audit evidence; actual BDT allocation and movement remain in the external bank.
+both settlement and liability. `ConfirmBenefitPayment` debits the simulated
+insurer account and marks the request and liability `PAID` after BankMSP supplies
+a hashed reference. It does not credit beneficiary accounts or verify an actual
+external transfer. The beneficiary allocations are a snapshot of intended shares,
+not proof of disbursement. Real BDT allocation and movement require an external
+bank adapter and reconciliation evidence.
 
 ## Verification
 

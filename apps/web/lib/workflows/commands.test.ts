@@ -18,12 +18,13 @@ describe("workflow command boundary", () => {
   });
 
   it("validates version-bound Oracle requests and fallback commands", () => {
-    expect(workflowCommandSchema.safeParse({ operation: "requestOracleVerification", requestId: "request-1", claimId: "claim-1", snapshotId: "registry-demo-v1", modelVersion: "model-v1", modelHash: "c".repeat(64), assignedOracleIdsJson: '["oracle1","oracle2"]', commitDeadline: "2026-09-09T12:00:00Z", revealDeadline: "2026-09-09T12:10:00Z" }).success).toBe(true);
+    expect(workflowCommandSchema.safeParse({ operation: "requestOracleVerification", requestId: "request-1", claimId: "claim-1", snapshotId: "registry-demo-v1", modelVersion: "model-v1", modelHash: "c".repeat(64), assignedOracleIdsJson: '["oracle1","oracle2","oracle3"]', requiredConfirmations: 2, commitDeadline: "2026-09-09T12:00:00Z", revealDeadline: "2026-09-09T12:10:00Z" }).success).toBe(true);
     expect(workflowCommandSchema.safeParse({ operation: "routeOracleFailureToReview", requestId: "request-1", reviewId: "review-1", assignedAuditorIdsJson: '["auditor1","auditor2","auditor3","auditor4"]', approvalThreshold: 3, rejectionThreshold: 2, deadline: "2026-09-12T12:00:00Z" }).success).toBe(true);
     expect(workflowCommandSchema.safeParse({ operation: "publishOracleRegistrySnapshot", id: "registry-demo-v1", version: 1, rootHash: "not-a-hash", rulesVersion: "rules-v1", rulesHash: "a".repeat(64), recordCount: 3 }).success).toBe(false);
   });
 
   it("validates versioned review, appeal, and fraud-support commands", () => {
+    expect(workflowCommandSchema.safeParse({ operation: "openAppealReview", appealId: "appeal-1", reviewId: "review-1", assignedAuditorIdsJson: '["auditor1","auditor2","auditor3","auditor4"]', approvalThreshold: 3, rejectionThreshold: 2, deadline: "2026-09-09T12:00:00Z" }).success).toBe(false);
     expect(workflowCommandSchema.safeParse({ operation: "openClaimReview", claimId: "claim-1", reviewId: "review-1", assignedAuditorIdsJson: '["auditor1","auditor2","auditor3","auditor4"]', approvalThreshold: 3, rejectionThreshold: 2, deadline: "2026-09-09T12:00:00Z" }).success).toBe(true);
     expect(workflowCommandSchema.safeParse({ operation: "submitClaimAppeal", appealId: "appeal-1", claimId: "claim-1", reasonCategory: "DOCUMENT_ERROR", reasonHash: "a".repeat(64), descriptionHash: "b".repeat(64), proposedClinicalReferenceHash: "c".repeat(64) }).success).toBe(true);
     expect(workflowCommandSchema.safeParse({ operation: "submitClaimAppeal", appealId: "appeal-1", claimId: "claim-1", reasonCategory: "DOCUMENT_ERROR", reasonHash: "a".repeat(64), descriptionHash: "b".repeat(64) }).success).toBe(false);

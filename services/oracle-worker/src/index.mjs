@@ -1,14 +1,17 @@
 import { createHash } from "node:crypto";
 import path from "node:path";
+import { pinnedDecision, decisionIdentity } from "./decision-store.mjs";
+import { routeModel, evaluatorVersion, evaluatorHash } from "./xgboost.mjs";
 import { environmentFileArgument, loadEnvironmentFile } from "./environment.mjs";
 
 loadEnvironmentFile(environmentFileArgument());
 
-const [{ loadOracleConfig }, { connectOracleGateway }, { loadRegistrySnapshot, validateRegistrySnapshot, assessRegistryRecord }, protocol, cursorModule, retryModule, healthModule] = await Promise.all([
+const [{ loadOracleConfig }, { connectOracleGateway }, { loadRegistrySnapshot, validateRegistrySnapshot, assessRegistryRecord }, protocol, privacy, cursorModule, retryModule, healthModule] = await Promise.all([
   import("./config.mjs"),
   import("./gateway.mjs"),
   import("./registry.mjs"),
   import("./protocol.mjs"),
+  import("./privacy.mjs"),
   import("./cursor.mjs"),
   import("./retry.mjs"),
   import("./health.mjs"),
@@ -24,6 +27,7 @@ const cursorPath = path.join(config.stateRoot, config.oracleId, "cursor.json");
 const decoder = new TextDecoder();
 let stopping = false;
 let activeEvents;
+let shutdownPromise;
 
 function log(level, message, details = {}) {
   console[level](JSON.stringify({ timestamp: new Date().toISOString(), service: config.oracleId, message, ...details }));
@@ -60,7 +64,7 @@ async function registryForRequest(request) {
   if (request.registrySnapshotId === registry.snapshotId) return registry;
   if (!config.registryApiUrl) return registry;
   const response = await fetch(`${config.registryApiUrl}/${encodeURIComponent(request.registrySnapshotId)}`, {
-    headers: { accept: "application/json" },
+    headers: { accept: "application/json", ...(config.registryApiToken ? { authorization: `Bearer ${config.registryApiToken}` } : {}) },
     signal: AbortSignal.timeout(config.registryRequestTimeoutMs),
   });
   if (!response.ok) throw new Error(`Hospital registry API returned ${response.status} for ${request.registrySnapshotId}`);
@@ -84,6 +88,8 @@ async function submitCommitment(request, commitmentHash) {
       if (current.commitmentHash !== commitmentHash) throw new Error(`Stored commitment differs for ${request.id}`);
       return current;
     }
+    const latest = await evaluate("ReadOracleRequest", request.id);
+    if (latest.status !== "PENDING" || Date.now() > Date.parse(latest.commitDeadline)) return null;
     const result = await submit("SubmitOracleCommitment", request.id, commitmentHash);
     const health = healthState.snapshot();
     await updateHealth({ counts: { commitments: health.counts.commitments + 1 } });
@@ -110,6 +116,10 @@ async function submitReveal(request, assessment, resultHash, salt) {
       if (current.resultHash !== resultHash) throw new Error(`Stored result differs for ${request.id}`);
       return current;
     }
+    // Another worker may have finalized the quorum since our last read or
+    // failed submission. Do not retry a completed request and delay later work.
+    const latest = await evaluate("ReadOracleRequest", request.id);
+    if (latest.status !== "PENDING" || Date.now() > Date.parse(latest.revealDeadline)) return null;
     const result = await submit(
       "RevealOracleResult",
       request.id,
@@ -140,37 +150,72 @@ async function processRequest(requestId) {
   let request = await evaluate("ReadOracleRequest", requestId);
   if (!request.assignedOracleIds.includes(config.oracleId)) return;
   if (request.status !== "PENDING" || await evaluateOrNull("ReadOracleResult", `${request.id}:${config.oracleId}`)) return;
-  const [claim, hospitalVerification, appeal] = await Promise.all([
+  // Check deadlines before any archive fetch. Resume the persisted assessment
+  // even when the registry service is unavailable after a successful commit.
+  const existingCommitment = await evaluateOrNull("ReadOracleCommitment", `${request.id}:${config.oracleId}`);
+  if ((!existingCommitment && Date.now() > Date.parse(request.commitDeadline)) || Date.now() > Date.parse(request.revealDeadline)) return;
+  const currentClaim = await evaluate("ReadClaim", request.claimId);
+  if (currentClaim.version !== request.claimVersion || currentClaim.currentOracleRequestId !== request.id) return;
+  const decision = await pinnedDecision({
+    directory: path.join(config.stateRoot, config.oracleId, "decisions"),
+    identity: decisionIdentity(config, runtime.identityFingerprint, request),
+    key: runtime.privateKey,
+    existingCommitment,
+    allowLegacyAdoption: request.modelVersion === "model-v1",
+    create: async () => {
+  const [claim, hospitalVerification, appeal, publicPresentation, privatePresentation] = await Promise.all([
     evaluate("ReadClaim", request.claimId),
     evaluate("ReadHospitalVerification", request.hospitalVerificationId),
     request.appealId ? evaluate("ReadClaimAppeal", request.appealId) : Promise.resolve(null),
+    request.privacyPresentationId ? evaluate("ReadSelectiveDisclosurePresentation", request.privacyPresentationId) : Promise.resolve(null),
+    request.privacyPresentationId ? evaluate("ReadSelectiveDisclosurePresentationPrivate", request.privacyPresentationId) : Promise.resolve(null),
   ]);
+  const [invoiceCredential, policyCredential] = publicPresentation
+    ? await Promise.all([
+      evaluate("ReadPrivacyCredential", publicPresentation.invoiceCredentialId),
+      evaluate("ReadPrivacyCredential", publicPresentation.policyCredentialId),
+    ])
+    : [null, null];
   const requestRegistry = await registryForRequest(request);
   if (claim.version !== request.claimVersion || claim.currentOracleRequestId !== request.id) {
-    await updateHealth({ status: "ONLINE", lastProcessedRequestId: request.id, lastError: `Stale request rejected for claim ${request.claimId}` });
-    return;
+    throw new Error(`Stale request rejected for claim ${request.claimId}`);
   }
-  const existingCommitment = await evaluateOrNull("ReadOracleCommitment", `${request.id}:${config.oracleId}`);
   if (!existingCommitment && Date.now() > Date.parse(request.commitDeadline)) {
-    await updateHealth({ status: "ONLINE", lastProcessedRequestId: request.id, lastError: `Commit deadline expired for ${request.id}` });
-    return;
+    throw new Error(`Commit deadline expired for ${request.id}`);
   }
   if (Date.now() > Date.parse(request.revealDeadline)) {
-    await updateHealth({ status: "ONLINE", lastProcessedRequestId: request.id, lastError: `Reveal deadline expired for ${request.id}` });
-    return;
+    throw new Error(`Reveal deadline expired for ${request.id}`);
   }
-  const assessment = assessRegistryRecord({
+  let assessment = assessRegistryRecord({
     snapshot: requestRegistry,
     request,
     claim,
     hospitalVerification,
     appeal,
-    configuredModelVersion: config.modelVersion,
-    configuredModelHash: config.modelHash,
+    configuredModelVersion: request.modelVersion === evaluatorVersion ? evaluatorVersion : config.modelVersion,
+    configuredModelHash: request.modelVersion === evaluatorVersion ? evaluatorHash : config.modelHash,
   });
+  const privacyAssessment = privacy.verifySelectiveDisclosurePresentation({
+    request, claim, publicPresentation, privatePresentation, invoiceCredential, policyCredential,
+  });
+  if (!privacyAssessment.valid) {
+    assessment = {
+      verified: false,
+      verificationCode: privacyAssessment.code,
+      recordHash: request.privacyPresentationHash || "0".repeat(64),
+    };
+  }
+  assessment = routeModel({ snapshot: requestRegistry, request, claim, assessment });
   const resultHash = protocol.buildResultDigest(request, assessment);
   const salt = protocol.buildDeterministicSalt(runtime.privateKey, request.id, config.oracleId);
   const commitmentHash = protocol.buildCommitmentDigest(request, { verified: assessment.verified, resultHash, salt });
+  return { assessment, resultHash, salt, commitmentHash, registry: {
+    sourceId: requestRegistry.sourceId, snapshotId: requestRegistry.snapshotId,
+    version: requestRegistry.version, rootHash: requestRegistry.rootHash, provenance: requestRegistry.provenance,
+  } };
+    },
+  });
+  const { assessment, resultHash, salt, commitmentHash, registry: requestRegistry } = decision;
   const health = healthState.snapshot();
   await updateHealth({
     status: "PROCESSING",
@@ -178,13 +223,18 @@ async function processRequest(requestId) {
     registrySnapshotId: requestRegistry.snapshotId,
     registryVersion: requestRegistry.version,
     registryRootHash: requestRegistry.rootHash,
+    registryDatasetId: requestRegistry.provenance?.datasetId ?? null,
+    registryDatasetVersion: requestRegistry.provenance?.datasetVersion ?? null,
+    registryInputSha256: requestRegistry.provenance?.inputSha256 ?? null,
+    registryTransformationVersion: requestRegistry.provenance?.transformationVersion ?? null,
     lastProcessedRequestId: request.id,
     lastError: null,
     counts: { requests: health.counts.requests + 1 },
   });
-  await submitCommitment(request, commitmentHash);
-  request = await waitForRevealPhase(request.id);
-  if (request.status === "PENDING" && Date.now() <= Date.parse(request.revealDeadline)) await submitReveal(request, assessment, resultHash, salt);
+  if (await submitCommitment(request, commitmentHash)) {
+    request = await waitForRevealPhase(request.id);
+    if (request.status === "PENDING" && Date.now() <= Date.parse(request.revealDeadline)) await submitReveal(request, assessment, resultHash, salt);
+  }
   await updateHealth({
     status: "ONLINE",
     lastProcessedRequestId: request.id,
@@ -215,6 +265,10 @@ async function consumeEvents() {
     getBlockNumber: () => BigInt(cursor.nextBlock),
     getTransactionId: () => cursor.transactionId,
   } : undefined;
+  // Persist health before opening the stream. Awaiting filesystem work between
+  // opening a gRPC stream and attaching its async iterator leaves early stream
+  // errors unhandled and can terminate the worker instead of reconnecting.
+  await updateHealth({ status: "ONLINE", lastError: null });
   activeEvents = await runtime.network.getChaincodeEvents(config.fabric.chaincodeName, {
     checkpoint,
     startBlock: BigInt(cursor.nextBlock),
@@ -256,16 +310,23 @@ async function main() {
 }
 
 async function shutdown(signal) {
-  if (stopping) return;
+  if (shutdownPromise) return shutdownPromise;
   stopping = true;
-  activeEvents?.close();
-  healthServer.close();
-  runtime.close();
-  await updateHealth({ status: "STOPPED", lastError: null }).catch(() => undefined);
-  log("log", "Oracle worker stopped", { signal });
+  shutdownPromise = (async () => {
+    activeEvents?.close();
+    runtime.close();
+    await updateHealth({ status: "STOPPED", lastError: null }).catch(() => undefined);
+    await new Promise((resolve) => healthServer.close(resolve));
+    log("log", "Oracle worker stopped", { signal });
+  })();
+  return shutdownPromise;
 }
 
-for (const signal of ["SIGINT", "SIGTERM"]) process.on(signal, () => void shutdown(signal));
+for (const signal of ["SIGINT", "SIGTERM", "SIGBREAK"]) {
+  process.on(signal, () => {
+    void shutdown(signal).finally(() => process.exit(0));
+  });
+}
 
 main().catch(async (error) => {
   const message = error instanceof Error ? error.message : String(error);

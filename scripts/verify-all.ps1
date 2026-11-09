@@ -139,7 +139,7 @@ function Stop-StartedOracleWorkers {
     }
     $startedOracleWorkers.Clear()
     $deadline = [DateTimeOffset]::UtcNow.AddSeconds(10)
-    while (((Get-OracleHealth 3301) -or (Get-OracleHealth 3302)) -and [DateTimeOffset]::UtcNow -lt $deadline) {
+    while (((Get-OracleHealth 3301) -or (Get-OracleHealth 3302) -or (Get-OracleHealth 3303)) -and [DateTimeOffset]::UtcNow -lt $deadline) {
         Start-Sleep -Milliseconds 250
     }
 }
@@ -150,6 +150,7 @@ function Assert-IsolatedBrowserRuntime {
     if (Get-WebHealth) { $occupied += "web:3000" }
     if (Get-OracleHealth 3301) { $occupied += "oracle1:3301" }
     if (Get-OracleHealth 3302) { $occupied += "oracle2:3302" }
+    if (Get-OracleHealth 3303) { $occupied += "oracle3:3303" }
     if ($occupied.Count -gt 0) {
         throw "Browser verification requires isolated application ports for baseline/conflict/timeout scenarios. Stop managed services while retaining Fabric first: .\\scripts\\demo-stack.ps1 -Action Stop -KeepNetwork. Occupied: $($occupied -join ', ')"
     }
@@ -173,6 +174,11 @@ try {
     Invoke-VerificationStep "Oracle worker unit tests" { npm run test }
     Pop-Location
 
+    Invoke-VerificationStep "Workflow model invariants" { node (Join-Path $projectRoot "formal/insurance-workflow/check-model.mjs") }
+    Invoke-VerificationStep "Research statistics and security regressions" {
+        node --test (Join-Path $projectRoot "benchmarks/comparative/statistics.test.mjs") (Join-Path $projectRoot "benchmarks/security-evaluation/cases.test.mjs")
+    }
+
     if (-not $SkipNetwork) {
         $wslProjectRoot = Resolve-WslProjectRoot
         Invoke-VerificationStep "Go chaincode suite" {
@@ -184,7 +190,8 @@ try {
         Invoke-VerificationStep "Oracle worker supervision and health" {
             Ensure-OracleWorker "oracle1" 3301 ".env.oracle1.example"
             Ensure-OracleWorker "oracle2" 3302 ".env.oracle2.example"
-            foreach ($port in 3301, 3302) {
+            Ensure-OracleWorker "oracle3" 3303 ".env.oracle3.example"
+            foreach ($port in 3301, 3302, 3303) {
                 $health = Get-OracleHealth $port
                 if (-not $health -or $health.status -notin "ONLINE", "PROCESSING") { throw "Oracle health on port $port is not operational." }
             }
@@ -200,6 +207,30 @@ try {
             try {
                 $env:ORACLE_E2E_SCENARIO = "conflict"
                 npx playwright test --grep "@oracle-conflict"
+            }
+            finally { $env:ORACLE_E2E_SCENARIO = $previousScenario }
+        }
+        Invoke-VerificationStep "Live Oracle two-worker wrong majority" {
+            $previousScenario = $env:ORACLE_E2E_SCENARIO
+            try {
+                $env:ORACLE_E2E_SCENARIO = "majority-wrong"
+                npx playwright test --grep "@oracle-majority-wrong"
+            }
+            finally { $env:ORACLE_E2E_SCENARIO = $previousScenario }
+        }
+        Invoke-VerificationStep "Live Oracle common-source counterexample" {
+            $previousScenario = $env:ORACLE_E2E_SCENARIO
+            try {
+                $env:ORACLE_E2E_SCENARIO = "common-source"
+                npx playwright test --grep "@oracle-common-source"
+            }
+            finally { $env:ORACLE_E2E_SCENARIO = $previousScenario }
+        }
+        Invoke-VerificationStep "Live Oracle one-worker fault tolerance" {
+            $previousScenario = $env:ORACLE_E2E_SCENARIO
+            try {
+                $env:ORACLE_E2E_SCENARIO = "one-unavailable"
+                npx playwright test --grep "@oracle-one-unavailable"
             }
             finally { $env:ORACLE_E2E_SCENARIO = $previousScenario }
         }

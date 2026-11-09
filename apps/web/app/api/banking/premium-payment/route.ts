@@ -1,18 +1,16 @@
 import { NextResponse } from "next/server";
 import { createHmac } from "node:crypto";
 import { z } from "zod";
+import { premiumIntentSchema, premiumOtpBinding } from "@/lib/banking/premium-intent";
+import { findDemoAccount } from "@/lib/auth/accounts";
 import { currentSession, sessionSecret } from "@/lib/auth/current-session";
 import { ledger } from "@/lib/fabric/ledger";
 import { otpChallenges } from "@/lib/banking/otp";
 import { checkMutationOrigin } from "@/lib/security/request-origin";
+import { reconcilePremiumOutcome } from "@/lib/banking/premium-outcome";
 
-const hash = z.string().regex(/^[a-fA-F0-9]{64}$/).transform((value) => value.toLowerCase());
-const requestSchema = z.object({
-  challengeId: z.string().uuid(), otp: z.string().regex(/^\d{6}$/),
-  transferId: z.string().min(3).max(128), paymentId: z.string().min(3).max(128), policyId: z.string().min(3).max(128),
-  sourceAccountId: z.string().min(3).max(128), destinationAccountId: z.string().min(3).max(128),
-  periodStartDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), periodEndDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  amountMinor: z.number().int().positive().safe(), externalReferenceHash: hash,
+const requestSchema = premiumIntentSchema.extend({
+  challengeId: z.string().uuid().optional(), otp: z.string().regex(/^\d{6}$/).optional(), recoverOnly: z.boolean().default(false),
 });
 export const runtime = "nodejs";
 
@@ -31,10 +29,22 @@ export async function POST(request: Request) {
   const parsed = requestSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ message: "Invalid premium payment request" }, { status: 400 });
   try {
-    const { challengeId, otp, ...payment } = parsed.data;
-    otpChallenges.consume(challengeId, otp, {
-      policyId: payment.policyId, sourceAccountId: payment.sourceAccountId, subjectId: session.subjectId,
-    }, otpSecret());
+    const { challengeId, otp, recoverOnly, ...payment } = parsed.data;
+    const policy = await ledger.readPolicy(payment.policyId);
+    if (policy.policyholderId !== session.subjectId) return NextResponse.json({ message: "This policy belongs to another subject" }, { status: 403 });
+    const transfer = await ledger.readBankTransfer(payment.transferId).catch((error: unknown) => {
+      if (String(error).includes("does not exist")) return null;
+      throw error;
+    });
+    if (transfer) {
+      const recorded = transfer.status === "SETTLED" ? await ledger.readPremiumPayment(payment.paymentId) : undefined;
+      return NextResponse.json({ ...reconcilePremiumOutcome(payment, transfer, recorded), recovered: true });
+    }
+    if (recoverOnly) return NextResponse.json({ status: "UNRESOLVED", message: "No matching committed transfer is visible. An unknown submission is not permission to create another payment." }, { status: 202 });
+    if (!challengeId || !otp) throw new Error("A valid OTP challenge is required for a new payment");
+    const recipient = findDemoAccount(session.accountId)?.email ?? process.env.POLICYHOLDER_OTP_EMAIL;
+    if (!recipient) throw new Error("No OTP recipient is configured");
+    otpChallenges.consume(challengeId, otp, premiumOtpBinding(payment, session.subjectId, recipient), otpSecret());
     const authorizationHash = createHmac("sha256", otpSecret()).update(`${challengeId}:${session.subjectId}:consumed`).digest("hex");
     return NextResponse.json({ result: await ledger.executeManualPremiumPayment({ ...payment, authorizationHash }) });
   } catch (error) {

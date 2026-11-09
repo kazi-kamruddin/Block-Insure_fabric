@@ -1,12 +1,15 @@
 # Verification results
 
-Run the repository verification from Windows PowerShell:
+After creating the isolated Phase 1 channel, run the repository verification
+from Windows PowerShell:
 
 ```powershell
-.\scripts\verify-all.ps1
+.\scripts\verify-phase1.ps1
 ```
 
-The runner checks web linting, strict types, unit tests, dependency advisories,
+The wrapper points browser writes and local worker state at
+`insurance-phase1-20260926` while `verify-all.ps1` checks web linting, strict
+types, unit tests, dependency advisories,
 the production build, Dockerized Go chaincode tests, the live Fabric network and
 committed contract, and the Microsoft Edge browser suite. The browser suite
 creates uniquely named local ledger records as part of its end-to-end workflow.

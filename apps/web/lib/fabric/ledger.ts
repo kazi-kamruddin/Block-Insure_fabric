@@ -1,5 +1,6 @@
 import "server-only";
 
+import { randomBytes } from "node:crypto";
 import type { Contract } from "@hyperledger/fabric-gateway";
 import { withFabricContract } from "./gateway";
 import type { FabricRole } from "./config";
@@ -22,6 +23,7 @@ import type {
   EvidenceAccessGrant,
   HospitalVerification,
   HospitalInvoice,
+  HospitalModelFacts,
   FraudAssessment,
   Liability,
   OracleCommitment,
@@ -35,6 +37,8 @@ import type {
   PremiumCollection,
   PremiumAdjustment,
   PremiumPayment,
+  PrivacyCredential,
+  SelectiveDisclosurePresentation,
   Settlement,
 } from "./types";
 
@@ -71,10 +75,15 @@ async function submitWithTransient<T>(
   transactionName: string,
   args: Array<string | number>,
   transientData: Record<string, string | Uint8Array>,
+  profileUserName?: string,
 ) {
   return withFabricContract(role, async (contract) => decodeJson<T>(
     await contract.submit(transactionName, { arguments: stringifyArguments(args), transientData }),
-  ));
+  ), profileUserName);
+}
+
+function randomSalts(names: readonly string[]) {
+  return JSON.stringify(Object.fromEntries(names.map((name) => [name, randomBytes(32).toString("hex")])));
 }
 
 async function submitAsAuditor<T>(
@@ -108,6 +117,13 @@ async function submitAsHospital<T>(
 }
 
 export const ledger = {
+  readHospitalModelFacts(invoiceId: string) {
+    return evaluate<HospitalModelFacts>("insurerAdmin", "ReadHospitalModelFacts", invoiceId);
+  },
+  recordHospitalModelFacts(facts: HospitalModelFacts, hospitalUserName?: string) {
+    return submitWithTransient<HospitalModelFacts>("hospitalOfficer", "RecordHospitalModelFacts", [facts.invoiceId],
+      { hospitalModelFacts: JSON.stringify(facts) }, hospitalUserName);
+  },
   async schemaVersion() {
     return withFabricContract("insurerAdmin", async (contract: Contract) => {
       const payload = await contract.evaluateTransaction("GetSchemaVersion");
@@ -413,10 +429,12 @@ export const ledger = {
     dischargeDate: string;
     status: "DRAFT" | "FINALIZED";
   }, hospitalUserName?: string) {
-    return submitAsHospital<HospitalInvoice>(
-      hospitalUserName, "CreateHospitalInvoice", input.id, input.patientReferenceHash,
+    if (!hospitalUserName) throw new Error("This Hospital account has no Fabric identity");
+    return submitWithTransient<HospitalInvoice>(
+      "hospitalOfficer", "CreateHospitalInvoiceWithCredential", [input.id, input.patientReferenceHash,
       input.invoiceReferenceHash, input.treatmentHash, input.amountMinor,
-      input.admissionDate, input.dischargeDate, input.status,
+      input.admissionDate, input.dischargeDate, input.status],
+      { credentialSalts: randomSalts(["admissionDate", "amountMinor", "dischargeDate", "hospitalId", "invoiceId", "invoiceReferenceHash", "patientReferenceHash", "status", "treatmentHash"]) }, hospitalUserName,
     );
   },
 
@@ -430,10 +448,12 @@ export const ledger = {
     dischargeDate: string;
     status: "DRAFT" | "FINALIZED" | "VOID";
   }, hospitalUserName?: string) {
-    return submitAsHospital<HospitalInvoice>(
-      hospitalUserName, "UpdateHospitalInvoice", input.id, input.patientReferenceHash,
+    if (!hospitalUserName) throw new Error("This Hospital account has no Fabric identity");
+    return submitWithTransient<HospitalInvoice>(
+      "hospitalOfficer", "UpdateHospitalInvoiceWithCredential", [input.id, input.patientReferenceHash,
       input.invoiceReferenceHash, input.treatmentHash, input.amountMinor,
-      input.admissionDate, input.dischargeDate, input.status,
+      input.admissionDate, input.dischargeDate, input.status],
+      { credentialSalts: randomSalts(["admissionDate", "amountMinor", "dischargeDate", "hospitalId", "invoiceId", "invoiceReferenceHash", "patientReferenceHash", "status", "treatmentHash"]) }, hospitalUserName,
     );
   },
 
@@ -618,15 +638,17 @@ export const ledger = {
     documentType: string;
     contentHash: string;
     storageReferenceHash: string;
+    expectedClaimVersion?: number;
   }) {
     return submit<EvidenceReference>(
       "policyholder",
-      "AddEvidenceReference",
+      input.expectedClaimVersion === undefined ? "AddEvidenceReference" : "AddEvidenceReferenceForVersion",
       input.claimId,
       input.evidenceId,
       input.documentType,
       input.contentHash,
       input.storageReferenceHash,
+      ...(input.expectedClaimVersion === undefined ? [] : [input.expectedClaimVersion]),
     );
   },
 
@@ -677,6 +699,52 @@ export const ledger = {
     return submit<HospitalVerification>("insurerAdmin", "CrossCheckClaimInvoice", claimId, verificationId);
   },
 
+  issueInvoicePrivacyCredential(input: { id: string; invoiceId: string; expiresAt: string }, hospitalUserName?: string) {
+    return submitWithTransient<PrivacyCredential>(
+      "hospitalOfficer", "IssueInvoicePrivacyCredential", [input.id, input.invoiceId, input.expiresAt],
+      { credentialSalts: randomSalts(["admissionDate", "amountMinor", "dischargeDate", "hospitalId", "invoiceId", "invoiceReferenceHash", "patientReferenceHash", "status", "treatmentHash"]) },
+      hospitalUserName,
+    );
+  },
+
+  issuePolicyPrivacyCredential(input: { id: string; policyId: string; expiresAt: string }) {
+    return submitWithTransient<PrivacyCredential>(
+      "insurerAdmin", "IssuePolicyPrivacyCredential", [input.id, input.policyId, input.expiresAt],
+      { credentialSalts: randomSalts(["coverageLimitMinor", "endDate", "packageId", "policyId", "policyholderId", "premiumMinor", "startDate", "status", "termsHash"]) },
+    );
+  },
+
+  revokeInvoicePrivacyCredential(id: string, hospitalUserName?: string) {
+    return submitAsHospital<PrivacyCredential>(hospitalUserName, "RevokePrivacyCredential", id);
+  },
+
+  revokePolicyPrivacyCredential(id: string) {
+    return submit<PrivacyCredential>("insurerAdmin", "RevokePrivacyCredential", id);
+  },
+
+  registerClaimPrivacyPresentation(input: { id: string; claimId: string; invoiceCredentialId: string; policyCredentialId: string; challenge: string; expiresAt: string }) {
+    return submit<SelectiveDisclosurePresentation>(
+      "policyholder", "RegisterClaimPrivacyPresentation", input.id, input.claimId,
+      input.invoiceCredentialId, input.policyCredentialId, input.challenge, input.expiresAt,
+    );
+  },
+
+  readPrivacyCredential(id: string) {
+    return evaluate<PrivacyCredential>("insurerAdmin", "ReadPrivacyCredential", id);
+  },
+
+  listPrivacyCredentials() {
+    return evaluate<PrivacyCredential[]>("insurerAdmin", "ListPrivacyCredentials");
+  },
+
+  readSelectiveDisclosurePresentation(id: string) {
+    return evaluate<SelectiveDisclosurePresentation>("insurerAdmin", "ReadSelectiveDisclosurePresentation", id);
+  },
+
+  listSelectiveDisclosurePresentations() {
+    return evaluate<SelectiveDisclosurePresentation[]>("insurerAdmin", "ListSelectiveDisclosurePresentations");
+  },
+
   publishOracleRegistrySnapshot(input: {
     id: string; version: number; rootHash: string; rulesVersion: string;
     rulesHash: string; recordCount: number;
@@ -689,12 +757,13 @@ export const ledger = {
 
   requestOracleVerification(input: {
     requestId: string; claimId: string; snapshotId: string; modelVersion: string;
-    modelHash: string; assignedOracleIdsJson: string; commitDeadline: string; revealDeadline: string;
+    modelHash: string; assignedOracleIdsJson: string; requiredConfirmations: number;
+    commitDeadline: string; revealDeadline: string;
   }) {
     return submit<OracleRequest>(
       "insurerAdmin", "RequestOracleVerification", input.requestId, input.claimId,
       input.snapshotId, input.modelVersion, input.modelHash, input.assignedOracleIdsJson,
-      input.commitDeadline, input.revealDeadline,
+      input.requiredConfirmations, input.commitDeadline, input.revealDeadline,
     );
   },
 
@@ -734,16 +803,6 @@ export const ledger = {
       input.reasonCategory, input.reasonHash, input.descriptionHash, input.evidenceHash,
       input.proposedHospitalId, input.proposedAmountMinor, input.proposedIncidentDate,
       input.proposedDescriptionHash, input.proposedClinicalReferenceHash,
-    );
-  },
-
-  openAppealReview(input: {
-    appealId: string; reviewId: string; assignedAuditorIdsJson: string;
-    approvalThreshold: number; rejectionThreshold: number; deadline: string;
-  }) {
-    return submit<ClaimReview>(
-      "insurerAdmin", "OpenAppealReview", input.appealId, input.reviewId,
-      input.assignedAuditorIdsJson, input.approvalThreshold, input.rejectionThreshold, input.deadline,
     );
   },
 

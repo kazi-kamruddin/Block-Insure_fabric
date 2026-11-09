@@ -1,4 +1,5 @@
 import "server-only";
+import { randomUUID } from "node:crypto";
 
 import { ledger } from "@/lib/fabric/ledger";
 import { findDemoAccount } from "@/lib/auth/accounts";
@@ -7,9 +8,12 @@ import { assessClaimFraud } from "@/lib/fraud/assess-claim";
 import type { WorkflowCommand } from "./commands";
 import { refreshHospitalRegistrySnapshot } from "@/lib/oracle/hospital-registry";
 import { buildEvidenceMerkleTree } from "@/lib/evidence/merkle";
+import evaluator from "@/lib/oracle/evaluator.json";
 
 export async function executeWorkflowCommand(command: WorkflowCommand, session: Session) {
   switch (command.operation) {
+    case "recordHospitalModelFacts":
+      return ledger.recordHospitalModelFacts(command, findDemoAccount(session.accountId)?.fabricUserName);
     case "createPartnerAgreement":
       return ledger.createPartnerAgreement(command);
     case "setPartnerAgreementStatus":
@@ -82,6 +86,16 @@ export async function executeWorkflowCommand(command: WorkflowCommand, session: 
       return ledger.submitClaim(command);
     case "crossCheckClaimInvoice":
       return ledger.crossCheckClaimInvoice(command.claimId, command.verificationId);
+    case "issueInvoicePrivacyCredential":
+      return ledger.issueInvoicePrivacyCredential(command, findDemoAccount(session.accountId)?.fabricUserName);
+    case "issuePolicyPrivacyCredential":
+      return ledger.issuePolicyPrivacyCredential(command);
+    case "revokeInvoicePrivacyCredential":
+      return ledger.revokeInvoicePrivacyCredential(command.id, findDemoAccount(session.accountId)?.fabricUserName);
+    case "revokePolicyPrivacyCredential":
+      return ledger.revokePolicyPrivacyCredential(command.id);
+    case "registerClaimPrivacyPresentation":
+      return ledger.registerClaimPrivacyPresentation(command);
     case "publishEvidenceMerkleBatch": {
       const parsed = JSON.parse(command.evidenceIdsJson) as unknown;
       if (!Array.isArray(parsed) || parsed.length === 0 || parsed.some((value) => typeof value !== "string")) {
@@ -94,8 +108,26 @@ export async function executeWorkflowCommand(command: WorkflowCommand, session: 
       return ledger.openClaimReview(command);
     case "publishOracleRegistrySnapshot":
       return ledger.publishOracleRegistrySnapshot(command);
-    case "requestOracleVerification":
-      return ledger.requestOracleVerification(command);
+    case "startClaimProcessing": {
+      const claim = await ledger.readClaim(command.claimId);
+      if (claim.status === "ORACLE_PENDING" && claim.currentOracleRequestId) return ledger.readOracleRequest(claim.currentOracleRequestId);
+      if (!["SUBMITTED", "APPEAL_SUBMITTED", "HOSPITAL_VERIFIED"].includes(claim.status)) throw new Error("This claim is not awaiting processing.");
+      const snapshot = await refreshHospitalRegistrySnapshot();
+      if (!snapshot) throw new Error("No Hospital invoice records are available.");
+      return ledger.requestOracleVerification({
+        requestId: `oracle-${randomUUID()}`, claimId: claim.id, snapshotId: snapshot.snapshotId,
+        modelVersion: process.env.FABRIC_XGBOOST_ENABLED === "true" ? evaluator.evaluatorVersion : "model-v1",
+        modelHash: process.env.FABRIC_XGBOOST_ENABLED === "true" ? evaluator.evaluatorHash : "c".repeat(64),
+        assignedOracleIdsJson: '["oracle1","oracle2","oracle3"]', requiredConfirmations: 2,
+        commitDeadline: new Date(Date.now() + 60_000).toISOString(),
+        revealDeadline: new Date(Date.now() + 180_000).toISOString(),
+      });
+    }
+    case "requestOracleVerification": {
+      const claim = await ledger.readClaim(command.claimId);
+      const snapshot = claim.hospitalInvoiceId ? await refreshHospitalRegistrySnapshot() : null;
+      return ledger.requestOracleVerification({ ...command, snapshotId: snapshot?.snapshotId ?? command.snapshotId });
+    }
     case "finalizeOracleTimeout":
       return ledger.finalizeOracleTimeout(command.requestId);
     case "routeOracleFailureToReview":
@@ -106,8 +138,6 @@ export async function executeWorkflowCommand(command: WorkflowCommand, session: 
       return ledger.grantEvidenceAccess(command);
     case "revokeEvidenceAccess":
       return ledger.revokeEvidenceAccess(command.grantId);
-    case "openAppealReview":
-      return ledger.openAppealReview(command);
     case "finalizeExpiredReview":
       return ledger.finalizeExpiredReview(command.reviewId);
     case "assessClaimFraud": {

@@ -8,19 +8,34 @@ identities and Fabric ledger controls.
 
 ## Project status
 
+An opt-in frozen XGBoost alignment candidate is under verification; see
+[its input contract and verification boundaries](docs/frozen-xgboost-alignment.md).
+It is not activated on preserved channels. Existing research results do not
+validate the new evaluator or establish real-patient classification accuracy.
+
 The original implementation areas and the policy/premium/benefit expansion are
-joined by a certificate-bound two-Oracle consensus subsystem. The source now
+joined by a certificate-bound 2-of-3 Oracle consensus subsystem. The source now
 defines partner agreements, policy-specific provider networks, an independent
-Hospital invoice register, insurer read-only invoice cross-checking, and a
+Hospital invoice register, Oracle-led invoice checking, and a
 five-business-organization network with a Go contract, Next.js Gateway boundary, role-specific
 workflows/evidence, release verification, policy acquisition, premium collection,
 bank mandates, governed benefits, distributed adjudication, appeals, and advisory
 fraud triage, governed evidence grants, durable event projection, and
 ledger-derived research metrics, evidence Merkle inclusion proofs, a targeted
 Bank–Insurer private-data collection, independent Oracle workers, commit/reveal
-consensus, and governed auditor fallback. The clean local deployment runs
-`insurance-contract` 1.2.2 with schema 12. Its automated code gate and live Fabric
+consensus, governed auditor fallback, issuer-bound selective-disclosure
+credentials, executable TLA+ workflow verification, and reproducible Caliper
+and fault-profile benchmarks. The archived clean local baseline runs
+`insurance-contract` 1.4.0 with schema 14. Its automated code gate and live Fabric
 workflow cover the Phase 1 partner and Hospital boundary.
+
+The current workflow demonstration uses a separate
+`insurance-workflow-20261005` channel with schema-15 chaincode 1.5.1-workflow.
+Use [the presentation runbook](docs/local-demonstration.md) and
+`scripts/workflow-demo.ps1` to start it. The earlier 3 October hardening gate is
+recorded in [the dated live record](docs/results/hardening-live-20261003.md).
+The default local environment file still selects the older main channel; use
+the workflow wrapper for the current demonstration.
 
 This is not a production deployment claim. Institutional authentication,
 durable encrypted object storage and key recovery, multi-node/orderer high
@@ -29,6 +44,11 @@ governance remain environment-specific work outside the local release.
 
 ## Workspace layout
 
+This repository is standalone: runtime, build, tests and operational tooling do
+not require the Solidity implementation or an imported copy. Shared methodology
+is represented by Fabric-owned frozen assets and source-hashed test fixtures.
+Other implementations serve only as read-only development references.
+
 - `network/` — local Fabric topology, channel configuration, and lifecycle scripts.
 - `chaincode/insurance-contract/` — insurance domain chaincode and its tests.
 - `apps/web/` — Next.js web application.
@@ -36,14 +56,18 @@ governance remain environment-specific work outside the local release.
 - `scripts/` — shared verification and supervised demonstration automation.
 - `services/oracle-worker/` — independent Oracle processes, registry fixtures,
   durable cursors, and health reporting.
+- `formal/insurance-workflow/` — TLA+ specification and exhaustive executable checker.
+- `benchmarks/` — Hyperledger Caliper and end-to-end Oracle fault experiments.
 
 Server-side Gateway, identity, evidence, fraud, event, and research modules are
 co-located under `apps/web/lib/`; cross-component browser tests live in
 `apps/web/e2e/`.
 
-`reference/` contains the prior Ethereum implementation for local study only.
-It is deliberately ignored by Git and must not be modified or committed as part
-of this Fabric project.
+`reference/` contains the prior Ethereum implementation and a dated Fabric
+context snapshot for local study. It is deliberately ignored by Git; edits to
+`reference/context Block_Insure_Fabric 13oct.md` remain local unless
+explicitly added to version control. The nested Ethereum implementation is not
+the active runtime.
 
 ## Implemented architecture
 
@@ -88,9 +112,9 @@ For a supervised local deployment from the repository root, use
 ledger, `Status` checks the web app plus the event, banking, and Oracle workers, and `Stop` retains Fabric
 volumes. `CleanBootstrap -ConfirmReset` is deliberately destructive and is only
 for an explicitly approved clean showcase; it rebuilds the topology, deploys
-chaincode 1.2.2, seeds partner agreements, private balance-bearing Bank accounts, Hospital invoices, and the
+chaincode 1.4.0, seeds partner agreements, private balance-bearing Bank accounts, Hospital invoices, and the
 policy/benefit/Oracle catalog, then starts the web app, event worker, automatic
-premium-collection worker, and both Oracle workers.
+premium-collection worker, and all three Oracle workers.
 
 See [the lifecycle design](docs/policy-premium-benefit-lifecycles.md) for policy,
 OTP, collection-worker, reconciliation, and benefit boundaries;
@@ -110,15 +134,38 @@ worker independence, and manual-review fallback.
 The [Merkle and private-banking design](docs/evidence-merkle-and-private-banking.md)
 specifies canonical evidence proofs, transient input, collection membership, and
 the public/private account split.
+The [Phase 1 baseline](docs/results/phase1-baseline-2026-09-26.md) records the
+current source/package/ledger provenance, completed checks, workflow boundaries,
+and the remaining isolated live gate.
+The [privacy, formal-verification, and benchmarking design](docs/privacy-formal-benchmarking.md)
+defines the selective-disclosure protocol, checked invariants, experiment matrix,
+and interpretation limits.
 
 ## Complete verification
 
-With Docker Desktop and the Fabric network running, execute every code, network,
-security, browser, and live-workflow check from Windows PowerShell:
+Code checks require only this checkout. Use Node.js 22.12 or newer within the
+22.x line, or a supported 24.x release, for the web test toolchain. Run
+`npm --prefix apps/web ci`, then its lint, typecheck, test, audit and build
+scripts. Oracle checks use `npm --prefix services/oracle-worker run check`,
+`npm --prefix services/oracle-worker run check:xgboost` and
+`npm --prefix services/oracle-worker test`. No sibling repository, imported
+reference directory, Fabric network or private environment file is needed for
+these code gates. The live verification below additionally requires this
+project's own network and enrolled identities.
+
+With Docker Desktop and the Fabric network running, create the isolated Phase 1
+channel once from Ubuntu WSL:
+
+```bash
+bash network/scripts/create-phase1-channel.sh
+```
+
+Then execute every code, network, security, browser, and live-workflow check
+from Windows PowerShell:
 
 ```powershell
 .\scripts\demo-stack.ps1 Stop -KeepNetwork
-.\scripts\verify-all.ps1
+.\scripts\verify-phase1.ps1
 .\scripts\demo-stack.ps1 Start
 ```
 
@@ -126,7 +173,10 @@ The verifier needs exclusive access to the Next.js build and Oracle worker ports
 it fails early with an actionable message if managed application services are
 still running. Fabric ledger volumes remain available throughout this sequence.
 
-The command writes an ignored machine-readable summary to
+The wrapper runs `verify-all.ps1` with an experiment channel and separate local
+evidence, event, Oracle, and browser-artifact paths. The preserved
+`insurance-channel` remains available for demonstrations. The command writes
+an ignored machine-readable summary to
 `verification-results/latest.json`. Its browser phase creates uniquely named
 local ledger records and proves role isolation plus automatic consensus and
 negative, divergent-snapshot, and unavailable-Oracle fallback settlement paths.

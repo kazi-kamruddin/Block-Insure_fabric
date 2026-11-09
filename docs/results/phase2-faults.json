@@ -1,0 +1,160 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-26T17:42:29.4392569+00:00",
+  "channel": "insurance-phase2-20260926",
+  "repetitions": 3,
+  "orderStrategy": "cyclic rotation across profiles",
+  "artifactRoot": "artifacts/20260926T170729871Z",
+  "measurements": [
+    {
+      "repetition": 1,
+      "orderIndex": 1,
+      "profile": "baseline",
+      "scenario": "baseline",
+      "startedAt": "2026-09-26T17:07:29.8930616+00:00",
+      "elapsedMs": 133041,
+      "passed": true,
+      "log": "artifacts/20260926T170729871Z/trial-1-baseline/playwright.log"
+    },
+    {
+      "repetition": 1,
+      "orderIndex": 2,
+      "profile": "negative",
+      "scenario": "baseline",
+      "startedAt": "2026-09-26T17:09:43.0012870+00:00",
+      "elapsedMs": 137831,
+      "passed": true,
+      "log": "artifacts/20260926T170729871Z/trial-1-negative/playwright.log"
+    },
+    {
+      "repetition": 1,
+      "orderIndex": 3,
+      "profile": "one-unavailable",
+      "scenario": "one-unavailable",
+      "startedAt": "2026-09-26T17:12:00.8597463+00:00",
+      "elapsedMs": 128969,
+      "passed": true,
+      "log": "artifacts/20260926T170729871Z/trial-1-one-unavailable/playwright.log"
+    },
+    {
+      "repetition": 1,
+      "orderIndex": 4,
+      "profile": "conflict",
+      "scenario": "conflict",
+      "startedAt": "2026-09-26T17:14:09.8454794+00:00",
+      "elapsedMs": 149578,
+      "passed": true,
+      "log": "artifacts/20260926T170729871Z/trial-1-conflict/playwright.log"
+    },
+    {
+      "repetition": 1,
+      "orderIndex": 5,
+      "profile": "timeout",
+      "scenario": "timeout",
+      "startedAt": "2026-09-26T17:16:39.4774197+00:00",
+      "elapsedMs": 143565,
+      "passed": true,
+      "log": "artifacts/20260926T170729871Z/trial-1-timeout/playwright.log"
+    },
+    {
+      "repetition": 2,
+      "orderIndex": 1,
+      "profile": "negative",
+      "scenario": "baseline",
+      "startedAt": "2026-09-26T17:19:03.0685214+00:00",
+      "elapsedMs": 137848,
+      "passed": true,
+      "log": "artifacts/20260926T170729871Z/trial-2-negative/playwright.log"
+    },
+    {
+      "repetition": 2,
+      "orderIndex": 2,
+      "profile": "one-unavailable",
+      "scenario": "one-unavailable",
+      "startedAt": "2026-09-26T17:21:20.9634948+00:00",
+      "elapsedMs": 152712,
+      "passed": true,
+      "log": "artifacts/20260926T170729871Z/trial-2-one-unavailable/playwright.log"
+    },
+    {
+      "repetition": 2,
+      "orderIndex": 3,
+      "profile": "conflict",
+      "scenario": "conflict",
+      "startedAt": "2026-09-26T17:23:53.6987326+00:00",
+      "elapsedMs": 140738,
+      "passed": true,
+      "log": "artifacts/20260926T170729871Z/trial-2-conflict/playwright.log"
+    },
+    {
+      "repetition": 2,
+      "orderIndex": 4,
+      "profile": "timeout",
+      "scenario": "timeout",
+      "startedAt": "2026-09-26T17:26:14.4487492+00:00",
+      "elapsedMs": 137941,
+      "passed": true,
+      "log": "artifacts/20260926T170729871Z/trial-2-timeout/playwright.log"
+    },
+    {
+      "repetition": 2,
+      "orderIndex": 5,
+      "profile": "baseline",
+      "scenario": "baseline",
+      "startedAt": "2026-09-26T17:28:32.4078506+00:00",
+      "elapsedMs": 130217,
+      "passed": true,
+      "log": "artifacts/20260926T170729871Z/trial-2-baseline/playwright.log"
+    },
+    {
+      "repetition": 3,
+      "orderIndex": 1,
+      "profile": "one-unavailable",
+      "scenario": "one-unavailable",
+      "startedAt": "2026-09-26T17:30:42.6447559+00:00",
+      "elapsedMs": 139051,
+      "passed": true,
+      "log": "artifacts/20260926T170729871Z/trial-3-one-unavailable/playwright.log"
+    },
+    {
+      "repetition": 3,
+      "orderIndex": 2,
+      "profile": "conflict",
+      "scenario": "conflict",
+      "startedAt": "2026-09-26T17:33:01.7316872+00:00",
+      "elapsedMs": 156210,
+      "passed": true,
+      "log": "artifacts/20260926T170729871Z/trial-3-conflict/playwright.log"
+    },
+    {
+      "repetition": 3,
+      "orderIndex": 3,
+      "profile": "timeout",
+      "scenario": "timeout",
+      "startedAt": "2026-09-26T17:35:37.9757240+00:00",
+      "elapsedMs": 146186,
+      "passed": true,
+      "log": "artifacts/20260926T170729871Z/trial-3-timeout/playwright.log"
+    },
+    {
+      "repetition": 3,
+      "orderIndex": 4,
+      "profile": "baseline",
+      "scenario": "baseline",
+      "startedAt": "2026-09-26T17:38:04.1814308+00:00",
+      "elapsedMs": 128419,
+      "passed": true,
+      "log": "artifacts/20260926T170729871Z/trial-3-baseline/playwright.log"
+    },
+    {
+      "repetition": 3,
+      "orderIndex": 5,
+      "profile": "negative",
+      "scenario": "baseline",
+      "startedAt": "2026-09-26T17:40:12.6196324+00:00",
+      "elapsedMs": 136756,
+      "passed": true,
+      "log": "artifacts/20260926T170729871Z/trial-3-negative/playwright.log"
+    }
+  ]
+}

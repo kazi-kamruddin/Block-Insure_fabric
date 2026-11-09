@@ -1,6 +1,8 @@
 package insurance
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"slices"
 	"strconv"
@@ -61,6 +63,12 @@ func (c *Contract) submitClaim(ctx contractapi.TransactionContextInterface, id, 
 		if invoice.HospitalID != hospitalID {
 			return nil, fmt.Errorf("hospital invoice %s belongs to hospital %s", hospitalInvoiceID, invoice.HospitalID)
 		}
+		if invoice.Status != "FINALIZED" {
+			return nil, fmt.Errorf("hospital invoice %s must be finalized before a claim", hospitalInvoiceID)
+		}
+		if invoice.PatientReferenceHash != patientSubjectHash(claimantID) {
+			return nil, fmt.Errorf("hospital invoice patient does not match this policyholder")
+		}
 	}
 	incident, err := validateDate("incidentDate", incidentDate)
 	if err != nil {
@@ -92,6 +100,13 @@ func (c *Contract) submitClaim(ctx contractapi.TransactionContextInterface, id, 
 		return nil, err
 	}
 	return claim, nil
+}
+
+// Hospitals use the policyholder's patient reference, rather than a name or a
+// free-form clinical description. This is an identity binding, not a secret.
+func patientSubjectHash(subject string) string {
+	digest := sha256.Sum256([]byte(strings.TrimSpace(subject)))
+	return hex.EncodeToString(digest[:])
 }
 
 func (c *Contract) AddEvidenceReference(ctx contractapi.TransactionContextInterface, claimID, evidenceID, documentType, contentHash, storageReferenceHash string) (*EvidenceReference, error) {
@@ -156,6 +171,19 @@ func (c *Contract) AddEvidenceReference(ctx contractapi.TransactionContextInterf
 		return nil, err
 	}
 	return evidence, nil
+}
+
+// New clients pin the version they encrypted and prepared. The historical
+// entrypoint remains available for compatible retained clients.
+func (c *Contract) AddEvidenceReferenceForVersion(ctx contractapi.TransactionContextInterface, claimID, evidenceID, documentType, contentHash, storageReferenceHash string, expectedClaimVersion int) (*EvidenceReference, error) {
+	claim, err := c.ReadClaim(ctx, claimID)
+	if err != nil {
+		return nil, err
+	}
+	if claim.Version != expectedClaimVersion {
+		return nil, fmt.Errorf("evidence claim version changed; reconcile the original upload")
+	}
+	return c.AddEvidenceReference(ctx, claimID, evidenceID, documentType, contentHash, storageReferenceHash)
 }
 
 func (c *Contract) VerifyClaim(ctx contractapi.TransactionContextInterface, claimID, verificationID, outcome, clinicalReferenceHash string) (*HospitalVerification, error) {

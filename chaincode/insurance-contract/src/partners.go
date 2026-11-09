@@ -113,13 +113,19 @@ func (c *Contract) ListPartnerAgreements(ctx contractapi.TransactionContextInter
 }
 
 func (c *Contract) requireActivePartner(ctx contractapi.TransactionContextInterface, partnerType, partnerID string) (*PartnerAgreement, error) {
+	today, err := transactionDate(ctx)
+	if err != nil {
+		return nil, err
+	}
+	asOf := today.Format("2006-01-02")
 	agreements, err := c.ListPartnerAgreements(ctx)
 	if err != nil {
 		return nil, err
 	}
 	for index := range agreements {
 		agreement := &agreements[index]
-		if agreement.PartnerType == partnerType && agreement.PartnerID == partnerID && agreement.Status == "ACTIVE" {
+		if agreement.PartnerType == partnerType && agreement.PartnerID == partnerID && agreement.Status == "ACTIVE" &&
+			agreement.EffectiveDate <= asOf && agreement.ExpiryDate >= asOf {
 			return agreement, nil
 		}
 	}

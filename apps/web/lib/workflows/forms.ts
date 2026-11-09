@@ -24,14 +24,21 @@ export type WorkflowFormValues = Record<string, string>;
 export type HashText = (value: string) => Promise<string>;
 
 export const operationsByRole = {
-  insurerAdmin: ["createPartnerAgreement", "setPartnerAgreementStatus", "createPolicyPackage", "configurePolicyPackagePartners", "publishPolicyPackage", "retirePolicyPackage", "createBenefitPlan", "publishBenefitPlan", "retireBenefitPlan", "issuePolicy", "advancePolicyLifecycle", "cancelPolicyAsInsurer", "queuePremiumCollection", "decideBenefitRequest", "markBenefitPaymentReady", "crossCheckClaimInvoice", "publishEvidenceMerkleBatch", "assessClaimFraud", "publishOracleRegistrySnapshot", "requestOracleVerification", "finalizeOracleTimeout", "routeOracleFailureToReview", "openClaimReview", "finalizeExpiredReview", "authorizeSettlement"],
-  policyholder: ["acquirePolicy", "requestBankMandate", "cancelBankMandate", "setBeneficiaries", "submitBenefitRequest", "renewPolicy", "cancelPolicy", "submitClaim", "submitClaimAppeal", "grantEvidenceAccess", "revokeEvidenceAccess"],
-  hospitalOfficer: ["createHospitalInvoice", "updateHospitalInvoice"],
+  insurerAdmin: ["startClaimProcessing", "createPartnerAgreement", "setPartnerAgreementStatus", "createPolicyPackage", "configurePolicyPackagePartners", "publishPolicyPackage", "retirePolicyPackage", "createBenefitPlan", "publishBenefitPlan", "retireBenefitPlan", "issuePolicy", "issuePolicyPrivacyCredential", "revokePolicyPrivacyCredential", "advancePolicyLifecycle", "cancelPolicyAsInsurer", "queuePremiumCollection", "decideBenefitRequest", "markBenefitPaymentReady", "publishEvidenceMerkleBatch", "assessClaimFraud", "publishOracleRegistrySnapshot", "requestOracleVerification", "finalizeOracleTimeout", "routeOracleFailureToReview", "openClaimReview", "finalizeExpiredReview", "authorizeSettlement"],
+  policyholder: ["acquirePolicy", "requestBankMandate", "cancelBankMandate", "setBeneficiaries", "submitBenefitRequest", "renewPolicy", "cancelPolicy", "submitClaim", "registerClaimPrivacyPresentation", "submitClaimAppeal", "grantEvidenceAccess", "revokeEvidenceAccess"],
+  hospitalOfficer: ["createHospitalInvoice", "updateHospitalInvoice", "recordHospitalModelFacts"],
   auditor: ["recordAuditorDecision"],
   bankOfficer: ["openBankAccount", "adjustBankAccountBalance", "reviewBankMandate", "recordPremiumAdjustment", "processPremiumCollection", "expireBankMandate", "confirmBenefitPayment", "confirmSettlement"],
 } as const satisfies Record<FabricRole, readonly WorkflowOperation[]>;
 
 export const workflowFormDefinitions: Record<WorkflowOperation, WorkflowFormDefinition> = {
+  recordHospitalModelFacts: { label: "Record model source facts", description: "Immutable private source facts for the synthetic thesis model. Use explicit categories and expected ranges; source attestations do not establish medical truth.", fields: [
+    { name: "invoiceId", label: "Finalized invoice ID" }, { name: "treatmentType", label: "Treatment category" },
+    { name: "diagnosisCode", label: "Diagnosis code (empty if unknown)" }, { name: "invoiceDate", label: "Invoice date", kind: "date" },
+    { name: "expectedMinBdt", label: "Expected minimum BDT", kind: "money" }, { name: "expectedMaxBdt", label: "Expected maximum BDT", kind: "money" },
+    { name: "licenseStatus", label: "Recorded provider license status", kind: "select", options: ["ACTIVE", "SUSPENDED", "BLACKLISTED"] },
+  ] },
+  startClaimProcessing: { label: "Start claim processing", description: "Send this claim to three Oracle workers to match its Hospital invoice. Two matching results determine the Oracle outcome.", fields: [{ name: "claimId", label: "Claim ID" }] },
   createPartnerAgreement: {
     label: "Register partner agreement",
     description: "Record an active insurer agreement with an independent Hospital or Bank.",
@@ -213,7 +220,7 @@ export const workflowFormDefinitions: Record<WorkflowOperation, WorkflowFormDefi
   },
   confirmBenefitPayment: {
     label: "Confirm benefit payout",
-    description: "Close the benefit liability against a hashed external transfer reference.",
+    description: "Record the Bank's simulated payment confirmation: debit the demo insurer balance and close the liability. Beneficiary credits and real bank transfers are outside this workflow.",
     fields: [{ name: "id", label: "Benefit request ID" }, { name: "bankReferenceText", label: "Bank transfer reference" }],
   },
   createHospitalInvoice: {
@@ -221,7 +228,7 @@ export const workflowFormDefinitions: Record<WorkflowOperation, WorkflowFormDefi
     description: "Add an invoice to this Hospital's independent billing register. Sensitive references are hashed in the browser.",
     fields: [
       { name: "id", label: "Invoice ID", placeholder: "invoice-1001" },
-      { name: "patientReferenceText", label: "Patient reference", help: "Hashed locally; patient identity is not written to the shared ledger." },
+      { name: "patientReferenceText", label: "Patient reference", placeholder: "policyholder1", help: "Use the patient’s insurance account reference, for example policyholder1. Hashed locally; it must identify the policyholder." },
       { name: "invoiceReferenceText", label: "Invoice reference", help: "Give this reference to the patient for a future claim." },
       { name: "treatmentText", label: "Treatment reference", kind: "textarea", help: "Hashed locally." },
       { name: "amountBdt", label: "Invoice total (BDT)", kind: "money" },
@@ -251,16 +258,45 @@ export const workflowFormDefinitions: Record<WorkflowOperation, WorkflowFormDefi
       { name: "id", label: "Claim ID", placeholder: "claim-1001" },
       { name: "policyId", label: "Policy ID", placeholder: "policy-1001" },
       { name: "hospitalId", label: "Contracted hospital", kind: "select", options: ["hospital-demo", "hospital-2", "hospital-3", "hospital-4", "hospital-5"], help: "The Hospital must be included in the purchased policy's provider network." },
-      { name: "hospitalInvoiceId", label: "Hospital invoice ID", placeholder: "invoice-1001", help: "The insurer can only cross-check this existing Hospital-owned invoice." },
+      { name: "hospitalInvoiceId", label: "Hospital invoice ID", placeholder: "invoice-1001", help: "Use the invoice supplied by your contracted Hospital. Its patient reference must match your account." },
       { name: "amountBdt", label: "Claim amount (BDT)", kind: "money", placeholder: "2500.00" },
       { name: "incidentDate", label: "Incident date", kind: "date" },
-      { name: "descriptionText", label: "Claim description reference", kind: "textarea", placeholder: "Private case reference or concise incident summary", help: "Hashed in this browser; only the SHA-256 digest is sent." },
+      { name: "descriptionText", label: "Claim description", kind: "textarea", placeholder: "Describe why you are claiming", help: "Write in your own words. You do not need to repeat the Hospital’s treatment wording. Hashed in this browser." },
     ],
   },
   crossCheckClaimInvoice: {
     label: "Cross-check Hospital invoice",
     description: "Compare a submitted claim with the immutable invoice maintained by its contracted Hospital. The insurer cannot edit the source record.",
     fields: [{ name: "claimId", label: "Claim ID" }, { name: "verificationId", label: "Verification ID", placeholder: "invoice-check-1001" }],
+  },
+  issueInvoicePrivacyCredential: {
+    label: "Issue private invoice credential",
+    description: "Anchor a salted Merkle root for a finalized invoice and retain the credential fields in the authorized private collection.",
+    fields: [{ name: "id", label: "Credential ID" }, { name: "invoiceId", label: "Finalized invoice ID" }, { name: "expiresAt", label: "Credential expiry (RFC3339)" }],
+  },
+  issuePolicyPrivacyCredential: {
+    label: "Issue private policy credential",
+    description: "Anchor a salted Merkle root for an active policy without publishing the complete credential.",
+    fields: [{ name: "id", label: "Credential ID" }, { name: "policyId", label: "Active policy ID" }, { name: "expiresAt", label: "Credential expiry (RFC3339)" }],
+  },
+  revokeInvoicePrivacyCredential: {
+    label: "Revoke invoice credential",
+    description: "The issuing Hospital disables this credential for future Oracle decisions, including existing presentations.",
+    fields: [{ name: "id", label: "Invoice credential ID" }],
+  },
+  revokePolicyPrivacyCredential: {
+    label: "Revoke policy credential",
+    description: "The issuing insurer disables this credential for future Oracle decisions, including existing presentations.",
+    fields: [{ name: "id", label: "Policy credential ID" }],
+  },
+  registerClaimPrivacyPresentation: {
+    label: "Create selective claim presentation",
+    description: "Disclose only the invoice and policy facts required by the Oracles, with claim-bound Merkle proofs and an anti-replay challenge.",
+    fields: [
+      { name: "id", label: "Presentation ID" }, { name: "claimId", label: "Hospital-verified claim ID" },
+      { name: "invoiceCredentialId", label: "Invoice credential ID" }, { name: "policyCredentialId", label: "Policy credential ID" },
+      { name: "challenge", label: "Unique challenge" }, { name: "expiresAt", label: "Presentation expiry (RFC3339)" },
+    ],
   },
   publishEvidenceMerkleBatch: {
     label: "Anchor evidence Merkle batch",
@@ -289,7 +325,7 @@ export const workflowFormDefinitions: Record<WorkflowOperation, WorkflowFormDefi
   },
   publishOracleRegistrySnapshot: {
     label: "Publish Oracle registry snapshot",
-    description: "Anchor the versioned registry root independently loaded by both Oracle services.",
+    description: "Anchor the versioned registry root independently loaded by the assigned Oracle services.",
     fields: [
       { name: "id", label: "Snapshot ID", placeholder: "registry-demo-v1" },
       { name: "version", label: "Snapshot version", placeholder: "1" },
@@ -300,15 +336,16 @@ export const workflowFormDefinitions: Record<WorkflowOperation, WorkflowFormDefi
     ],
   },
   requestOracleVerification: {
-    label: "Request two-Oracle verification",
-    description: "Snapshot the claim, registry, model, two certificate subjects, and commit/reveal deadlines.",
+    label: "Request threshold Oracle verification",
+    description: "Bind the claim, registry, model, assigned certificate subjects, quorum, and commit/reveal deadlines.",
     fields: [
       { name: "requestId", label: "Oracle request ID", placeholder: "oracle-request-1001" },
-      { name: "claimId", label: "Invoice-cross-checked claim ID", placeholder: "claim-1001" },
+      { name: "claimId", label: "Submitted claim ID", placeholder: "claim-1001" },
       { name: "snapshotId", label: "Registry snapshot ID", placeholder: "registry-demo-v1" },
       { name: "modelVersion", label: "Model version", placeholder: "model-v1" },
       { name: "modelHash", label: "Model commitment" },
-      { name: "assignedOracleIdsJson", label: "Assigned Oracle certificate subjects", kind: "textarea", placeholder: '["oracle1","oracle2"]' },
+      { name: "assignedOracleIdsJson", label: "Assigned Oracle certificate subjects", kind: "textarea", placeholder: '["oracle1","oracle2","oracle3"]' },
+      { name: "requiredConfirmations", label: "Required matching confirmations", placeholder: "2" },
       { name: "commitDeadline", label: "Commit deadline (RFC3339)" },
       { name: "revealDeadline", label: "Reveal deadline (RFC3339)" },
     ],
@@ -332,7 +369,7 @@ export const workflowFormDefinitions: Record<WorkflowOperation, WorkflowFormDefi
   },
   submitClaimAppeal: {
     label: "Appeal rejected claim",
-    description: "Commit corrected facts for the single appeal. A matching finalized Hospital invoice and fresh insurer cross-check are required before a new Oracle cycle.",
+    description: "Commit corrected facts for the single appeal. The insurer starts a fresh Oracle cycle against the corrected Hospital invoice.",
     fields: [
       { name: "appealId", label: "Appeal ID", placeholder: "appeal-1001" },
       { name: "claimId", label: "Claim ID", placeholder: "claim-1001" },
@@ -365,18 +402,6 @@ export const workflowFormDefinitions: Record<WorkflowOperation, WorkflowFormDefi
     label: "Revoke evidence grant",
     description: "Immediately prevent any unused access allowed by an owned grant while preserving its ledger history.",
     fields: [{ name: "grantId", label: "Grant ID", placeholder: "grant-1001" }],
-  },
-  openAppealReview: {
-    label: "Open appeal review",
-    description: "Create a new immutable review round for a submitted appeal.",
-    fields: [
-      { name: "appealId", label: "Appeal ID", placeholder: "appeal-1001" },
-      { name: "reviewId", label: "Review ID", placeholder: "review-appeal-1001" },
-      { name: "assignedAuditorIdsJson", label: "Assigned auditor IDs", kind: "textarea" },
-      { name: "approvalThreshold", label: "Approval threshold" },
-      { name: "rejectionThreshold", label: "Rejection threshold" },
-      { name: "deadline", label: "Review deadline (RFC3339)" },
-    ],
   },
   finalizeExpiredReview: {
     label: "Finalize expired review",
@@ -434,6 +459,7 @@ export function createWorkflowFormValues(
 ): WorkflowFormValues {
   const today = dateOffset(0);
   const defaults: Record<WorkflowOperation, WorkflowFormValues> = {
+    recordHospitalModelFacts: { invoiceId: "", treatmentType: "", diagnosisCode: "", invoiceDate: today, expectedMinBdt: "", expectedMaxBdt: "", licenseStatus: "ACTIVE" },
     createPartnerAgreement: { id: generatedId("agreement", idFactory), partnerType: "HOSPITAL", partnerId: "", name: "", location: "", tier: "Preferred", accessScope: "Read-only invoice verification fields", effectiveDate: today, expiryDate: dateOffset(3) },
     setPartnerAgreementStatus: { id: "", status: "ACTIVE" },
     createPolicyPackage: { id: generatedId("package", idFactory), name: "", description: "", premiumBdt: "", coverageLimitBdt: "", termsText: "" },
@@ -467,17 +493,22 @@ export function createWorkflowFormValues(
     updateHospitalInvoice: { id: "", patientReferenceText: "", invoiceReferenceText: "", treatmentText: "", amountBdt: "", admissionDate: today, dischargeDate: today, status: "DRAFT" },
     submitClaim: { id: generatedId("claim", idFactory), policyId: "", hospitalId: "hospital-demo", hospitalInvoiceId: "", amountBdt: "", incidentDate: today, descriptionText: "" },
     crossCheckClaimInvoice: { claimId: "", verificationId: generatedId("invoice-check", idFactory) },
+    issueInvoicePrivacyCredential: { id: generatedId("invoice-credential", idFactory), invoiceId: "", expiresAt: deadlineOffset(365) },
+    issuePolicyPrivacyCredential: { id: generatedId("policy-credential", idFactory), policyId: "", expiresAt: deadlineOffset(365) },
+    revokeInvoicePrivacyCredential: { id: "" },
+    revokePolicyPrivacyCredential: { id: "" },
+    registerClaimPrivacyPresentation: { id: generatedId("privacy-presentation", idFactory), claimId: "", invoiceCredentialId: "", policyCredentialId: "", challenge: generatedId("challenge", idFactory), expiresAt: deadlineOffset(1) },
     publishEvidenceMerkleBatch: { id: generatedId("evidence-batch", idFactory), evidenceIdsJson: "[]" },
     assessClaimFraud: { assessmentId: generatedId("fraud", idFactory), claimId: "" },
     openClaimReview: { claimId: "", reviewId: generatedId("review", idFactory), assignedAuditorIdsJson: '["auditor1","auditor2","auditor3","auditor4"]', approvalThreshold: "3", rejectionThreshold: "2", deadline: deadlineOffset(3) },
     publishOracleRegistrySnapshot: { id: "registry-demo-v1", version: "1", rootHash: "c6da6361115c611b091faa9f35836f9f5c8ee0fdbefb6bc0d8cc6fdde571ebcd", rulesVersion: "rules-v1", rulesHash: "a".repeat(64), recordCount: "3" },
-    requestOracleVerification: { requestId: generatedId("oracle-request", idFactory), claimId: "", snapshotId: "registry-demo-v1", modelVersion: "model-v1", modelHash: "c".repeat(64), assignedOracleIdsJson: '["oracle1","oracle2"]', commitDeadline: new Date(Date.now() + 10 * 60_000).toISOString(), revealDeadline: new Date(Date.now() + 20 * 60_000).toISOString() },
+    startClaimProcessing: { claimId: "" },
+    requestOracleVerification: { requestId: generatedId("oracle-request", idFactory), claimId: "", snapshotId: "registry-demo-v1", modelVersion: "model-v1", modelHash: "c".repeat(64), assignedOracleIdsJson: '["oracle1","oracle2","oracle3"]', requiredConfirmations: "2", commitDeadline: new Date(Date.now() + 10 * 60_000).toISOString(), revealDeadline: new Date(Date.now() + 20 * 60_000).toISOString() },
     finalizeOracleTimeout: { requestId: "" },
     routeOracleFailureToReview: { requestId: "", reviewId: generatedId("review-oracle", idFactory), assignedAuditorIdsJson: '["auditor1","auditor2","auditor3","auditor4"]', approvalThreshold: "3", rejectionThreshold: "2", deadline: deadlineOffset(3) },
     submitClaimAppeal: { appealId: generatedId("appeal", idFactory), claimId: "", reasonCategory: "DOCUMENT_ERROR", reasonText: "", descriptionText: "", evidenceText: "", proposedHospitalId: "", proposedAmountMinor: "0", proposedIncidentDate: "", proposedDescriptionText: "", proposedClinicalReferenceHash: "" },
     grantEvidenceAccess: { id: generatedId("grant", idFactory), evidenceId: "", granteeMsp: "AuditorMSP", granteeRole: "auditor", granteeSubject: "auditor1", purpose: "AUDIT", expiresAt: deadlineOffset(7), maxAccesses: "3" },
     revokeEvidenceAccess: { grantId: "" },
-    openAppealReview: { appealId: "", reviewId: generatedId("review-appeal", idFactory), assignedAuditorIdsJson: '["auditor1","auditor2","auditor3","auditor4"]', approvalThreshold: "3", rejectionThreshold: "2", deadline: deadlineOffset(3) },
     finalizeExpiredReview: { reviewId: "" },
     recordAuditorDecision: { reviewId: "", decisionId: generatedId("decision", idFactory), outcome: "APPROVE", reasonText: "" },
     authorizeSettlement: { settlementId: generatedId("settlement", idFactory), claimId: "", sourceAccountId: "bank-insurer-premium", destinationAccountId: "showcase-customer-account" },
@@ -663,6 +694,12 @@ export async function buildWorkflowCommand(
     case "confirmBenefitPayment":
       command = { operation, id: required(values, "id", "Benefit request ID"), bankReferenceHash: await digest("bankReferenceText", "Bank transfer reference") };
       break;
+    case "recordHospitalModelFacts":
+      command = { operation, invoiceId: required(values, "invoiceId", "Invoice ID"), treatmentType: required(values, "treatmentType", "Treatment category"),
+        diagnosisCode: values.diagnosisCode ?? "", invoiceDate: required(values, "invoiceDate", "Invoice date"),
+        expectedMinMinor: nonNegativeBdtToMinor(required(values, "expectedMinBdt", "Expected minimum")),
+        expectedMaxMinor: bdtToMinor(required(values, "expectedMaxBdt", "Expected maximum")), licenseStatus: required(values, "licenseStatus", "License status") };
+      break;
     case "createHospitalInvoice":
     case "updateHospitalInvoice":
       command = {
@@ -691,6 +728,19 @@ export async function buildWorkflowCommand(
     case "crossCheckClaimInvoice":
       command = { operation, claimId: required(values, "claimId", "Claim ID"), verificationId: required(values, "verificationId", "Verification ID") };
       break;
+    case "issueInvoicePrivacyCredential":
+      command = { operation, id: required(values, "id", "Credential ID"), invoiceId: required(values, "invoiceId", "Invoice ID"), expiresAt: required(values, "expiresAt", "Credential expiry") };
+      break;
+    case "issuePolicyPrivacyCredential":
+      command = { operation, id: required(values, "id", "Credential ID"), policyId: required(values, "policyId", "Policy ID"), expiresAt: required(values, "expiresAt", "Credential expiry") };
+      break;
+    case "revokeInvoicePrivacyCredential":
+    case "revokePolicyPrivacyCredential":
+      command = { operation, id: required(values, "id", "Credential ID") };
+      break;
+    case "registerClaimPrivacyPresentation":
+      command = { operation, id: required(values, "id", "Presentation ID"), claimId: required(values, "claimId", "Claim ID"), invoiceCredentialId: required(values, "invoiceCredentialId", "Invoice credential ID"), policyCredentialId: required(values, "policyCredentialId", "Policy credential ID"), challenge: required(values, "challenge", "Challenge"), expiresAt: required(values, "expiresAt", "Presentation expiry") };
+      break;
     case "publishEvidenceMerkleBatch":
       command = { operation, id: required(values, "id", "Merkle batch ID"), evidenceIdsJson: required(values, "evidenceIdsJson", "Evidence IDs") };
       break;
@@ -703,8 +753,11 @@ export async function buildWorkflowCommand(
     case "publishOracleRegistrySnapshot":
       command = { operation, id: required(values, "id", "Snapshot ID"), version: positiveInteger(values, "version", "Snapshot version"), rootHash: required(values, "rootHash", "Canonical registry root"), rulesVersion: required(values, "rulesVersion", "Rules version"), rulesHash: required(values, "rulesHash", "Rules commitment"), recordCount: positiveInteger(values, "recordCount", "Registry record count") };
       break;
+    case "startClaimProcessing":
+      command = { operation, claimId: required(values, "claimId", "Claim ID") };
+      break;
     case "requestOracleVerification":
-      command = { operation, requestId: required(values, "requestId", "Oracle request ID"), claimId: required(values, "claimId", "Claim ID"), snapshotId: required(values, "snapshotId", "Snapshot ID"), modelVersion: required(values, "modelVersion", "Model version"), modelHash: required(values, "modelHash", "Model commitment"), assignedOracleIdsJson: required(values, "assignedOracleIdsJson", "Assigned Oracle IDs"), commitDeadline: required(values, "commitDeadline", "Commit deadline"), revealDeadline: required(values, "revealDeadline", "Reveal deadline") };
+      command = { operation, requestId: required(values, "requestId", "Oracle request ID"), claimId: required(values, "claimId", "Claim ID"), snapshotId: required(values, "snapshotId", "Snapshot ID"), modelVersion: required(values, "modelVersion", "Model version"), modelHash: required(values, "modelHash", "Model commitment"), assignedOracleIdsJson: required(values, "assignedOracleIdsJson", "Assigned Oracle IDs"), requiredConfirmations: positiveInteger(values, "requiredConfirmations", "Required confirmations"), commitDeadline: required(values, "commitDeadline", "Commit deadline"), revealDeadline: required(values, "revealDeadline", "Reveal deadline") };
       break;
     case "finalizeOracleTimeout":
       command = { operation, requestId: required(values, "requestId", "Oracle request ID") };
@@ -743,9 +796,6 @@ export async function buildWorkflowCommand(
       break;
     case "revokeEvidenceAccess":
       command = { operation, grantId: required(values, "grantId", "Grant ID") };
-      break;
-    case "openAppealReview":
-      command = { operation, appealId: required(values, "appealId", "Appeal ID"), reviewId: required(values, "reviewId", "Review ID"), assignedAuditorIdsJson: required(values, "assignedAuditorIdsJson", "Assigned auditor IDs"), approvalThreshold: positiveInteger(values, "approvalThreshold", "Approval threshold"), rejectionThreshold: positiveInteger(values, "rejectionThreshold", "Rejection threshold"), deadline: required(values, "deadline", "Review deadline") };
       break;
     case "finalizeExpiredReview":
       command = { operation, reviewId: required(values, "reviewId", "Review ID") };

@@ -5,13 +5,17 @@ import path from "node:path";
 
 export type OracleWorkerHealth = {
   schemaVersion: number;
-  oracleId: "oracle1" | "oracle2";
+  oracleId: OracleId;
   label: string;
   status: string;
   registrySource: string;
   registrySnapshotId: string;
   registryVersion: number;
   registryRootHash: string;
+  registryDatasetId?: string | null;
+  registryDatasetVersion?: string | null;
+  registryInputSha256?: string | null;
+  registryTransformationVersion?: string | null;
   modelVersion: string;
   startedAt: string;
   updatedAt: string;
@@ -21,6 +25,12 @@ export type OracleWorkerHealth = {
   counts: { requests: number; commitments: number; reveals: number; verified: number; failed: number };
   lastProcessingLatencyMs: number | null;
 };
+
+export type OracleId = "oracle1" | "oracle2" | "oracle3";
+
+export function isOracleWorkerOperational(status: string) {
+  return status === "ONLINE" || status === "PROCESSING";
+}
 
 type HealthReadOptions = {
   environment?: NodeJS.ProcessEnv;
@@ -40,9 +50,9 @@ function stateRoot(environment: NodeJS.ProcessEnv = process.env, startDirectory 
   return path.resolve(startDirectory, "data", "oracle");
 }
 
-function offlineHealth(oracleId: "oracle1" | "oracle2"): OracleWorkerHealth {
+function offlineHealth(oracleId: OracleId): OracleWorkerHealth {
   return {
-    schemaVersion: 1, oracleId, label: oracleId === "oracle1" ? "Oracle 1" : "Oracle 2",
+    schemaVersion: 1, oracleId, label: `Oracle ${oracleId.at(-1)}`,
     status: "OFFLINE", registrySource: "Unavailable", registrySnapshotId: "", registryVersion: 0,
     registryRootHash: "", modelVersion: "", startedAt: "", updatedAt: "", lastProcessedBlock: null,
     lastProcessedRequestId: null, lastError: "No worker health record exists", counts: { requests: 0, commitments: 0, reveals: 0, verified: 0, failed: 0 },
@@ -50,10 +60,11 @@ function offlineHealth(oracleId: "oracle1" | "oracle2"): OracleWorkerHealth {
   };
 }
 
-export async function readOracleWorkerHealth(oracleId: "oracle1" | "oracle2", options: HealthReadOptions = {}) {
+export async function readOracleWorkerHealth(oracleId: OracleId, options: HealthReadOptions = {}) {
   const environment = options.environment ?? process.env;
-  const endpoint = environment[oracleId === "oracle1" ? "ORACLE1_HEALTH_URL" : "ORACLE2_HEALTH_URL"]
-    ?? `http://127.0.0.1:${oracleId === "oracle1" ? 3301 : 3302}/health`;
+  const ordinal = Number(oracleId.at(-1));
+  const endpoint = environment[`ORACLE${ordinal}_HEALTH_URL`]
+    ?? `http://127.0.0.1:${3300 + ordinal}/health`;
   try {
     const response = await (options.fetcher ?? fetch)(endpoint, { cache: "no-store", signal: AbortSignal.timeout(1_500) });
     if (!response.ok) throw new Error(`health endpoint returned ${response.status}`);

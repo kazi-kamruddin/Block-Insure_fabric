@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
-import { readOracleWorkerHealth, type OracleWorkerHealth } from "./health";
+import { isOracleWorkerOperational, readOracleWorkerHealth, type OracleWorkerHealth } from "./health";
 
 const temporaryRoots: string[] = [];
 const health: OracleWorkerHealth = {
@@ -23,6 +23,13 @@ afterEach(async () => {
 });
 
 describe("Oracle worker health", () => {
+  it("treats online and actively processing workers as operational", () => {
+    expect(isOracleWorkerOperational("ONLINE")).toBe(true);
+    expect(isOracleWorkerOperational("PROCESSING")).toBe(true);
+    expect(isOracleWorkerOperational("DEGRADED")).toBe(false);
+    expect(isOracleWorkerOperational("OFFLINE")).toBe(false);
+  });
+
   it("prefers a live worker response", async () => {
     const fetcher = vi.fn(async () => new Response(JSON.stringify(health), { status: 200 }));
     await expect(readOracleWorkerHealth("oracle1", { fetcher })).resolves.toEqual(health);

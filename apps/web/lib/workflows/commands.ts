@@ -1,12 +1,14 @@
 import { z } from "zod";
 import type { FabricRole } from "@/lib/fabric/config";
+import { ledgerDateSchema as date, ledgerIdSchema as id } from "@/lib/fabric/validation";
 
-const id = z.string().trim().min(1).max(100).regex(/^[a-zA-Z0-9._:-]+$/);
 const hash = z.string().trim().regex(/^[a-fA-F0-9]{64}$/).transform((value) => value.toLowerCase());
-const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const money = z.number().int().positive().safe();
 
 export const workflowCommandSchema = z.discriminatedUnion("operation", [
+  z.object({ operation: z.literal("recordHospitalModelFacts"), invoiceId: id, treatmentType: z.string().trim().min(1).max(80),
+    diagnosisCode: z.string().trim().max(40), invoiceDate: date, expectedMinMinor: z.number().int().nonnegative().safe(),
+    expectedMaxMinor: money, licenseStatus: z.enum(["ACTIVE", "SUSPENDED", "BLACKLISTED"]) }),
   z.object({
     operation: z.literal("createPartnerAgreement"), id,
     partnerType: z.enum(["HOSPITAL", "BANK"]), partnerId: id,
@@ -80,10 +82,16 @@ export const workflowCommandSchema = z.discriminatedUnion("operation", [
     descriptionHash: hash,
   }),
   z.object({ operation: z.literal("crossCheckClaimInvoice"), claimId: id, verificationId: id }),
+  z.object({ operation: z.literal("issueInvoicePrivacyCredential"), id, invoiceId: id, expiresAt: z.string().datetime({ offset: true }) }),
+  z.object({ operation: z.literal("issuePolicyPrivacyCredential"), id, policyId: id, expiresAt: z.string().datetime({ offset: true }) }),
+  z.object({ operation: z.literal("revokeInvoicePrivacyCredential"), id }),
+  z.object({ operation: z.literal("revokePolicyPrivacyCredential"), id }),
+  z.object({ operation: z.literal("registerClaimPrivacyPresentation"), id, claimId: id, invoiceCredentialId: id, policyCredentialId: id, challenge: id, expiresAt: z.string().datetime({ offset: true }) }),
   z.object({ operation: z.literal("publishEvidenceMerkleBatch"), id, evidenceIdsJson: z.string().trim().min(2).max(10_000) }),
   z.object({ operation: z.literal("openClaimReview"), claimId: id, reviewId: id, assignedAuditorIdsJson: z.string().trim().min(2).max(1_000), approvalThreshold: z.number().int().positive().max(9), rejectionThreshold: z.number().int().positive().max(9), deadline: z.string().datetime({ offset: true }) }),
   z.object({ operation: z.literal("publishOracleRegistrySnapshot"), id, version: z.number().int().positive(), rootHash: hash, rulesVersion: id, rulesHash: hash, recordCount: z.number().int().positive() }),
-  z.object({ operation: z.literal("requestOracleVerification"), requestId: id, claimId: id, snapshotId: id, modelVersion: id, modelHash: hash, assignedOracleIdsJson: z.string().trim().min(2).max(500), commitDeadline: z.string().datetime({ offset: true }), revealDeadline: z.string().datetime({ offset: true }) }),
+  z.object({ operation: z.literal("requestOracleVerification"), requestId: id, claimId: id, snapshotId: id, modelVersion: id, modelHash: hash, assignedOracleIdsJson: z.string().trim().min(2).max(500), requiredConfirmations: z.number().int().positive().max(9), commitDeadline: z.string().datetime({ offset: true }), revealDeadline: z.string().datetime({ offset: true }) }),
+  z.object({ operation: z.literal("startClaimProcessing"), claimId: id }),
   z.object({ operation: z.literal("finalizeOracleTimeout"), requestId: id }),
   z.object({ operation: z.literal("routeOracleFailureToReview"), requestId: id, reviewId: id, assignedAuditorIdsJson: z.string().trim().min(2).max(1_000), approvalThreshold: z.number().int().positive().max(9), rejectionThreshold: z.number().int().positive().max(9), deadline: z.string().datetime({ offset: true }) }),
   z.object({
@@ -109,7 +117,6 @@ export const workflowCommandSchema = z.discriminatedUnion("operation", [
     maxAccesses: z.number().int().min(1).max(100),
   }),
   z.object({ operation: z.literal("revokeEvidenceAccess"), grantId: id }),
-  z.object({ operation: z.literal("openAppealReview"), appealId: id, reviewId: id, assignedAuditorIdsJson: z.string().trim().min(2).max(1_000), approvalThreshold: z.number().int().positive().max(9), rejectionThreshold: z.number().int().positive().max(9), deadline: z.string().datetime({ offset: true }) }),
   z.object({ operation: z.literal("finalizeExpiredReview"), reviewId: id }),
   z.object({ operation: z.literal("assessClaimFraud"), assessmentId: id, claimId: id }),
   z.object({
@@ -127,6 +134,7 @@ export type WorkflowCommand = z.infer<typeof workflowCommandSchema>;
 export type WorkflowOperation = WorkflowCommand["operation"];
 
 export const requiredRoleByOperation = {
+  startClaimProcessing: "insurerAdmin",
   createPartnerAgreement: "insurerAdmin",
   setPartnerAgreementStatus: "insurerAdmin",
   configurePolicyPackagePartners: "insurerAdmin",
@@ -157,9 +165,15 @@ export const requiredRoleByOperation = {
   markBenefitPaymentReady: "insurerAdmin",
   confirmBenefitPayment: "bankOfficer",
   createHospitalInvoice: "hospitalOfficer",
+  recordHospitalModelFacts: "hospitalOfficer",
   updateHospitalInvoice: "hospitalOfficer",
   submitClaim: "policyholder",
   crossCheckClaimInvoice: "insurerAdmin",
+  issueInvoicePrivacyCredential: "hospitalOfficer",
+  issuePolicyPrivacyCredential: "insurerAdmin",
+  revokeInvoicePrivacyCredential: "hospitalOfficer",
+  revokePolicyPrivacyCredential: "insurerAdmin",
+  registerClaimPrivacyPresentation: "policyholder",
   publishEvidenceMerkleBatch: "insurerAdmin",
   openClaimReview: "insurerAdmin",
   publishOracleRegistrySnapshot: "insurerAdmin",
@@ -169,7 +183,6 @@ export const requiredRoleByOperation = {
   submitClaimAppeal: "policyholder",
   grantEvidenceAccess: "policyholder",
   revokeEvidenceAccess: "policyholder",
-  openAppealReview: "insurerAdmin",
   finalizeExpiredReview: "insurerAdmin",
   assessClaimFraud: "insurerAdmin",
   recordAuditorDecision: "auditor",

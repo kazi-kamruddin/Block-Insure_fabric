@@ -169,6 +169,13 @@ func validatePremiumPeriod(policy *Policy, periodStartDate, periodEndDate string
 	if end.After(policyEnd) {
 		return fmt.Errorf("premium period cannot exceed policy end date")
 	}
+	interval := policy.PremiumIntervalDays
+	if interval == 0 {
+		interval = defaultPremiumIntervalDays
+	}
+	if end.After(start.AddDate(0, 0, interval-1)) {
+		return fmt.Errorf("premium period cannot exceed the policy premium interval")
+	}
 	if amountMinor != policy.PremiumMinor {
 		return fmt.Errorf("premium amount must equal the policy premium")
 	}
@@ -189,6 +196,9 @@ func validatePremiumAccounts(ctx contractapi.TransactionContextInterface, c *Con
 	}
 	if source.AccountType != "CUSTOMER" || destination.AccountType != "INSURER" {
 		return nil, nil, fmt.Errorf("premium transfer requires a CUSTOMER source and INSURER destination")
+	}
+	if destination.OwnerID != "insurer" {
+		return nil, nil, fmt.Errorf("premium destination must belong to the insurer")
 	}
 	if source.OwnerID != policy.PolicyholderID {
 		return nil, nil, fmt.Errorf("source bank account is not owned by the policyholder")
@@ -375,6 +385,9 @@ func (c *Contract) ProcessPremiumCollection(ctx contractapi.TransactionContextIn
 	}
 	if err := validatePremiumPeriod(policy, collection.DueDate, periodEndDate, collection.AmountMinor); err != nil {
 		return nil, err
+	}
+	if collection.DueDate > mandate.ExpiryDate || periodEndDate > mandate.ExpiryDate {
+		return nil, fmt.Errorf("premium period cannot exceed mandate expiry")
 	}
 	source, destination, err := validatePremiumAccounts(ctx, c, policy, mandate.AccountReferenceID, destinationAccountID)
 	if err != nil {

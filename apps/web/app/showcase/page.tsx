@@ -1,31 +1,39 @@
 import Link from "next/link";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 const organizations = [
   ["InsurerMSP", "Coordinates policies, verification, and liabilities", "Cannot edit Hospital records or confirm Bank execution"],
   ["HospitalMSP", "Owns the independent patient invoice register", "Cannot approve or settle insurance claims"],
   ["BankMSP", "Owns balances, mandates, transfers, and bounce decisions", "Cannot approve claims or change policy terms"],
   ["AuditorMSP", "Casts assigned certificate-bound review votes", "One vote cannot finalize a governed review"],
-  ["OracleMSP", "Runs two subject-isolated commit/reveal workers", "Cannot settle a claim or expose unrevealed results"],
+  ["OracleMSP", "Runs three certificate-bound commit/reveal workers", "Cannot settle a claim or expose unrevealed results"],
 ] as const;
 
 const stories = [
-  { index: "A", title: "Premium integrity", flow: "Policyholder → Bank → Insurer", detail: "Manual email OTP or scheduled EFT creates one linked transfer and payment. Funds settle customer-to-insurer or bounce without changing coverage dates." },
-  { index: "B", title: "Claim integrity", flow: "Hospital → Policyholder → Insurer → Oracles", detail: "A claim binds to a finalized contracted-Hospital invoice, passes a read-only cross-check, then receives a version-bound two-Oracle result." },
+  { index: "A", title: "Premium integrity", flow: "Policyholder → Bank → Insurer", detail: "Demo OTP or scheduled EFT creates one linked transfer and payment. Simulated funds move customer-to-insurer or bounce without changing coverage dates." },
+  { index: "B", title: "Claim integrity", flow: "Hospital → Policyholder → Insurer → Oracles", detail: "A claim binds to a finalized contracted-Hospital invoice. The insurer starts processing, and Oracle workers compare invoice facts before a version-bound 2-of-3 result." },
   { index: "C", title: "Governed fallback", flow: "Oracles → Auditors → Insurer → Bank", detail: "Negative, conflicting, or timed-out Oracle work enters fixed quorum review. Approval creates a liability; Bank confirmation closes it." },
 ] as const;
 
 export default function ShowcasePage() {
   return (
     <main className="showcasePage">
-      <nav className="shell nav">
-        <Link className="brand" href="/"><span className="brandMark">BI</span><span>Block-Insure</span></Link>
-        <div className="navLinks"><Link href="/">Home</Link><Link href="/workspace">Workspaces</Link><span className="networkPill"><i /> presentation board</span></div>
-      </nav>
+      <header className="floatingNavWrapper">
+        <nav className="shell nav">
+          <Link className="brand" href="/"><span className="brandMark">BI</span><span>Block-Insure</span></Link>
+          <div className="navLinks">
+            <Link href="/">Home</Link>
+            <Link href="/workspace">Workspaces</Link>
+            <span className="networkPill"><span className="status-dot-pulse" aria-hidden="true" /> presentation board</span>
+            <ThemeToggle />
+          </div>
+        </nav>
+      </header>
 
       <section className="shell showcaseHero">
         <span className="eyebrow">Supervisor demonstration · Phase 3</span>
         <h1>One insurance journey. Five institutional boundaries.</h1>
-        <p className="lede">Block-Insure is the coordination layer. Hospitals keep invoices, Banks execute funds, Auditors vote independently, and Fabric preserves the shared proof.</p>
+        <p className="lede">Block-Insure is the coordination layer. Hospitals keep invoices, the Bank simulates transfers, assigned Auditors cast separate votes, and Fabric preserves the shared proof.</p>
         <div className="actions">
           <Link className="primary" href="/workspace">Start role demonstration</Link>
           <Link className="secondary" href="/#policies">View live policy network</Link>
@@ -59,10 +67,10 @@ export default function ShowcasePage() {
       <section className="shell presenterChecklist">
         <div><span className="kicker">Close the demonstration</span><h2>Show the proof, not only the happy path.</h2></div>
         <ol>
-          <li><strong>Identity:</strong> point out the portal, MSP, role, and organization-specific visual language.</li>
-          <li><strong>Boundary:</strong> explain one action this organization is intentionally unable to perform.</li>
-          <li><strong>Failure:</strong> show insufficient-funds bounce or Oracle fallback without hidden manual overrides.</li>
-          <li><strong>Audit:</strong> finish with the linked ledger asset, policy statement, claim dossier, or reproducibility snapshot.</li>
+          <li><span><strong>Identity:</strong> point out the portal, MSP, role, and organization-specific visual language.</span></li>
+          <li><span><strong>Boundary:</strong> explain one action this organization is intentionally unable to perform.</span></li>
+          <li><span><strong>Failure:</strong> show insufficient-funds bounce or Oracle fallback without hidden manual overrides.</span></li>
+          <li><span><strong>Audit:</strong> finish with the linked ledger asset, policy statement, claim dossier, or reproducibility snapshot.</span></li>
         </ol>
       </section>
       <footer className="shell footer"><span>Block-Insure Fabric</span><span>Identity · Boundary · Failure · Proof</span></footer>

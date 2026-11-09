@@ -8,9 +8,10 @@ export function emptyCursor(startBlock = 0) {
 export async function loadCursor(filePath, identity, startBlock = 0) {
   try {
     const stored = JSON.parse(await fs.readFile(filePath, "utf8"));
-    if (stored.identity !== identity || !Number.isInteger(stored.nextBlock)) return emptyCursor(startBlock);
+    if (stored.identity !== identity || !Number.isSafeInteger(stored.nextBlock) || stored.nextBlock < 0) return emptyCursor(startBlock);
+    if (stored.nextBlock < Number(startBlock)) return emptyCursor(startBlock);
     return {
-      nextBlock: Math.max(Number(startBlock), stored.nextBlock),
+      nextBlock: stored.nextBlock,
       transactionId: String(stored.transactionId ?? ""),
     };
   } catch (error) {

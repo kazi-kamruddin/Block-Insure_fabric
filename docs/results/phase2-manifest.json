@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-09-26T18:21:18.633Z",
+  "sourceCommit": "de0c65a9a0aa0c3e1c14333513d3e0a62b64a124",
+  "worktreeModified": true,
+  "worktreeStatus": "M .gitignore\n M benchmarks/phase2/capture-manifest.mjs\n M benchmarks/phase2/summarize.mjs\n M docs/comparative-and-security-evaluation.md\n M docs/results/phase2-exclusions.md\n?? docs/paper/\n?? docs/results/artifacts/\n?? docs/results/phase2-caliper/run1-resources.jsonl\n?? docs/results/phase2-caliper/run1.html\n?? docs/results/phase2-caliper/run1.log\n?? docs/results/phase2-caliper/run2-resources.jsonl\n?? docs/results/phase2-caliper/run2.html\n?? docs/results/phase2-caliper/run2.log\n?? docs/results/phase2-caliper/run3-resources.jsonl\n?? docs/results/phase2-caliper/run3.html\n?? docs/results/phase2-caliper/run3.log\n?? docs/results/phase2-caliper/samples/run1-round10-worker0.json\n?? docs/results/phase2-caliper/samples/run1-round10-worker1.json\n?? docs/results/phase2-caliper/samples/run1-round11-worker0.json\n?? docs/results/phase2-caliper/samples/run1-round11-worker1.json\n?? docs/results/phase2-caliper/samples/run1-round12-worker0.json\n?? docs/results/phase2-caliper/samples/run1-round12-worker1.json\n?? docs/results/phase2-caliper/samples/run1-round13-worker0.json\n?? docs/results/phase2-caliper/samples/run1-round13-worker1.json\n?? docs/results/phase2-caliper/samples/run1-round14-worker0.json\n?? docs/results/phase2-caliper/samples/run1-round14-worker1.json\n?? docs/results/phase2-caliper/samples/run1-round15-worker0.json\n?? docs/results/phase2-caliper/samples/run1-round15-worker1.json\n?? docs/results/phase2-caliper/samples/run1-round16-worker0.json\n?? docs/results/phase2-caliper/samples/run1-round16-worker1.json\n?? docs/results/phase2-caliper/samples/run1-round17-worker0.json\n?? docs/results/phase2-caliper/samples/run1-round17-worker1.json\n?? docs/results/phase2-caliper/samples/run1-round18-worker0.json\n?? docs/results/phase2-caliper/samples/run1-round18-worker1.json\n?? docs/results/phase2-caliper/samples/run1-round4-worker0.json\n?? docs/results/phase2-caliper/samples/run1-round4-worker1.json\n?? docs/results/phase2-caliper/samples/run1-round5-worker0.json\n?? docs/results/phase2-caliper/samples/run1-round5-worker1.json\n?? docs/results/phase2-caliper/samples/run1-round6-worker0.json\n?? docs/results/phase2-caliper/samples/run1-round6-worker1.json\n?? docs/results/phase2-caliper/samples/run1-round7-worker0.json\n?? docs/results/phase2-caliper/samples/run1-round7-worker1.json\n?? docs/results/phase2-caliper/samples/run1-round8-worker0.json\n?? docs/results/phase2-caliper/samples/run1-round8-worker1.json\n?? docs/results/phase2-caliper/samples/run1-round9-worker0.json\n?? docs/results/phase2-caliper/samples/run1-round9-worker1.json\n?? docs/results/phase2-caliper/samples/run2-round10-worker0.json\n?? docs/results/phase2-caliper/samples/run2-round10-worker1.json\n?? docs/results/phase2-caliper/samples/run2-round11-worker0.json\n?? docs/results/phase2-caliper/samples/run2-round11-worker1.json\n?? docs/results/phase2-caliper/samples/run2-round12-worker0.json\n?? docs/results/phase2-caliper/samples/run2-round12-worker1.json\n?? docs/results/phase2-caliper/samples/run2-round13-worker0.json\n?? docs/results/phase2-caliper/samples/run2-round13-worker1.json\n?? docs/results/phase2-caliper/samples/run2-round14-worker0.json\n?? docs/results/phase2-caliper/samples/run2-round14-worker1.json\n?? docs/results/phase2-caliper/samples/run2-round15-worker0.json\n?? docs/results/phase2-caliper/samples/run2-round15-worker1.json\n?? docs/results/phase2-caliper/samples/run2-round16-worker0.json\n?? docs/results/phase2-caliper/samples/run2-round16-worker1.json\n?? docs/results/phase2-caliper/samples/run2-round17-worker0.json\n?? docs/results/phase2-caliper/samples/run2-round17-worker1.json\n?? docs/results/phase2-caliper/samples/run2-round18-worker0.json\n?? docs/results/phase2-caliper/samples/run2-round18-worker1.json\n?? docs/results/phase2-caliper/samples/run2-round4-worker0.json\n?? docs/results/phase2-caliper/samples/run2-round4-worker1.json\n?? docs/results/phase2-caliper/samples/run2-round5-worker0.json\n?? docs/results/phase2-caliper/samples/run2-round5-worker1.json\n?? docs/results/phase2-caliper/samples/run2-round6-worker0.json\n?? docs/results/phase2-caliper/samples/run2-round6-worker1.json\n?? docs/results/phase2-caliper/samples/run2-round7-worker0.json\n?? docs/results/phase2-caliper/samples/run2-round7-worker1.json\n?? docs/results/phase2-caliper/samples/run2-round8-worker0.json\n?? docs/results/phase2-caliper/samples/run2-round8-worker1.json\n?? docs/results/phase2-caliper/samples/run2-round9-worker0.json\n?? docs/results/phase2-caliper/samples/run2-round9-worker1.json\n?? docs/results/phase2-caliper/samples/run3-round10-worker0.json\n?? docs/results/phase2-caliper/samples/run3-round10-worker1.json\n?? docs/results/phase2-caliper/samples/run3-round11-worker0.json\n?? docs/results/phase2-caliper/samples/run3-round11-worker1.json\n?? docs/results/phase2-caliper/samples/run3-round12-worker0.json\n?? docs/results/phase2-caliper/samples/run3-round12-worker1.json\n?? docs/results/phase2-caliper/samples/run3-round13-worker0.json\n?? docs/results/phase2-caliper/samples/run3-round13-worker1.json\n?? docs/results/phase2-caliper/samples/run3-round14-worker0.json\n?? docs/results/phase2-caliper/samples/run3-round14-worker1.json\n?? docs/results/phase2-caliper/samples/run3-round15-worker0.json\n?? docs/results/phase2-caliper/samples/run3-round15-worker1.json\n?? docs/results/phase2-caliper/samples/run3-round16-worker0.json\n?? docs/results/phase2-caliper/samples/run3-round16-worker1.json\n?? docs/results/phase2-caliper/samples/run3-round17-worker0.json\n?? docs/results/phase2-caliper/samples/run3-round17-worker1.json\n?? docs/results/phase2-caliper/samples/run3-round18-worker0.json\n?? docs/results/phase2-caliper/samples/run3-round18-worker1.json\n?? docs/results/phase2-caliper/samples/run3-round4-worker0.json\n?? docs/results/phase2-caliper/samples/run3-round4-worker1.json\n?? docs/results/phase2-caliper/samples/run3-round5-worker0.json\n?? docs/results/phase2-caliper/samples/run3-round5-worker1.json\n?? docs/results/phase2-caliper/samples/run3-round6-worker0.json\n?? docs/results/phase2-caliper/samples/run3-round6-worker1.json\n?? docs/results/phase2-caliper/samples/run3-round7-worker0.json\n?? docs/results/phase2-caliper/samples/run3-round7-worker1.json\n?? docs/results/phase2-caliper/samples/run3-round8-worker0.json\n?? docs/results/phase2-caliper/samples/run3-round8-worker1.json\n?? docs/results/phase2-caliper/samples/run3-round9-worker0.json\n?? docs/results/phase2-caliper/samples/run3-round9-worker1.json\n?? docs/results/phase2-evidence-index.md\n?? docs/results/phase2-faults.json\n?? docs/results/phase2-ledgers-after.txt\n?? docs/results/phase2-live-ledger.json\n?? docs/results/phase2-manifest.json\n?? docs/results/phase2-package-audit.txt\n?? docs/results/phase2-summary/",
+  "runtimePackageId": "insurance-contract_1.4.0-phase2:8141d7f8edeb64f819e682354c0c46dc8b312245c1f2c3ccbfb36005bab8b27c",
+  "channel": "insurance-phase2-20260926",
+  "environment": {
+    "node": "v24.16.0",
+    "platform": "win32",
+    "architecture": "x64",
+    "cpuModel": "AMD Ryzen 5 5600H with Radeon Graphics         ",
+    "logicalCpuCount": 12,
+    "memoryBytes": 7883206656
+  },
+  "sha256": {
+    "network/channel-artifacts/insurance-contract_1.4.0-phase2.tar.gz": "8141d7f8edeb64f819e682354c0c46dc8b312245c1f2c3ccbfb36005bab8b27c",
+    "services/oracle-worker/registry/oracle1-v1.json": "6cf12a6f8f1cfcea92d7c1e29228e28312ae13e2f56b4fc11e8705f36e1b7a08",
+    "services/oracle-worker/registry/oracle2-v1.json": "719933d02e3a77263aa8b38cb812eb7d89b80b759cae188d97de997266c7e880",
+    "services/oracle-worker/registry/oracle3-v1.json": "5637eeb367a0f7d3430f3f236728136cb431aedd83c00fc6fe97563398d8ef77",
+    "services/oracle-worker/registry/oracle2-conflict-v1.json": "9be2d890895cc478cb23bcd953998ecb21a5c89385ce56afd5df931a474ecb0b",
+    "benchmarks/caliper/benchmark.yaml": "0ee26b17ee695e46f6d2dc6a1cceb033810dd0415861f5c968e486e413e5ff50",
+    "benchmarks/comparative/run-experiment.mjs": "6044dd1034b3e1e39322773ce53998421fbab9e21a77117a7a27707b4611f046",
+    "benchmarks/oracle-faults/run-matrix.ps1": "97af2ed3d27de28caba9b6f0bcbf5e566d62fc2f0532100a77c8b581aa660249",
+    "benchmarks/oracle-faults/run-protocol-matrix.mjs": "a368378fcf0856a99fe676d4280353f319bc81f3a550ebbb9d1d61569763e9bc",
+    "benchmarks/security-evaluation/threat-model.json": "28ab72188565d89c8826421f5985681c0b13355c3140490fbad58cf432af7265"
+  },
+  "ledgers": {
+    "before": {
+      "insurance-channel": {
+        "height": 2100,
+        "currentBlockHash": "KEXpmruMaXUnA8IGIQ8D2/u3yUIJM23Q0waCLjPvMGA=",
+        "previousBlockHash": "aY+OH0sn+T2vGZrE0nE73YjrQek7W9OIKNMjnv2V6pA="
+      },
+      "insurance-phase1-20260926": {
+        "height": 483,
+        "currentBlockHash": "qgkTD2ZBUpb8YnqNvoitQw5RnUcIHWQQa0Mqu2JnnC8=",
+        "previousBlockHash": "OmftRRaluREhdOUJo1pvS2VkvFFTocYKu7qU0nLPjXA="
+      }
+    },
+    "after": {
+      "insurance-channel": {
+        "height": 2100,
+        "currentBlockHash": "KEXpmruMaXUnA8IGIQ8D2/u3yUIJM23Q0waCLjPvMGA=",
+        "previousBlockHash": "aY+OH0sn+T2vGZrE0nE73YjrQek7W9OIKNMjnv2V6pA="
+      },
+      "insurance-phase1-20260926": {
+        "height": 483,
+        "currentBlockHash": "qgkTD2ZBUpb8YnqNvoitQw5RnUcIHWQQa0Mqu2JnnC8=",
+        "previousBlockHash": "OmftRRaluREhdOUJo1pvS2VkvFFTocYKu7qU0nLPjXA="
+      },
+      "insurance-phase2-20260926": {
+        "height": 875,
+        "currentBlockHash": "HwYelv6CgNVsVF04gTUeN+9qLUMD4i6KWYRWyrZKM+U=",
+        "previousBlockHash": "OkhRH9KgN3fJgINJKMlBYHn0c2rrGLw05J9No4EUsog="
+      }
+    },
+    "preservedUnchanged": true
+  },
+  "artifactScope": "Synthetic local prototype; package, fixtures, scripts, and raw trial outputs are archived. Credentials and live chain data are not bundled."
+}

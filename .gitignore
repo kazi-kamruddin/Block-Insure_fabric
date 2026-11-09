@@ -6,11 +6,44 @@ coverage/
 /data/evidence/
 /data/events/
 /data/oracle/
+/data/otp/
+/data/evidence-phase1/
+/data/events-phase1/
+/data/oracle-phase1/
+/data/evidence-phase2/
+/data/events-phase2/
+/data/oracle-phase2/
+/data/evidence-hardening/
+/data/events-hardening/
+/data/oracle-hardening/
+/data/evidence-workflow/
+/data/events-workflow/
+/data/oracle-workflow/
+/data/oracle-alignment-20261108/
+/data/events-alignment-20261108/
+/data/evidence-alignment-20261108/
+/data/otp-alignment-20261108/
+/data/oracle-alignment-20261108/
+/data/events-alignment-20261108/
+/data/evidence-alignment-20261108/
+/data/otp-alignment-20261108/
 /data/demo-stack/
 /apps/web/data/
 /apps/web/test-results/
 /apps/web/playwright-report/
 /verification-results/*.json
+/verification-results/phase1-playwright/
+/verification-results/hardening-playwright/
+/verification-results/supervisor-*.png
+/benchmarks/caliper/generated/
+/benchmarks/caliper/reports/
+/benchmarks/oracle-faults/reports/
+/benchmarks/comparative/reports/
+/benchmarks/security-evaluation/reports/
+/formal/insurance-workflow/reports/
+/formal/insurance-workflow/.cache/
+/formal/insurance-workflow/states/
+/formal/insurance-workflow/*_TTrace_*
 
 # Local configuration and credentials
 .env
@@ -33,6 +66,9 @@ network/vars/
 # Logs and temporary files
 logs/
 *.log
+!/docs/results/phase2-caliper/*.log
+!/docs/results/artifacts/**/
+!/docs/results/artifacts/**/*.log
 .DS_Store
 Thumbs.db
 
@@ -42,3 +78,16 @@ Thumbs.db
 
 # Permanent local-only Ethereum reference implementation
 /reference/
+
+# ==========================================
+# AI Agent files and local skill packages
+# ==========================================
+.agents/
+.agent/
+_agents/
+_agent/
+skills/
+AGENTS.md
+AGENT.md
+agent.md
+GEMINI.md

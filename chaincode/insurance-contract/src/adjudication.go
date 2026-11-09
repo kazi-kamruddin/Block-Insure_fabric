@@ -120,6 +120,9 @@ func (c *Contract) openReview(
 	if err := validateReviewRules(assignments, approvalThreshold, rejectionThreshold); err != nil {
 		return nil, err
 	}
+	if err := c.requireXGBoostReviewReadiness(ctx, claim, assignments, approvalThreshold, rejectionThreshold, deadline); err != nil {
+		return nil, err
+	}
 	deadline, err = validateReviewDeadline(ctx, deadline)
 	if err != nil {
 		return nil, err
@@ -264,9 +267,11 @@ func (c *Contract) SubmitClaimAppeal(
 		}
 		effectiveInvoiceID = ""
 		for _, invoice := range invoices {
-			if invoice.HospitalID == effectiveHospitalID && invoice.Status == "FINALIZED" && strings.EqualFold(invoice.InvoiceReferenceHash, proposedClinicalReferenceHash) {
+			if invoice.HospitalID == effectiveHospitalID && invoice.Status == "FINALIZED" && invoice.PatientReferenceHash == patientSubjectHash(subject) && strings.EqualFold(invoice.InvoiceReferenceHash, proposedClinicalReferenceHash) {
+				if effectiveInvoiceID != "" {
+					return nil, fmt.Errorf("corrected invoice reference is ambiguous")
+				}
 				effectiveInvoiceID = invoice.ID
-				break
 			}
 		}
 		if effectiveInvoiceID == "" {

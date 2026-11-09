@@ -11,7 +11,7 @@ chaincode_root="${project_root}/chaincode/insurance-contract"
 
 channel_name="${CHANNEL_NAME:-insurance-channel}"
 chaincode_name="${CHAINCODE_NAME:-insurance-contract}"
-chaincode_version="${CHAINCODE_VERSION:-1.2.2}"
+chaincode_version="${CHAINCODE_VERSION:-1.4.0}"
 chaincode_sequence="${CHAINCODE_SEQUENCE:-}"
 chaincode_label="${chaincode_name}_${chaincode_version}"
 package_file="${artifacts}/${chaincode_label}.tar.gz"
@@ -24,13 +24,12 @@ export FABRIC_CFG_PATH="${samples_root}/config"
 
 package_chaincode() {
   if command -v go >/dev/null 2>&1; then
-    peer lifecycle chaincode package "${package_file}" \
-      --path "${chaincode_root}" --lang golang --label "${chaincode_label}"
+    bash "${script_dir}/package-chaincode.sh" "${chaincode_root}" "${package_file}" "${chaincode_label}"
     return
   fi
 
   local docker_command="" chaincode_mount="${chaincode_root}" artifacts_mount="${artifacts}"
-  local bin_mount="${samples_root}/bin" config_mount="${samples_root}/config"
+  local bin_mount="${samples_root}/bin" config_mount="${samples_root}/config" scripts_mount="${script_dir}"
   local attempt
   for attempt in {1..10}; do
     if command -v docker >/dev/null && docker info >/dev/null 2>&1; then
@@ -42,6 +41,7 @@ package_chaincode() {
       artifacts_mount="$(wslpath -w "${artifacts}")"
       bin_mount="$(wslpath -w "${samples_root}/bin")"
       config_mount="$(wslpath -w "${samples_root}/config")"
+      scripts_mount="$(wslpath -w "${script_dir}")"
       break
     fi
     if [ "${attempt}" -lt 10 ]; then
@@ -55,13 +55,15 @@ package_chaincode() {
   fi
 
   "${docker_command}" run --rm \
+    --memory 512m --cpus 1 -e GOMEMLIMIT=384MiB -e GOMAXPROCS=1 -e GOFLAGS=-p=1 \
     -v "${chaincode_mount}:/chaincode:ro" \
     -v "${artifacts_mount}:/artifacts" \
     -v "${bin_mount}:/fabric-bin:ro" \
     -v "${config_mount}:/fabric-config:ro" \
+    -v "${scripts_mount}:/package-scripts:ro" \
+    -v block-insure-go-cache:/go/pkg/mod \
     -e FABRIC_CFG_PATH=/fabric-config \
-    golang:1.25 /fabric-bin/peer lifecycle chaincode package "/artifacts/${chaincode_label}.tar.gz" \
-      --path /chaincode --lang golang --label "${chaincode_label}"
+    golang:1.25 bash /package-scripts/package-chaincode.sh /chaincode "/artifacts/${chaincode_label}.tar.gz" "${chaincode_label}" /fabric-bin/peer
   "${docker_command}" run --rm -v "${artifacts_mount}:/artifacts" \
     golang:1.25 chmod 0644 "/artifacts/${chaincode_label}.tar.gz"
 }
@@ -104,8 +106,12 @@ resolve_chaincode_sequence() {
     return
   fi
   if [[ "${definition_version}" == "${chaincode_version}" ]]; then
-    echo "${chaincode_name} ${chaincode_version} is already committed at sequence ${definition_sequence}."
-    echo "Set CHAINCODE_VERSION to a new version when the source changes."
+    echo "${chaincode_name} ${chaincode_version} is already committed at sequence ${definition_sequence}; auditing package and source before reuse."
+    if ! CHANNEL_NAME="${channel_name}" CHAINCODE_VERSION="${chaincode_version}" CHAINCODE_SEQUENCE="${definition_sequence}" \
+      bash "${project_root}/scripts/audit-chaincode-package.sh"; then
+      echo "Committed ${chaincode_version} does not match the current source/package on every peer. Set CHAINCODE_VERSION to a new version and deploy on a suitable channel." >&2
+      exit 1
+    fi
     exit 0
   fi
   chaincode_sequence="$((definition_sequence + 1))"

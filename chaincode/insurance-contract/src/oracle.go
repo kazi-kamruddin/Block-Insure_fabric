@@ -13,23 +13,58 @@ import (
 )
 
 const (
-	oracleProtocolVersion       = "block-insure-oracle-v1"
-	oracleRequiredConfirmations = 2
+	oracleProtocolVersion  = "block-insure-oracle-v1"
+	oracleMinimumAssignees = 1
+	oracleMaximumAssignees = 9
 )
 
 var oracleVerificationCodes = map[string]bool{
-	"VERIFIED":                   true,
-	"SNAPSHOT_VERSION_MISMATCH":  true,
-	"REGISTRY_ROOT_MISMATCH":     true,
-	"RULES_VERSION_MISMATCH":     true,
-	"MODEL_VERSION_MISMATCH":     true,
-	"APPEAL_COMMITMENT_MISMATCH": true,
-	"RECORD_NOT_FOUND":           true,
-	"RECORD_INVALID":             true,
-	"AMOUNT_OUT_OF_RANGE":        true,
-	"INCIDENT_DATE_MISMATCH":     true,
-	"DESCRIPTION_MISMATCH":       true,
-	"HOSPITAL_MISMATCH":          true,
+	"VERIFIED":                     true,
+	"SNAPSHOT_VERSION_MISMATCH":    true,
+	"REGISTRY_ROOT_MISMATCH":       true,
+	"RULES_VERSION_MISMATCH":       true,
+	"MODEL_VERSION_MISMATCH":       true,
+	"APPEAL_COMMITMENT_MISMATCH":   true,
+	"RECORD_NOT_FOUND":             true,
+	"RECORD_INVALID":               true,
+	"AMOUNT_OUT_OF_RANGE":          true,
+	"INCIDENT_DATE_MISMATCH":       true,
+	"DESCRIPTION_MISMATCH":         true,
+	"HOSPITAL_MISMATCH":            true,
+	"PATIENT_MISMATCH":             true,
+	"PRIVACY_PRESENTATION_MISSING": true,
+	"PRIVACY_PROOF_INVALID":        true,
+	"PRIVACY_PRESENTATION_EXPIRED": true,
+	"PRIVACY_CREDENTIAL_INACTIVE":  true,
+}
+
+// Historical requests retain their fixed-code validator. The Fabric evaluator
+// binds the full inference/context digest to the existing exact-result quorum.
+func validateOracleRoutingCode(modelVersion, code string, verified bool) error {
+	if modelVersion == "fabric-xgb-synthetic-v1" {
+		for _, prefix := range []string{"XGB_AUTO:", "XGB_REVIEW:"} {
+			if strings.HasPrefix(code, prefix) {
+				if err := validateHash("inference result digest", strings.TrimPrefix(code, prefix)); err != nil {
+					return err
+				}
+				if verified != (prefix == "XGB_AUTO:") {
+					return fmt.Errorf("verified disagrees with XGBoost routing code")
+				}
+				return nil
+			}
+		}
+		if !verified && (code == "XGB_CONTEXT_OR_INFERENCE_UNAVAILABLE" || code == "XGB_EVALUATOR_UNAVAILABLE" || (oracleVerificationCodes[code] && code != "VERIFIED")) {
+			return nil
+		}
+		return fmt.Errorf("unsupported XGBoost routing result")
+	}
+	if !oracleVerificationCodes[code] {
+		return fmt.Errorf("verificationCode %s is not supported", code)
+	}
+	if verified != (code == "VERIFIED") {
+		return fmt.Errorf("verified must be true exactly when verificationCode is VERIFIED")
+	}
+	return nil
 }
 
 func canonicalProtocolHash(domain string, values ...string) string {
@@ -83,6 +118,9 @@ func oracleResultDigest(request *OracleRequest, verified bool, verificationCode,
 		request.RulesHash,
 		request.ModelVersion,
 		request.ModelHash,
+		request.PrivacyPresentationID,
+		request.PrivacyPresentationHash,
+		request.PrivacyProtocolVersion,
 		strconv.FormatBool(verified),
 		verificationCode,
 		strings.ToLower(recordHash),
@@ -119,13 +157,19 @@ func requireOracleIdentity(ctx contractapi.TransactionContextInterface) (string,
 	return identity, subject, nil
 }
 
-func parseTwoOracleAssignments(raw string) ([]string, error) {
+func parseOracleAssignments(raw string, requiredConfirmations int) ([]string, error) {
 	var assignments []string
 	if err := json.Unmarshal([]byte(raw), &assignments); err != nil {
 		return nil, fmt.Errorf("assignedOracleIds must be a JSON string array")
 	}
-	if len(assignments) != oracleRequiredConfirmations {
-		return nil, fmt.Errorf("exactly two Oracle certificate subjects must be assigned")
+	if len(assignments) < oracleMinimumAssignees || len(assignments) > oracleMaximumAssignees {
+		return nil, fmt.Errorf("assigned Oracle count must be between %d and %d", oracleMinimumAssignees, oracleMaximumAssignees)
+	}
+	if requiredConfirmations < 1 || requiredConfirmations > len(assignments) {
+		return nil, fmt.Errorf("requiredConfirmations must be between 1 and the assigned Oracle count")
+	}
+	if requiredConfirmations <= len(assignments)/2 {
+		return nil, fmt.Errorf("requiredConfirmations must be a strict majority of assigned Oracles")
 	}
 	seen := make(map[string]bool, len(assignments))
 	for index, value := range assignments {
@@ -171,6 +215,51 @@ func containsOracleAssignment(assignments []string, subject string) bool {
 		}
 	}
 	return false
+}
+
+// EvaluateOracleThreshold is a read-only, deterministic protocol primitive
+// used by tests and Caliper to compare consensus configurations without
+// creating ledger assets.
+func (c *Contract) EvaluateOracleThreshold(ctx contractapi.TransactionContextInterface, responsesJSON string, requiredConfirmations int) (*OracleThresholdEvaluation, error) {
+	var responses []*string
+	if err := json.Unmarshal([]byte(responsesJSON), &responses); err != nil {
+		return nil, fmt.Errorf("responses must be a JSON array of SHA-256 hashes or null")
+	}
+	if len(responses) < oracleMinimumAssignees || len(responses) > oracleMaximumAssignees {
+		return nil, fmt.Errorf("response slots must be between %d and %d", oracleMinimumAssignees, oracleMaximumAssignees)
+	}
+	if requiredConfirmations < 1 || requiredConfirmations > len(responses) || requiredConfirmations <= len(responses)/2 {
+		return nil, fmt.Errorf("requiredConfirmations must be a strict majority of response slots")
+	}
+	counts := make(map[string]int)
+	responseCount := 0
+	winner := ""
+	matching := 0
+	for _, response := range responses {
+		if response == nil {
+			continue
+		}
+		hash := strings.ToLower(strings.TrimSpace(*response))
+		if err := validateHash("response hash", hash); err != nil {
+			return nil, err
+		}
+		responseCount++
+		counts[hash]++
+		if counts[hash] > matching || (counts[hash] == matching && (winner == "" || hash < winner)) {
+			winner = hash
+			matching = counts[hash]
+		}
+	}
+	status := "PENDING"
+	if matching >= requiredConfirmations {
+		status = "CONSENSUS"
+	} else if responseCount == len(responses) {
+		status = "CONFLICT"
+	}
+	return &OracleThresholdEvaluation{
+		AssignedOracleCount: len(responses), RequiredConfirmations: requiredConfirmations,
+		ResponseCount: responseCount, MatchingResponses: matching, WinningResultHash: winner, Status: status,
+	}, nil
 }
 
 func oracleSubmissionID(requestID, oracleID string) string {
@@ -223,7 +312,9 @@ func (c *Contract) PublishOracleRegistrySnapshot(
 
 func (c *Contract) RequestOracleVerification(
 	ctx contractapi.TransactionContextInterface,
-	requestID, claimID, snapshotID, modelVersion, modelHash, assignedOracleIDsJSON, commitDeadline, revealDeadline string,
+	requestID, claimID, snapshotID, modelVersion, modelHash, assignedOracleIDsJSON string,
+	requiredConfirmations int,
+	commitDeadline, revealDeadline string,
 ) (*OracleRequest, error) {
 	if _, err := requireIdentity(ctx, "InsurerMSP", "insurerAdmin"); err != nil {
 		return nil, err
@@ -232,17 +323,23 @@ func (c *Contract) RequestOracleVerification(
 	if err != nil {
 		return nil, err
 	}
-	if claim.Status != "HOSPITAL_VERIFIED" && claim.Status != "APPEAL_SUBMITTED" {
+	invoiceFlow := claim.HospitalInvoiceID != ""
+	if !invoiceFlow && claim.Status != "HOSPITAL_VERIFIED" && claim.Status != "APPEAL_SUBMITTED" {
 		return nil, fmt.Errorf("claim %s is not ready for Oracle verification", claimID)
 	}
-	if claim.HospitalVerificationID == "" {
+	if !invoiceFlow && claim.HospitalVerificationID == "" {
 		return nil, fmt.Errorf("claim %s requires a current verified hospital attestation", claimID)
 	}
-	verification, err := c.ReadHospitalVerification(ctx, claim.HospitalVerificationID)
+	var verification *HospitalVerification
+	if invoiceFlow {
+		verification, err = c.bindOracleInvoice(ctx, claim, requestID)
+	} else {
+		verification, err = c.ReadHospitalVerification(ctx, claim.HospitalVerificationID)
+	}
 	if err != nil {
 		return nil, err
 	}
-	if verification.Outcome != "VERIFIED" || verification.ClaimID != claimID || verification.ClaimVersion != claim.Version {
+	if (!invoiceFlow && verification.Outcome != "VERIFIED") || verification.ClaimID != claimID || verification.ClaimVersion != claim.Version {
 		return nil, fmt.Errorf("claim %s requires a current verified hospital attestation", claimID)
 	}
 	appealID := ""
@@ -255,7 +352,7 @@ func (c *Contract) RequestOracleVerification(
 		if readErr != nil {
 			return nil, readErr
 		}
-		if appeal.Status != "HOSPITAL_VERIFIED" || appeal.ClaimVersion != claim.Version || appeal.HospitalVerificationID != verification.ID {
+		if (!invoiceFlow && (appeal.Status != "HOSPITAL_VERIFIED" || appeal.HospitalVerificationID != verification.ID)) || appeal.ClaimVersion != claim.Version {
 			return nil, fmt.Errorf("appeal %s requires fresh hospital verification", appeal.ID)
 		}
 		if appeal.CommitmentHash == "" || appeal.CommitmentHash != appealCommitmentHash(appeal) {
@@ -263,6 +360,13 @@ func (c *Contract) RequestOracleVerification(
 		}
 		appealID = appeal.ID
 		appealHash = appeal.CommitmentHash
+		if invoiceFlow {
+			appeal.HospitalVerificationID = verification.ID
+			appeal.Status = "ORACLE_PENDING"
+			if err := overwriteAsset(ctx, "claimAppeal", appeal.ID, appeal); err != nil {
+				return nil, err
+			}
+		}
 	} else if verification.AppealID != "" {
 		return nil, fmt.Errorf("claim %s has an appeal-bound hospital attestation in its initial cycle", claimID)
 	}
@@ -270,15 +374,26 @@ func (c *Contract) RequestOracleVerification(
 	if err != nil {
 		return nil, err
 	}
+	if invoiceFlow && snapshot.RulesVersion != "hospital-invoice-rules-v2" {
+		return nil, fmt.Errorf("invoice claims require a current Hospital registry using hospital-invoice-rules-v2")
+	}
 	if !idPattern.MatchString(strings.TrimSpace(modelVersion)) {
 		return nil, fmt.Errorf("modelVersion is invalid")
 	}
 	if err := validateHash("modelHash", modelHash); err != nil {
 		return nil, err
 	}
-	assignments, err := parseTwoOracleAssignments(assignedOracleIDsJSON)
+	assignments, err := parseOracleAssignments(assignedOracleIDsJSON, requiredConfirmations)
 	if err != nil {
 		return nil, err
+	}
+	if modelVersion == "fabric-xgb-synthetic-v1" && (len(assignments) != 3 || requiredConfirmations != 2) {
+		return nil, fmt.Errorf("Fabric XGBoost requires exactly three Oracles and two matching results")
+	}
+	if modelVersion == "fabric-xgb-synthetic-v1" {
+		if _, err := c.requireXGBoostEvidence(ctx, claim); err != nil {
+			return nil, err
+		}
 	}
 	commitDeadline, revealDeadline, err = parseOracleDeadlines(ctx, commitDeadline, revealDeadline)
 	if err != nil {
@@ -288,15 +403,40 @@ func (c *Contract) RequestOracleVerification(
 	if err != nil {
 		return nil, err
 	}
+	privacyPresentationID := ""
+	privacyPresentationHash := ""
+	privacyProtocol := ""
+	if claim.PrivacyPresentationID != "" {
+		presentation, presentationErr := c.ReadSelectiveDisclosurePresentation(ctx, claim.PrivacyPresentationID)
+		if presentationErr != nil {
+			return nil, presentationErr
+		}
+		expiry, parseErr := time.Parse(time.RFC3339, presentation.ExpiresAt)
+		requestTime, requestTimeErr := time.Parse(time.RFC3339Nano, now)
+		if parseErr != nil || requestTimeErr != nil || !expiry.After(requestTime) {
+			return nil, fmt.Errorf("privacy presentation %s is expired", presentation.ID)
+		}
+		if presentation.Status != "VERIFIED" || presentation.ClaimID != claim.ID || presentation.ClaimVersion != claim.Version {
+			return nil, fmt.Errorf("privacy presentation %s is stale for claim %s", presentation.ID, claim.ID)
+		}
+		if err := c.validatePresentationCredentials(ctx, presentation, requestTime); err != nil {
+			return nil, err
+		}
+		privacyPresentationID = presentation.ID
+		privacyPresentationHash = presentation.PresentationHash
+		privacyProtocol = presentation.ProtocolVersion
+	}
 	request := &OracleRequest{
 		AssetType: "oracleRequest", SchemaVersion: SchemaVersion, ID: requestID,
 		ClaimID: claimID, ClaimVersion: claim.Version, HospitalVerificationID: verification.ID,
 		AppealID: appealID, AppealCommitmentHash: appealHash,
-		QueryHash: oracleQueryHash(claim, verification), RegistrySnapshotID: snapshot.ID,
+		PrivacyPresentationID: privacyPresentationID, PrivacyPresentationHash: privacyPresentationHash,
+		PrivacyProtocolVersion: privacyProtocol,
+		QueryHash:              oracleQueryHash(claim, verification), RegistrySnapshotID: snapshot.ID,
 		RegistryVersion: snapshot.Version, RegistryRootHash: snapshot.RootHash,
 		RulesVersion: snapshot.RulesVersion, RulesHash: snapshot.RulesHash,
 		ModelVersion: strings.TrimSpace(modelVersion), ModelHash: strings.ToLower(modelHash),
-		AssignedOracleIDs: assignments, RequiredConfirmations: oracleRequiredConfirmations,
+		AssignedOracleIDs: assignments, RequiredConfirmations: requiredConfirmations,
 		ExpectedResponses: len(assignments), Status: "PENDING", CommitDeadline: commitDeadline,
 		RevealDeadline: revealDeadline, RequestedAt: now,
 	}
@@ -411,11 +551,8 @@ func (c *Contract) RevealOracleResult(
 		return nil, fmt.Errorf("model version mismatch")
 	}
 	verificationCode = strings.ToUpper(strings.TrimSpace(verificationCode))
-	if !oracleVerificationCodes[verificationCode] {
-		return nil, fmt.Errorf("verificationCode %s is not supported", verificationCode)
-	}
-	if verified != (verificationCode == "VERIFIED") {
-		return nil, fmt.Errorf("verified must be true exactly when verificationCode is VERIFIED")
+	if err := validateOracleRoutingCode(request.ModelVersion, verificationCode, verified); err != nil {
+		return nil, err
 	}
 	for _, field := range []struct {
 		name  string
@@ -442,6 +579,24 @@ func (c *Contract) RevealOracleResult(
 	if txTime.AsTime().After(revealDeadline) {
 		return nil, fmt.Errorf("Oracle request %s reveal phase has ended", requestID)
 	}
+	if verified && request.RulesVersion == "hospital-invoice-rules-v2" {
+		invoice, err := c.ReadHospitalInvoice(ctx, claim.HospitalInvoiceID)
+		if err != nil {
+			return nil, err
+		}
+		if invoice.Status != "FINALIZED" || invoice.PatientReferenceHash != patientSubjectHash(claim.ClaimantID) {
+			return nil, fmt.Errorf("hospital invoice %s is no longer valid for a positive Oracle result", invoice.ID)
+		}
+	}
+	if verified && request.PrivacyPresentationID != "" {
+		presentation, err := c.ReadSelectiveDisclosurePresentation(ctx, request.PrivacyPresentationID)
+		if err != nil {
+			return nil, err
+		}
+		if err := c.validatePresentationCredentials(ctx, presentation, txTime.AsTime()); err != nil {
+			return nil, err
+		}
+	}
 	commitment, err := c.ReadOracleCommitment(ctx, oracleSubmissionID(requestID, oracleID))
 	if err != nil {
 		return nil, fmt.Errorf("Oracle %s must commit before revealing: %w", oracleID, err)
@@ -463,14 +618,16 @@ func (c *Contract) RevealOracleResult(
 		RequestID: requestID, ClaimID: request.ClaimID, ClaimVersion: claimVersion,
 		RegistryVersion: registryVersion, ModelVersion: modelVersion, OracleID: oracleID,
 		OracleIdentity: oracleIdentity, Verified: verified, VerificationCode: verificationCode,
-		RecordHash: strings.ToLower(recordHash), ResultHash: expectedResultHash, CreatedAt: now,
+		RecordHash: strings.ToLower(recordHash), ResultHash: expectedResultHash,
+		PrivacyPresentationID: request.PrivacyPresentationID, PrivacyPresentationHash: request.PrivacyPresentationHash,
+		CreatedAt: now,
 	}
 	if err := putState(ctx, "oracleResult", result.ID, result); err != nil {
 		return nil, err
 	}
 	request.RevealCount++
 	// Fabric range queries do not guarantee that an asset written earlier in the
-	// same simulation is visible. Count this reveal explicitly and read only the
+	// same simulation is visible. Count this reveal explicitly and read each
 	// other assigned Oracle's deterministic result key from world state.
 	matching := 1
 	for _, assignedOracleID := range request.AssignedOracleIDs {
@@ -544,7 +701,7 @@ func (c *Contract) finalizeOracleRequest(ctx contractapi.TransactionContextInter
 			if err != nil {
 				return err
 			}
-			if appeal.Status == "HOSPITAL_VERIFIED" {
+			if appeal.Status == "HOSPITAL_VERIFIED" || appeal.Status == "ORACLE_PENDING" {
 				appeal.Status = "OVERTURNED"
 				appeal.ResolvedAt = now
 				if err := overwriteAsset(ctx, "claimAppeal", appeal.ID, appeal); err != nil {
@@ -634,7 +791,7 @@ func (c *Contract) RouteOracleFailureToReview(
 		if readErr != nil {
 			return nil, readErr
 		}
-		if appeal.Status == "HOSPITAL_VERIFIED" {
+		if appeal.Status == "HOSPITAL_VERIFIED" || appeal.Status == "ORACLE_PENDING" {
 			appealID = appeal.ID
 			kind = "APPEAL"
 		}

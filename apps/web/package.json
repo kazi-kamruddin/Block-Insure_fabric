@@ -9,21 +9,22 @@
     "start": "node scripts/start-standalone.mjs",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit --incremental false",
-    "test": "vitest run",
+    "test": "vitest run --configLoader runner",
     "test:e2e": "playwright test",
+    "test:e2e:offline": "playwright test --config playwright.offline.config.ts",
     "check:worker": "node --check scripts/load-environment.mjs && node --check scripts/start-standalone.mjs && node --check scripts/sync-events.mjs && node --check scripts/process-premium-collections.mjs",
     "events:sync": "node scripts/sync-events.mjs",
     "banking:collect": "node scripts/process-premium-collections.mjs"
   },
   "dependencies": {
-    "@grpc/grpc-js": "1.14.4",
+    "@grpc/grpc-js": "1.14.5",
     "@hyperledger/fabric-gateway": "1.12.1",
-    "@next/env": "16.3.4",
-    "next": "16.3.4",
+    "@next/env": "16.4.5",
+    "next": "16.4.5",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "server-only": "0.0.1",
-    "zod": "4.5.4"
+    "zod": "4.6.7"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",
@@ -32,9 +33,9 @@
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.7",
     "eslint": "^9.0.0",
-    "eslint-config-next": "16.3.4",
+    "eslint-config-next": "16.4.5",
     "typescript": "^5.9.0",
-    "vitest": "^5.0.0"
+    "vitest": "5.1.0"
   },
   "engines": {
     "node": ">=20.9.0"

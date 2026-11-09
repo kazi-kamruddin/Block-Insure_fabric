@@ -1,0 +1,1202 @@
+{
+  "schemaVersion": 1,
+  "reference": {
+    "method": "Read-only development comparison; expected values extracted from the reference pipeline. Tests use only this local fixture, never reference source paths.",
+    "modelSha256": "e83eab8c8df7c9996471c754d352d9201ffd30246184c72cd1943c612d2ab380",
+    "files": [
+      {
+        "path": "backEnd/services/advisoryContextService.js",
+        "sha256": "9bf331a2ec777a98e9ffdc528cbc1752f45a3c5c95e6b6e62ce5331daa3e3244"
+      },
+      {
+        "path": "backEnd/research/context.js",
+        "sha256": "95842cfa612bf6c3220ee63d12b3b9cd3fb368f8591e9c60f256bcbaf1654a33"
+      },
+      {
+        "path": "backEnd/services/continuousFeatureService.js",
+        "sha256": "9d81cc13ed8c9980c784e9250822d3c16215cc9d42f135f7de77d36f6ba6247a"
+      },
+      {
+        "path": "oracle/observableFeatures.js",
+        "sha256": "8a8066f60312aa4c3f67952392e153e2127282d9617749f1146956a829b242ab"
+      },
+      {
+        "path": "oracle/independentAssessment.js",
+        "sha256": "9fb46d1b564543107f07d6aae888cad1be5b240654484796a9d72721390c4645"
+      },
+      {
+        "path": "oracle/xgboostAssessment.js",
+        "sha256": "6f1e260f1930582fe4200f3e78cb5f4998e3283b04ccd04b054e0584c062cae5"
+      },
+      {
+        "path": "backEnd/triage-policy.json",
+        "sha256": "0cb01b4fd4d8a7acf352795a3ac35a3a462a862c42e5c1747ed6c7c78a8e542b"
+      },
+      {
+        "path": "backEnd/artifacts/xgboost-advisory-v1.json",
+        "sha256": "e83eab8c8df7c9996471c754d352d9201ffd30246184c72cd1943c612d2ab380"
+      }
+    ]
+  },
+  "cases": [
+    {
+      "name": "baseline",
+      "input": {
+        "records": [
+          {
+            "invoiceId": "inv-current",
+            "invoiceHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "hospitalMsp": "HospitalMSP",
+            "hospitalId": "hospital1",
+            "patientIssuerMsp": "InsurerMSP",
+            "patientReferenceHash": "095862709ca28bdcef35db33d0474e5d75eae87703762381512964ce77b83335",
+            "treatmentType": "SURGERY",
+            "diagnosisCode": "D1",
+            "treatmentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "admissionDate": "2026-06-10",
+            "dischargeDate": "2026-06-11",
+            "invoiceDate": "2026-06-12",
+            "amountMinor": 10000000,
+            "expectedMinMinor": 5000000,
+            "expectedMaxMinor": 20000000,
+            "invoiceStatus": "VALID",
+            "recordStatus": "VALID",
+            "licenseStatus": "ACTIVE"
+          },
+          {
+            "invoiceId": "inv-prior",
+            "invoiceHash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "hospitalMsp": "HospitalMSP",
+            "hospitalId": "hospital1",
+            "patientIssuerMsp": "InsurerMSP",
+            "patientReferenceHash": "095862709ca28bdcef35db33d0474e5d75eae87703762381512964ce77b83335",
+            "treatmentType": "SURGERY",
+            "diagnosisCode": "D1",
+            "treatmentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "admissionDate": "2026-06-01",
+            "dischargeDate": "2026-06-02",
+            "invoiceDate": "2026-06-03",
+            "amountMinor": 10000000,
+            "expectedMinMinor": 5000000,
+            "expectedMaxMinor": 20000000,
+            "invoiceStatus": "VALID",
+            "recordStatus": "VALID",
+            "licenseStatus": "ACTIVE"
+          }
+        ],
+        "claim": {
+          "hospitalInvoiceId": "inv-current",
+          "hospitalId": "hospital1",
+          "hospitalMsp": "HospitalMSP",
+          "claimantId": "holder1",
+          "claimantMsp": "InsurerMSP",
+          "amountMinor": 5000000,
+          "invoiceHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "treatmentType": "SURGERY",
+          "incidentDate": "2026-06-10",
+          "createdAt": "2026-06-15T00:00:00Z"
+        },
+        "snapshotTimestamp": "2026-06-15T00:00:00Z"
+      },
+      "normalizedRecords": [
+        {
+          "hospitalId": "[\"HospitalMSP\",\"hospital1\"]",
+          "patientHash": "[\"InsurerMSP\",\"095862709ca28bdcef35db33d0474e5d75eae87703762381512964ce77b83335\"]",
+          "authorizedClaimants": [
+            "[\"InsurerMSP\",\"095862709ca28bdcef35db33d0474e5d75eae87703762381512964ce77b83335\"]"
+          ],
+          "treatmentType": "SURGERY",
+          "diagnosisCode": "D1",
+          "admissionDate": "2026-06-10T00:00:00.000Z",
+          "dischargeDate": "2026-06-11T00:00:00.000Z",
+          "invoiceDate": "2026-06-12T00:00:00.000Z",
+          "billAmount": 1,
+          "expectedBillMin": 0.5,
+          "expectedBillMax": 2,
+          "invoiceHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "invoiceStatus": "VALID",
+          "recordStatus": "VALID",
+          "licenseStatus": "ACTIVE",
+          "observableHistory": {}
+        },
+        {
+          "hospitalId": "[\"HospitalMSP\",\"hospital1\"]",
+          "patientHash": "[\"InsurerMSP\",\"095862709ca28bdcef35db33d0474e5d75eae87703762381512964ce77b83335\"]",
+          "authorizedClaimants": [
+            "[\"InsurerMSP\",\"095862709ca28bdcef35db33d0474e5d75eae87703762381512964ce77b83335\"]"
+          ],
+          "treatmentType": "SURGERY",
+          "diagnosisCode": "D1",
+          "admissionDate": "2026-06-01T00:00:00.000Z",
+          "dischargeDate": "2026-06-02T00:00:00.000Z",
+          "invoiceDate": "2026-06-03T00:00:00.000Z",
+          "billAmount": 1,
+          "expectedBillMin": 0.5,
+          "expectedBillMax": 2,
+          "invoiceHash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "invoiceStatus": "VALID",
+          "recordStatus": "VALID",
+          "licenseStatus": "ACTIVE",
+          "observableHistory": {}
+        }
+      ],
+      "observation": {
+        "features": {
+          "clean_registry_match": 1,
+          "registry_record_missing": 0,
+          "hospital_id_mismatch": 0,
+          "invoice_hash_mismatch": 0,
+          "claim_exceeds_registry_bill": 0,
+          "bill_range_anomaly": 0,
+          "treatment_type_mismatch": 0,
+          "date_mismatch": 0,
+          "invalid_record_status": 0,
+          "used_invoice": 0,
+          "cancelled_record": 0,
+          "license_suspended": 0,
+          "license_blacklisted": 0,
+          "repeat_claim_pattern": 0,
+          "provider_velocity_anomaly": 0,
+          "claimant_velocity_anomaly": 0,
+          "near_duplicate_advisory": 0,
+          "missing_or_noisy_record": 0,
+          "log_bill": 0.6931471805599453,
+          "bill_to_expected_max": 0.5,
+          "care_days": 1,
+          "invoice_lag_days": 1,
+          "log_prior_claims": 0,
+          "history_similar": 0.6931471805599453,
+          "history_patient14": 0.6931471805599453,
+          "history_provider30": 0.6931471805599453,
+          "history_provider_mean_bill": 0.6931471805599453,
+          "graph_patient_degree": 0.6931471805599453,
+          "graph_provider_degree": 0.6931471805599453,
+          "graph_edge_repeat_share": 1,
+          "graph_provider_hhi": 1,
+          "graph_birank_patient": 1,
+          "graph_birank_provider": 1,
+          "temporal_provider7": 0,
+          "temporal_history_available": 1,
+          "history_available": 1
+        },
+        "providerLags": [
+          9
+        ],
+        "mandatory": false,
+        "group": "SURGERY",
+        "diagnosis": "D1"
+      },
+      "assessment": {
+        "method": "XGBoost with explainable graph-temporal fusion and uncertainty quantification",
+        "authority": "ADMIN_ADVISORY_ONLY",
+        "riskScore": 0.09084655525165869,
+        "riskScoreUnits": 90846555,
+        "rawMargin": -2.1907222270965576,
+        "riskMeaning": "Score calibrated on constructed billing actions; not a real-world fraud probability",
+        "recommendation": "REVIEW_RECOMMENDED",
+        "reasons": [
+          "MODEL_THRESHOLD"
+        ],
+        "uncertainty": {
+          "ood": {
+            "distance": 32.685177125515615,
+            "groupSource": "pooled",
+            "warning": true
+          },
+          "predictionSet": [
+            "SIMULATED_ACTION"
+          ],
+          "ambiguous": false,
+          "nominalCoverage": 0.9,
+          "coverageGuaranteedForRuntime": false,
+          "triggersReview": false
+        },
+        "policy": {
+          "version": "xgboost-advisory-v1",
+          "threshold": 0.086932212,
+          "thresholdUnits": 86932212,
+          "scoreScale": 1000000000,
+          "comparisonBudget": 0.3,
+          "runtimeCapacityGuarantee": false
+        },
+        "explanation": {
+          "method": "Exact tree-path-dependent Shapley values",
+          "scale": "raw_margin",
+          "base": -2.3066145582237865,
+          "contributions": {
+            "bill_range_anomaly": 0.1886951722270714,
+            "bill_to_expected_max": 0,
+            "cancelled_record": 0,
+            "care_days": 0,
+            "claim_exceeds_registry_bill": 0,
+            "claimant_velocity_anomaly": 0,
+            "clean_registry_match": -0.49893992924834846,
+            "date_mismatch": -0.020241388703587736,
+            "graph_birank_patient": -0.02915653645772038,
+            "graph_birank_provider": -0.0010933345247911702,
+            "graph_edge_repeat_share": -0.001899139513183575,
+            "graph_patient_degree": 0,
+            "graph_provider_degree": 0,
+            "graph_provider_hhi": -0.00436947892428728,
+            "history_available": 0,
+            "history_patient14": 0.09714786675399278,
+            "history_provider30": -0.015843062754832306,
+            "history_provider_mean_bill": 0.18170627456429497,
+            "history_similar": 0,
+            "hospital_id_mismatch": 0,
+            "invalid_record_status": 0,
+            "invoice_hash_mismatch": 0,
+            "invoice_lag_days": 0,
+            "license_blacklisted": 0,
+            "license_suspended": 0,
+            "log_bill": 0,
+            "log_prior_claims": 0,
+            "missing_or_noisy_record": 0,
+            "near_duplicate_advisory": 0,
+            "provider_velocity_anomaly": 0,
+            "registry_record_missing": 0,
+            "repeat_claim_pattern": 0,
+            "temporal_hawkes_available": 0,
+            "temporal_hawkes_excitation": 0.19934996116196652,
+            "temporal_hawkes_intensity": 0,
+            "temporal_history_available": 0,
+            "temporal_provider7": 0.041470461616534206,
+            "treatment_type_mismatch": 0,
+            "used_invoice": -0.020290034509218964,
+            "ood_distance": -0.0006444726209848344
+          },
+          "additivityError": 2.7939676350285936e-8
+        },
+        "transactionCreated": false
+      }
+    },
+    {
+      "name": "large-amount",
+      "input": {
+        "records": [
+          {
+            "invoiceId": "inv-current",
+            "invoiceHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "hospitalMsp": "HospitalMSP",
+            "hospitalId": "hospital1",
+            "patientIssuerMsp": "InsurerMSP",
+            "patientReferenceHash": "095862709ca28bdcef35db33d0474e5d75eae87703762381512964ce77b83335",
+            "treatmentType": "SURGERY",
+            "diagnosisCode": "D1",
+            "treatmentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "admissionDate": "2026-06-10",
+            "dischargeDate": "2026-06-11",
+            "invoiceDate": "2026-06-12",
+            "amountMinor": 100000000,
+            "expectedMinMinor": 5000000,
+            "expectedMaxMinor": 20000000,
+            "invoiceStatus": "VALID",
+            "recordStatus": "VALID",
+            "licenseStatus": "ACTIVE"
+          },
+          {
+            "invoiceId": "inv-prior",
+            "invoiceHash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "hospitalMsp": "HospitalMSP",
+            "hospitalId": "hospital1",
+            "patientIssuerMsp": "InsurerMSP",
+            "patientReferenceHash": "095862709ca28bdcef35db33d0474e5d75eae87703762381512964ce77b83335",
+            "treatmentType": "SURGERY",
+            "diagnosisCode": "D1",
+            "treatmentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "admissionDate": "2026-06-01",
+            "dischargeDate": "2026-06-02",
+            "invoiceDate": "2026-06-03",
+            "amountMinor": 10000000,
+            "expectedMinMinor": 5000000,
+            "expectedMaxMinor": 20000000,
+            "invoiceStatus": "VALID",
+            "recordStatus": "VALID",
+            "licenseStatus": "ACTIVE"
+          }
+        ],
+        "claim": {
+          "hospitalInvoiceId": "inv-current",
+          "hospitalId": "hospital1",
+          "hospitalMsp": "HospitalMSP",
+          "claimantId": "holder1",
+          "claimantMsp": "InsurerMSP",
+          "amountMinor": 5000000,
+          "invoiceHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "treatmentType": "SURGERY",
+          "incidentDate": "2026-06-10",
+          "createdAt": "2026-06-15T00:00:00Z"
+        },
+        "snapshotTimestamp": "2026-06-15T00:00:00Z"
+      },
+      "normalizedRecords": [
+        {
+          "hospitalId": "[\"HospitalMSP\",\"hospital1\"]",
+          "patientHash": "[\"InsurerMSP\",\"095862709ca28bdcef35db33d0474e5d75eae87703762381512964ce77b83335\"]",
+          "authorizedClaimants": [
+            "[\"InsurerMSP\",\"095862709ca28bdcef35db33d0474e5d75eae87703762381512964ce77b83335\"]"
+          ],
+          "treatmentType": "SURGERY",
+          "diagnosisCode": "D1",
+          "admissionDate": "2026-06-10T00:00:00.000Z",
+          "dischargeDate": "2026-06-11T00:00:00.000Z",
+          "invoiceDate": "2026-06-12T00:00:00.000Z",
+          "billAmount": 10,
+          "expectedBillMin": 0.5,
+          "expectedBillMax": 2,
+          "invoiceHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "invoiceStatus": "VALID",
+          "recordStatus": "VALID",
+          "licenseStatus": "ACTIVE",
+          "observableHistory": {}
+        },
+        {
+          "hospitalId": "[\"HospitalMSP\",\"hospital1\"]",
+          "patientHash": "[\"InsurerMSP\",\"095862709ca28bdcef35db33d0474e5d75eae87703762381512964ce77b83335\"]",
+          "authorizedClaimants": [
+            "[\"InsurerMSP\",\"095862709ca28bdcef35db33d0474e5d75eae87703762381512964ce77b83335\"]"
+          ],
+          "treatmentType": "SURGERY",
+          "diagnosisCode": "D1",
+          "admissionDate": "2026-06-01T00:00:00.000Z",
+          "dischargeDate": "2026-06-02T00:00:00.000Z",
+          "invoiceDate": "2026-06-03T00:00:00.000Z",
+          "billAmount": 1,
+          "expectedBillMin": 0.5,
+          "expectedBillMax": 2,
+          "invoiceHash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "invoiceStatus": "VALID",
+          "recordStatus": "VALID",
+          "licenseStatus": "ACTIVE",
+          "observableHistory": {}
+        }
+      ],
+      "observation": {
+        "features": {
+          "clean_registry_match": 0,
+          "registry_record_missing": 0,
+          "hospital_id_mismatch": 0,
+          "invoice_hash_mismatch": 0,
+          "claim_exceeds_registry_bill": 1,
+          "bill_range_anomaly": 1,
+          "treatment_type_mismatch": 0,
+          "date_mismatch": 0,
+          "invalid_record_status": 0,
+          "used_invoice": 0,
+          "cancelled_record": 0,
+          "license_suspended": 0,
+          "license_blacklisted": 0,
+          "repeat_claim_pattern": 0,
+          "provider_velocity_anomaly": 0,
+          "claimant_velocity_anomaly": 0,
+          "near_duplicate_advisory": 0,
+          "missing_or_noisy_record": 0,
+          "log_bill": 2.3978952727983707,
+          "bill_to_expected_max": 5,
+          "care_days": 1,
+          "invoice_lag_days": 1,
+          "log_prior_claims": 0,
+          "history_similar": 0,
+          "history_patient14": 0.6931471805599453,
+          "history_provider30": 0.6931471805599453,
+          "history_provider_mean_bill": 0.6931471805599453,
+          "graph_patient_degree": 0.6931471805599453,
+          "graph_provider_degree": 0.6931471805599453,
+          "graph_edge_repeat_share": 1,
+          "graph_provider_hhi": 1,
+          "graph_birank_patient": 1,
+          "graph_birank_provider": 1,
+          "temporal_provider7": 0,
+          "temporal_history_available": 1,
+          "history_available": 1
+        },
+        "providerLags": [
+          9
+        ],
+        "mandatory": true,
+        "group": "SURGERY",
+        "diagnosis": "D1"
+      },
+      "assessment": {
+        "method": "XGBoost with explainable graph-temporal fusion and uncertainty quantification",
+        "authority": "ADMIN_ADVISORY_ONLY",
+        "riskScore": 0.16995571454750438,
+        "riskScoreUnits": 169955715,
+        "rawMargin": -1.6565773487091064,
+        "riskMeaning": "Score calibrated on constructed billing actions; not a real-world fraud probability",
+        "recommendation": "REVIEW_RECOMMENDED",
+        "reasons": [
+          "INTEGRITY_OR_EXISTING_REVIEW_RULE",
+          "MODEL_THRESHOLD"
+        ],
+        "uncertainty": {
+          "ood": {
+            "distance": 35.584093041213045,
+            "groupSource": "pooled",
+            "warning": true
+          },
+          "predictionSet": [
+            "SIMULATED_ACTION"
+          ],
+          "ambiguous": false,
+          "nominalCoverage": 0.9,
+          "coverageGuaranteedForRuntime": false,
+          "triggersReview": false
+        },
+        "policy": {
+          "version": "xgboost-advisory-v1",
+          "threshold": 0.086932212,
+          "thresholdUnits": 86932212,
+          "scoreScale": 1000000000,
+          "comparisonBudget": 0.3,
+          "runtimeCapacityGuarantee": false
+        },
+        "explanation": {
+          "method": "Exact tree-path-dependent Shapley values",
+          "scale": "raw_margin",
+          "base": -2.3066145582237865,
+          "contributions": {
+            "bill_range_anomaly": -0.872122210013998,
+            "bill_to_expected_max": 0,
+            "cancelled_record": 0,
+            "care_days": 0,
+            "claim_exceeds_registry_bill": 0,
+            "claimant_velocity_anomaly": 0,
+            "clean_registry_match": 1.2293767548443857,
+            "date_mismatch": -0.020241388703587736,
+            "graph_birank_patient": -0.02915653645772038,
+            "graph_birank_provider": -0.0010933345247911702,
+            "graph_edge_repeat_share": -0.001899139513183575,
+            "graph_patient_degree": 0,
+            "graph_provider_degree": 0,
+            "graph_provider_hhi": -0.00436947892428728,
+            "history_available": 0,
+            "history_patient14": 0.09714786675399278,
+            "history_provider30": -0.015843062754832306,
+            "history_provider_mean_bill": 0.09259239887897236,
+            "history_similar": 0,
+            "hospital_id_mismatch": 0,
+            "invalid_record_status": 0,
+            "invoice_hash_mismatch": 0,
+            "invoice_lag_days": 0,
+            "license_blacklisted": 0,
+            "license_suspended": 0,
+            "log_bill": 0,
+            "log_prior_claims": 0,
+            "missing_or_noisy_record": 0,
+            "near_duplicate_advisory": 0,
+            "provider_velocity_anomaly": 0,
+            "registry_record_missing": 0,
+            "repeat_claim_pattern": 0,
+            "temporal_hawkes_available": 0,
+            "temporal_hawkes_excitation": 0.15510950829066764,
+            "temporal_hawkes_intensity": 0,
+            "temporal_history_available": 0,
+            "temporal_provider7": 0.041470461616534206,
+            "treatment_type_mismatch": 0,
+            "used_invoice": -0.020290034509218964,
+            "ood_distance": -0.0006444726209848344
+          },
+          "additivityError": 1.2284726835787296e-7
+        },
+        "transactionCreated": false
+      }
+    },
+    {
+      "name": "suspended-license",
+      "input": {
+        "records": [
+          {
+            "invoiceId": "inv-current",
+            "invoiceHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "hospitalMsp": "HospitalMSP",
+            "hospitalId": "hospital1",
+            "patientIssuerMsp": "InsurerMSP",
+            "patientReferenceHash": "095862709ca28bdcef35db33d0474e5d75eae87703762381512964ce77b83335",
+            "treatmentType": "SURGERY",
+            "diagnosisCode": "D1",
+            "treatmentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "admissionDate": "2026-06-10",
+            "dischargeDate": "2026-06-11",
+            "invoiceDate": "2026-06-12",
+            "amountMinor": 10000000,
+            "expectedMinMinor": 5000000,
+            "expectedMaxMinor": 20000000,
+            "invoiceStatus": "VALID",
+            "recordStatus": "VALID",
+            "licenseStatus": "SUSPENDED"
+          },
+          {
+            "invoiceId": "inv-prior",
+            "invoiceHash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "hospitalMsp": "HospitalMSP",
+            "hospitalId": "hospital1",
+            "patientIssuerMsp": "InsurerMSP",
+            "patientReferenceHash": "095862709ca28bdcef35db33d0474e5d75eae87703762381512964ce77b83335",
+            "treatmentType": "SURGERY",
+            "diagnosisCode": "D1",
+            "treatmentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "admissionDate": "2026-06-01",
+            "dischargeDate": "2026-06-02",
+            "invoiceDate": "2026-06-03",
+            "amountMinor": 10000000,
+            "expectedMinMinor": 5000000,
+            "expectedMaxMinor": 20000000,
+            "invoiceStatus": "VALID",
+            "recordStatus": "VALID",
+            "licenseStatus": "ACTIVE"
+          }
+        ],
+        "claim": {
+          "hospitalInvoiceId": "inv-current",
+          "hospitalId": "hospital1",
+          "hospitalMsp": "HospitalMSP",
+          "claimantId": "holder1",
+          "claimantMsp": "InsurerMSP",
+          "amountMinor": 5000000,
+          "invoiceHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "treatmentType": "SURGERY",
+          "incidentDate": "2026-06-10",
+          "createdAt": "2026-06-15T00:00:00Z"
+        },
+        "snapshotTimestamp": "2026-06-15T00:00:00Z"
+      },
+      "normalizedRecords": [
+        {
+          "hospitalId": "[\"HospitalMSP\",\"hospital1\"]",
+          "patientHash": "[\"InsurerMSP\",\"095862709ca28bdcef35db33d0474e5d75eae87703762381512964ce77b83335\"]",
+          "authorizedClaimants": [
+            "[\"InsurerMSP\",\"095862709ca28bdcef35db33d0474e5d75eae87703762381512964ce77b83335\"]"
+          ],
+          "treatmentType": "SURGERY",
+          "diagnosisCode": "D1",
+          "admissionDate": "2026-06-10T00:00:00.000Z",
+          "dischargeDate": "2026-06-11T00:00:00.000Z",
+          "invoiceDate": "2026-06-12T00:00:00.000Z",
+          "billAmount": 1,
+          "expectedBillMin": 0.5,
+          "expectedBillMax": 2,
+          "invoiceHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "invoiceStatus": "VALID",
+          "recordStatus": "VALID",
+          "licenseStatus": "SUSPENDED",
+          "observableHistory": {}
+        },
+        {
+          "hospitalId": "[\"HospitalMSP\",\"hospital1\"]",
+          "patientHash": "[\"InsurerMSP\",\"095862709ca28bdcef35db33d0474e5d75eae87703762381512964ce77b83335\"]",
+          "authorizedClaimants": [
+            "[\"InsurerMSP\",\"095862709ca28bdcef35db33d0474e5d75eae87703762381512964ce77b83335\"]"
+          ],
+          "treatmentType": "SURGERY",
+          "diagnosisCode": "D1",
+          "admissionDate": "2026-06-01T00:00:00.000Z",
+          "dischargeDate": "2026-06-02T00:00:00.000Z",
+          "invoiceDate": "2026-06-03T00:00:00.000Z",
+          "billAmount": 1,
+          "expectedBillMin": 0.5,
+          "expectedBillMax": 2,
+          "invoiceHash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "invoiceStatus": "VALID",
+          "recordStatus": "VALID",
+          "licenseStatus": "ACTIVE",
+          "observableHistory": {}
+        }
+      ],
+      "observation": {
+        "features": {
+          "clean_registry_match": 0,
+          "registry_record_missing": 0,
+          "hospital_id_mismatch": 0,
+          "invoice_hash_mismatch": 0,
+          "claim_exceeds_registry_bill": 0,
+          "bill_range_anomaly": 0,
+          "treatment_type_mismatch": 0,
+          "date_mismatch": 0,
+          "invalid_record_status": 0,
+          "used_invoice": 0,
+          "cancelled_record": 0,
+          "license_suspended": 1,
+          "license_blacklisted": 0,
+          "repeat_claim_pattern": 0,
+          "provider_velocity_anomaly": 0,
+          "claimant_velocity_anomaly": 0,
+          "near_duplicate_advisory": 0,
+          "missing_or_noisy_record": 0,
+          "log_bill": 0.6931471805599453,
+          "bill_to_expected_max": 0.5,
+          "care_days": 1,
+          "invoice_lag_days": 1,
+          "log_prior_claims": 0,
+          "history_similar": 0.6931471805599453,
+          "history_patient14": 0.6931471805599453,
+          "history_provider30": 0.6931471805599453,
+          "history_provider_mean_bill": 0.6931471805599453,
+          "graph_patient_degree": 0.6931471805599453,
+          "graph_provider_degree": 0.6931471805599453,
+          "graph_edge_repeat_share": 1,
+          "graph_provider_hhi": 1,
+          "graph_birank_patient": 1,
+          "graph_birank_provider": 1,
+          "temporal_provider7": 0,
+          "temporal_history_available": 1,
+          "history_available": 1
+        },
+        "providerLags": [
+          9
+        ],
+        "mandatory": true,
+        "group": "SURGERY",
+        "diagnosis": "D1"
+      },
+      "assessment": {
+        "method": "XGBoost with explainable graph-temporal fusion and uncertainty quantification",
+        "authority": "ADMIN_ADVISORY_ONLY",
+        "riskScore": 0.9828208781297912,
+        "riskScoreUnits": 982820878,
+        "rawMargin": 2.537261486053467,
+        "riskMeaning": "Score calibrated on constructed billing actions; not a real-world fraud probability",
+        "recommendation": "REVIEW_RECOMMENDED",
+        "reasons": [
+          "INTEGRITY_OR_EXISTING_REVIEW_RULE",
+          "MODEL_THRESHOLD"
+        ],
+        "uncertainty": {
+          "ood": {
+            "distance": 32.685177125515615,
+            "groupSource": "pooled",
+            "warning": true
+          },
+          "predictionSet": [
+            "SIMULATED_ACTION"
+          ],
+          "ambiguous": false,
+          "nominalCoverage": 0.9,
+          "coverageGuaranteedForRuntime": false,
+          "triggersReview": false
+        },
+        "policy": {
+          "version": "xgboost-advisory-v1",
+          "threshold": 0.086932212,
+          "thresholdUnits": 86932212,
+          "scoreScale": 1000000000,
+          "comparisonBudget": 0.3,
+          "runtimeCapacityGuarantee": false
+        },
+        "explanation": {
+          "method": "Exact tree-path-dependent Shapley values",
+          "scale": "raw_margin",
+          "base": -2.3066145582237865,
+          "contributions": {
+            "bill_range_anomaly": 1.5197084624612966,
+            "bill_to_expected_max": 0,
+            "cancelled_record": 0,
+            "care_days": 0,
+            "claim_exceeds_registry_bill": 0,
+            "claimant_velocity_anomaly": 0,
+            "clean_registry_match": 3.0313845744922685,
+            "date_mismatch": -0.020241388703587736,
+            "graph_birank_patient": -0.02915653645772038,
+            "graph_birank_provider": -0.0010933345247911702,
+            "graph_edge_repeat_share": -0.001899139513183575,
+            "graph_patient_degree": 0,
+            "graph_provider_degree": 0,
+            "graph_provider_hhi": -0.00436947892428728,
+            "history_available": 0,
+            "history_patient14": 0.09714786675399278,
+            "history_provider30": -0.015843062754832306,
+            "history_provider_mean_bill": 0.09259239887897236,
+            "history_similar": 0,
+            "hospital_id_mismatch": 0,
+            "invalid_record_status": 0,
+            "invoice_hash_mismatch": 0,
+            "invoice_lag_days": 0,
+            "license_blacklisted": 0,
+            "license_suspended": 0,
+            "log_bill": 0,
+            "log_prior_claims": 0,
+            "missing_or_noisy_record": 0,
+            "near_duplicate_advisory": 0,
+            "provider_velocity_anomaly": 0,
+            "registry_record_missing": 0,
+            "repeat_claim_pattern": 0,
+            "temporal_hawkes_available": 0,
+            "temporal_hawkes_excitation": 0.15510950829066764,
+            "temporal_hawkes_intensity": 0,
+            "temporal_history_available": 0,
+            "temporal_provider7": 0.041470461616534206,
+            "treatment_type_mismatch": 0,
+            "used_invoice": -0.020290034509218964,
+            "ood_distance": -0.0006444726209848344
+          },
+          "additivityError": 2.1979212805334214e-7
+        },
+        "transactionCreated": false
+      }
+    },
+    {
+      "name": "invalid-record",
+      "input": {
+        "records": [
+          {
+            "invoiceId": "inv-current",
+            "invoiceHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "hospitalMsp": "HospitalMSP",
+            "hospitalId": "hospital1",
+            "patientIssuerMsp": "InsurerMSP",
+            "patientReferenceHash": "095862709ca28bdcef35db33d0474e5d75eae87703762381512964ce77b83335",
+            "treatmentType": "SURGERY",
+            "diagnosisCode": "D1",
+            "treatmentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "admissionDate": "2026-06-10",
+            "dischargeDate": "2026-06-11",
+            "invoiceDate": "2026-06-12",
+            "amountMinor": 10000000,
+            "expectedMinMinor": 5000000,
+            "expectedMaxMinor": 20000000,
+            "invoiceStatus": "VALID",
+            "recordStatus": "INVALID",
+            "licenseStatus": "ACTIVE"
+          },
+          {
+            "invoiceId": "inv-prior",
+            "invoiceHash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "hospitalMsp": "HospitalMSP",
+            "hospitalId": "hospital1",
+            "patientIssuerMsp": "InsurerMSP",
+            "patientReferenceHash": "095862709ca28bdcef35db33d0474e5d75eae87703762381512964ce77b83335",
+            "treatmentType": "SURGERY",
+            "diagnosisCode": "D1",
+            "treatmentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "admissionDate": "2026-06-01",
+            "dischargeDate": "2026-06-02",
+            "invoiceDate": "2026-06-03",
+            "amountMinor": 10000000,
+            "expectedMinMinor": 5000000,
+            "expectedMaxMinor": 20000000,
+            "invoiceStatus": "VALID",
+            "recordStatus": "VALID",
+            "licenseStatus": "ACTIVE"
+          }
+        ],
+        "claim": {
+          "hospitalInvoiceId": "inv-current",
+          "hospitalId": "hospital1",
+          "hospitalMsp": "HospitalMSP",
+          "claimantId": "holder1",
+          "claimantMsp": "InsurerMSP",
+          "amountMinor": 5000000,
+          "invoiceHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "treatmentType": "SURGERY",
+          "incidentDate": "2026-06-10",
+          "createdAt": "2026-06-15T00:00:00Z"
+        },
+        "snapshotTimestamp": "2026-06-15T00:00:00Z"
+      },
+      "normalizedRecords": [
+        {
+          "hospitalId": "[\"HospitalMSP\",\"hospital1\"]",
+          "patientHash": "[\"InsurerMSP\",\"095862709ca28bdcef35db33d0474e5d75eae87703762381512964ce77b83335\"]",
+          "authorizedClaimants": [
+            "[\"InsurerMSP\",\"095862709ca28bdcef35db33d0474e5d75eae87703762381512964ce77b83335\"]"
+          ],
+          "treatmentType": "SURGERY",
+          "diagnosisCode": "D1",
+          "admissionDate": "2026-06-10T00:00:00.000Z",
+          "dischargeDate": "2026-06-11T00:00:00.000Z",
+          "invoiceDate": "2026-06-12T00:00:00.000Z",
+          "billAmount": 1,
+          "expectedBillMin": 0.5,
+          "expectedBillMax": 2,
+          "invoiceHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "invoiceStatus": "VALID",
+          "recordStatus": "INVALID",
+          "licenseStatus": "ACTIVE",
+          "observableHistory": {}
+        },
+        {
+          "hospitalId": "[\"HospitalMSP\",\"hospital1\"]",
+          "patientHash": "[\"InsurerMSP\",\"095862709ca28bdcef35db33d0474e5d75eae87703762381512964ce77b83335\"]",
+          "authorizedClaimants": [
+            "[\"InsurerMSP\",\"095862709ca28bdcef35db33d0474e5d75eae87703762381512964ce77b83335\"]"
+          ],
+          "treatmentType": "SURGERY",
+          "diagnosisCode": "D1",
+          "admissionDate": "2026-06-01T00:00:00.000Z",
+          "dischargeDate": "2026-06-02T00:00:00.000Z",
+          "invoiceDate": "2026-06-03T00:00:00.000Z",
+          "billAmount": 1,
+          "expectedBillMin": 0.5,
+          "expectedBillMax": 2,
+          "invoiceHash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "invoiceStatus": "VALID",
+          "recordStatus": "VALID",
+          "licenseStatus": "ACTIVE",
+          "observableHistory": {}
+        }
+      ],
+      "observation": {
+        "features": {
+          "clean_registry_match": 0,
+          "registry_record_missing": 0,
+          "hospital_id_mismatch": 0,
+          "invoice_hash_mismatch": 0,
+          "claim_exceeds_registry_bill": 0,
+          "bill_range_anomaly": 0,
+          "treatment_type_mismatch": 0,
+          "date_mismatch": 0,
+          "invalid_record_status": 1,
+          "used_invoice": 0,
+          "cancelled_record": 0,
+          "license_suspended": 0,
+          "license_blacklisted": 0,
+          "repeat_claim_pattern": 0,
+          "provider_velocity_anomaly": 0,
+          "claimant_velocity_anomaly": 0,
+          "near_duplicate_advisory": 0,
+          "missing_or_noisy_record": 0,
+          "log_bill": 0.6931471805599453,
+          "bill_to_expected_max": 0.5,
+          "care_days": 1,
+          "invoice_lag_days": 1,
+          "log_prior_claims": 0,
+          "history_similar": 0.6931471805599453,
+          "history_patient14": 0.6931471805599453,
+          "history_provider30": 0.6931471805599453,
+          "history_provider_mean_bill": 0.6931471805599453,
+          "graph_patient_degree": 0.6931471805599453,
+          "graph_provider_degree": 0.6931471805599453,
+          "graph_edge_repeat_share": 1,
+          "graph_provider_hhi": 1,
+          "graph_birank_patient": 1,
+          "graph_birank_provider": 1,
+          "temporal_provider7": 0,
+          "temporal_history_available": 1,
+          "history_available": 1
+        },
+        "providerLags": [
+          9
+        ],
+        "mandatory": true,
+        "group": "SURGERY",
+        "diagnosis": "D1"
+      },
+      "assessment": {
+        "method": "XGBoost with explainable graph-temporal fusion and uncertainty quantification",
+        "authority": "ADMIN_ADVISORY_ONLY",
+        "riskScore": 0.9828208781297912,
+        "riskScoreUnits": 982820878,
+        "rawMargin": 2.537261486053467,
+        "riskMeaning": "Score calibrated on constructed billing actions; not a real-world fraud probability",
+        "recommendation": "REVIEW_RECOMMENDED",
+        "reasons": [
+          "INTEGRITY_OR_EXISTING_REVIEW_RULE",
+          "MODEL_THRESHOLD"
+        ],
+        "uncertainty": {
+          "ood": {
+            "distance": 32.685177125515615,
+            "groupSource": "pooled",
+            "warning": true
+          },
+          "predictionSet": [
+            "SIMULATED_ACTION"
+          ],
+          "ambiguous": false,
+          "nominalCoverage": 0.9,
+          "coverageGuaranteedForRuntime": false,
+          "triggersReview": false
+        },
+        "policy": {
+          "version": "xgboost-advisory-v1",
+          "threshold": 0.086932212,
+          "thresholdUnits": 86932212,
+          "scoreScale": 1000000000,
+          "comparisonBudget": 0.3,
+          "runtimeCapacityGuarantee": false
+        },
+        "explanation": {
+          "method": "Exact tree-path-dependent Shapley values",
+          "scale": "raw_margin",
+          "base": -2.3066145582237865,
+          "contributions": {
+            "bill_range_anomaly": 1.5197084624612966,
+            "bill_to_expected_max": 0,
+            "cancelled_record": 0,
+            "care_days": 0,
+            "claim_exceeds_registry_bill": 0,
+            "claimant_velocity_anomaly": 0,
+            "clean_registry_match": 3.0313845744922685,
+            "date_mismatch": -0.020241388703587736,
+            "graph_birank_patient": -0.02915653645772038,
+            "graph_birank_provider": -0.0010933345247911702,
+            "graph_edge_repeat_share": -0.001899139513183575,
+            "graph_patient_degree": 0,
+            "graph_provider_degree": 0,
+            "graph_provider_hhi": -0.00436947892428728,
+            "history_available": 0,
+            "history_patient14": 0.09714786675399278,
+            "history_provider30": -0.015843062754832306,
+            "history_provider_mean_bill": 0.09259239887897236,
+            "history_similar": 0,
+            "hospital_id_mismatch": 0,
+            "invalid_record_status": 0,
+            "invoice_hash_mismatch": 0,
+            "invoice_lag_days": 0,
+            "license_blacklisted": 0,
+            "license_suspended": 0,
+            "log_bill": 0,
+            "log_prior_claims": 0,
+            "missing_or_noisy_record": 0,
+            "near_duplicate_advisory": 0,
+            "provider_velocity_anomaly": 0,
+            "registry_record_missing": 0,
+            "repeat_claim_pattern": 0,
+            "temporal_hawkes_available": 0,
+            "temporal_hawkes_excitation": 0.15510950829066764,
+            "temporal_hawkes_intensity": 0,
+            "temporal_history_available": 0,
+            "temporal_provider7": 0.041470461616534206,
+            "treatment_type_mismatch": 0,
+            "used_invoice": -0.020290034509218964,
+            "ood_distance": -0.0006444726209848344
+          },
+          "additivityError": 2.1979212805334214e-7
+        },
+        "transactionCreated": false
+      }
+    },
+    {
+      "name": "narrow-expected-range",
+      "input": {
+        "records": [
+          {
+            "invoiceId": "inv-current",
+            "invoiceHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "hospitalMsp": "HospitalMSP",
+            "hospitalId": "hospital1",
+            "patientIssuerMsp": "InsurerMSP",
+            "patientReferenceHash": "095862709ca28bdcef35db33d0474e5d75eae87703762381512964ce77b83335",
+            "treatmentType": "SURGERY",
+            "diagnosisCode": "D1",
+            "treatmentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "admissionDate": "2026-06-10",
+            "dischargeDate": "2026-06-11",
+            "invoiceDate": "2026-06-12",
+            "amountMinor": 10000000,
+            "expectedMinMinor": 1250000,
+            "expectedMaxMinor": 2500000,
+            "invoiceStatus": "VALID",
+            "recordStatus": "VALID",
+            "licenseStatus": "ACTIVE"
+          },
+          {
+            "invoiceId": "inv-prior",
+            "invoiceHash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "hospitalMsp": "HospitalMSP",
+            "hospitalId": "hospital1",
+            "patientIssuerMsp": "InsurerMSP",
+            "patientReferenceHash": "095862709ca28bdcef35db33d0474e5d75eae87703762381512964ce77b83335",
+            "treatmentType": "SURGERY",
+            "diagnosisCode": "D1",
+            "treatmentHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "admissionDate": "2026-06-01",
+            "dischargeDate": "2026-06-02",
+            "invoiceDate": "2026-06-03",
+            "amountMinor": 10000000,
+            "expectedMinMinor": 5000000,
+            "expectedMaxMinor": 20000000,
+            "invoiceStatus": "VALID",
+            "recordStatus": "VALID",
+            "licenseStatus": "ACTIVE"
+          }
+        ],
+        "claim": {
+          "hospitalInvoiceId": "inv-current",
+          "hospitalId": "hospital1",
+          "hospitalMsp": "HospitalMSP",
+          "claimantId": "holder1",
+          "claimantMsp": "InsurerMSP",
+          "amountMinor": 5000000,
+          "invoiceHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "treatmentType": "SURGERY",
+          "incidentDate": "2026-06-10",
+          "createdAt": "2026-06-15T00:00:00Z"
+        },
+        "snapshotTimestamp": "2026-06-15T00:00:00Z"
+      },
+      "normalizedRecords": [
+        {
+          "hospitalId": "[\"HospitalMSP\",\"hospital1\"]",
+          "patientHash": "[\"InsurerMSP\",\"095862709ca28bdcef35db33d0474e5d75eae87703762381512964ce77b83335\"]",
+          "authorizedClaimants": [
+            "[\"InsurerMSP\",\"095862709ca28bdcef35db33d0474e5d75eae87703762381512964ce77b83335\"]"
+          ],
+          "treatmentType": "SURGERY",
+          "diagnosisCode": "D1",
+          "admissionDate": "2026-06-10T00:00:00.000Z",
+          "dischargeDate": "2026-06-11T00:00:00.000Z",
+          "invoiceDate": "2026-06-12T00:00:00.000Z",
+          "billAmount": 1,
+          "expectedBillMin": 0.125,
+          "expectedBillMax": 0.25,
+          "invoiceHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "invoiceStatus": "VALID",
+          "recordStatus": "VALID",
+          "licenseStatus": "ACTIVE",
+          "observableHistory": {}
+        },
+        {
+          "hospitalId": "[\"HospitalMSP\",\"hospital1\"]",
+          "patientHash": "[\"InsurerMSP\",\"095862709ca28bdcef35db33d0474e5d75eae87703762381512964ce77b83335\"]",
+          "authorizedClaimants": [
+            "[\"InsurerMSP\",\"095862709ca28bdcef35db33d0474e5d75eae87703762381512964ce77b83335\"]"
+          ],
+          "treatmentType": "SURGERY",
+          "diagnosisCode": "D1",
+          "admissionDate": "2026-06-01T00:00:00.000Z",
+          "dischargeDate": "2026-06-02T00:00:00.000Z",
+          "invoiceDate": "2026-06-03T00:00:00.000Z",
+          "billAmount": 1,
+          "expectedBillMin": 0.5,
+          "expectedBillMax": 2,
+          "invoiceHash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "invoiceStatus": "VALID",
+          "recordStatus": "VALID",
+          "licenseStatus": "ACTIVE",
+          "observableHistory": {}
+        }
+      ],
+      "observation": {
+        "features": {
+          "clean_registry_match": 0,
+          "registry_record_missing": 0,
+          "hospital_id_mismatch": 0,
+          "invoice_hash_mismatch": 0,
+          "claim_exceeds_registry_bill": 1,
+          "bill_range_anomaly": 1,
+          "treatment_type_mismatch": 0,
+          "date_mismatch": 0,
+          "invalid_record_status": 0,
+          "used_invoice": 0,
+          "cancelled_record": 0,
+          "license_suspended": 0,
+          "license_blacklisted": 0,
+          "repeat_claim_pattern": 0,
+          "provider_velocity_anomaly": 0,
+          "claimant_velocity_anomaly": 0,
+          "near_duplicate_advisory": 0,
+          "missing_or_noisy_record": 0,
+          "log_bill": 0.6931471805599453,
+          "bill_to_expected_max": 4,
+          "care_days": 1,
+          "invoice_lag_days": 1,
+          "log_prior_claims": 0,
+          "history_similar": 0.6931471805599453,
+          "history_patient14": 0.6931471805599453,
+          "history_provider30": 0.6931471805599453,
+          "history_provider_mean_bill": 0.6931471805599453,
+          "graph_patient_degree": 0.6931471805599453,
+          "graph_provider_degree": 0.6931471805599453,
+          "graph_edge_repeat_share": 1,
+          "graph_provider_hhi": 1,
+          "graph_birank_patient": 1,
+          "graph_birank_provider": 1,
+          "temporal_provider7": 0,
+          "temporal_history_available": 1,
+          "history_available": 1
+        },
+        "providerLags": [
+          9
+        ],
+        "mandatory": true,
+        "group": "SURGERY",
+        "diagnosis": "D1"
+      },
+      "assessment": {
+        "method": "XGBoost with explainable graph-temporal fusion and uncertainty quantification",
+        "authority": "ADMIN_ADVISORY_ONLY",
+        "riskScore": 0.16995571454750438,
+        "riskScoreUnits": 169955715,
+        "rawMargin": -1.6565773487091064,
+        "riskMeaning": "Score calibrated on constructed billing actions; not a real-world fraud probability",
+        "recommendation": "REVIEW_RECOMMENDED",
+        "reasons": [
+          "INTEGRITY_OR_EXISTING_REVIEW_RULE",
+          "MODEL_THRESHOLD"
+        ],
+        "uncertainty": {
+          "ood": {
+            "distance": 33.88144523840337,
+            "groupSource": "pooled",
+            "warning": true
+          },
+          "predictionSet": [
+            "SIMULATED_ACTION"
+          ],
+          "ambiguous": false,
+          "nominalCoverage": 0.9,
+          "coverageGuaranteedForRuntime": false,
+          "triggersReview": false
+        },
+        "policy": {
+          "version": "xgboost-advisory-v1",
+          "threshold": 0.086932212,
+          "thresholdUnits": 86932212,
+          "scoreScale": 1000000000,
+          "comparisonBudget": 0.3,
+          "runtimeCapacityGuarantee": false
+        },
+        "explanation": {
+          "method": "Exact tree-path-dependent Shapley values",
+          "scale": "raw_margin",
+          "base": -2.3066145582237865,
+          "contributions": {
+            "bill_range_anomaly": -0.872122210013998,
+            "bill_to_expected_max": 0,
+            "cancelled_record": 0,
+            "care_days": 0,
+            "claim_exceeds_registry_bill": 0,
+            "claimant_velocity_anomaly": 0,
+            "clean_registry_match": 1.2293767548443857,
+            "date_mismatch": -0.020241388703587736,
+            "graph_birank_patient": -0.02915653645772038,
+            "graph_birank_provider": -0.0010933345247911702,
+            "graph_edge_repeat_share": -0.001899139513183575,
+            "graph_patient_degree": 0,
+            "graph_provider_degree": 0,
+            "graph_provider_hhi": -0.00436947892428728,
+            "history_available": 0,
+            "history_patient14": 0.09714786675399278,
+            "history_provider30": -0.015843062754832306,
+            "history_provider_mean_bill": 0.09259239887897236,
+            "history_similar": 0,
+            "hospital_id_mismatch": 0,
+            "invalid_record_status": 0,
+            "invoice_hash_mismatch": 0,
+            "invoice_lag_days": 0,
+            "license_blacklisted": 0,
+            "license_suspended": 0,
+            "log_bill": 0,
+            "log_prior_claims": 0,
+            "missing_or_noisy_record": 0,
+            "near_duplicate_advisory": 0,
+            "provider_velocity_anomaly": 0,
+            "registry_record_missing": 0,
+            "repeat_claim_pattern": 0,
+            "temporal_hawkes_available": 0,
+            "temporal_hawkes_excitation": 0.15510950829066764,
+            "temporal_hawkes_intensity": 0,
+            "temporal_history_available": 0,
+            "temporal_provider7": 0.041470461616534206,
+            "treatment_type_mismatch": 0,
+            "used_invoice": -0.020290034509218964,
+            "ood_distance": -0.0006444726209848344
+          },
+          "additivityError": 1.2284726835787296e-7
+        },
+        "transactionCreated": false
+      }
+    }
+  ]
+}

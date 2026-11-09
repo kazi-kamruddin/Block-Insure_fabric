@@ -1,0 +1,23 @@
+
+> @block-insure/web@0.1.0 test:e2e
+> playwright test e2e/oracle-workflow.spec.ts --grep matching negative Oracle
+
+[WebServer] (node:13188) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:10672) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:6556) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:23492) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:21672) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 1 test using 1 worker
+
+(node:4628) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] {"timestamp":"2026-09-26T17:11:54.175Z","service":"oracle1","message":"Oracle event consumption failed","error":"10 ABORTED: failed to endorse transaction, see attached details for more info"}
+  ok 1 e2e\oracle-workflow.spec.ts:167:5 › matching negative Oracle results fall back to fixed four-auditor governance (58.6s)
+
+  1 passed (2.3m)

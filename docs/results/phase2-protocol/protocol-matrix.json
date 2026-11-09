@@ -1,0 +1,1251 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-09-26T17:14:05.702Z",
+  "method": "Deterministic protocol model; ground truth is an external test label, not verified by the quorum",
+  "stateSpace": {
+    "total": 64,
+    "counts": {
+      "CONSENSUS": 30,
+      "CONFLICT": 6,
+      "TIMEOUT": 28,
+      "PENDING": 0
+    }
+  },
+  "results": [
+    {
+      "scenario": "honest",
+      "configuration": "1-of-1",
+      "responses": [
+        "correct"
+      ],
+      "groundTruth": "correct",
+      "outcome": {
+        "status": "CONSENSUS",
+        "resultHash": "correct",
+        "matchingResponses": 1,
+        "revealedResponses": 1
+      },
+      "classification": "CORRECT_AUTOMATIC"
+    },
+    {
+      "scenario": "honest",
+      "configuration": "2-of-2",
+      "responses": [
+        "correct",
+        "correct"
+      ],
+      "groundTruth": "correct",
+      "outcome": {
+        "status": "CONSENSUS",
+        "resultHash": "correct",
+        "matchingResponses": 2,
+        "revealedResponses": 2
+      },
+      "classification": "CORRECT_AUTOMATIC"
+    },
+    {
+      "scenario": "honest",
+      "configuration": "2-of-3",
+      "responses": [
+        "correct",
+        "correct",
+        "correct"
+      ],
+      "groundTruth": "correct",
+      "outcome": {
+        "status": "CONSENSUS",
+        "resultHash": "correct",
+        "matchingResponses": 3,
+        "revealedResponses": 3
+      },
+      "classification": "CORRECT_AUTOMATIC"
+    },
+    {
+      "scenario": "one-divergent",
+      "configuration": "1-of-1",
+      "responses": [
+        "correct"
+      ],
+      "groundTruth": "correct",
+      "outcome": {
+        "status": "CONSENSUS",
+        "resultHash": "correct",
+        "matchingResponses": 1,
+        "revealedResponses": 1
+      },
+      "classification": "CORRECT_AUTOMATIC"
+    },
+    {
+      "scenario": "one-divergent",
+      "configuration": "2-of-2",
+      "responses": [
+        "correct",
+        "incorrect"
+      ],
+      "groundTruth": "correct",
+      "outcome": {
+        "status": "CONFLICT",
+        "resultHash": null,
+        "matchingResponses": 0,
+        "revealedResponses": 2
+      },
+      "classification": "NO_AUTOMATIC_DECISION"
+    },
+    {
+      "scenario": "one-divergent",
+      "configuration": "2-of-3",
+      "responses": [
+        "correct",
+        "incorrect",
+        "correct"
+      ],
+      "groundTruth": "correct",
+      "outcome": {
+        "status": "CONSENSUS",
+        "resultHash": "correct",
+        "matchingResponses": 2,
+        "revealedResponses": 3
+      },
+      "classification": "CORRECT_AUTOMATIC"
+    },
+    {
+      "scenario": "first-divergent",
+      "configuration": "1-of-1",
+      "responses": [
+        "incorrect"
+      ],
+      "groundTruth": "correct",
+      "outcome": {
+        "status": "CONSENSUS",
+        "resultHash": "incorrect",
+        "matchingResponses": 1,
+        "revealedResponses": 1
+      },
+      "classification": "UNSAFE_AUTOMATIC"
+    },
+    {
+      "scenario": "first-divergent",
+      "configuration": "2-of-2",
+      "responses": [
+        "incorrect",
+        "correct"
+      ],
+      "groundTruth": "correct",
+      "outcome": {
+        "status": "CONFLICT",
+        "resultHash": null,
+        "matchingResponses": 0,
+        "revealedResponses": 2
+      },
+      "classification": "NO_AUTOMATIC_DECISION"
+    },
+    {
+      "scenario": "first-divergent",
+      "configuration": "2-of-3",
+      "responses": [
+        "incorrect",
+        "correct",
+        "correct"
+      ],
+      "groundTruth": "correct",
+      "outcome": {
+        "status": "CONSENSUS",
+        "resultHash": "correct",
+        "matchingResponses": 2,
+        "revealedResponses": 3
+      },
+      "classification": "CORRECT_AUTOMATIC"
+    },
+    {
+      "scenario": "one-unavailable",
+      "configuration": "1-of-1",
+      "responses": [
+        "correct"
+      ],
+      "groundTruth": "correct",
+      "outcome": {
+        "status": "CONSENSUS",
+        "resultHash": "correct",
+        "matchingResponses": 1,
+        "revealedResponses": 1
+      },
+      "classification": "CORRECT_AUTOMATIC"
+    },
+    {
+      "scenario": "one-unavailable",
+      "configuration": "2-of-2",
+      "responses": [
+        "correct",
+        null
+      ],
+      "groundTruth": "correct",
+      "outcome": {
+        "status": "TIMEOUT",
+        "resultHash": null,
+        "matchingResponses": 0,
+        "revealedResponses": 1
+      },
+      "classification": "NO_AUTOMATIC_DECISION"
+    },
+    {
+      "scenario": "one-unavailable",
+      "configuration": "2-of-3",
+      "responses": [
+        "correct",
+        null,
+        "correct"
+      ],
+      "groundTruth": "correct",
+      "outcome": {
+        "status": "CONSENSUS",
+        "resultHash": "correct",
+        "matchingResponses": 2,
+        "revealedResponses": 2
+      },
+      "classification": "CORRECT_AUTOMATIC"
+    },
+    {
+      "scenario": "two-divergent",
+      "configuration": "1-of-1",
+      "responses": [
+        "incorrect"
+      ],
+      "groundTruth": "correct",
+      "outcome": {
+        "status": "CONSENSUS",
+        "resultHash": "incorrect",
+        "matchingResponses": 1,
+        "revealedResponses": 1
+      },
+      "classification": "UNSAFE_AUTOMATIC"
+    },
+    {
+      "scenario": "two-divergent",
+      "configuration": "2-of-2",
+      "responses": [
+        "incorrect",
+        "incorrect"
+      ],
+      "groundTruth": "correct",
+      "outcome": {
+        "status": "CONSENSUS",
+        "resultHash": "incorrect",
+        "matchingResponses": 2,
+        "revealedResponses": 2
+      },
+      "classification": "UNSAFE_AUTOMATIC"
+    },
+    {
+      "scenario": "two-divergent",
+      "configuration": "2-of-3",
+      "responses": [
+        "incorrect",
+        "incorrect",
+        "correct"
+      ],
+      "groundTruth": "correct",
+      "outcome": {
+        "status": "CONSENSUS",
+        "resultHash": "incorrect",
+        "matchingResponses": 2,
+        "revealedResponses": 3
+      },
+      "classification": "UNSAFE_AUTOMATIC"
+    },
+    {
+      "scenario": "two-unavailable",
+      "configuration": "1-of-1",
+      "responses": [
+        "correct"
+      ],
+      "groundTruth": "correct",
+      "outcome": {
+        "status": "CONSENSUS",
+        "resultHash": "correct",
+        "matchingResponses": 1,
+        "revealedResponses": 1
+      },
+      "classification": "CORRECT_AUTOMATIC"
+    },
+    {
+      "scenario": "two-unavailable",
+      "configuration": "2-of-2",
+      "responses": [
+        "correct",
+        null
+      ],
+      "groundTruth": "correct",
+      "outcome": {
+        "status": "TIMEOUT",
+        "resultHash": null,
+        "matchingResponses": 0,
+        "revealedResponses": 1
+      },
+      "classification": "NO_AUTOMATIC_DECISION"
+    },
+    {
+      "scenario": "two-unavailable",
+      "configuration": "2-of-3",
+      "responses": [
+        "correct",
+        null,
+        null
+      ],
+      "groundTruth": "correct",
+      "outcome": {
+        "status": "TIMEOUT",
+        "resultHash": null,
+        "matchingResponses": 0,
+        "revealedResponses": 1
+      },
+      "classification": "NO_AUTOMATIC_DECISION"
+    },
+    {
+      "scenario": "three-way-conflict",
+      "configuration": "1-of-1",
+      "responses": [
+        "correct"
+      ],
+      "groundTruth": "correct",
+      "outcome": {
+        "status": "CONSENSUS",
+        "resultHash": "correct",
+        "matchingResponses": 1,
+        "revealedResponses": 1
+      },
+      "classification": "CORRECT_AUTOMATIC"
+    },
+    {
+      "scenario": "three-way-conflict",
+      "configuration": "2-of-2",
+      "responses": [
+        "correct",
+        "incorrect"
+      ],
+      "groundTruth": "correct",
+      "outcome": {
+        "status": "CONFLICT",
+        "resultHash": null,
+        "matchingResponses": 0,
+        "revealedResponses": 2
+      },
+      "classification": "NO_AUTOMATIC_DECISION"
+    },
+    {
+      "scenario": "three-way-conflict",
+      "configuration": "2-of-3",
+      "responses": [
+        "correct",
+        "incorrect",
+        "other"
+      ],
+      "groundTruth": "correct",
+      "outcome": {
+        "status": "CONFLICT",
+        "resultHash": null,
+        "matchingResponses": 0,
+        "revealedResponses": 3
+      },
+      "classification": "NO_AUTOMATIC_DECISION"
+    },
+    {
+      "scenario": "common-source-error",
+      "configuration": "1-of-1",
+      "responses": [
+        "incorrect"
+      ],
+      "groundTruth": "correct",
+      "outcome": {
+        "status": "CONSENSUS",
+        "resultHash": "incorrect",
+        "matchingResponses": 1,
+        "revealedResponses": 1
+      },
+      "classification": "UNSAFE_AUTOMATIC"
+    },
+    {
+      "scenario": "common-source-error",
+      "configuration": "2-of-2",
+      "responses": [
+        "incorrect",
+        "incorrect"
+      ],
+      "groundTruth": "correct",
+      "outcome": {
+        "status": "CONSENSUS",
+        "resultHash": "incorrect",
+        "matchingResponses": 2,
+        "revealedResponses": 2
+      },
+      "classification": "UNSAFE_AUTOMATIC"
+    },
+    {
+      "scenario": "common-source-error",
+      "configuration": "2-of-3",
+      "responses": [
+        "incorrect",
+        "incorrect",
+        "incorrect"
+      ],
+      "groundTruth": "correct",
+      "outcome": {
+        "status": "CONSENSUS",
+        "resultHash": "incorrect",
+        "matchingResponses": 3,
+        "revealedResponses": 3
+      },
+      "classification": "UNSAFE_AUTOMATIC"
+    }
+  ],
+  "commonSourceAssessment": {
+    "externallyDesignatedGroundTruthVerified": false,
+    "replicaSource": "same anchored fixture used by all three modeled workers",
+    "registryRootHash": "c6da6361115c611b091faa9f35836f9f5c8ee0fdbefb6bc0d8cc6fdde571ebcd",
+    "workerAssessmentCodes": [
+      "VERIFIED",
+      "VERIFIED",
+      "VERIFIED"
+    ],
+    "consensus": {
+      "status": "CONSENSUS",
+      "resultHash": "249bba3a12fd13da08f0e234271f35a93e4f0e0e107532d7a78801c84d41f494",
+      "matchingResponses": 3,
+      "revealedResponses": 3
+    },
+    "classification": "UNSAFE_AUTOMATIC_UNDER_SYNTHETIC_SOURCE_ERROR"
+  },
+  "exhaustiveStates": [
+    {
+      "responses": [
+        null,
+        null,
+        null
+      ],
+      "outcome": {
+        "status": "TIMEOUT",
+        "resultHash": null,
+        "matchingResponses": 0,
+        "revealedResponses": 0
+      }
+    },
+    {
+      "responses": [
+        null,
+        null,
+        "A"
+      ],
+      "outcome": {
+        "status": "TIMEOUT",
+        "resultHash": null,
+        "matchingResponses": 0,
+        "revealedResponses": 1
+      }
+    },
+    {
+      "responses": [
+        null,
+        null,
+        "B"
+      ],
+      "outcome": {
+        "status": "TIMEOUT",
+        "resultHash": null,
+        "matchingResponses": 0,
+        "revealedResponses": 1
+      }
+    },
+    {
+      "responses": [
+        null,
+        null,
+        "C"
+      ],
+      "outcome": {
+        "status": "TIMEOUT",
+        "resultHash": null,
+        "matchingResponses": 0,
+        "revealedResponses": 1
+      }
+    },
+    {
+      "responses": [
+        null,
+        "A",
+        null
+      ],
+      "outcome": {
+        "status": "TIMEOUT",
+        "resultHash": null,
+        "matchingResponses": 0,
+        "revealedResponses": 1
+      }
+    },
+    {
+      "responses": [
+        null,
+        "A",
+        "A"
+      ],
+      "outcome": {
+        "status": "CONSENSUS",
+        "resultHash": "A",
+        "matchingResponses": 2,
+        "revealedResponses": 2
+      }
+    },
+    {
+      "responses": [
+        null,
+        "A",
+        "B"
+      ],
+      "outcome": {
+        "status": "TIMEOUT",
+        "resultHash": null,
+        "matchingResponses": 0,
+        "revealedResponses": 2
+      }
+    },
+    {
+      "responses": [
+        null,
+        "A",
+        "C"
+      ],
+      "outcome": {
+        "status": "TIMEOUT",
+        "resultHash": null,
+        "matchingResponses": 0,
+        "revealedResponses": 2
+      }
+    },
+    {
+      "responses": [
+        null,
+        "B",
+        null
+      ],
+      "outcome": {
+        "status": "TIMEOUT",
+        "resultHash": null,
+        "matchingResponses": 0,
+        "revealedResponses": 1
+      }
+    },
+    {
+      "responses": [
+        null,
+        "B",
+        "A"
+      ],
+      "outcome": {
+        "status": "TIMEOUT",
+        "resultHash": null,
+        "matchingResponses": 0,
+        "revealedResponses": 2
+      }
+    },
+    {
+      "responses": [
+        null,
+        "B",
+        "B"
+      ],
+      "outcome": {
+        "status": "CONSENSUS",
+        "resultHash": "B",
+        "matchingResponses": 2,
+        "revealedResponses": 2
+      }
+    },
+    {
+      "responses": [
+        null,
+        "B",
+        "C"
+      ],
+      "outcome": {
+        "status": "TIMEOUT",
+        "resultHash": null,
+        "matchingResponses": 0,
+        "revealedResponses": 2
+      }
+    },
+    {
+      "responses": [
+        null,
+        "C",
+        null
+      ],
+      "outcome": {
+        "status": "TIMEOUT",
+        "resultHash": null,
+        "matchingResponses": 0,
+        "revealedResponses": 1
+      }
+    },
+    {
+      "responses": [
+        null,
+        "C",
+        "A"
+      ],
+      "outcome": {
+        "status": "TIMEOUT",
+        "resultHash": null,
+        "matchingResponses": 0,
+        "revealedResponses": 2
+      }
+    },
+    {
+      "responses": [
+        null,
+        "C",
+        "B"
+      ],
+      "outcome": {
+        "status": "TIMEOUT",
+        "resultHash": null,
+        "matchingResponses": 0,
+        "revealedResponses": 2
+      }
+    },
+    {
+      "responses": [
+        null,
+        "C",
+        "C"
+      ],
+      "outcome": {
+        "status": "CONSENSUS",
+        "resultHash": "C",
+        "matchingResponses": 2,
+        "revealedResponses": 2
+      }
+    },
+    {
+      "responses": [
+        "A",
+        null,
+        null
+      ],
+      "outcome": {
+        "status": "TIMEOUT",
+        "resultHash": null,
+        "matchingResponses": 0,
+        "revealedResponses": 1
+      }
+    },
+    {
+      "responses": [
+        "A",
+        null,
+        "A"
+      ],
+      "outcome": {
+        "status": "CONSENSUS",
+        "resultHash": "A",
+        "matchingResponses": 2,
+        "revealedResponses": 2
+      }
+    },
+    {
+      "responses": [
+        "A",
+        null,
+        "B"
+      ],
+      "outcome": {
+        "status": "TIMEOUT",
+        "resultHash": null,
+        "matchingResponses": 0,
+        "revealedResponses": 2
+      }
+    },
+    {
+      "responses": [
+        "A",
+        null,
+        "C"
+      ],
+      "outcome": {
+        "status": "TIMEOUT",
+        "resultHash": null,
+        "matchingResponses": 0,
+        "revealedResponses": 2
+      }
+    },
+    {
+      "responses": [
+        "A",
+        "A",
+        null
+      ],
+      "outcome": {
+        "status": "CONSENSUS",
+        "resultHash": "A",
+        "matchingResponses": 2,
+        "revealedResponses": 2
+      }
+    },
+    {
+      "responses": [
+        "A",
+        "A",
+        "A"
+      ],
+      "outcome": {
+        "status": "CONSENSUS",
+        "resultHash": "A",
+        "matchingResponses": 3,
+        "revealedResponses": 3
+      }
+    },
+    {
+      "responses": [
+        "A",
+        "A",
+        "B"
+      ],
+      "outcome": {
+        "status": "CONSENSUS",
+        "resultHash": "A",
+        "matchingResponses": 2,
+        "revealedResponses": 3
+      }
+    },
+    {
+      "responses": [
+        "A",
+        "A",
+        "C"
+      ],
+      "outcome": {
+        "status": "CONSENSUS",
+        "resultHash": "A",
+        "matchingResponses": 2,
+        "revealedResponses": 3
+      }
+    },
+    {
+      "responses": [
+        "A",
+        "B",
+        null
+      ],
+      "outcome": {
+        "status": "TIMEOUT",
+        "resultHash": null,
+        "matchingResponses": 0,
+        "revealedResponses": 2
+      }
+    },
+    {
+      "responses": [
+        "A",
+        "B",
+        "A"
+      ],
+      "outcome": {
+        "status": "CONSENSUS",
+        "resultHash": "A",
+        "matchingResponses": 2,
+        "revealedResponses": 3
+      }
+    },
+    {
+      "responses": [
+        "A",
+        "B",
+        "B"
+      ],
+      "outcome": {
+        "status": "CONSENSUS",
+        "resultHash": "B",
+        "matchingResponses": 2,
+        "revealedResponses": 3
+      }
+    },
+    {
+      "responses": [
+        "A",
+        "B",
+        "C"
+      ],
+      "outcome": {
+        "status": "CONFLICT",
+        "resultHash": null,
+        "matchingResponses": 0,
+        "revealedResponses": 3
+      }
+    },
+    {
+      "responses": [
+        "A",
+        "C",
+        null
+      ],
+      "outcome": {
+        "status": "TIMEOUT",
+        "resultHash": null,
+        "matchingResponses": 0,
+        "revealedResponses": 2
+      }
+    },
+    {
+      "responses": [
+        "A",
+        "C",
+        "A"
+      ],
+      "outcome": {
+        "status": "CONSENSUS",
+        "resultHash": "A",
+        "matchingResponses": 2,
+        "revealedResponses": 3
+      }
+    },
+    {
+      "responses": [
+        "A",
+        "C",
+        "B"
+      ],
+      "outcome": {
+        "status": "CONFLICT",
+        "resultHash": null,
+        "matchingResponses": 0,
+        "revealedResponses": 3
+      }
+    },
+    {
+      "responses": [
+        "A",
+        "C",
+        "C"
+      ],
+      "outcome": {
+        "status": "CONSENSUS",
+        "resultHash": "C",
+        "matchingResponses": 2,
+        "revealedResponses": 3
+      }
+    },
+    {
+      "responses": [
+        "B",
+        null,
+        null
+      ],
+      "outcome": {
+        "status": "TIMEOUT",
+        "resultHash": null,
+        "matchingResponses": 0,
+        "revealedResponses": 1
+      }
+    },
+    {
+      "responses": [
+        "B",
+        null,
+        "A"
+      ],
+      "outcome": {
+        "status": "TIMEOUT",
+        "resultHash": null,
+        "matchingResponses": 0,
+        "revealedResponses": 2
+      }
+    },
+    {
+      "responses": [
+        "B",
+        null,
+        "B"
+      ],
+      "outcome": {
+        "status": "CONSENSUS",
+        "resultHash": "B",
+        "matchingResponses": 2,
+        "revealedResponses": 2
+      }
+    },
+    {
+      "responses": [
+        "B",
+        null,
+        "C"
+      ],
+      "outcome": {
+        "status": "TIMEOUT",
+        "resultHash": null,
+        "matchingResponses": 0,
+        "revealedResponses": 2
+      }
+    },
+    {
+      "responses": [
+        "B",
+        "A",
+        null
+      ],
+      "outcome": {
+        "status": "TIMEOUT",
+        "resultHash": null,
+        "matchingResponses": 0,
+        "revealedResponses": 2
+      }
+    },
+    {
+      "responses": [
+        "B",
+        "A",
+        "A"
+      ],
+      "outcome": {
+        "status": "CONSENSUS",
+        "resultHash": "A",
+        "matchingResponses": 2,
+        "revealedResponses": 3
+      }
+    },
+    {
+      "responses": [
+        "B",
+        "A",
+        "B"
+      ],
+      "outcome": {
+        "status": "CONSENSUS",
+        "resultHash": "B",
+        "matchingResponses": 2,
+        "revealedResponses": 3
+      }
+    },
+    {
+      "responses": [
+        "B",
+        "A",
+        "C"
+      ],
+      "outcome": {
+        "status": "CONFLICT",
+        "resultHash": null,
+        "matchingResponses": 0,
+        "revealedResponses": 3
+      }
+    },
+    {
+      "responses": [
+        "B",
+        "B",
+        null
+      ],
+      "outcome": {
+        "status": "CONSENSUS",
+        "resultHash": "B",
+        "matchingResponses": 2,
+        "revealedResponses": 2
+      }
+    },
+    {
+      "responses": [
+        "B",
+        "B",
+        "A"
+      ],
+      "outcome": {
+        "status": "CONSENSUS",
+        "resultHash": "B",
+        "matchingResponses": 2,
+        "revealedResponses": 3
+      }
+    },
+    {
+      "responses": [
+        "B",
+        "B",
+        "B"
+      ],
+      "outcome": {
+        "status": "CONSENSUS",
+        "resultHash": "B",
+        "matchingResponses": 3,
+        "revealedResponses": 3
+      }
+    },
+    {
+      "responses": [
+        "B",
+        "B",
+        "C"
+      ],
+      "outcome": {
+        "status": "CONSENSUS",
+        "resultHash": "B",
+        "matchingResponses": 2,
+        "revealedResponses": 3
+      }
+    },
+    {
+      "responses": [
+        "B",
+        "C",
+        null
+      ],
+      "outcome": {
+        "status": "TIMEOUT",
+        "resultHash": null,
+        "matchingResponses": 0,
+        "revealedResponses": 2
+      }
+    },
+    {
+      "responses": [
+        "B",
+        "C",
+        "A"
+      ],
+      "outcome": {
+        "status": "CONFLICT",
+        "resultHash": null,
+        "matchingResponses": 0,
+        "revealedResponses": 3
+      }
+    },
+    {
+      "responses": [
+        "B",
+        "C",
+        "B"
+      ],
+      "outcome": {
+        "status": "CONSENSUS",
+        "resultHash": "B",
+        "matchingResponses": 2,
+        "revealedResponses": 3
+      }
+    },
+    {
+      "responses": [
+        "B",
+        "C",
+        "C"
+      ],
+      "outcome": {
+        "status": "CONSENSUS",
+        "resultHash": "C",
+        "matchingResponses": 2,
+        "revealedResponses": 3
+      }
+    },
+    {
+      "responses": [
+        "C",
+        null,
+        null
+      ],
+      "outcome": {
+        "status": "TIMEOUT",
+        "resultHash": null,
+        "matchingResponses": 0,
+        "revealedResponses": 1
+      }
+    },
+    {
+      "responses": [
+        "C",
+        null,
+        "A"
+      ],
+      "outcome": {
+        "status": "TIMEOUT",
+        "resultHash": null,
+        "matchingResponses": 0,
+        "revealedResponses": 2
+      }
+    },
+    {
+      "responses": [
+        "C",
+        null,
+        "B"
+      ],
+      "outcome": {
+        "status": "TIMEOUT",
+        "resultHash": null,
+        "matchingResponses": 0,
+        "revealedResponses": 2
+      }
+    },
+    {
+      "responses": [
+        "C",
+        null,
+        "C"
+      ],
+      "outcome": {
+        "status": "CONSENSUS",
+        "resultHash": "C",
+        "matchingResponses": 2,
+        "revealedResponses": 2
+      }
+    },
+    {
+      "responses": [
+        "C",
+        "A",
+        null
+      ],
+      "outcome": {
+        "status": "TIMEOUT",
+        "resultHash": null,
+        "matchingResponses": 0,
+        "revealedResponses": 2
+      }
+    },
+    {
+      "responses": [
+        "C",
+        "A",
+        "A"
+      ],
+      "outcome": {
+        "status": "CONSENSUS",
+        "resultHash": "A",
+        "matchingResponses": 2,
+        "revealedResponses": 3
+      }
+    },
+    {
+      "responses": [
+        "C",
+        "A",
+        "B"
+      ],
+      "outcome": {
+        "status": "CONFLICT",
+        "resultHash": null,
+        "matchingResponses": 0,
+        "revealedResponses": 3
+      }
+    },
+    {
+      "responses": [
+        "C",
+        "A",
+        "C"
+      ],
+      "outcome": {
+        "status": "CONSENSUS",
+        "resultHash": "C",
+        "matchingResponses": 2,
+        "revealedResponses": 3
+      }
+    },
+    {
+      "responses": [
+        "C",
+        "B",
+        null
+      ],
+      "outcome": {
+        "status": "TIMEOUT",
+        "resultHash": null,
+        "matchingResponses": 0,
+        "revealedResponses": 2
+      }
+    },
+    {
+      "responses": [
+        "C",
+        "B",
+        "A"
+      ],
+      "outcome": {
+        "status": "CONFLICT",
+        "resultHash": null,
+        "matchingResponses": 0,
+        "revealedResponses": 3
+      }
+    },
+    {
+      "responses": [
+        "C",
+        "B",
+        "B"
+      ],
+      "outcome": {
+        "status": "CONSENSUS",
+        "resultHash": "B",
+        "matchingResponses": 2,
+        "revealedResponses": 3
+      }
+    },
+    {
+      "responses": [
+        "C",
+        "B",
+        "C"
+      ],
+      "outcome": {
+        "status": "CONSENSUS",
+        "resultHash": "C",
+        "matchingResponses": 2,
+        "revealedResponses": 3
+      }
+    },
+    {
+      "responses": [
+        "C",
+        "C",
+        null
+      ],
+      "outcome": {
+        "status": "CONSENSUS",
+        "resultHash": "C",
+        "matchingResponses": 2,
+        "revealedResponses": 2
+      }
+    },
+    {
+      "responses": [
+        "C",
+        "C",
+        "A"
+      ],
+      "outcome": {
+        "status": "CONSENSUS",
+        "resultHash": "C",
+        "matchingResponses": 2,
+        "revealedResponses": 3
+      }
+    },
+    {
+      "responses": [
+        "C",
+        "C",
+        "B"
+      ],
+      "outcome": {
+        "status": "CONSENSUS",
+        "resultHash": "C",
+        "matchingResponses": 2,
+        "revealedResponses": 3
+      }
+    },
+    {
+      "responses": [
+        "C",
+        "C",
+        "C"
+      ],
+      "outcome": {
+        "status": "CONSENSUS",
+        "resultHash": "C",
+        "matchingResponses": 3,
+        "revealedResponses": 3
+      }
+    }
+  ]
+}

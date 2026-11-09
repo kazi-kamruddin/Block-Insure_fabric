@@ -3,7 +3,7 @@ import type { EvidenceReference } from "@/lib/fabric/types";
 import { buildEvidenceMerkleTree, evidenceLeafHash, verifyEvidenceMerkleProof } from "./merkle";
 
 const evidence = (id: string, content: string): EvidenceReference => ({
-  assetType: "evidenceReference", schemaVersion: 12, id, claimId: "claim-1", claimVersion: 1,
+  assetType: "evidenceReference", schemaVersion: 13, id, claimId: "claim-1", claimVersion: 1,
   documentType: "INVOICE", contentHash: content.repeat(64), storageReferenceHash: "f".repeat(64),
   submittedBy: "policyholder1", createdAt: "2026-09-05T12:00:00Z",
 });

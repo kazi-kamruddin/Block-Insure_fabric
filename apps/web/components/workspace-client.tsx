@@ -14,8 +14,9 @@ import { PresentationGuide } from "@/components/presentation-guide";
 import type { WorkflowCommand } from "@/lib/workflows/commands";
 import { bdtToMinor } from "@/lib/workflows/forms";
 import { decryptEvidenceBytes, encryptEvidenceBytes, sha256Hex } from "@/lib/evidence/browser-crypto";
+import { createEvidenceRecovery, restoreEvidenceRecovery } from "@/lib/evidence/recovery";
 
-type AssetType = "partner-agreement" | "hospital-invoice" | "package" | "policy" | "claim" | "evidence" | "evidence-batch" | "evidence-grant" | "verification" | "decision" | "review" | "appeal" | "fraud-assessment" | "settlement" | "access" | "claim-history" | "account" | "bank-transfer" | "mandate" | "premium-payment" | "premium-adjustment" | "collection" | "benefit-plan" | "beneficiaries" | "benefit-request" | "liability" | "oracle-snapshot" | "oracle-request" | "oracle-commitment" | "oracle-result" | "oracle-history";
+type AssetType = "partner-agreement" | "hospital-invoice" | "package" | "policy" | "claim" | "evidence" | "evidence-batch" | "evidence-grant" | "verification" | "decision" | "review" | "appeal" | "fraud-assessment" | "settlement" | "access" | "claim-history" | "account" | "bank-transfer" | "mandate" | "premium-payment" | "premium-adjustment" | "collection" | "benefit-plan" | "beneficiaries" | "benefit-request" | "liability" | "oracle-snapshot" | "oracle-request" | "oracle-commitment" | "oracle-result" | "oracle-history" | "privacy-credential" | "privacy-presentation";
 type NotificationItem = { id: string; title: string; message: string; assetId: string; blockNumber: string };
 type BankCommunicationItem = { id: string; title: string; assetId: string; amountMinor: number; currency: string; status: string; adapter: string; recipient: string; deliveredAt: string; error: string };
 type ResearchSnapshotView = {
@@ -25,9 +26,10 @@ type ResearchSnapshotView = {
   adjudication: { reviewRounds: number; appeals: number; meanClosureLatencyMs: number | null };
   fraudDecisionSupport: { assessments: number; advisoryOnly: boolean };
   evidenceGovernance: { grants: number; accesses: number; grantBackedAccesses: number };
+  privacyPreservingVerification: { credentials: number; presentations: number; privacyBoundOracleRequests: number };
 };
 type OracleOperationsView = {
-  workers: Array<{ oracleId: string; label: string; status: string; registrySource: string; registrySnapshotId: string; registryVersion: number; modelVersion: string; updatedAt: string; lastProcessedBlock: string | number | null; lastProcessedRequestId: string | null; lastError: string | null; counts: { requests: number; commitments: number; reveals: number; verified: number; failed: number }; lastProcessingLatencyMs: number | null }>;
+  workers: Array<{ oracleId: string; label: string; status: string; registrySource: string; registrySnapshotId: string; registryVersion: number; registryDatasetId?: string | null; registryDatasetVersion?: string | null; registryInputSha256?: string | null; registryTransformationVersion?: string | null; modelVersion: string; updatedAt: string; lastProcessedBlock: string | number | null; lastProcessedRequestId: string | null; lastError: string | null; counts: { requests: number; commitments: number; reveals: number; verified: number; failed: number }; lastProcessingLatencyMs: number | null }>;
   metrics: { requests: number; pending: number; agreements: number; conflicts: number; timeouts: number; finalized: number };
 };
 
@@ -61,7 +63,7 @@ const commandTemplates = {
     ["Retire package", { operation: "retirePolicyPackage", id: "package-1" }],
     ["Issue policy", { operation: "issuePolicy", id: "policy-1", packageId: "package-1", policyholderId: "policyholder1", startDate: "2026-01-01", endDate: "2026-12-31" }],
     ["Publish Oracle registry", { operation: "publishOracleRegistrySnapshot", id: "registry-demo-v1", version: 1, rootHash: "c6da6361115c611b091faa9f35836f9f5c8ee0fdbefb6bc0d8cc6fdde571ebcd", rulesVersion: "rules-v1", rulesHash: hash, recordCount: 3 }],
-    ["Request Oracle verification", { operation: "requestOracleVerification", requestId: "oracle-request-1", claimId: "claim-1", snapshotId: "registry-demo-v1", modelVersion: "model-v1", modelHash: "c".repeat(64), assignedOracleIdsJson: '["oracle1","oracle2"]', commitDeadline: "2026-09-09T12:00:00Z", revealDeadline: "2026-09-09T12:10:00Z" }],
+    ["Request Oracle verification", { operation: "requestOracleVerification", requestId: "oracle-request-1", claimId: "claim-1", snapshotId: "registry-demo-v1", modelVersion: "model-v1", modelHash: "c".repeat(64), assignedOracleIdsJson: '["oracle1","oracle2","oracle3"]', requiredConfirmations: 2, commitDeadline: "2026-09-09T12:00:00Z", revealDeadline: "2026-09-09T12:10:00Z" }],
     ["Route Oracle failure", { operation: "routeOracleFailureToReview", requestId: "oracle-request-1", reviewId: "review-1", assignedAuditorIdsJson: '["auditor1","auditor2","auditor3","auditor4"]', approvalThreshold: 3, rejectionThreshold: 2, deadline: "2026-09-12T12:00:00Z" }],
     ["Open review", { operation: "openClaimReview", claimId: "claim-1", reviewId: "review-1", assignedAuditorIdsJson: '["auditor1","auditor2","auditor3","auditor4"]', approvalThreshold: 3, rejectionThreshold: 2, deadline: "2026-09-09T12:00:00Z" }],
     ["Authorize settlement", { operation: "authorizeSettlement", settlementId: "settlement-1", claimId: "claim-1", sourceAccountId: "bank-insurer-premium", destinationAccountId: "showcase-customer-account" }],
@@ -107,6 +109,10 @@ export function WorkspaceClient({
   const [plaintextEvidence, setPlaintextEvidence] = useState<File | null>(null);
   const [evidencePassphrase, setEvidencePassphrase] = useState("");
   const [evidencePassphraseConfirmation, setEvidencePassphraseConfirmation] = useState("");
+  const [backupPassword, setBackupPassword] = useState("");
+  const [recoveryDownload, setRecoveryDownload] = useState<{ url: string; name: string } | null>(null);
+  const [recoveryFile, setRecoveryFile] = useState<File | null>(null);
+  const [restorePassword, setRestorePassword] = useState("");
   const [encrypting, setEncrypting] = useState(false);
   const [retrievalEvidenceId, setRetrievalEvidenceId] = useState("");
   const [retrievalGrantId, setRetrievalGrantId] = useState("");
@@ -133,6 +139,7 @@ export function WorkspaceClient({
   useEffect(() => () => {
     if (decryptedEvidence) URL.revokeObjectURL(decryptedEvidence.url);
   }, [decryptedEvidence]);
+  useEffect(() => () => { if (recoveryDownload) URL.revokeObjectURL(recoveryDownload.url); }, [recoveryDownload]);
 
   const refreshNotifications = useCallback(async () => {
     try {
@@ -152,6 +159,15 @@ export function WorkspaceClient({
       setBankCommunications([]);
     }
   }, []);
+
+  useEffect(() => {
+    if (!account) return;
+    const timer = window.setTimeout(() => {
+      void refreshNotifications();
+      if (account.role === "bankOfficer") void refreshBankCommunications();
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [account, refreshNotifications, refreshBankCommunications]);
 
   async function synchronizeEvents() {
     setBusy(true);
@@ -225,8 +241,6 @@ export function WorkspaceClient({
       const signedInAccount = body.account as DemoAccount;
       setAccount(signedInAccount);
       setOutput(`Signed in as ${body.account.displayName}.`);
-      await refreshNotifications();
-      if (signedInAccount.role === "bankOfficer") await refreshBankCommunications();
       router.push(`/workspace/${workspaceForAccount(signedInAccount)}`);
     } catch (error) {
       setOutput(error instanceof Error ? error.message : "Sign-in failed");
@@ -236,13 +250,28 @@ export function WorkspaceClient({
   }
 
   async function logout() {
-    await fetch("/api/auth/logout", { method: "POST" });
-    setAccount(null);
-    setDashboard(null);
-    setCommand("");
-    setOutput("Signed out.");
-    router.push("/workspace");
-    router.refresh();
+    setBusy(true);
+    try {
+      await responseJson(await fetch("/api/auth/logout", { method: "POST" }));
+      setAccount(null);
+      setDashboard(null);
+      setCommand("");
+      setEvidencePassphrase("");
+      setEvidencePassphraseConfirmation("");
+      setRetrievalPassphrase("");
+      setBackupPassword("");
+      setRestorePassword("");
+      setRecoveryFile(null);
+      setRecoveryDownload(null);
+      setDecryptedEvidence(null);
+      setOutput("Signed out.");
+      router.push("/workspace");
+      router.refresh();
+    } catch (error) {
+      setOutput(error instanceof Error ? error.message : "Sign-out failed");
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function submitWorkflow(payload: WorkflowCommand) {
@@ -299,15 +328,21 @@ export function WorkspaceClient({
   }
 
   function updateManualPayment(name: keyof typeof manualPayment, value: string) {
-    setManualPayment((current) => ({ ...current, [name]: value }));
+    setManualPayment((current) => ({ ...current, [name]: value,
+      ...(!["otp", "challengeId", "demoCode"].includes(name) ? { challengeId: "", otp: "", demoCode: "" } : {}),
+    }));
   }
 
   async function requestPremiumOtp() {
     setBusy(true);
     try {
+      const externalReferenceHash = await sha256Hex(new TextEncoder().encode(manualPayment.externalReference.trim()));
       const body = await responseJson(await fetch("/api/banking/otp", {
         method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ policyId: manualPayment.policyId, sourceAccountId: manualPayment.sourceAccountId }),
+        body: JSON.stringify({ policyId: manualPayment.policyId, sourceAccountId: manualPayment.sourceAccountId,
+          destinationAccountId: manualPayment.destinationAccountId, transferId: manualPayment.transferId, paymentId: manualPayment.paymentId,
+          periodStartDate: manualPayment.periodStartDate, periodEndDate: manualPayment.periodEndDate,
+          amountMinor: bdtToMinor(manualPayment.amountBdt), externalReferenceHash }),
       }));
       setManualPayment((current) => ({ ...current, challengeId: body.challengeId, demoCode: body.demoCode ?? "", otp: body.demoCode ?? "" }));
       setOutput(body.demoCode ? `Demo OTP ${body.demoCode} expires at ${body.expiresAt}.` : `OTP challenge created and delivered by the configured adapter; expires at ${body.expiresAt}.`);
@@ -321,19 +356,28 @@ export function WorkspaceClient({
   async function submitManualPremium() {
     setBusy(true);
     try {
+      if (!account) throw new Error("Sign in before authorizing a payment.");
       if (!manualPayment.challengeId) throw new Error("Request an OTP first.");
       const externalReferenceHash = await sha256Hex(new TextEncoder().encode(manualPayment.externalReference.trim()));
+      const intent = {
+        transferId: manualPayment.transferId, paymentId: manualPayment.paymentId, policyId: manualPayment.policyId,
+        sourceAccountId: manualPayment.sourceAccountId, destinationAccountId: manualPayment.destinationAccountId,
+        periodStartDate: manualPayment.periodStartDate, periodEndDate: manualPayment.periodEndDate,
+        amountMinor: bdtToMinor(manualPayment.amountBdt), externalReferenceHash,
+      };
+      const pendingKey = `block-insure:premium-intent:${account.id}`;
+      const previous = localStorage.getItem(pendingKey);
+      if (previous && previous !== JSON.stringify(intent)) throw new Error("Recover the saved payment outcome before authorizing a different payment.");
+      localStorage.setItem(pendingKey, JSON.stringify(intent));
       const body = await responseJson(await fetch("/api/banking/premium-payment", {
         method: "POST", headers: { "content-type": "application/json" },
         body: JSON.stringify({
           challengeId: manualPayment.challengeId, otp: manualPayment.otp,
-          transferId: manualPayment.transferId, paymentId: manualPayment.paymentId, policyId: manualPayment.policyId,
-          sourceAccountId: manualPayment.sourceAccountId, destinationAccountId: manualPayment.destinationAccountId,
-          periodStartDate: manualPayment.periodStartDate, periodEndDate: manualPayment.periodEndDate,
-          amountMinor: bdtToMinor(manualPayment.amountBdt), externalReferenceHash,
+          ...intent,
         }),
       }));
       setOutput(JSON.stringify(body.result, null, 2));
+      if (["SETTLED", "BOUNCED"].includes(body.result?.status)) localStorage.removeItem(pendingKey);
       setManualPayment((current) => ({ ...current, challengeId: "", otp: "", demoCode: "", externalReference: "" }));
       await refreshDashboard();
     } catch (error) {
@@ -341,6 +385,22 @@ export function WorkspaceClient({
     } finally {
       setBusy(false);
     }
+  }
+
+  async function recoverManualPremium() {
+    setBusy(true);
+    try {
+      if (!account) throw new Error("Sign in before recovering a payment.");
+      const key = `block-insure:premium-intent:${account.id}`;
+      const saved = localStorage.getItem(key);
+      if (!saved) throw new Error("No saved payment intent is available in this browser.");
+      const outcome = await responseJson(await fetch("/api/banking/premium-payment", {
+        method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...JSON.parse(saved), recoverOnly: true }),
+      }));
+      setOutput(JSON.stringify(outcome, null, 2));
+      if (["SETTLED", "BOUNCED"].includes(outcome.status)) { localStorage.removeItem(key); await refreshDashboard(); }
+    } catch (error) { setOutput(error instanceof Error ? error.message : "Payment recovery unavailable"); }
+    finally { setBusy(false); }
   }
 
   async function uploadEvidence() {
@@ -365,6 +425,7 @@ export function WorkspaceClient({
 
   async function encryptEvidence() {
     setEncrypting(true);
+    setRecoveryDownload(null);
     try {
       if (!plaintextEvidence) throw new Error("Choose the original evidence file.");
       if (evidencePassphrase !== evidencePassphraseConfirmation) throw new Error("Evidence passphrases do not match.");
@@ -374,6 +435,11 @@ export function WorkspaceClient({
         { claimId: evidenceClaimId.trim(), evidenceId: evidenceId.trim() },
       );
       const safeName = plaintextEvidence.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+      if (backupPassword) {
+        const backup = await createEvidenceRecovery(evidencePassphrase, backupPassword,
+          { claimId: evidenceClaimId.trim(), evidenceId: evidenceId.trim() }, encrypted.contentHash);
+        setRecoveryDownload({ url: URL.createObjectURL(new Blob([backup], { type: "application/json" })), name: `${safeName}.bifkey` });
+      }
       const envelopeBuffer = new ArrayBuffer(encrypted.envelope.byteLength);
       new Uint8Array(envelopeBuffer).set(encrypted.envelope);
       const file = new File(
@@ -385,6 +451,7 @@ export function WorkspaceClient({
       setContentHash(encrypted.contentHash);
       setEvidencePassphrase("");
       setEvidencePassphraseConfirmation("");
+      setBackupPassword("");
       setOutput(`Encrypted ${plaintextEvidence.name} locally. Keep the passphrase safe; it cannot be recovered by Block-Insure.`);
     } catch (error) {
       setCiphertext(null);
@@ -393,6 +460,20 @@ export function WorkspaceClient({
     } finally {
       setEncrypting(false);
     }
+  }
+
+  async function restoreEvidenceKey() {
+    setRetrieving(true);
+    try {
+      if (!recoveryFile || recoveryFile.size > 16_384) throw new Error("Select a recovery file of at most 16 KiB.");
+      const recovered = await restoreEvidenceRecovery(await recoveryFile.text(), restorePassword);
+      setRetrievalEvidenceId(recovered.evidenceId);
+      setRetrievalPassphrase(recovered.passphrase);
+      setDecryptedEvidence(null);
+      setRestorePassword("");
+      setOutput(`Recovery key restored for ${recovered.evidenceId}. Retrieve the original ciphertext to verify and decrypt it.`);
+    } catch (error) { setOutput(error instanceof Error ? error.message : "Recovery file could not be opened"); }
+    finally { setRetrieving(false); }
   }
 
   async function retrieveEvidence() {
@@ -611,6 +692,7 @@ export function WorkspaceClient({
             <div className="metricCard"><span>Reviews / appeals</span><strong>{researchSnapshot.adjudication.reviewRounds} / {researchSnapshot.adjudication.appeals}</strong><small>Immutable rounds</small></div>
             <div className="metricCard"><span>Fraud assessments</span><strong>{researchSnapshot.fraudDecisionSupport.assessments}</strong><small>{researchSnapshot.fraudDecisionSupport.advisoryOnly ? "Advisory only" : "Boundary violation"}</small></div>
             <div className="metricCard"><span>Evidence grants / access</span><strong>{researchSnapshot.evidenceGovernance.grants} / {researchSnapshot.evidenceGovernance.accesses}</strong><small>{researchSnapshot.evidenceGovernance.grantBackedAccesses} grant-backed</small></div>
+            <div className="metricCard"><span>Private credentials / proofs</span><strong>{researchSnapshot.privacyPreservingVerification.credentials} / {researchSnapshot.privacyPreservingVerification.presentations}</strong><small>{researchSnapshot.privacyPreservingVerification.privacyBoundOracleRequests} requests bound</small></div>
           </div>}
           {researchSnapshot && <p className="cardNote">Schema {researchSnapshot.provenance.ledgerSchemaVersion}; indexed events {researchSnapshot.provenance.indexedEvents}; hash <code>{researchSnapshot.reproducibilityHash.slice(0, 16)}…</code></p>}
         </article>}
@@ -627,7 +709,7 @@ export function WorkspaceClient({
               <div className="metricCard"><span>Conflicts / timeouts</span><strong>{oracleOperations.metrics.conflicts} / {oracleOperations.metrics.timeouts}</strong><small>auditor fallback outcomes</small></div>
             </div>
             <div className="queueList">{oracleOperations.workers.map((worker) => <div className="queueItem" key={worker.oracleId}>
-              <div><div className="queueTitle"><strong>{worker.label} · {worker.oracleId}</strong><span className={`status status-${worker.status.toLowerCase()}`}>{worker.status}</span></div><p>{worker.registrySource} · snapshot {worker.registrySnapshotId || "unavailable"} v{worker.registryVersion} · model {worker.modelVersion || "unavailable"}</p><small>Block {worker.lastProcessedBlock ?? "—"} · request {worker.lastProcessedRequestId ?? "—"} · {worker.lastProcessingLatencyMs ?? "—"} ms</small>{worker.lastError && <p className="evidenceWarning">{worker.lastError}</p>}</div>
+              <div><div className="queueTitle"><strong>{worker.label} · {worker.oracleId}</strong><span className={`status status-${worker.status.toLowerCase()}`}>{worker.status}</span></div><p>{worker.registrySource} · snapshot {worker.registrySnapshotId || "unavailable"} v{worker.registryVersion} · model {worker.modelVersion || "unavailable"}</p>{worker.registryDatasetId && <small>{worker.registryDatasetId}@{worker.registryDatasetVersion} · transform {worker.registryTransformationVersion} · input {worker.registryInputSha256?.slice(0, 12)}…</small>}<small>Block {worker.lastProcessedBlock ?? "—"} · request {worker.lastProcessedRequestId ?? "—"} · {worker.lastProcessingLatencyMs ?? "—"} ms</small>{worker.lastError && <p className="evidenceWarning">{worker.lastError}</p>}</div>
               <span>{worker.counts.commitments} commit / {worker.counts.reveals} reveal</span>
             </div>)}</div>
           </>}
@@ -647,7 +729,7 @@ export function WorkspaceClient({
           <article className="workCard evidenceCard">
             <span className="kicker">Manual premium</span>
             <h2>Pay with one-time authorization</h2>
-            <p className="cardNote">The connected Bank emails an OTP bound to you, this policy, and the selected account. A valid code triggers one atomic customer debit and insurer credit; no EFT mandate is required.</p>
+            <p className="cardNote">The Bank emails an OTP for the exact payment details and recipient. Changing a detail requires a new code. Payment completes only after a valid committed Bank transfer.</p>
             <div className="evidenceFields">
               <label>Policy ID<input value={manualPayment.policyId} onChange={(event) => updateManualPayment("policyId", event.target.value)} /></label>
               <label>Customer account ID<input value={manualPayment.sourceAccountId} onChange={(event) => updateManualPayment("sourceAccountId", event.target.value)} /></label>
@@ -664,6 +746,7 @@ export function WorkspaceClient({
             <div className="evidenceActions">
               <button className="secondary button" disabled={busy || !manualPayment.policyId || !manualPayment.sourceAccountId} onClick={requestPremiumOtp}>Email OTP</button>
               <button className="primary button" disabled={busy || !manualPayment.challengeId || manualPayment.otp.length !== 6} onClick={submitManualPremium}>Authorize premium</button>
+              <button className="secondary button" disabled={busy} onClick={recoverManualPremium}>Recover saved payment</button>
             </div>
           </article>
         )}
@@ -703,6 +786,7 @@ export function WorkspaceClient({
               <option value="settlement">Settlement</option><option value="claim-history">Claim history</option>
               <option value="oracle-snapshot">Oracle registry snapshot</option><option value="oracle-request">Oracle request</option>
               <option value="oracle-commitment">Oracle commitment</option><option value="oracle-result">Oracle revealed result</option><option value="oracle-history">Oracle request history</option>
+              <option value="privacy-credential">Privacy credential anchor</option><option value="privacy-presentation">Selective disclosure presentation</option>
               <option value="account">Bank account</option><option value="bank-transfer">Bank transfer</option><option value="mandate">Debit mandate</option>
               <option value="premium-payment">Premium payment</option><option value="premium-adjustment">Premium reversal</option><option value="collection">Premium collection</option>
               <option value="benefit-plan">Benefit plan</option><option value="beneficiaries">Beneficiary designation</option>
@@ -740,12 +824,13 @@ export function WorkspaceClient({
             <h2>Encrypt, store, and anchor evidence</h2>
             <p className="cardNote">Encryption happens in this browser with AES-256-GCM. The passphrase and plaintext never reach the server; only the generated <code>.enc</code> envelope is stored, and Fabric receives integrity hashes.</p>
             <div className="evidenceFields">
-              <label>Claim ID<input value={evidenceClaimId} onChange={(event) => setEvidenceClaimId(event.target.value)} placeholder="claim-1" /></label>
-              <label>Evidence ID<input value={evidenceId} onChange={(event) => setEvidenceId(event.target.value)} placeholder="evidence-1" /></label>
+              <label>Claim ID<input disabled={busy || encrypting} value={evidenceClaimId} onChange={(event) => { setEvidenceClaimId(event.target.value); setCiphertext(null); setContentHash(""); setRecoveryDownload(null); }} placeholder="claim-1" /></label>
+              <label>Evidence ID<input disabled={busy || encrypting} value={evidenceId} onChange={(event) => { setEvidenceId(event.target.value); setCiphertext(null); setContentHash(""); setRecoveryDownload(null); }} placeholder="evidence-1" /></label>
               <label>Document type<input value={documentType} onChange={(event) => setDocumentType(event.target.value)} /></label>
-              <label>Original file<input type="file" onChange={(event) => { setPlaintextEvidence(event.target.files?.[0] ?? null); setCiphertext(null); setContentHash(""); }} /></label>
-              <label>Evidence passphrase<input type="password" autoComplete="new-password" value={evidencePassphrase} onChange={(event) => setEvidencePassphrase(event.target.value)} placeholder="At least 12 characters" /></label>
-              <label>Confirm passphrase<input type="password" autoComplete="new-password" value={evidencePassphraseConfirmation} onChange={(event) => setEvidencePassphraseConfirmation(event.target.value)} /></label>
+              <label>Original file<input disabled={busy || encrypting} type="file" onChange={(event) => { setPlaintextEvidence(event.target.files?.[0] ?? null); setCiphertext(null); setContentHash(""); setRecoveryDownload(null); }} /></label>
+              <label>Evidence passphrase<input disabled={busy || encrypting} type="password" autoComplete="new-password" value={evidencePassphrase} onChange={(event) => setEvidencePassphrase(event.target.value)} placeholder="At least 12 characters" /></label>
+              <label>Confirm passphrase<input disabled={busy || encrypting} type="password" autoComplete="new-password" value={evidencePassphraseConfirmation} onChange={(event) => setEvidencePassphraseConfirmation(event.target.value)} /></label>
+              <label>Separate backup password (optional)<input disabled={busy || encrypting} type="password" autoComplete="new-password" value={backupPassword} onChange={(event) => setBackupPassword(event.target.value)} placeholder="Protect a downloadable recovery key" /></label>
               <label>Original content SHA-256<input value={contentHash} readOnly placeholder="Calculated after encryption" /></label>
               <div className="encryptionStatus">
                 <strong>{ciphertext ? "Ciphertext ready" : "Not encrypted yet"}</strong>
@@ -755,8 +840,9 @@ export function WorkspaceClient({
             <div className="evidenceActions">
               <button className="secondary button" disabled={busy || encrypting} onClick={encryptEvidence}>{encrypting ? "Encrypting…" : "Encrypt in browser"}</button>
               <button className="primary button" disabled={busy || encrypting || !ciphertext} onClick={uploadEvidence}>Store ciphertext and record reference</button>
+              {recoveryDownload && <a className="secondary button" href={recoveryDownload.url} download={recoveryDownload.name}>Download recovery key</a>}
             </div>
-            <p className="evidenceWarning">Block-Insure never receives or stores the passphrase. Losing it makes the downloaded ciphertext unrecoverable.</p>
+            <p className="evidenceWarning">Keep the evidence passphrase, or download its recovery key and remember the separate backup password. Losing both paths makes the ciphertext unrecoverable. The server cannot restore either secret.</p>
           </article>
         )}
 
@@ -769,9 +855,12 @@ export function WorkspaceClient({
               <label>Evidence ID<input value={retrievalEvidenceId} onChange={(event) => { setRetrievalEvidenceId(event.target.value); setDecryptedEvidence(null); }} placeholder="evidence-1" /></label>
               <label>Grant ID (optional)<input value={retrievalGrantId} onChange={(event) => setRetrievalGrantId(event.target.value)} placeholder="grant-1" /></label>
               <label>Evidence passphrase<input type="password" autoComplete="current-password" value={retrievalPassphrase} onChange={(event) => setRetrievalPassphrase(event.target.value)} /></label>
+              <label>Recovery key file<input type="file" accept=".bifkey,application/json" onChange={(event) => setRecoveryFile(event.target.files?.[0] ?? null)} /></label>
+              <label>Backup password<input type="password" autoComplete="current-password" value={restorePassword} onChange={(event) => setRestorePassword(event.target.value)} /></label>
             </div>
             <div className="evidenceActions">
               <button className="primary button" disabled={busy || retrieving} onClick={retrieveEvidence}>{retrieving ? "Retrieving…" : "Retrieve and decrypt"}</button>
+              <button className="secondary button" disabled={busy || retrieving || !recoveryFile} onClick={restoreEvidenceKey}>Restore recovery key</button>
               {decryptedEvidence && <a className="secondary button" download={decryptedEvidence.name} href={decryptedEvidence.url}>Download verified plaintext</a>}
             </div>
           </article>

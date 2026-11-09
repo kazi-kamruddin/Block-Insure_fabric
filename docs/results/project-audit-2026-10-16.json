@@ -1,0 +1,382 @@
+{
+  "schemaVersion": 1,
+  "auditDate": "2026-10-16",
+  "timezone": "Asia/Dhaka",
+  "completedAt": "2026-10-16T04:09:15.630Z",
+  "status": "completed_with_followups",
+  "baseCommit": "efe7549",
+  "sourceState": "uncommitted working-tree changes",
+  "scope": [
+    "Active Next.js API and browser workflows, authentication, authorization, evidence, banking, dashboards, and events",
+    "Go insurance chaincode: policy, claim, invoice, Oracle, review, evidence, settlement, partner, banking, and benefit boundaries",
+    "Oracle worker protocol, persistence, startup, and reconnect behavior",
+    "Network/release scripts, CI checks, executable workflow model, and research/security regression tests"
+  ],
+  "preservedExistingEdits": [
+    "README.md",
+    "docs/local-demonstration.md",
+    "scripts/workflow-demo.ps1"
+  ],
+  "findings": [
+    {
+      "id": "AUTH-01",
+      "status": "fixed",
+      "description": "Restricted policy statement exports to owning policyholders, insurers, and auditors.",
+      "files": [
+        "apps/web/app/api/policies/[id]/statement/route.ts"
+      ]
+    },
+    {
+      "id": "AUTH-02",
+      "status": "fixed",
+      "description": "Scoped subjectless policyholder notifications to ledger-owned claims and policies; fail closed when ownership cannot be checked.",
+      "files": [
+        "apps/web/app/api/operations/notifications/route.ts"
+      ]
+    },
+    {
+      "id": "AUTH-03",
+      "status": "fixed",
+      "description": "Rejected inherited object properties as demo accounts and malformed session-token suffixes.",
+      "files": [
+        "apps/web/lib/auth/accounts.ts",
+        "apps/web/lib/auth/session-token.ts"
+      ]
+    },
+    {
+      "id": "VALIDATION-01",
+      "status": "fixed",
+      "description": "Unified API/workflow IDs with Go's 3–128-character key format and rejected impossible calendar dates.",
+      "files": [
+        "apps/web/lib/fabric/validation.ts"
+      ]
+    },
+    {
+      "id": "UI-01",
+      "status": "fixed",
+      "description": "Invalidated OTP challenges when the selected policy or source account changes; report failed sign-out requests.",
+      "files": [
+        "apps/web/components/workspace-client.tsx"
+      ]
+    },
+    {
+      "id": "EVIDENCE-01",
+      "status": "fixed",
+      "description": "Invalidated ciphertext when claim/evidence bindings change and disabled binding edits during encryption/upload.",
+      "files": [
+        "apps/web/components/workspace-client.tsx"
+      ]
+    },
+    {
+      "id": "PAYMENT-01",
+      "status": "fixed",
+      "description": "Prevented one premium from buying a period longer than its configured interval.",
+      "files": [
+        "chaincode/insurance-contract/src/bank_transfers.go"
+      ]
+    },
+    {
+      "id": "PAYMENT-02",
+      "status": "fixed",
+      "description": "Required the premium destination account to belong to the insurer.",
+      "files": [
+        "chaincode/insurance-contract/src/bank_transfers.go"
+      ]
+    },
+    {
+      "id": "PAYMENT-03",
+      "status": "fixed",
+      "description": "Enforced mandate period expiry and rejected mandate expiry before its next debit.",
+      "files": [
+        "chaincode/insurance-contract/src/bank_transfers.go",
+        "chaincode/insurance-contract/src/banking.go"
+      ]
+    },
+    {
+      "id": "PAYMENT-04",
+      "status": "fixed",
+      "description": "Rejected negative/overflowed bank balances and overflow in premium reversal limits.",
+      "files": [
+        "chaincode/insurance-contract/src/bank_private.go",
+        "chaincode/insurance-contract/src/banking.go"
+      ]
+    },
+    {
+      "id": "POLICY-01",
+      "status": "fixed",
+      "description": "Kept the final coverage date inclusive and allowed unpaid policies to expire.",
+      "files": [
+        "chaincode/insurance-contract/src/policy_lifecycle.go"
+      ]
+    },
+    {
+      "id": "POLICY-02",
+      "status": "fixed",
+      "description": "Aligned issued-policy paid-through and next-due dates, including coverage shorter than one interval.",
+      "files": [
+        "chaincode/insurance-contract/src/policies.go"
+      ]
+    },
+    {
+      "id": "PARTNER-01",
+      "status": "fixed",
+      "description": "Enforced agreement effective/expiry dates using the Fabric transaction timestamp.",
+      "files": [
+        "chaincode/insurance-contract/src/partners.go"
+      ]
+    },
+    {
+      "id": "EVENTS-01",
+      "status": "fixed",
+      "description": "Derived payment communications from the final event actually committed by Fabric.",
+      "files": [
+        "apps/web/lib/events/projection.ts"
+      ]
+    },
+    {
+      "id": "ORACLE-01",
+      "status": "fixed",
+      "description": "Serialized registry publication within the web process and reused unchanged snapshots.",
+      "files": [
+        "apps/web/lib/oracle/hospital-registry.ts"
+      ]
+    },
+    {
+      "id": "ORACLE-02",
+      "status": "fixed",
+      "description": "Discarded a transaction checkpoint when advancing the configured start block; rejected invalid persisted block numbers.",
+      "files": [
+        "services/oracle-worker/src/cursor.mjs"
+      ]
+    },
+    {
+      "id": "ORACLE-03",
+      "status": "fixed",
+      "description": "Attached the stream consumer before asynchronous health-file work could expose an unhandled gRPC stream error.",
+      "files": [
+        "services/oracle-worker/src/index.mjs"
+      ]
+    },
+    {
+      "id": "PERFORMANCE-01",
+      "status": "fixed",
+      "description": "Loaded only dashboard collections used by each role.",
+      "files": [
+        "apps/web/lib/dashboard/load-dashboard.ts"
+      ]
+    },
+    {
+      "id": "CLEANUP-01",
+      "status": "fixed",
+      "description": "Removed an unreachable premium-receipt helper and duplicate ignore rules.",
+      "files": [
+        "chaincode/insurance-contract/src/banking.go",
+        ".gitignore"
+      ]
+    },
+    {
+      "id": "VERIFICATION-01",
+      "status": "fixed",
+      "description": "Added formal-model and research/security regression checks to CI and the local verifier; made Go verification check formatting without rewriting source.",
+      "files": [
+        ".github/workflows/quality.yml",
+        "scripts/verify-all.ps1",
+        "chaincode/insurance-contract/scripts/test.sh"
+      ]
+    },
+    {
+      "id": "VERIFICATION-02",
+      "status": "fixed",
+      "description": "Detected newly added runtime source files omitted from a chaincode package.",
+      "files": [
+        "scripts/audit-chaincode-package.sh"
+      ]
+    },
+    {
+      "id": "VERIFICATION-03",
+      "status": "fixed",
+      "description": "Added browser/API checks that can run without Fabric/Oracle services or ledger writes.",
+      "files": [
+        "apps/web/e2e/offline.spec.ts",
+        "apps/web/playwright.offline.config.ts"
+      ]
+    },
+    {
+      "id": "DEPENDENCIES-01",
+      "status": "fixed",
+      "description": "Updated sharp to 0.35.5 and source-map-js to 1.2.2 within existing constraints.",
+      "files": [
+        "apps/web/package-lock.json"
+      ]
+    },
+    {
+      "id": "DEPENDENCIES-02",
+      "status": "partially_fixed",
+      "description": "Updated Go gRPC to 1.83.2 and compatible transitive libraries while retaining Go 1.25. The rescan no longer reports gRPC findings; Go standard-library and x/net HTTP/2 findings remain.",
+      "files": [
+        "chaincode/insurance-contract/go.mod",
+        "chaincode/insurance-contract/go.sum"
+      ]
+    }
+  ],
+  "dashboardLedgerQueries": {
+    "before": {
+      "insurerAdmin": 21,
+      "policyholder": 21,
+      "hospitalOfficer": 20,
+      "auditor": 20,
+      "bankOfficer": 21
+    },
+    "after": {
+      "insurerAdmin": 7,
+      "policyholder": 7,
+      "hospitalOfficer": 2,
+      "auditor": 4,
+      "bankOfficer": 6
+    }
+  },
+  "validation": {
+    "webUnitTests": {
+      "status": "passed",
+      "tests": 81,
+      "files": 25
+    },
+    "webLint": {
+      "status": "passed"
+    },
+    "webTypecheck": {
+      "status": "passed"
+    },
+    "webProductionBuild": {
+      "status": "passed"
+    },
+    "webWorkerSyntax": {
+      "status": "passed"
+    },
+    "oracleWorkerTests": {
+      "status": "passed",
+      "tests": 20
+    },
+    "oracleWorkerUnavailablePeerRecovery": {
+      "status": "passed",
+      "observation": "Worker remained alive, persisted DEGRADED health, and retried the stopped peer at least twice using an isolated state root and health port."
+    },
+    "goFormatting": {
+      "status": "passed"
+    },
+    "goVet": {
+      "status": "passed"
+    },
+    "goTests": {
+      "status": "passed",
+      "runtime": "go1.25.14",
+      "dependencyState": "gRPC 1.83.2 / x/net 0.58.0 / x/text 0.41.0"
+    },
+    "researchAndSecurityTests": {
+      "status": "passed",
+      "tests": 8
+    },
+    "executableWorkflowModel": {
+      "status": "passed",
+      "reachableStates": 208,
+      "invariants": 5
+    },
+    "offlineBrowserAndApi": {
+      "status": "passed",
+      "tests": 7,
+      "browser": "Microsoft Edge",
+      "coverage": [
+        "Public rendering and sign-in accessibility",
+        "Anonymous and cross-site rejection",
+        "Inherited-property account rejection",
+        "Hospital/Bank statement and workflow isolation",
+        "Invalid state keys and calendar dates",
+        "Evidence encryption binding invalidation"
+      ]
+    },
+    "operationalScriptSyntax": {
+      "status": "passed",
+      "powerShellScripts": 8,
+      "bashScripts": 18
+    },
+    "packageAuditSyntheticArchives": {
+      "status": "passed",
+      "cases": [
+        "Complete package accepted",
+        "Missing runtime file rejected",
+        "Modified runtime file rejected"
+      ]
+    },
+    "gitDiffWhitespace": {
+      "status": "passed"
+    },
+    "liveFabricJourneys": {
+      "status": "not_run",
+      "reason": "Fabric network containers were stopped. The audit did not start, reset, redeploy, or write to a preserved Fabric channel."
+    }
+  },
+  "dependencies": {
+    "webProductionAudit": {
+      "status": "passed",
+      "reportedVulnerabilities": 0
+    },
+    "webFullAudit": {
+      "status": "findings_remaining",
+      "highSeverityPackageEntries": 5,
+      "underlyingAdvisories": 1,
+      "dependencyChain": [
+        "eslint-config-next",
+        "@next/eslint-plugin-next",
+        "fast-glob",
+        "micromatch",
+        "braces"
+      ],
+      "advisory": "https://github.com/advisories/GHSA-vfj7-8cjw-p6xm",
+      "reason": "No patched braces release was listed by the advisory. npm's proposed alternative was an incompatible major downgrade of eslint-config-next; the full audit gate was retained."
+    },
+    "goVulnerabilityScan": {
+      "status": "findings_remaining",
+      "scanner": "govulncheck v1.7.0",
+      "runtime": "go1.25.14",
+      "symbolLevelFindings": 9,
+      "importOnlyFindings": 4,
+      "grpcFindings": 0,
+      "sarifReport": "verification-results/audit-go-2026-10-16.json",
+      "compactReport": "verification-results/audit-go-summary-2026-10-16.json",
+      "interpretation": "Static call reachability does not establish exploitability in the configured Fabric deployment."
+    }
+  },
+  "followups": [
+    {
+      "id": "SECURITY-01",
+      "priority": "high",
+      "action": "Upgrade the Fabric chaincode build/test toolchain together with its deployment builder to a supported patched Go release (at least Go 1.26.9 for the recorded standard-library findings), then upgrade x/net to at least 0.60.0 and rerun govulncheck and the live Fabric gate.",
+      "reason": "The x/net 0.60.0 patch requires Go 1.26.0. The current source/build scripts deliberately retain the project's Go 1.25 baseline.",
+      "sources": [
+        "https://pkg.go.dev/vuln/GO-2026-6617",
+        "https://raw.githubusercontent.com/golang/net/v0.60.0/go.mod"
+      ]
+    },
+    {
+      "id": "SECURITY-02",
+      "priority": "medium",
+      "action": "Update the development ESLint dependency chain when an upstream fix becomes available. The existing full npm audit remains non-green until this is resolved.",
+      "source": "https://github.com/advisories/GHSA-vfj7-8cjw-p6xm"
+    },
+    {
+      "id": "LIVE-01",
+      "priority": "high",
+      "action": "Package/deploy the changed chaincode to an isolated verification channel and run the full live workflow suite before using the fixes on a preserved demonstration channel.",
+      "reason": "Source tests and offline browser checks passed; these are not a live Fabric compatibility result."
+    }
+  ],
+  "deployment": {
+    "preservedLedgerUntouched": true,
+    "chaincodeChangesDeployed": false,
+    "majorProductFeaturesAdded": false
+  },
+  "limitations": [
+    "Registry publication serialization is scoped to the existing web process; multiple web replicas would require shared concurrency control.",
+    "Archived benchmark measurements were preserved and are not measurements of this modified source tree."
+  ]
+}

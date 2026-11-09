@@ -1,5 +1,8 @@
 import Link from "next/link";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { ledger } from "@/lib/fabric/ledger";
+
+export const dynamic = "force-dynamic";
 
 const capabilities = [
   ["Insurer", "Issue policies, govern packages, and authorize settlements"],
@@ -15,24 +18,41 @@ function money(minor: number) {
 }
 
 export default async function Home() {
+  const channelName = process.env.FABRIC_CHANNEL_NAME ?? "insurance-channel";
   const [packages, agreements] = await Promise.all([
     ledger.listPolicyPackages().then((items) => items.filter((item) => item.status === "PUBLISHED")).catch(() => []),
     ledger.listPartnerAgreements().then((items) => items.filter((item) => item.status === "ACTIVE")).catch(() => []),
   ]);
   const partnerName = new Map(agreements.map((item) => [item.partnerId, item.name]));
+  const showcasePackage = packages.find((item) => item.id === "showcase-health-v1");
+  const featuredPackages = showcasePackage ? [showcasePackage] : packages.slice(0, 5);
+  const remainingPackages = packages.filter((item) => !featuredPackages.some((featured) => featured.id === item.id));
+  const packageCard = (item: (typeof packages)[number]) => (
+    <article className="capability" key={item.id}>
+      <span className="index">v{item.version}</span>
+      <h3>{item.name}</h3>
+      <p>{item.description || "Published governed health coverage"}</p>
+      <p><strong>{money(item.premiumMinor)}</strong> premium · {money(item.coverageLimitMinor)} limit</p>
+      <p><strong>Hospitals:</strong> {(item.hospitalIds ?? []).map((id) => partnerName.get(id) ?? id).join(", ") || "Not configured"}</p>
+      <p><strong>Banks:</strong> {(item.bankIds ?? []).map((id) => partnerName.get(id) ?? id).join(", ") || "Not configured"}</p>
+    </article>
+  );
   return (
     <main>
-      <nav className="shell nav">
-        <a className="brand" href="#top" aria-label="Block-Insure home">
-          <span className="brandMark">BI</span>
-          <span>Block-Insure</span>
-        </a>
-        <div className="navLinks">
-          <Link href="/showcase">Presentation</Link>
-          <Link href="/workspace">Workspaces</Link>
-          <span className="networkPill"><i /> insurance-channel</span>
-        </div>
-      </nav>
+      <header className="floatingNavWrapper">
+        <nav className="shell nav">
+          <a className="brand" href="#top" aria-label="Block-Insure home">
+            <span className="brandMark">BI</span>
+            <span>Block-Insure</span>
+          </a>
+          <div className="navLinks">
+            <Link href="/showcase">Presentation</Link>
+            <Link href="/workspace">Workspaces</Link>
+            <span className="networkPill"><span className="status-dot-pulse" aria-hidden="true" /> {channelName}</span>
+            <ThemeToggle />
+          </div>
+        </nav>
+      </header>
 
       <section className="shell hero" id="top">
         <div className="eyebrow">Hyperledger Fabric · Permissioned by design</div>
@@ -53,18 +73,15 @@ export default async function Home() {
           <div><span className="kicker">Public policy catalog</span><h2>Published coverage packages</h2></div>
           <p>These package versions are read from the live Fabric ledger. Purchase and policy management remain inside the policyholder workspace.</p>
         </div>
-        <div className="capabilityGrid">
-          {packages.length ? packages.map((item) => (
-            <article className="capability" key={item.id}>
-              <span className="index">v{item.version}</span>
-              <h3>{item.name}</h3>
-              <p>{item.description || "Published governed health coverage"}</p>
-              <p><strong>{money(item.premiumMinor)}</strong> premium · {money(item.coverageLimitMinor)} limit</p>
-              <p><strong>Hospitals:</strong> {(item.hospitalIds ?? []).map((id) => partnerName.get(id) ?? id).join(", ") || "Not configured"}</p>
-              <p><strong>Banks:</strong> {(item.bankIds ?? []).map((id) => partnerName.get(id) ?? id).join(", ") || "Not configured"}</p>
-            </article>
-          )) : <article className="capability"><h3>Catalog unavailable</h3><p>Start or verify the Fabric network to load published packages.</p></article>}
+        <div className="capabilityGrid featuredCatalog">
+          {featuredPackages.length ? featuredPackages.map(packageCard) : <article className="capability"><h3>Catalog unavailable</h3><p>Start or verify the Fabric network to load published packages.</p></article>}
         </div>
+        {remainingPackages.length > 0 && (
+          <details className="catalogMore">
+            <summary>Browse {remainingPackages.length} more published package versions</summary>
+            <div className="capabilityGrid">{remainingPackages.map(packageCard)}</div>
+          </details>
+        )}
       </section>
 
       <section className="shell network" id="network">

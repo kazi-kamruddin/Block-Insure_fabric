@@ -262,6 +262,12 @@ func TestBankAccountPrivateDataBoundary(t *testing.T) {
 	setIdentity(ctx, "hospital", "HospitalMSP", "hospitalOfficer", nil)
 	_, err = contract.ReadBankAccountReference(ctx, account.ID)
 	requireError(t, err, "shared only with BankMSP and InsurerMSP")
+	setIdentity(ctx, "auditor", "AuditorMSP", "auditor", nil)
+	_, err = contract.ReadBankAccountReference(ctx, account.ID)
+	requireError(t, err, "shared only with BankMSP and InsurerMSP")
+	setIdentity(ctx, "different-policyholder", "InsurerMSP", "policyholder", map[string]string{"subjectId": "policyholder2"})
+	_, err = contract.ReadBankAccountReference(ctx, account.ID)
+	requireError(t, err, "owning policyholder is required")
 	setIdentity(ctx, "policyholder", "InsurerMSP", "policyholder", map[string]string{"subjectId": "policyholder1"})
 	owned, err := contract.ReadBankAccountReference(ctx, account.ID)
 	requireNoError(t, err)
@@ -354,6 +360,11 @@ func TestPolicyToSettlementWorkflow(t *testing.T) {
 	setIdentity(ctx, "bank-officer", "BankMSP", "bankOfficer", nil)
 	_, err = contract.ConfirmSettlement(ctx, "settlement-001", "payout-settlement-001", hashC)
 	requireNoError(t, err)
+	var payoutEvent map[string]any
+	requireNoError(t, json.Unmarshal(ctx.stub.eventValue, &payoutEvent))
+	if ctx.stub.eventName != "SettlementConfirmed" || payoutEvent["policyId"] != "policy-001" || payoutEvent["claimantId"] != "policyholder1" || payoutEvent["transferId"] != "payout-settlement-001" {
+		t.Fatalf("committed payout event lost delivery context: %s %s", ctx.stub.eventName, ctx.stub.eventValue)
+	}
 	sourceAccount, err := contract.ReadBankAccountReference(ctx, "settlement-insurer")
 	requireNoError(t, err)
 	destinationAccount, err := contract.ReadBankAccountReference(ctx, "settlement-customer")
@@ -457,6 +468,10 @@ func TestDistributedReviewAppealAndFraudDecisionSupport(t *testing.T) {
 	_, err = contract.RecordAuditorDecision(ctx, "review-initial", "decision-r1-duplicate", "REJECT", hashC)
 	requireError(t, err, "already voted")
 	setIdentity(ctx, "auditor2-cert", "AuditorMSP", "auditor", map[string]string{"subjectId": "auditor2"})
+	ctx.stub.timestamp = timestamppb.New(time.Date(2026, time.September, 9, 12, 0, 0, 0, time.UTC))
+	_, err = contract.RecordAuditorDecision(ctx, "review-initial", "decision-r1-late", "REJECT", hashC)
+	requireError(t, err, "deadline has passed")
+	ctx.stub.timestamp = timestamppb.New(time.Date(2026, time.September, 5, 12, 0, 0, 0, time.UTC))
 	_, err = contract.RecordAuditorDecision(ctx, "review-initial", "decision-r1-a2", "REJECT", hashC)
 	requireNoError(t, err)
 	claim, err = contract.ReadClaim(ctx, "claim-review")
@@ -480,7 +495,7 @@ func TestDistributedReviewAppealAndFraudDecisionSupport(t *testing.T) {
 	requireError(t, err, "fresh hospital and Oracle verification")
 	_, err = contract.RequestOracleVerification(
 		ctx, "request-appeal-too-early", "claim-review", "registry-appeal", "model-v1", hashA,
-		`["oracle1","oracle2"]`, "2026-09-05T12:05:00Z", "2026-09-05T12:10:00Z",
+		`["oracle1","oracle2"]`, 2, "2026-09-05T12:05:00Z", "2026-09-05T12:10:00Z",
 	)
 	requireError(t, err, "current verified hospital attestation")
 
@@ -498,7 +513,7 @@ func TestDistributedReviewAppealAndFraudDecisionSupport(t *testing.T) {
 	requireNoError(t, err)
 	appealRequest, err := contract.RequestOracleVerification(
 		ctx, "request-appeal-review", "claim-review", "registry-appeal", "model-v1", hashA,
-		`["oracle1","oracle2"]`, "2026-09-05T12:05:00Z", "2026-09-05T12:10:00Z",
+		`["oracle1","oracle2"]`, 2, "2026-09-05T12:05:00Z", "2026-09-05T12:10:00Z",
 	)
 	requireNoError(t, err)
 	resultHash := oracleResultDigest(appealRequest, false, "RECORD_INVALID", hashC)
@@ -587,7 +602,7 @@ func TestPartnerNetworkAndIndependentHospitalInvoiceCrossCheck(t *testing.T) {
 	}
 
 	setIdentity(ctx, "hospital1-cert", "HospitalMSP", "hospitalOfficer", map[string]string{"subjectId": "hospital1"})
-	invoice, err := contract.CreateHospitalInvoice(ctx, "invoice-1001", hashA, hashB, hashC, 250_000, "2026-06-10", "2026-06-20", "FINALIZED")
+	invoice, err := contract.CreateHospitalInvoice(ctx, "invoice-1001", patientSubjectHash("policyholder1"), hashB, hashC, 250_000, "2026-06-10", "2026-06-20", "FINALIZED")
 	requireNoError(t, err)
 	if invoice.HospitalID != "hospital1" || invoice.Status != "FINALIZED" {
 		t.Fatalf("Hospital invoice ownership was not captured: %+v", invoice)
@@ -609,15 +624,12 @@ func TestPartnerNetworkAndIndependentHospitalInvoiceCrossCheck(t *testing.T) {
 	requireError(t, err, "Hospital users only maintain invoices")
 
 	setIdentity(ctx, "insurer-admin", "InsurerMSP", "insurerAdmin", nil)
-	verification, err := contract.CrossCheckClaimInvoice(ctx, claim.ID, "invoice-check-1001")
-	requireNoError(t, err)
-	if verification.Outcome != "VERIFIED" || verification.HospitalIdentity != "hospital1" || verification.ClinicalReferenceHash != hashB {
-		t.Fatalf("insurer invoice cross-check did not retain Hospital provenance: %+v", verification)
-	}
+	_, err = contract.CrossCheckClaimInvoice(ctx, claim.ID, "invoice-check-1001")
+	requireError(t, err, "use Oracle verification")
 	claim, err = contract.ReadClaim(ctx, claim.ID)
 	requireNoError(t, err)
-	if claim.Status != "HOSPITAL_VERIFIED" {
-		t.Fatalf("verified invoice did not advance the claim: %+v", claim)
+	if claim.Status != "SUBMITTED" {
+		t.Fatalf("the insurer changed an invoice claim verdict: %+v", claim)
 	}
 }
 
@@ -948,6 +960,10 @@ func TestBenefitsBeneficiariesAndLiabilityLifecycle(t *testing.T) {
 }
 
 func setupOracleRequest(t *testing.T, suffix string) (*Contract, *testContext, *OracleRequest) {
+	return setupOracleRequestWithProfile(t, suffix, `["oracle1","oracle2"]`, 2)
+}
+
+func setupOracleRequestWithProfile(t *testing.T, suffix, assignedOracleIDsJSON string, requiredConfirmations int) (*Contract, *testContext, *OracleRequest) {
 	t.Helper()
 	contract := &Contract{}
 	ctx := &testContext{stub: newMemoryStub()}
@@ -991,7 +1007,8 @@ func setupOracleRequest(t *testing.T, suffix string) (*Contract, *testContext, *
 		"registry-oracle-"+suffix,
 		"model-v1",
 		hashC,
-		`["oracle1","oracle2"]`,
+		assignedOracleIDsJSON,
+		requiredConfirmations,
 		"2026-09-05T12:05:00Z",
 		"2026-09-05T12:10:00Z",
 	)
@@ -1084,6 +1101,56 @@ func TestOracleAuthorizationCommitRevealAndExactSuccess(t *testing.T) {
 	setIdentity(ctx, "insurer-admin", "InsurerMSP", "insurerAdmin", nil)
 	_, err = contract.AuthorizeSettlement(ctx, "settlement-oracle-success", claim.ID, "account-insurer-oracle-success", "account-customer-oracle-success")
 	requireNoError(t, err)
+}
+
+func TestOracleTwoOfThreeThresholdConsensus(t *testing.T) {
+	t.Run("one divergent result is tolerated", func(t *testing.T) {
+		contract, ctx, request := setupOracleRequestWithProfile(t, "threshold-majority", `["oracle1","oracle2","oracle3"]`, 2)
+		if request.ExpectedResponses != 3 || request.RequiredConfirmations != 2 {
+			t.Fatalf("unexpected threshold profile: %+v", request)
+		}
+		validRecord := strings.Repeat("d", 64)
+		divergentRecord := strings.Repeat("e", 64)
+		validResult := commitOracleTestResult(t, contract, ctx, request, "oracle1", true, "VERIFIED", validRecord, strings.Repeat("1", 64))
+		divergentResult := commitOracleTestResult(t, contract, ctx, request, "oracle2", false, "REGISTRY_ROOT_MISMATCH", divergentRecord, strings.Repeat("2", 64))
+		commitOracleTestResult(t, contract, ctx, request, "oracle3", true, "VERIFIED", validRecord, strings.Repeat("3", 64))
+
+		revealOracleTestResult(t, contract, ctx, request, "oracle2", false, "REGISTRY_ROOT_MISMATCH", divergentRecord, divergentResult, strings.Repeat("2", 64))
+		revealOracleTestResult(t, contract, ctx, request, "oracle1", true, "VERIFIED", validRecord, validResult, strings.Repeat("1", 64))
+		revealOracleTestResult(t, contract, ctx, request, "oracle3", true, "VERIFIED", validRecord, validResult, strings.Repeat("3", 64))
+
+		claim, err := contract.ReadClaim(ctx, request.ClaimID)
+		requireNoError(t, err)
+		finalRequest, err := contract.ReadOracleRequest(ctx, request.ID)
+		requireNoError(t, err)
+		if claim.Status != "APPROVED" || finalRequest.Status != "CONSENSUS" || finalRequest.RevealCount != 3 {
+			t.Fatalf("2-of-3 majority did not approve the claim: request=%+v claim=%+v", finalRequest, claim)
+		}
+	})
+
+	t.Run("one unavailable Oracle is tolerated after commit deadline", func(t *testing.T) {
+		contract, ctx, request := setupOracleRequestWithProfile(t, "threshold-unavailable", `["oracle1","oracle2","oracle3"]`, 2)
+		recordHash := strings.Repeat("d", 64)
+		resultHash := commitOracleTestResult(t, contract, ctx, request, "oracle1", true, "VERIFIED", recordHash, strings.Repeat("1", 64))
+		commitOracleTestResult(t, contract, ctx, request, "oracle2", true, "VERIFIED", recordHash, strings.Repeat("2", 64))
+		ctx.stub.timestamp = timestamppb.New(time.Date(2026, time.September, 5, 12, 6, 0, 0, time.UTC))
+		revealOracleTestResult(t, contract, ctx, request, "oracle1", true, "VERIFIED", recordHash, resultHash, strings.Repeat("1", 64))
+		revealOracleTestResult(t, contract, ctx, request, "oracle2", true, "VERIFIED", recordHash, resultHash, strings.Repeat("2", 64))
+		finalRequest, err := contract.ReadOracleRequest(ctx, request.ID)
+		requireNoError(t, err)
+		if finalRequest.Status != "CONSENSUS" || finalRequest.CommitmentCount != 2 || finalRequest.RevealCount != 2 {
+			t.Fatalf("available majority did not finalize after the commit deadline: %+v", finalRequest)
+		}
+	})
+
+	t.Run("unsafe thresholds are rejected", func(t *testing.T) {
+		if _, err := parseOracleAssignments(`["oracle1","oracle2","oracle3"]`, 1); err == nil || !strings.Contains(err.Error(), "strict majority") {
+			t.Fatalf("expected non-majority threshold rejection, got %v", err)
+		}
+		if _, err := parseOracleAssignments(`["oracle1","oracle1","oracle3"]`, 2); err == nil || !strings.Contains(err.Error(), "duplicated") {
+			t.Fatalf("expected duplicate assignment rejection, got %v", err)
+		}
+	})
 }
 
 func TestOracleNegativeConflictTimeoutAndFallback(t *testing.T) {
@@ -1229,7 +1296,7 @@ func TestOracleDeadlinesStaleVersionsAndAppealIsolation(t *testing.T) {
 	setIdentity(ctx, "insurer-admin", "InsurerMSP", "insurerAdmin", nil)
 	_, err = contract.RequestOracleVerification(
 		ctx, "request-oracle-appeal-too-early", claim.ID, request.RegistrySnapshotID, request.ModelVersion, request.ModelHash,
-		`["oracle1","oracle2"]`, "2026-09-05T12:05:00Z", "2026-09-05T12:10:00Z",
+		`["oracle1","oracle2"]`, 2, "2026-09-05T12:05:00Z", "2026-09-05T12:10:00Z",
 	)
 	requireError(t, err, "current verified hospital attestation")
 	setIdentity(ctx, "hospital", "HospitalMSP", "hospitalOfficer", map[string]string{"subjectId": "hospital1"})
@@ -1238,7 +1305,7 @@ func TestOracleDeadlinesStaleVersionsAndAppealIsolation(t *testing.T) {
 	setIdentity(ctx, "insurer-admin", "InsurerMSP", "insurerAdmin", nil)
 	appealRequest, err := contract.RequestOracleVerification(
 		ctx, "request-oracle-appeal", claim.ID, request.RegistrySnapshotID, request.ModelVersion, request.ModelHash,
-		`["oracle1","oracle2"]`, "2026-09-05T12:05:00Z", "2026-09-05T12:10:00Z",
+		`["oracle1","oracle2"]`, 2, "2026-09-05T12:05:00Z", "2026-09-05T12:10:00Z",
 	)
 	requireNoError(t, err)
 	if appealRequest.ClaimVersion != 2 || appealRequest.QueryHash == request.QueryHash || appealRequest.AppealID != appeal.ID || appealRequest.AppealCommitmentHash != appeal.CommitmentHash {
@@ -1268,11 +1335,129 @@ func TestOracleProtocolMatchesWorkerHashVector(t *testing.T) {
 		ModelVersion: "model-v1", ModelHash: strings.Repeat("4", 64),
 	}
 	resultHash := oracleResultDigest(request, true, "VERIFIED", strings.Repeat("5", 64))
-	if resultHash != "82f423a623598cfdcbff6239a447f9ac774eec08175ba8c2f76ae7485e131eb7" {
+	if resultHash != "26b3db31914509e7d5935b2726389ef5958b7987f530e96d9afeeeff41570bbe" {
 		t.Fatalf("Go Oracle result hash diverged from the Node worker: %s", resultHash)
 	}
 	commitment := oracleCommitmentDigest(request, true, resultHash, strings.Repeat("6", 64))
-	if commitment != "d72e0d6dc8003404d09d75d6db5d5e7eba6f48437c536784b97c6f1afcc0a942" {
+	if commitment != "2228c3f37167b622a585bc56361063a2ab8850b57887e7d998ca2b7f0b3b3133" {
 		t.Fatalf("Go Oracle commitment diverged from the Node worker: %s", commitment)
+	}
+}
+
+func TestSelectiveDisclosureCredentialAndPresentationLifecycle(t *testing.T) {
+	contract := &Contract{}
+	ctx := &testContext{stub: newMemoryStub()}
+	hashA := strings.Repeat("a", 64)
+	hashB := strings.Repeat("b", 64)
+	hashC := strings.Repeat("c", 64)
+
+	invoice := &HospitalInvoice{
+		AssetType: "hospitalInvoice", SchemaVersion: SchemaVersion, ID: "invoice-private-1", HospitalID: "hospital1",
+		PatientReferenceHash: patientSubjectHash("policyholder1"), InvoiceReferenceHash: hashB, TreatmentHash: hashC, AmountMinor: 50_000,
+		AdmissionDate: "2026-06-10", DischargeDate: "2026-06-20", Status: "FINALIZED",
+	}
+	policy := &Policy{
+		AssetType: "policy", SchemaVersion: SchemaVersion, ID: "policy-private-1", PackageID: "package-private-1",
+		PolicyholderID: "policyholder1", StartDate: "2026-01-01", EndDate: "2026-12-31",
+		PremiumMinor: 1_000, CoverageLimitMinor: 100_000, TermsHash: hashC, Status: "ACTIVE",
+	}
+	claim := &Claim{
+		AssetType: "claim", SchemaVersion: SchemaVersion, ID: "claim-private-1", PolicyID: policy.ID,
+		ClaimantID: "policyholder1", HospitalID: "hospital1", HospitalInvoiceID: invoice.ID,
+		AmountMinor: 50_000, IncidentDate: "2026-06-15", DescriptionHash: hashA,
+		HospitalVerificationID: "verification-private-1", Version: 1, Status: "HOSPITAL_VERIFIED",
+	}
+	requireNoError(t, putState(ctx, "hospitalInvoice", invoice.ID, invoice))
+	requireNoError(t, putState(ctx, "policy", policy.ID, policy))
+	requireNoError(t, putState(ctx, "claim", claim.ID, claim))
+
+	setSalts := func(names []string, value string) {
+		salts := make(map[string]string, len(names))
+		for _, name := range names {
+			salts[name] = value
+		}
+		payload, err := json.Marshal(salts)
+		requireNoError(t, err)
+		ctx.stub.transient["credentialSalts"] = payload
+	}
+
+	setIdentity(ctx, "hospital1-cert", "HospitalMSP", "hospitalOfficer", map[string]string{"subjectId": "hospital1"})
+	setSalts([]string{"admissionDate", "amountMinor", "dischargeDate", "hospitalId", "invoiceId", "invoiceReferenceHash", "patientReferenceHash", "status", "treatmentHash"}, hashA)
+	invoiceCredential, err := contract.IssueInvoicePrivacyCredential(ctx, "credential-invoice-1", invoice.ID, "2027-01-01T00:00:00Z")
+	requireNoError(t, err)
+
+	setIdentity(ctx, "insurer-admin", "InsurerMSP", "insurerAdmin", nil)
+	setSalts([]string{"coverageLimitMinor", "endDate", "packageId", "policyId", "policyholderId", "premiumMinor", "startDate", "status", "termsHash"}, hashB)
+	policyCredential, err := contract.IssuePolicyPrivacyCredential(ctx, "credential-policy-1", policy.ID, "2027-01-01T00:00:00Z")
+	requireNoError(t, err)
+	if invoiceCredential.RootHash == policyCredential.RootHash {
+		t.Fatal("independent credentials unexpectedly produced the same Merkle root")
+	}
+
+	setIdentity(ctx, "policyholder-cert", "InsurerMSP", "policyholder", map[string]string{"subjectId": "policyholder1"})
+	presentation, err := contract.RegisterClaimPrivacyPresentation(
+		ctx, "presentation-private-1", claim.ID, invoiceCredential.ID, policyCredential.ID,
+		"challenge-private-1", "2026-09-06T12:00:00Z",
+	)
+	requireNoError(t, err)
+	if presentation.Status != "VERIFIED" || presentation.ClaimVersion != 1 || presentation.PresentationHash == "" {
+		t.Fatalf("unexpected public presentation: %+v", presentation)
+	}
+	publicJSON, err := json.Marshal(presentation)
+	requireNoError(t, err)
+	if strings.Contains(string(publicJSON), invoice.TreatmentHash) || strings.Contains(string(publicJSON), invoice.PatientReferenceHash) {
+		t.Fatalf("public presentation leaked undisclosed medical fields: %s", publicJSON)
+	}
+	setIdentity(ctx, "different-policyholder-cert", "InsurerMSP", "policyholder", map[string]string{"subjectId": "policyholder2"})
+	_, err = contract.ReadSelectiveDisclosurePresentationPrivate(ctx, presentation.ID)
+	requireError(t, err, "belongs to another policyholder")
+	setIdentity(ctx, "auditor-cert", "AuditorMSP", "auditor", map[string]string{"subjectId": "auditor1"})
+	_, err = contract.ReadSelectiveDisclosurePresentationPrivate(ctx, presentation.ID)
+	requireError(t, err, "access denied")
+	setIdentity(ctx, "policyholder-cert", "InsurerMSP", "policyholder", map[string]string{"subjectId": "policyholder1"})
+	_, err = contract.ReadSelectiveDisclosurePresentationPrivate(ctx, presentation.ID)
+	requireNoError(t, err)
+
+	setIdentity(ctx, "oracle1-cert", "OracleMSP", "oracle", map[string]string{"subjectId": "oracle1"})
+	private, err := contract.ReadSelectiveDisclosurePresentationPrivate(ctx, presentation.ID)
+	requireNoError(t, err)
+	if len(private.Disclosures) != len(invoiceDisclosureNames)+len(policyDisclosureNames) {
+		t.Fatalf("unexpected disclosure count: %+v", private)
+	}
+	for _, disclosure := range private.Disclosures {
+		root := invoiceCredential.RootHash
+		if disclosure.CredentialID == policyCredential.ID {
+			root = policyCredential.RootHash
+		}
+		if !verifyPrivacyDisclosure(disclosure, root) {
+			t.Fatalf("valid disclosure proof rejected: %+v", disclosure)
+		}
+	}
+
+	tampered := private.Disclosures[0]
+	tampered.Value += "-tampered"
+	if verifyPrivacyDisclosure(tampered, invoiceCredential.RootHash) {
+		t.Fatal("tampered selective disclosure was accepted")
+	}
+
+	setIdentity(ctx, "hospital2-cert", "HospitalMSP", "hospitalOfficer", map[string]string{"subjectId": "hospital2"})
+	_, err = contract.RevokePrivacyCredential(ctx, invoiceCredential.ID)
+	requireError(t, err, "only credential issuer")
+	setIdentity(ctx, "hospital1-cert", "HospitalMSP", "hospitalOfficer", map[string]string{"subjectId": "hospital1"})
+	revoked, err := contract.RevokePrivacyCredential(ctx, invoiceCredential.ID)
+	requireNoError(t, err)
+	if revoked.Status != "REVOKED" {
+		t.Fatalf("credential revocation was not recorded: %+v", revoked)
+	}
+	setIdentity(ctx, "policyholder-cert", "InsurerMSP", "policyholder", map[string]string{"subjectId": "policyholder1"})
+	_, err = contract.RegisterClaimPrivacyPresentation(ctx, "presentation-private-2", claim.ID, invoiceCredential.ID, policyCredential.ID, "challenge-private-2", "2026-09-06T12:00:00Z")
+	requireError(t, err, "not active")
+	unchanged, err := contract.ReadSelectiveDisclosurePresentation(ctx, presentation.ID)
+	requireNoError(t, err)
+	if unchanged.Status != "VERIFIED" {
+		t.Fatalf("existing presentation changed after credential revocation: %+v", unchanged)
+	}
+	if err := contract.validatePresentationCredentials(ctx, unchanged, time.Date(2026, 9, 6, 12, 0, 0, 0, time.UTC)); err == nil || !strings.Contains(err.Error(), "inactive") {
+		t.Fatalf("revoked credential remained usable through an old presentation: %v", err)
 	}
 }

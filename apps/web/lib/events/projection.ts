@@ -110,6 +110,19 @@ function notificationTargets(event: IndexedFabricEvent) {
 
 function communicationFor(event: IndexedFabricEvent, createdAt: string): BankCommunication | null {
   const p = event.payload;
+  // Fabric commits one chaincode event per transaction. These terminal events
+  // replace BankTransferProcessed when the same transaction also writes a
+  // receipt, reversal, collection, or settlement. Project their transfer facts directly.
+  const transferId = text(p, "transferId");
+  if (transferId && ["PremiumPaymentRecorded", "PremiumAdjustmentRecorded", "PremiumCollectionProcessed", "SettlementConfirmed", "SettlementPaymentFailed"].includes(event.eventName)) {
+    const method = event.eventName === "PremiumPaymentRecorded" ? text(p, "method")
+      : event.eventName === "PremiumAdjustmentRecorded" ? "REVERSAL"
+      : event.eventName === "PremiumCollectionProcessed" ? "EFT" : "CLAIM_PAYOUT";
+    const status = event.eventName === "SettlementPaymentFailed" || text(p, "status") === "BOUNCED" ? "BOUNCED" : "SETTLED";
+    // A collection can also be moved to RETRY without executing a transfer.
+    if (event.eventName === "PremiumCollectionProcessed" && !["COMPLETED", "BOUNCED"].includes(text(p, "status"))) return null;
+    return communicationFor({ ...event, eventName: "BankTransferProcessed", payload: { ...p, id: transferId, method, status } }, createdAt);
+  }
   if (event.eventName === "BankTransferProcessed" && text(p, "policyId")) {
     const method = text(p, "method");
     const status = text(p, "status");
@@ -166,9 +179,11 @@ export function applyFabricEvent(current: EventProjection, event: IndexedFabricE
   };
 }
 
-export function notificationsFor(projection: EventProjection, role: string, subject = "") {
+export function notificationsFor(projection: EventProjection, role: string, subject = "", ownedAssetIds: ReadonlySet<string> = new Set()) {
   return projection.notifications.filter((item) => item.recipientRole === role &&
-    (!item.recipientSubject || item.recipientSubject === "*" || item.recipientSubject === subject));
+    (item.recipientSubject === "*" || (item.recipientSubject
+      ? item.recipientSubject === subject
+      : role !== "policyholder" || ownedAssetIds.has(item.assetId))));
 }
 
 export function communicationsFor(projection: EventProjection) {

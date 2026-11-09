@@ -6,6 +6,12 @@ network_root="$(cd -- "${script_dir}/.." && pwd -P)"
 samples_root="${network_root}/.fabric/fabric-samples"
 organizations="${network_root}/organizations"
 channel_name="${CHANNEL_NAME:-insurance-channel}"
+invoice_date_from="2026-06-10"
+invoice_date_through="2026-06-20"
+if [[ "${channel_name}" == insurance-workflow-* ]]; then
+  invoice_date_from="$(TZ=Asia/Dhaka date +%F)"
+  invoice_date_through="${invoice_date_from}"
+fi
 chaincode_name="${CHAINCODE_NAME:-insurance-contract}"
 orderer_ca="${organizations}/ordererOrganizations/blockinsure.test/orderers/orderer.blockinsure.test/tls/ca.crt"
 
@@ -131,7 +137,7 @@ for index in 1 2 3 4 5; do
   printf -v invoice_lookup_hash '%064x' "$((index + 16))"
   set_client_context hospital HospitalMSP 8051 "hospital${index}"
   if ! exists ReadHospitalInvoice "${invoice_id}"; then
-    invoke CreateHospitalInvoice "${invoice_id}" "${hash_a}" "${invoice_lookup_hash}" "${registry_root}" "$((200000 + index * 10000))" 2026-06-10 2026-06-20 FINALIZED
+    invoke CreateHospitalInvoice "${invoice_id}" "$(printf %s policyholder1 | sha256sum | cut -d' ' -f1)" "${invoice_lookup_hash}" "${registry_root}" "$((200000 + index * 10000))" "${invoice_date_from}" "${invoice_date_through}" FINALIZED
   fi
 done
 

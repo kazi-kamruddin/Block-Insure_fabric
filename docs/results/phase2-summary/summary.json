@@ -1,0 +1,2383 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-09-26T18:18:54.680Z",
+  "inputSha256": {
+    "phase2-comparative/latest.json": "1dc33021d6950f3b6773c8c61048a199067fdd93b504b828bfe84934e5d9b3c6",
+    "phase2-security/latest.json": "6035c1997dab9cf75d8b7ace0f0fa25b3869d42ff9df6c398a20c7cbd50f9e42",
+    "phase2-protocol/protocol-matrix.json": "dfe8ffd9b6e326b0a29cdcd9384e51117c8c46e777bec19f381ebd84394075b0",
+    "phase2-faults.json": "2343ec3ec2f0a7677dbc39cd83fef4ba5b8062fa1731f8d6f42bb79475ef834d",
+    "phase2-live-ledger.json": "d4f4ff401ecaef5e54a255a1f9a59469a05fa89af3d1dec6aed77540bf1ba099",
+    "phase2-caliper/run1.log": "a49ca7b5e31560294319562548ab14caca433d4ded54666af16b7ac8d3b06d1b",
+    "phase2-caliper/run2.log": "c0802cdb4be9860013375ceb158184b2dfbbd1fba3954d7f48630d0ca76bd2af",
+    "phase2-caliper/run3.log": "a13aec2abd2305fb230234ad90b477ca0706a52d5b7f103ce2260e177dbe96b4",
+    "phase2-caliper/samples/run1-round4-worker0.json": "90644a9a1e6eb9ffd8e844fe71dd27effb528456d908af2480c69dd03e8f6755",
+    "phase2-caliper/samples/run1-round4-worker1.json": "662f80ca8be81ba4a26da57688738145951d6310fddca0a6c1e4fc7f2c27fe82",
+    "phase2-caliper/samples/run1-round5-worker0.json": "1b1cb43c00e93d1031f8a9a3c6c90a99c5bc966918cddfe85f0306a968e56109",
+    "phase2-caliper/samples/run1-round5-worker1.json": "58b9a542c09a81143ab4ccbf4b75d7ca30a9e745d420f617a24488310670509a",
+    "phase2-caliper/samples/run1-round6-worker0.json": "d42bfaa050054a5cc5c5b1826c733106d68b658907f0177c2d67078e8653333b",
+    "phase2-caliper/samples/run1-round6-worker1.json": "8c92a43a348791e2705d73437669527fea8fac4b19941538895a7b7abb934c59",
+    "phase2-caliper/samples/run1-round7-worker0.json": "ac6ae83d06eeba46686b5b9850101c26ecd2c51e67e986e15a71bf3ab733e4f7",
+    "phase2-caliper/samples/run1-round7-worker1.json": "55db47d28f55966f4185f3da102e688d7be457cdbf2853e787c0c5ca412596d0",
+    "phase2-caliper/samples/run1-round8-worker0.json": "0c5f3cd5d54514a6a0c2748e9af29bf543d3b55b3f05149f14e24999dc0294fe",
+    "phase2-caliper/samples/run1-round8-worker1.json": "993562bac11a01fe717cad8b9df78db0249a7d0cf843e117014a8dc50fd74850",
+    "phase2-caliper/samples/run1-round9-worker1.json": "6fd8e4d65fe52786bc9d4e68aef272b8a773bdc471d47d7e90336bf07b194d4f",
+    "phase2-caliper/samples/run1-round9-worker0.json": "070c1a6b512487b58b2832f7dfb05b721d32b9ef6b97c2248f94530946e10314",
+    "phase2-caliper/samples/run1-round10-worker0.json": "006188870bb0dba6851db09e72603c90569dcf39d5fccbc3499ba393343a56c2",
+    "phase2-caliper/samples/run1-round10-worker1.json": "9ef7af337ebee008af4dbf5a54eebcc416af57ab84320d155ce96fe172f149f8",
+    "phase2-caliper/samples/run1-round11-worker0.json": "a4348b88272cc849964161528a586ad7b91c145f944390a56cd118c544d42fd3",
+    "phase2-caliper/samples/run1-round11-worker1.json": "1dd22d1e21eac1df19e6a4caad587c5572fae2f6de49d5d17cf869c5a75cb162",
+    "phase2-caliper/samples/run1-round12-worker0.json": "2d98ca120e36612c6c5429987f3ec4decac7186e24793332c699c67e103692f2",
+    "phase2-caliper/samples/run1-round12-worker1.json": "0583013e3235fff76490c2e7bafeaa7ff8af0cf675c01fdce57649e039a9dc21",
+    "phase2-caliper/samples/run1-round13-worker0.json": "37afa5e1684cbf6b4bbcb04722c9c5955ca37673211ad670fa5c71ffe9eed2cf",
+    "phase2-caliper/samples/run1-round13-worker1.json": "2b875052ce1b50d9c9250c417ce6fb4c9fd5e9c4a01b8f01b2aad7a8af052e6c",
+    "phase2-caliper/samples/run1-round14-worker0.json": "407f24fa625c2bd93d620b867248653221e24d175d4b213fd8a068b5eec2c46b",
+    "phase2-caliper/samples/run1-round14-worker1.json": "32efb3bc0b9f577a90222599185e23259b9d6563e2c82dd366482afc5be2718c",
+    "phase2-caliper/samples/run1-round15-worker0.json": "fabff96cae3db78c49ed7fc7270d7b1304491006f1c90742569a04ccca1b542e",
+    "phase2-caliper/samples/run1-round15-worker1.json": "68bc591e6283a0053ed4ca7b56d248f45337a6b0df190bebc92f0a9b9ea66414",
+    "phase2-caliper/samples/run1-round16-worker0.json": "0d825608e600d39c850e054dd1560607eaa7806b959a76dce9f2bcd2ce1cbf27",
+    "phase2-caliper/samples/run1-round16-worker1.json": "c0a5fd92a190dc228796f780fba3e278e21dbbae4e41962379fed167eaf0afd7",
+    "phase2-caliper/samples/run1-round17-worker0.json": "48ccd6ad2a7fa6d3ae80f39d15a058f020a32e05a9a3740a3b043c8a08680a89",
+    "phase2-caliper/samples/run1-round17-worker1.json": "62fe557356af1f686355bedf4c0ad33bc7faa177dcbedf7a4eeb0c4cd1eef9d4",
+    "phase2-caliper/samples/run1-round18-worker0.json": "18bd3f69579585f5c78e6591e1aaa8d25b6e734eda7332096ac4883b090d3fd1",
+    "phase2-caliper/samples/run1-round18-worker1.json": "f43ebb811a62981d724a280acc4f53c1489c51a2bdbb0392e50e06ab2ee65098",
+    "phase2-caliper/samples/run2-round4-worker0.json": "d446a9bacb067c61bb02be4a65421f59a6ee1ccafe374784cbd0bc01f4d369c4",
+    "phase2-caliper/samples/run2-round4-worker1.json": "ba85022a50a722b7af0398c68f6747df6d9ca249e37c19d3929fee3ee68bcf54",
+    "phase2-caliper/samples/run2-round5-worker0.json": "1065da8a97928be2ceea98595da8e65877cc163715a2d9d7160490c0b6765194",
+    "phase2-caliper/samples/run2-round5-worker1.json": "c205fb6927050fa6f17452cba6da176b58882db2608ee788ca84acd397bc03e0",
+    "phase2-caliper/samples/run2-round6-worker0.json": "baee5a3aad907cf8ae8e523b1b8c543ef7aa5a965a6386b62884365a319fb4ca",
+    "phase2-caliper/samples/run2-round6-worker1.json": "a6d8f8faa228441135b1fc48e517c4859481e09718085cadf48410ab16d382f4",
+    "phase2-caliper/samples/run2-round7-worker0.json": "918e233a403d79630d745ce89b24161969c7538eea80fbee048e884ec066de7f",
+    "phase2-caliper/samples/run2-round7-worker1.json": "1ce93fc17385d7cbb1bdfe39e770541aff03293a4805a6b6e44600dcfeb3a7ee",
+    "phase2-caliper/samples/run2-round8-worker0.json": "7f912d28cb494670382cccb1b1ad6236b5630a3d35693665ae94b55fc1ccf2ea",
+    "phase2-caliper/samples/run2-round8-worker1.json": "dd0a60ab9a64baf1db02c1672c1bca1e5dd656212b642c701829de93a4f429db",
+    "phase2-caliper/samples/run2-round9-worker1.json": "1657dfe3fcc1b8746d5dbfbde13b1fd98944603fef2d922c47ca10753ec8d722",
+    "phase2-caliper/samples/run2-round9-worker0.json": "ea17879790833ac96b48a413bbe284452d8c68a29ff8212c378dd1ea1f23f5e5",
+    "phase2-caliper/samples/run2-round10-worker0.json": "6c916314a5fcc6ba96326f256385a9f3e767229e8ad689fb2f976e6bb2a83c81",
+    "phase2-caliper/samples/run2-round10-worker1.json": "fde88cadbe4eb9b937815e642dfeea7a383323b6e71b1aecadb46f2314e9487a",
+    "phase2-caliper/samples/run2-round11-worker0.json": "a957b7cf593d250a111a23fe2f1270e51e6a1309235a2b80f0c136ffa16846aa",
+    "phase2-caliper/samples/run2-round11-worker1.json": "547f077303a1ee5e8c71a4c0cd3014bc51ea46db01dbcccb8b12c87752b0830d",
+    "phase2-caliper/samples/run2-round12-worker0.json": "af62138eb3de83618fc50f4ff04e3bdbd87c764993ef185a3077c143c043417e",
+    "phase2-caliper/samples/run2-round12-worker1.json": "fb9822e44a9a2e4cc19f6a71c93061b70d04be9382cc8032da60816785da8cee",
+    "phase2-caliper/samples/run2-round13-worker0.json": "ad210c0741b2228e8a7f618ab889e1c4399b73a7cb7af6a80f7a4216c210643e",
+    "phase2-caliper/samples/run2-round13-worker1.json": "38fceb626aadabc5e65733ce9b3463feed9e0400a2d54ba6f237176c31bd3c22",
+    "phase2-caliper/samples/run2-round14-worker0.json": "f831ebb0ca1a1cb6515180ecdb5bd752f366b01d17ec06daeee436f4e0c630ea",
+    "phase2-caliper/samples/run2-round14-worker1.json": "2506d31c996bcc398cc9a78db2891240a1c4a3edb1690e15b9f461e93f46f675",
+    "phase2-caliper/samples/run2-round15-worker0.json": "0891152f8148eee2805ba2b3a0344da0573d9bd3c8473b2838e947b00ffb4815",
+    "phase2-caliper/samples/run2-round15-worker1.json": "b0dbef2b2776b7dc495dfc9334a68a7e2427a059d16eb1662c526b6c336eb352",
+    "phase2-caliper/samples/run2-round16-worker0.json": "726f17dc1ad3caa1d97bc9c56c41a8819325f235e67220a38a3f662ccdf4ef30",
+    "phase2-caliper/samples/run2-round16-worker1.json": "d8560b664b671a773e28ba4d17de607e92b43ea849cacde510c965326e2c759f",
+    "phase2-caliper/samples/run2-round17-worker0.json": "f3a4e6b577d549256439a335366feedacea5a2100dc392cc6ad06acfd91803b4",
+    "phase2-caliper/samples/run2-round17-worker1.json": "95f00b302a3b9ea22ed86156f6ac5701f0d6b765e8d9a453ba826d982a3f1d84",
+    "phase2-caliper/samples/run2-round18-worker0.json": "a0bf748ff32ff67dce82acafcc57569422d4dec3229be396a4f2ebbb27aa00d0",
+    "phase2-caliper/samples/run2-round18-worker1.json": "e0888d35308530981e29ab13b10a7e5916a4adbf54f86e575b8015b1a91720b5",
+    "phase2-caliper/samples/run3-round4-worker0.json": "d72088916f3820c49a1e55594201806d31418353b1bb394053037d1074637ae5",
+    "phase2-caliper/samples/run3-round4-worker1.json": "9ef3405a9c36d283fe5463ff4492e1a29b7ce5e968f49dc73ad6b44f7f2936ce",
+    "phase2-caliper/samples/run3-round5-worker0.json": "fdcbbdc71ad00fe30f59dcb2fe8b0f32625571e4debb82eb54de760b4052f425",
+    "phase2-caliper/samples/run3-round5-worker1.json": "6313eb24571cb40181a99aae4bbfaa42a835b8bcc3bdb4637fbdb83897a7a5a1",
+    "phase2-caliper/samples/run3-round6-worker0.json": "a09e5c075dbf17c2ec316652f64a232c11fcc4f5d5a2049bddb2dd5b92cb40fd",
+    "phase2-caliper/samples/run3-round6-worker1.json": "22a5942752ee8d5a2b40a440923e40edf57423c20ea424f1a57364fbc6509591",
+    "phase2-caliper/samples/run3-round7-worker1.json": "147875f358e8414eadacf241116e6ea0146c4458b460dea16f96faa9fff22366",
+    "phase2-caliper/samples/run3-round7-worker0.json": "32085ac403eb7196995697d493b59683f156be768a1caa153a1b0ec4637e386c",
+    "phase2-caliper/samples/run3-round8-worker0.json": "5e0dd030821e0d8c4b7996ed9502fdca46bbf089aae6c8ef4e244c15e3f6e52f",
+    "phase2-caliper/samples/run3-round8-worker1.json": "217db00d5568ebd93133aa321b142a4fac7fbac5a3553073ca78b7719887bc33",
+    "phase2-caliper/samples/run3-round9-worker0.json": "cedb35a2cd1c8355162b649cd2de606806168a04de54d0e6d0609992ae1ea7d9",
+    "phase2-caliper/samples/run3-round9-worker1.json": "10826dceacdf69c5d4b4677bacf3b9bf8ca367ae162af3ee1ad5992670824280",
+    "phase2-caliper/samples/run3-round10-worker0.json": "f1c8e9e061a6aaf375d1e61c2e694f3e98cdf02b9f10165fb9d85d363df6b146",
+    "phase2-caliper/samples/run3-round10-worker1.json": "86d68ce31625479e3739d4f099dcb6006441aa833147610f1d65ddaa20574293",
+    "phase2-caliper/samples/run3-round11-worker0.json": "5a2ef77c4b00be2d54cc2f4d28df22095ad17609f283e51193ab424a5c360069",
+    "phase2-caliper/samples/run3-round11-worker1.json": "1b701fab47898f72bfc1a58816a56006c002290c9018fdd0da5fbc749c844ab7",
+    "phase2-caliper/samples/run3-round12-worker1.json": "888b4b807b27ecb0a8bba91218b29ecde143ee5e3983d74e47c4709ef3c17dd5",
+    "phase2-caliper/samples/run3-round12-worker0.json": "46723d46f0ec71be86dbdac5ee07c87d910ae91ff686164ce160cb5641649940",
+    "phase2-caliper/samples/run3-round13-worker0.json": "907bdf375bd4da944d482cab8368c4a5c49442edfe0e8b18c7aa67d7cd9cff16",
+    "phase2-caliper/samples/run3-round13-worker1.json": "fbebe6d24bce8f4177dea34e3b246504d14d576d463decd807d6dd48e7df9fac",
+    "phase2-caliper/samples/run3-round14-worker0.json": "fe54a0ac5d0fb9466bfc97ef895345e43808b5b590c7728af0389ef083c06d36",
+    "phase2-caliper/samples/run3-round14-worker1.json": "0e7fe148c8beab89544a23765e7ec9503e476e2a10c1857cf9489643be930ee1",
+    "phase2-caliper/samples/run3-round15-worker1.json": "8222d052d4ee5b911e18865989bff1d186b4ee59ff380e1506a6df5cd6af4353",
+    "phase2-caliper/samples/run3-round15-worker0.json": "de482241d24d41900f742e9efd635e80df56ce255fb4419eea0672cc8bf13738",
+    "phase2-caliper/samples/run3-round16-worker0.json": "4e8c6387e14e89c5f3845a0bd369f5e463d5e19ace4e2a2a3ffe32c43e396fff",
+    "phase2-caliper/samples/run3-round16-worker1.json": "7599c2fe0ecfb5df3ef4e7e9ea65a4f2cce64ef3eb89a79f0d006790af4ded45",
+    "phase2-caliper/samples/run3-round17-worker1.json": "104114bc0018ff4b27cae190b2b23e462ccfd4d10e9753885e9e6ea02b1cd4c6",
+    "phase2-caliper/samples/run3-round17-worker0.json": "bbe0c9b928c52a53546f319e4eddb9998d141bce6b6309eed1d9ad59d78c12c8",
+    "phase2-caliper/samples/run3-round18-worker0.json": "e0956f803e87f6ad1803baa01acd038ea703b45849e23ece7960125d941052c6",
+    "phase2-caliper/samples/run3-round18-worker1.json": "1463521d4b397c0eedc6b28b22cf03fdcc58cc751afd2dd33418e10e5c2a182e",
+    "phase2-caliper/run1-resources.jsonl": "aa9738e7a084bc2eb543ac4255f5f7016cec74f3acf914357a6a279b1dd6f965",
+    "phase2-caliper/run2-resources.jsonl": "c9cf43d412e17f3201ac56f7d2d482ad30cfd91afe665b215f16314cef60e8d1",
+    "phase2-caliper/run3-resources.jsonl": "c9efd0a35e0fa333f3bce6829960bc033d499616e84e071aba93a7f611768b41"
+  },
+  "comparative": {
+    "design": {
+      "repetitions": 30,
+      "operationsPerTrial": 1000,
+      "warmupOperations": 200,
+      "orderStrategy": "balanced cyclic rotation",
+      "timer": "process.hrtime.bigint",
+      "confidenceInterval": "normal approximation over independent trial means (95%)",
+      "scope": "Oracle decision, binding, threshold, and optional selective-disclosure computation; excludes Fabric network and storage latency"
+    },
+    "environment": {
+      "node": "v24.16.0",
+      "platform": "win32",
+      "architecture": "x64",
+      "cpuModel": "AMD Ryzen 5 5600H with Radeon Graphics         ",
+      "logicalCpuCount": 12,
+      "totalMemoryBytes": 7883206656
+    },
+    "summary": [
+      {
+        "configuration": "centralized",
+        "label": "Centralized trusted verifier",
+        "repetitions": 30,
+        "totalOperations": 30000,
+        "meanLatencyUs": 5.056,
+        "medianLatencyUs": 3.2,
+        "p95LatencyUs": 9.3,
+        "latencyStandardDeviationUs": 31.95,
+        "trialMeanLatency95CiUs": {
+          "lower": 3.964,
+          "upper": 6.148,
+          "margin": 1.092
+        },
+        "meanThroughputOpsPerSecond": 223276.475,
+        "throughput95Ci": {
+          "lower": 199255.28,
+          "upper": 247297.67,
+          "margin": 24021.195
+        },
+        "meanCpuUserMsPer1000Operations": 7.9,
+        "meanCpuSystemMsPer1000Operations": 1.033,
+        "meanProcessCpuUtilizationPercent": 179.857,
+        "meanHeapDeltaBytes": 555876.267,
+        "latencyOverheadVsCentralized": 1,
+        "throughputRelativeToCentralizedPercent": 100
+      },
+      {
+        "configuration": "oracle-1-of-1",
+        "label": "Single Oracle (1-of-1)",
+        "repetitions": 30,
+        "totalOperations": 30000,
+        "meanLatencyUs": 17.67,
+        "medianLatencyUs": 10.3,
+        "p95LatencyUs": 38.9,
+        "latencyStandardDeviationUs": 67.027,
+        "trialMeanLatency95CiUs": {
+          "lower": 13.54,
+          "upper": 21.8,
+          "margin": 4.13
+        },
+        "meanThroughputOpsPerSecond": 68389.616,
+        "throughput95Ci": {
+          "lower": 60441.109,
+          "upper": 76338.123,
+          "margin": 7948.507
+        },
+        "meanCpuUserMsPer1000Operations": 14.6,
+        "meanCpuSystemMsPer1000Operations": 0,
+        "meanProcessCpuUtilizationPercent": 80.806,
+        "meanHeapDeltaBytes": 243677.6,
+        "latencyOverheadVsCentralized": 3.495,
+        "throughputRelativeToCentralizedPercent": 30.63
+      },
+      {
+        "configuration": "oracle-2-of-2",
+        "label": "Unanimous Oracles (2-of-2)",
+        "repetitions": 30,
+        "totalOperations": 30000,
+        "meanLatencyUs": 24.822,
+        "medianLatencyUs": 13.5,
+        "p95LatencyUs": 49.3,
+        "latencyStandardDeviationUs": 117.244,
+        "trialMeanLatency95CiUs": {
+          "lower": 16.268,
+          "upper": 33.376,
+          "margin": 8.554
+        },
+        "meanThroughputOpsPerSecond": 51918.641,
+        "throughput95Ci": {
+          "lower": 45809.921,
+          "upper": 58027.361,
+          "margin": 6108.72
+        },
+        "meanCpuUserMsPer1000Operations": 20.767,
+        "meanCpuSystemMsPer1000Operations": 2.633,
+        "meanProcessCpuUtilizationPercent": 104.339,
+        "meanHeapDeltaBytes": -694469.867,
+        "latencyOverheadVsCentralized": 4.909,
+        "throughputRelativeToCentralizedPercent": 23.253
+      },
+      {
+        "configuration": "oracle-2-of-3",
+        "label": "Fault-tolerant Oracles (2-of-3)",
+        "repetitions": 30,
+        "totalOperations": 30000,
+        "meanLatencyUs": 27.934,
+        "medianLatencyUs": 16.8,
+        "p95LatencyUs": 58.6,
+        "latencyStandardDeviationUs": 94.006,
+        "trialMeanLatency95CiUs": {
+          "lower": 23.139,
+          "upper": 32.728,
+          "margin": 4.795
+        },
+        "meanThroughputOpsPerSecond": 41071.752,
+        "throughput95Ci": {
+          "lower": 36395.736,
+          "upper": 45747.768,
+          "margin": 4676.016
+        },
+        "meanCpuUserMsPer1000Operations": 26.533,
+        "meanCpuSystemMsPer1000Operations": 2.133,
+        "meanProcessCpuUtilizationPercent": 106.202,
+        "meanHeapDeltaBytes": 352872.267,
+        "latencyOverheadVsCentralized": 5.525,
+        "throughputRelativeToCentralizedPercent": 18.395
+      },
+      {
+        "configuration": "oracle-2-of-3-private",
+        "label": "2-of-3 with selective disclosure",
+        "repetitions": 30,
+        "totalOperations": 30000,
+        "meanLatencyUs": 548.221,
+        "medianLatencyUs": 364.2,
+        "p95LatencyUs": 1210.7,
+        "latencyStandardDeviationUs": 556.874,
+        "trialMeanLatency95CiUs": {
+          "lower": 471.181,
+          "upper": 625.26,
+          "margin": 77.039
+        },
+        "meanThroughputOpsPerSecond": 2041.323,
+        "throughput95Ci": {
+          "lower": 1824.057,
+          "upper": 2258.589,
+          "margin": 217.266
+        },
+        "meanCpuUserMsPer1000Operations": 502.067,
+        "meanCpuSystemMsPer1000Operations": 31.7,
+        "meanProcessCpuUtilizationPercent": 98.186,
+        "meanHeapDeltaBytes": -415813.067,
+        "latencyOverheadVsCentralized": 108.43,
+        "throughputRelativeToCentralizedPercent": 0.914
+      }
+    ],
+    "comparisons": {
+      "twoOfThreeLatencyOverheadVsCentralized": 5.525,
+      "privacyLatencyOverheadVsNonPrivateTwoOfThree": 19.626,
+      "paired": [
+        {
+          "treatment": "oracle-2-of-3",
+          "control": "centralized",
+          "repetitions": 30,
+          "meanDifferenceUs": 22.878,
+          "difference95CiUs": {
+            "lower": 18.846,
+            "upper": 26.91
+          },
+          "meanRatio": 5.926,
+          "ratio95Ci": {
+            "lower": 5.152,
+            "upper": 6.7
+          }
+        },
+        {
+          "treatment": "oracle-2-of-3-private",
+          "control": "oracle-2-of-3",
+          "repetitions": 30,
+          "meanDifferenceUs": 520.287,
+          "difference95CiUs": {
+            "lower": 447.478,
+            "upper": 593.096
+          },
+          "meanRatio": 20.411,
+          "ratio95Ci": {
+            "lower": 18.981,
+            "upper": 21.841
+          }
+        }
+      ]
+    }
+  },
+  "protocol": {
+    "stateSpace": {
+      "total": 64,
+      "counts": {
+        "CONSENSUS": 30,
+        "CONFLICT": 6,
+        "TIMEOUT": 28,
+        "PENDING": 0
+      }
+    },
+    "commonSourceAssessment": {
+      "externallyDesignatedGroundTruthVerified": false,
+      "replicaSource": "same anchored fixture used by all three modeled workers",
+      "registryRootHash": "c6da6361115c611b091faa9f35836f9f5c8ee0fdbefb6bc0d8cc6fdde571ebcd",
+      "workerAssessmentCodes": [
+        "VERIFIED",
+        "VERIFIED",
+        "VERIFIED"
+      ],
+      "consensus": {
+        "status": "CONSENSUS",
+        "resultHash": "249bba3a12fd13da08f0e234271f35a93e4f0e0e107532d7a78801c84d41f494",
+        "matchingResponses": 3,
+        "revealedResponses": 3
+      },
+      "classification": "UNSAFE_AUTOMATIC_UNDER_SYNTHETIC_SOURCE_ERROR"
+    }
+  },
+  "security": {
+    "threatsEvaluated": 8,
+    "threatsPassed": 8,
+    "safeOutcomeRatePercent": 100,
+    "automatedEvidenceCoveragePercent": 100,
+    "controlCoveragePercent": 100,
+    "highOrCriticalResidualRisks": 2,
+    "uniqueChaincodeTestsExecuted": 5
+  },
+  "live": [
+    {
+      "profile": "baseline",
+      "trials": 3,
+      "passed": 3,
+      "meanWholeTestSeconds": 130.6,
+      "rangeWholeTestSeconds": [
+        128.4,
+        133
+      ]
+    },
+    {
+      "profile": "negative",
+      "trials": 3,
+      "passed": 3,
+      "meanWholeTestSeconds": 137.5,
+      "rangeWholeTestSeconds": [
+        136.8,
+        137.8
+      ]
+    },
+    {
+      "profile": "one-unavailable",
+      "trials": 3,
+      "passed": 3,
+      "meanWholeTestSeconds": 140.2,
+      "rangeWholeTestSeconds": [
+        129,
+        152.7
+      ]
+    },
+    {
+      "profile": "conflict",
+      "trials": 3,
+      "passed": 3,
+      "meanWholeTestSeconds": 148.8,
+      "rangeWholeTestSeconds": [
+        140.7,
+        156.2
+      ]
+    },
+    {
+      "profile": "timeout",
+      "trials": 3,
+      "passed": 3,
+      "meanWholeTestSeconds": 142.6,
+      "rangeWholeTestSeconds": [
+        137.9,
+        146.2
+      ]
+    }
+  ],
+  "liveDecisionTimes": [
+    {
+      "profile": "baseline",
+      "claims": 3,
+      "oracleFinalizationMeanSeconds": 13.08,
+      "oracleFinalizationRangeSeconds": [
+        13.01,
+        13.15
+      ],
+      "claimToObservedFinalStateMeanSeconds": 27.59,
+      "claimToObservedFinalStateRangeSeconds": [
+        27.32,
+        27.73
+      ],
+      "reviewClosureMeanSeconds": null,
+      "reviewClosureRangeSeconds": null,
+      "finalizationCodes": [
+        "EXACT_CONSENSUS"
+      ],
+      "claimStatuses": [
+        "SETTLED"
+      ],
+      "reviewStatuses": []
+    },
+    {
+      "profile": "negative",
+      "claims": 3,
+      "oracleFinalizationMeanSeconds": 12.99,
+      "oracleFinalizationRangeSeconds": [
+        12.92,
+        13.12
+      ],
+      "claimToObservedFinalStateMeanSeconds": 36.16,
+      "claimToObservedFinalStateRangeSeconds": [
+        35.93,
+        36.47
+      ],
+      "reviewClosureMeanSeconds": 6.58,
+      "reviewClosureRangeSeconds": [
+        6.55,
+        6.59
+      ],
+      "finalizationCodes": [
+        "NEGATIVE_RESULT"
+      ],
+      "claimStatuses": [
+        "SETTLED"
+      ],
+      "reviewStatuses": [
+        "APPROVED"
+      ]
+    },
+    {
+      "profile": "one-unavailable",
+      "claims": 3,
+      "oracleFinalizationMeanSeconds": 22.65,
+      "oracleFinalizationRangeSeconds": [
+        22.34,
+        23.16
+      ],
+      "claimToObservedFinalStateMeanSeconds": 29.49,
+      "claimToObservedFinalStateRangeSeconds": [
+        29.01,
+        30.04
+      ],
+      "reviewClosureMeanSeconds": null,
+      "reviewClosureRangeSeconds": null,
+      "finalizationCodes": [
+        "EXACT_CONSENSUS"
+      ],
+      "claimStatuses": [
+        "APPROVED"
+      ],
+      "reviewStatuses": []
+    },
+    {
+      "profile": "conflict",
+      "claims": 3,
+      "oracleFinalizationMeanSeconds": 16.62,
+      "oracleFinalizationRangeSeconds": [
+        16.03,
+        17.45
+      ],
+      "claimToObservedFinalStateMeanSeconds": 42.8,
+      "claimToObservedFinalStateRangeSeconds": [
+        40.03,
+        46.16
+      ],
+      "reviewClosureMeanSeconds": 7.35,
+      "reviewClosureRangeSeconds": [
+        6.5,
+        8.63
+      ],
+      "finalizationCodes": [
+        "CONFLICT"
+      ],
+      "claimStatuses": [
+        "SETTLED"
+      ],
+      "reviewStatuses": [
+        "APPROVED"
+      ]
+    },
+    {
+      "profile": "timeout",
+      "claims": 3,
+      "oracleFinalizationMeanSeconds": 16.51,
+      "oracleFinalizationRangeSeconds": [
+        16.5,
+        16.51
+      ],
+      "claimToObservedFinalStateMeanSeconds": 39.97,
+      "claimToObservedFinalStateRangeSeconds": [
+        38.47,
+        41.82
+      ],
+      "reviewClosureMeanSeconds": 6.78,
+      "reviewClosureRangeSeconds": [
+        6.49,
+        7.02
+      ],
+      "finalizationCodes": [
+        "TIMEOUT"
+      ],
+      "claimStatuses": [
+        "SETTLED"
+      ],
+      "reviewStatuses": [
+        "APPROVED"
+      ]
+    }
+  ],
+  "caliperTrials": [
+    {
+      "run": 1,
+      "label": "schema-read",
+      "successful": 200,
+      "failed": 0,
+      "offeredTpsObserved": 20.2,
+      "maxLatencySeconds": 0.47,
+      "minLatencySeconds": 0.01,
+      "averageLatencySeconds": 0.04,
+      "achievedTps": 20.1
+    },
+    {
+      "run": 1,
+      "label": "oracle-1-of-1",
+      "successful": 200,
+      "failed": 0,
+      "offeredTpsObserved": 20.2,
+      "maxLatencySeconds": 0.14,
+      "minLatencySeconds": 0.01,
+      "averageLatencySeconds": 0.01,
+      "achievedTps": 20.2
+    },
+    {
+      "run": 1,
+      "label": "oracle-2-of-2",
+      "successful": 200,
+      "failed": 0,
+      "offeredTpsObserved": 20.2,
+      "maxLatencySeconds": 0.09,
+      "minLatencySeconds": 0.01,
+      "averageLatencySeconds": 0.01,
+      "achievedTps": 20.2
+    },
+    {
+      "run": 1,
+      "label": "oracle-2-of-3",
+      "successful": 200,
+      "failed": 0,
+      "offeredTpsObserved": 20.2,
+      "maxLatencySeconds": 0.16,
+      "minLatencySeconds": 0.01,
+      "averageLatencySeconds": 0.01,
+      "achievedTps": 20.2
+    },
+    {
+      "run": 1,
+      "label": "anchored-write-5-tps",
+      "successful": 100,
+      "failed": 0,
+      "offeredTpsObserved": 5.1,
+      "maxLatencySeconds": 3.96,
+      "minLatencySeconds": 0.29,
+      "averageLatencySeconds": 1.56,
+      "achievedTps": 5,
+      "workloadLatency": {
+        "all": {
+          "count": 100,
+          "medianMs": 1539.542,
+          "p95Ms": 3169.052,
+          "maxMs": 3961.189
+        },
+        "reads": null,
+        "writes": {
+          "count": 100,
+          "medianMs": 1539.542,
+          "p95Ms": 3169.052,
+          "maxMs": 3961.189
+        },
+        "threw": 0
+      }
+    },
+    {
+      "run": 1,
+      "label": "anchored-write-10-tps",
+      "successful": 100,
+      "failed": 0,
+      "offeredTpsObserved": 10.2,
+      "maxLatencySeconds": 2.41,
+      "minLatencySeconds": 0.28,
+      "averageLatencySeconds": 0.95,
+      "achievedTps": 9.9,
+      "workloadLatency": {
+        "all": {
+          "count": 100,
+          "medianMs": 896.473,
+          "p95Ms": 2201.667,
+          "maxMs": 2413.36
+        },
+        "reads": null,
+        "writes": {
+          "count": 100,
+          "medianMs": 896.473,
+          "p95Ms": 2201.667,
+          "maxMs": 2413.36
+        },
+        "threw": 0
+      }
+    },
+    {
+      "run": 1,
+      "label": "anchored-write-20-tps",
+      "successful": 100,
+      "failed": 0,
+      "offeredTpsObserved": 20.4,
+      "maxLatencySeconds": 1.08,
+      "minLatencySeconds": 0.27,
+      "averageLatencySeconds": 0.58,
+      "achievedTps": 19.3,
+      "workloadLatency": {
+        "all": {
+          "count": 100,
+          "medianMs": 580.901,
+          "p95Ms": 836.954,
+          "maxMs": 1085.856
+        },
+        "reads": null,
+        "writes": {
+          "count": 100,
+          "medianMs": 580.901,
+          "p95Ms": 836.954,
+          "maxMs": 1085.856
+        },
+        "threw": 0
+      }
+    },
+    {
+      "run": 1,
+      "label": "claim-submit-5-tps",
+      "successful": 100,
+      "failed": 0,
+      "offeredTpsObserved": 5.1,
+      "maxLatencySeconds": 2.84,
+      "minLatencySeconds": 0.32,
+      "averageLatencySeconds": 1.26,
+      "achievedTps": 5,
+      "workloadLatency": {
+        "all": {
+          "count": 100,
+          "medianMs": 1213.003,
+          "p95Ms": 2107.64,
+          "maxMs": 2837.54
+        },
+        "reads": null,
+        "writes": {
+          "count": 100,
+          "medianMs": 1213.003,
+          "p95Ms": 2107.64,
+          "maxMs": 2837.54
+        },
+        "threw": 0
+      }
+    },
+    {
+      "run": 1,
+      "label": "claim-submit-10-tps",
+      "successful": 100,
+      "failed": 0,
+      "offeredTpsObserved": 10.2,
+      "maxLatencySeconds": 1.83,
+      "minLatencySeconds": 0.33,
+      "averageLatencySeconds": 0.96,
+      "achievedTps": 9.3,
+      "workloadLatency": {
+        "all": {
+          "count": 100,
+          "medianMs": 958.297,
+          "p95Ms": 1626.094,
+          "maxMs": 1827.438
+        },
+        "reads": null,
+        "writes": {
+          "count": 100,
+          "medianMs": 958.297,
+          "p95Ms": 1626.094,
+          "maxMs": 1827.438
+        },
+        "threw": 0
+      }
+    },
+    {
+      "run": 1,
+      "label": "claim-submit-20-tps",
+      "successful": 100,
+      "failed": 0,
+      "offeredTpsObserved": 20.4,
+      "maxLatencySeconds": 0.89,
+      "minLatencySeconds": 0.31,
+      "averageLatencySeconds": 0.6,
+      "achievedTps": 19.2,
+      "workloadLatency": {
+        "all": {
+          "count": 100,
+          "medianMs": 597.546,
+          "p95Ms": 810.339,
+          "maxMs": 892.964
+        },
+        "reads": null,
+        "writes": {
+          "count": 100,
+          "medianMs": 597.546,
+          "p95Ms": 810.339,
+          "maxMs": 892.964
+        },
+        "threw": 0
+      }
+    },
+    {
+      "run": 1,
+      "label": "claim-submit-40-tps",
+      "successful": 100,
+      "failed": 0,
+      "offeredTpsObserved": 40,
+      "maxLatencySeconds": 2.58,
+      "minLatencySeconds": 0.39,
+      "averageLatencySeconds": 1.63,
+      "achievedTps": 22.9,
+      "workloadLatency": {
+        "all": {
+          "count": 100,
+          "medianMs": 1817.822,
+          "p95Ms": 2320.442,
+          "maxMs": 2577.294
+        },
+        "reads": null,
+        "writes": {
+          "count": 100,
+          "medianMs": 1817.822,
+          "p95Ms": 2320.442,
+          "maxMs": 2577.294
+        },
+        "threw": 0
+      }
+    },
+    {
+      "run": 1,
+      "label": "claim-submit-80-tps",
+      "successful": 100,
+      "failed": 0,
+      "offeredTpsObserved": 65.2,
+      "maxLatencySeconds": 3.88,
+      "minLatencySeconds": 0.89,
+      "averageLatencySeconds": 2.77,
+      "achievedTps": 20.1,
+      "workloadLatency": {
+        "all": {
+          "count": 100,
+          "medianMs": 3074.153,
+          "p95Ms": 3597.953,
+          "maxMs": 3877.543
+        },
+        "reads": null,
+        "writes": {
+          "count": 100,
+          "medianMs": 3074.153,
+          "p95Ms": 3597.953,
+          "maxMs": 3877.543
+        },
+        "threw": 0
+      }
+    },
+    {
+      "run": 1,
+      "label": "claim-submit-160-tps",
+      "successful": 100,
+      "failed": 0,
+      "offeredTpsObserved": 161.3,
+      "maxLatencySeconds": 7.99,
+      "minLatencySeconds": 3.41,
+      "averageLatencySeconds": 5.73,
+      "achievedTps": 12,
+      "workloadLatency": {
+        "all": {
+          "count": 100,
+          "medianMs": 5686.467,
+          "p95Ms": 7767.345,
+          "maxMs": 7995.842
+        },
+        "reads": null,
+        "writes": {
+          "count": 100,
+          "medianMs": 5686.467,
+          "p95Ms": 7767.345,
+          "maxMs": 7995.842
+        },
+        "threw": 0
+      }
+    },
+    {
+      "run": 1,
+      "label": "mixed-policy-claim-5-tps",
+      "successful": 100,
+      "failed": 0,
+      "offeredTpsObserved": 5.1,
+      "maxLatencySeconds": 2.69,
+      "minLatencySeconds": 0.01,
+      "averageLatencySeconds": 0.86,
+      "achievedTps": 4.6,
+      "workloadLatency": {
+        "all": {
+          "count": 100,
+          "medianMs": 392.042,
+          "p95Ms": 2558.369,
+          "maxMs": 2691.306
+        },
+        "reads": {
+          "count": 50,
+          "medianMs": 8.903,
+          "p95Ms": 72.674,
+          "maxMs": 82.224
+        },
+        "writes": {
+          "count": 50,
+          "medianMs": 1642.155,
+          "p95Ms": 2648.986,
+          "maxMs": 2691.306
+        },
+        "threw": 0
+      }
+    },
+    {
+      "run": 1,
+      "label": "mixed-policy-claim-10-tps",
+      "successful": 100,
+      "failed": 0,
+      "offeredTpsObserved": 10.2,
+      "maxLatencySeconds": 2.66,
+      "minLatencySeconds": 0.01,
+      "averageLatencySeconds": 0.72,
+      "achievedTps": 9.5,
+      "workloadLatency": {
+        "all": {
+          "count": 100,
+          "medianMs": 274.284,
+          "p95Ms": 2264.055,
+          "maxMs": 2665.286
+        },
+        "reads": {
+          "count": 50,
+          "medianMs": 15.143,
+          "p95Ms": 153.007,
+          "maxMs": 205.229
+        },
+        "writes": {
+          "count": 50,
+          "medianMs": 1464.018,
+          "p95Ms": 2354.311,
+          "maxMs": 2665.286
+        },
+        "threw": 0
+      }
+    },
+    {
+      "run": 1,
+      "label": "mixed-policy-claim-20-tps",
+      "successful": 100,
+      "failed": 0,
+      "offeredTpsObserved": 20.4,
+      "maxLatencySeconds": 1.44,
+      "minLatencySeconds": 0.01,
+      "averageLatencySeconds": 0.41,
+      "achievedTps": 19.1,
+      "workloadLatency": {
+        "all": {
+          "count": 100,
+          "medianMs": 225.576,
+          "p95Ms": 1180.073,
+          "maxMs": 1443.201
+        },
+        "reads": {
+          "count": 50,
+          "medianMs": 12.937,
+          "p95Ms": 87.758,
+          "maxMs": 147.478
+        },
+        "writes": {
+          "count": 50,
+          "medianMs": 780.652,
+          "p95Ms": 1243.193,
+          "maxMs": 1443.201
+        },
+        "threw": 0
+      }
+    },
+    {
+      "run": 1,
+      "label": "mixed-policy-claim-40-tps",
+      "successful": 100,
+      "failed": 0,
+      "offeredTpsObserved": 40.8,
+      "maxLatencySeconds": 1.74,
+      "minLatencySeconds": 0.01,
+      "averageLatencySeconds": 0.5,
+      "achievedTps": 26.4,
+      "workloadLatency": {
+        "all": {
+          "count": 100,
+          "medianMs": 391.693,
+          "p95Ms": 1539.217,
+          "maxMs": 1744.026
+        },
+        "reads": {
+          "count": 50,
+          "medianMs": 17.464,
+          "p95Ms": 688.421,
+          "maxMs": 789.385
+        },
+        "writes": {
+          "count": 50,
+          "medianMs": 746.122,
+          "p95Ms": 1642.265,
+          "maxMs": 1744.026
+        },
+        "threw": 0
+      }
+    },
+    {
+      "run": 1,
+      "label": "mixed-policy-claim-80-tps",
+      "successful": 100,
+      "failed": 0,
+      "offeredTpsObserved": 81.5,
+      "maxLatencySeconds": 1.84,
+      "minLatencySeconds": 0.01,
+      "averageLatencySeconds": 0.6,
+      "achievedTps": 35,
+      "workloadLatency": {
+        "all": {
+          "count": 100,
+          "medianMs": 379.713,
+          "p95Ms": 1775.357,
+          "maxMs": 1845.823
+        },
+        "reads": {
+          "count": 50,
+          "medianMs": 53.311,
+          "p95Ms": 254.206,
+          "maxMs": 334.034
+        },
+        "writes": {
+          "count": 50,
+          "medianMs": 1139.031,
+          "p95Ms": 1801.83,
+          "maxMs": 1845.823
+        },
+        "threw": 0
+      }
+    },
+    {
+      "run": 1,
+      "label": "mixed-policy-claim-160-tps",
+      "successful": 100,
+      "failed": 0,
+      "offeredTpsObserved": 156.5,
+      "maxLatencySeconds": 1.63,
+      "minLatencySeconds": 0.01,
+      "averageLatencySeconds": 0.6,
+      "achievedTps": 48.7,
+      "workloadLatency": {
+        "all": {
+          "count": 100,
+          "medianMs": 499.181,
+          "p95Ms": 1491.802,
+          "maxMs": 1630.744
+        },
+        "reads": {
+          "count": 50,
+          "medianMs": 31.7,
+          "p95Ms": 271.062,
+          "maxMs": 303.842
+        },
+        "writes": {
+          "count": 50,
+          "medianMs": 1135.387,
+          "p95Ms": 1515.836,
+          "maxMs": 1630.744
+        },
+        "threw": 0
+      }
+    },
+    {
+      "run": 2,
+      "label": "schema-read",
+      "successful": 200,
+      "failed": 0,
+      "offeredTpsObserved": 20.2,
+      "maxLatencySeconds": 0.35,
+      "minLatencySeconds": 0.01,
+      "averageLatencySeconds": 0.02,
+      "achievedTps": 20.2
+    },
+    {
+      "run": 2,
+      "label": "oracle-1-of-1",
+      "successful": 200,
+      "failed": 0,
+      "offeredTpsObserved": 20.2,
+      "maxLatencySeconds": 0.05,
+      "minLatencySeconds": 0.01,
+      "averageLatencySeconds": 0.01,
+      "achievedTps": 20.2
+    },
+    {
+      "run": 2,
+      "label": "oracle-2-of-2",
+      "successful": 200,
+      "failed": 0,
+      "offeredTpsObserved": 20.2,
+      "maxLatencySeconds": 0.08,
+      "minLatencySeconds": 0,
+      "averageLatencySeconds": 0.01,
+      "achievedTps": 20.2
+    },
+    {
+      "run": 2,
+      "label": "oracle-2-of-3",
+      "successful": 200,
+      "failed": 0,
+      "offeredTpsObserved": 20.2,
+      "maxLatencySeconds": 0.04,
+      "minLatencySeconds": 0.01,
+      "averageLatencySeconds": 0.01,
+      "achievedTps": 20.2
+    },
+    {
+      "run": 2,
+      "label": "anchored-write-5-tps",
+      "successful": 100,
+      "failed": 0,
+      "offeredTpsObserved": 5.1,
+      "maxLatencySeconds": 2.28,
+      "minLatencySeconds": 0.24,
+      "averageLatencySeconds": 1.14,
+      "achievedTps": 5,
+      "workloadLatency": {
+        "all": {
+          "count": 100,
+          "medianMs": 1107.55,
+          "p95Ms": 1952.521,
+          "maxMs": 2277.707
+        },
+        "reads": null,
+        "writes": {
+          "count": 100,
+          "medianMs": 1107.55,
+          "p95Ms": 1952.521,
+          "maxMs": 2277.707
+        },
+        "threw": 0
+      }
+    },
+    {
+      "run": 2,
+      "label": "anchored-write-10-tps",
+      "successful": 100,
+      "failed": 0,
+      "offeredTpsObserved": 10.2,
+      "maxLatencySeconds": 1.22,
+      "minLatencySeconds": 0.21,
+      "averageLatencySeconds": 0.67,
+      "achievedTps": 10,
+      "workloadLatency": {
+        "all": {
+          "count": 100,
+          "medianMs": 637.149,
+          "p95Ms": 1125.849,
+          "maxMs": 1218.408
+        },
+        "reads": null,
+        "writes": {
+          "count": 100,
+          "medianMs": 637.149,
+          "p95Ms": 1125.849,
+          "maxMs": 1218.408
+        },
+        "threw": 0
+      }
+    },
+    {
+      "run": 2,
+      "label": "anchored-write-20-tps",
+      "successful": 100,
+      "failed": 0,
+      "offeredTpsObserved": 20.4,
+      "maxLatencySeconds": 1.92,
+      "minLatencySeconds": 0.59,
+      "averageLatencySeconds": 1.14,
+      "achievedTps": 18.2,
+      "workloadLatency": {
+        "all": {
+          "count": 100,
+          "medianMs": 1117.404,
+          "p95Ms": 1681.59,
+          "maxMs": 1926.383
+        },
+        "reads": null,
+        "writes": {
+          "count": 100,
+          "medianMs": 1117.404,
+          "p95Ms": 1681.59,
+          "maxMs": 1926.383
+        },
+        "threw": 0
+      }
+    },
+    {
+      "run": 2,
+      "label": "claim-submit-5-tps",
+      "successful": 100,
+      "failed": 0,
+      "offeredTpsObserved": 5.1,
+      "maxLatencySeconds": 2.42,
+      "minLatencySeconds": 0.28,
+      "averageLatencySeconds": 1.22,
+      "achievedTps": 5,
+      "workloadLatency": {
+        "all": {
+          "count": 100,
+          "medianMs": 1191.694,
+          "p95Ms": 2055.669,
+          "maxMs": 2419.134
+        },
+        "reads": null,
+        "writes": {
+          "count": 100,
+          "medianMs": 1191.694,
+          "p95Ms": 2055.669,
+          "maxMs": 2419.134
+        },
+        "threw": 0
+      }
+    },
+    {
+      "run": 2,
+      "label": "claim-submit-10-tps",
+      "successful": 100,
+      "failed": 0,
+      "offeredTpsObserved": 10.2,
+      "maxLatencySeconds": 1.82,
+      "minLatencySeconds": 0.28,
+      "averageLatencySeconds": 0.84,
+      "achievedTps": 9.9,
+      "workloadLatency": {
+        "all": {
+          "count": 100,
+          "medianMs": 851.439,
+          "p95Ms": 1428.228,
+          "maxMs": 1825.294
+        },
+        "reads": null,
+        "writes": {
+          "count": 100,
+          "medianMs": 851.439,
+          "p95Ms": 1428.228,
+          "maxMs": 1825.294
+        },
+        "threw": 0
+      }
+    },
+    {
+      "run": 2,
+      "label": "claim-submit-20-tps",
+      "successful": 100,
+      "failed": 0,
+      "offeredTpsObserved": 20.4,
+      "maxLatencySeconds": 0.78,
+      "minLatencySeconds": 0.3,
+      "averageLatencySeconds": 0.54,
+      "achievedTps": 19.2,
+      "workloadLatency": {
+        "all": {
+          "count": 100,
+          "medianMs": 540.008,
+          "p95Ms": 768.361,
+          "maxMs": 776.137
+        },
+        "reads": null,
+        "writes": {
+          "count": 100,
+          "medianMs": 540.008,
+          "p95Ms": 768.361,
+          "maxMs": 776.137
+        },
+        "threw": 0
+      }
+    },
+    {
+      "run": 2,
+      "label": "claim-submit-40-tps",
+      "successful": 100,
+      "failed": 0,
+      "offeredTpsObserved": 40.3,
+      "maxLatencySeconds": 1.89,
+      "minLatencySeconds": 0.4,
+      "averageLatencySeconds": 1.23,
+      "achievedTps": 25.8,
+      "workloadLatency": {
+        "all": {
+          "count": 100,
+          "medianMs": 1380.375,
+          "p95Ms": 1761.896,
+          "maxMs": 1892.809
+        },
+        "reads": null,
+        "writes": {
+          "count": 100,
+          "medianMs": 1380.375,
+          "p95Ms": 1761.896,
+          "maxMs": 1892.809
+        },
+        "threw": 0
+      }
+    },
+    {
+      "run": 2,
+      "label": "claim-submit-80-tps",
+      "successful": 100,
+      "failed": 0,
+      "offeredTpsObserved": 60.4,
+      "maxLatencySeconds": 3.64,
+      "minLatencySeconds": 1.47,
+      "averageLatencySeconds": 2.76,
+      "achievedTps": 21.2,
+      "workloadLatency": {
+        "all": {
+          "count": 100,
+          "medianMs": 2941.809,
+          "p95Ms": 3558.538,
+          "maxMs": 3642.107
+        },
+        "reads": null,
+        "writes": {
+          "count": 100,
+          "medianMs": 2941.809,
+          "p95Ms": 3558.538,
+          "maxMs": 3642.107
+        },
+        "threw": 0
+      }
+    },
+    {
+      "run": 2,
+      "label": "claim-submit-160-tps",
+      "successful": 100,
+      "failed": 0,
+      "offeredTpsObserved": 129,
+      "maxLatencySeconds": 3.27,
+      "minLatencySeconds": 1.76,
+      "averageLatencySeconds": 2.5,
+      "achievedTps": 25.4,
+      "workloadLatency": {
+        "all": {
+          "count": 100,
+          "medianMs": 2402.137,
+          "p95Ms": 3228.102,
+          "maxMs": 3265.349
+        },
+        "reads": null,
+        "writes": {
+          "count": 100,
+          "medianMs": 2402.137,
+          "p95Ms": 3228.102,
+          "maxMs": 3265.349
+        },
+        "threw": 0
+      }
+    },
+    {
+      "run": 2,
+      "label": "mixed-policy-claim-5-tps",
+      "successful": 100,
+      "failed": 0,
+      "offeredTpsObserved": 5.1,
+      "maxLatencySeconds": 2.39,
+      "minLatencySeconds": 0.01,
+      "averageLatencySeconds": 0.77,
+      "achievedTps": 4.6,
+      "workloadLatency": {
+        "all": {
+          "count": 100,
+          "medianMs": 333.72,
+          "p95Ms": 2334.225,
+          "maxMs": 2386.321
+        },
+        "reads": {
+          "count": 50,
+          "medianMs": 9.486,
+          "p95Ms": 26.332,
+          "maxMs": 53.005
+        },
+        "writes": {
+          "count": 50,
+          "medianMs": 1471.201,
+          "p95Ms": 2354.654,
+          "maxMs": 2386.321
+        },
+        "threw": 0
+      }
+    },
+    {
+      "run": 2,
+      "label": "mixed-policy-claim-10-tps",
+      "successful": 100,
+      "failed": 0,
+      "offeredTpsObserved": 10.2,
+      "maxLatencySeconds": 2.08,
+      "minLatencySeconds": 0.01,
+      "averageLatencySeconds": 0.61,
+      "achievedTps": 9.9,
+      "workloadLatency": {
+        "all": {
+          "count": 100,
+          "medianMs": 238.904,
+          "p95Ms": 2055.298,
+          "maxMs": 2082.196
+        },
+        "reads": {
+          "count": 50,
+          "medianMs": 14.365,
+          "p95Ms": 62.741,
+          "maxMs": 199.804
+        },
+        "writes": {
+          "count": 50,
+          "medianMs": 1259.338,
+          "p95Ms": 2074.203,
+          "maxMs": 2082.196
+        },
+        "threw": 0
+      }
+    },
+    {
+      "run": 2,
+      "label": "mixed-policy-claim-20-tps",
+      "successful": 100,
+      "failed": 0,
+      "offeredTpsObserved": 20.4,
+      "maxLatencySeconds": 1.3,
+      "minLatencySeconds": 0.01,
+      "averageLatencySeconds": 0.39,
+      "achievedTps": 19.2,
+      "workloadLatency": {
+        "all": {
+          "count": 100,
+          "medianMs": 253.773,
+          "p95Ms": 1140.263,
+          "maxMs": 1303.909
+        },
+        "reads": {
+          "count": 50,
+          "medianMs": 13.347,
+          "p95Ms": 55.748,
+          "maxMs": 221.657
+        },
+        "writes": {
+          "count": 50,
+          "medianMs": 743.205,
+          "p95Ms": 1148.442,
+          "maxMs": 1303.909
+        },
+        "threw": 0
+      }
+    },
+    {
+      "run": 2,
+      "label": "mixed-policy-claim-40-tps",
+      "successful": 100,
+      "failed": 0,
+      "offeredTpsObserved": 40.7,
+      "maxLatencySeconds": 0.91,
+      "minLatencySeconds": 0.01,
+      "averageLatencySeconds": 0.33,
+      "achievedTps": 35.2,
+      "workloadLatency": {
+        "all": {
+          "count": 100,
+          "medianMs": 264.11,
+          "p95Ms": 806.188,
+          "maxMs": 908.573
+        },
+        "reads": {
+          "count": 50,
+          "medianMs": 17.689,
+          "p95Ms": 139.941,
+          "maxMs": 162.904
+        },
+        "writes": {
+          "count": 50,
+          "medianMs": 607.566,
+          "p95Ms": 855.355,
+          "maxMs": 908.573
+        },
+        "threw": 0
+      }
+    },
+    {
+      "run": 2,
+      "label": "mixed-policy-claim-80-tps",
+      "successful": 100,
+      "failed": 0,
+      "offeredTpsObserved": 81.6,
+      "maxLatencySeconds": 1.5,
+      "minLatencySeconds": 0.01,
+      "averageLatencySeconds": 0.59,
+      "achievedTps": 41.2,
+      "workloadLatency": {
+        "all": {
+          "count": 100,
+          "medianMs": 427.42,
+          "p95Ms": 1403.385,
+          "maxMs": 1502.568
+        },
+        "reads": {
+          "count": 50,
+          "medianMs": 37.557,
+          "p95Ms": 332.828,
+          "maxMs": 383.894
+        },
+        "writes": {
+          "count": 50,
+          "medianMs": 1193.726,
+          "p95Ms": 1445.965,
+          "maxMs": 1502.568
+        },
+        "threw": 0
+      }
+    },
+    {
+      "run": 2,
+      "label": "mixed-policy-claim-160-tps",
+      "successful": 100,
+      "failed": 0,
+      "offeredTpsObserved": 133.5,
+      "maxLatencySeconds": 1.86,
+      "minLatencySeconds": 0.02,
+      "averageLatencySeconds": 0.73,
+      "achievedTps": 44.5,
+      "workloadLatency": {
+        "all": {
+          "count": 100,
+          "medianMs": 700.536,
+          "p95Ms": 1652.11,
+          "maxMs": 1858.516
+        },
+        "reads": {
+          "count": 50,
+          "medianMs": 68.894,
+          "p95Ms": 150.656,
+          "maxMs": 438.106
+        },
+        "writes": {
+          "count": 50,
+          "medianMs": 1418.04,
+          "p95Ms": 1814.321,
+          "maxMs": 1858.516
+        },
+        "threw": 0
+      }
+    },
+    {
+      "run": 3,
+      "label": "schema-read",
+      "successful": 200,
+      "failed": 0,
+      "offeredTpsObserved": 20.2,
+      "maxLatencySeconds": 0.66,
+      "minLatencySeconds": 0.01,
+      "averageLatencySeconds": 0.03,
+      "achievedTps": 20.2
+    },
+    {
+      "run": 3,
+      "label": "oracle-1-of-1",
+      "successful": 200,
+      "failed": 0,
+      "offeredTpsObserved": 20.3,
+      "maxLatencySeconds": 0.79,
+      "minLatencySeconds": 0.01,
+      "averageLatencySeconds": 0.06,
+      "achievedTps": 20.2
+    },
+    {
+      "run": 3,
+      "label": "oracle-2-of-2",
+      "successful": 200,
+      "failed": 0,
+      "offeredTpsObserved": 20.2,
+      "maxLatencySeconds": 0.06,
+      "minLatencySeconds": 0.01,
+      "averageLatencySeconds": 0.01,
+      "achievedTps": 20.2
+    },
+    {
+      "run": 3,
+      "label": "oracle-2-of-3",
+      "successful": 200,
+      "failed": 0,
+      "offeredTpsObserved": 20.2,
+      "maxLatencySeconds": 0.23,
+      "minLatencySeconds": 0.01,
+      "averageLatencySeconds": 0.02,
+      "achievedTps": 20.1
+    },
+    {
+      "run": 3,
+      "label": "anchored-write-5-tps",
+      "successful": 100,
+      "failed": 0,
+      "offeredTpsObserved": 5.1,
+      "maxLatencySeconds": 2.74,
+      "minLatencySeconds": 0.27,
+      "averageLatencySeconds": 1.24,
+      "achievedTps": 5,
+      "workloadLatency": {
+        "all": {
+          "count": 100,
+          "medianMs": 1149.318,
+          "p95Ms": 2297.556,
+          "maxMs": 2742.039
+        },
+        "reads": null,
+        "writes": {
+          "count": 100,
+          "medianMs": 1149.318,
+          "p95Ms": 2297.556,
+          "maxMs": 2742.039
+        },
+        "threw": 0
+      }
+    },
+    {
+      "run": 3,
+      "label": "anchored-write-10-tps",
+      "successful": 100,
+      "failed": 0,
+      "offeredTpsObserved": 10.2,
+      "maxLatencySeconds": 1.54,
+      "minLatencySeconds": 0.22,
+      "averageLatencySeconds": 0.71,
+      "achievedTps": 10,
+      "workloadLatency": {
+        "all": {
+          "count": 100,
+          "medianMs": 692.891,
+          "p95Ms": 1141.178,
+          "maxMs": 1542.6
+        },
+        "reads": null,
+        "writes": {
+          "count": 100,
+          "medianMs": 692.891,
+          "p95Ms": 1141.178,
+          "maxMs": 1542.6
+        },
+        "threw": 0
+      }
+    },
+    {
+      "run": 3,
+      "label": "anchored-write-20-tps",
+      "successful": 100,
+      "failed": 0,
+      "offeredTpsObserved": 20.4,
+      "maxLatencySeconds": 1.72,
+      "minLatencySeconds": 0.41,
+      "averageLatencySeconds": 0.88,
+      "achievedTps": 18,
+      "workloadLatency": {
+        "all": {
+          "count": 100,
+          "medianMs": 855.645,
+          "p95Ms": 1245.221,
+          "maxMs": 1724.755
+        },
+        "reads": null,
+        "writes": {
+          "count": 100,
+          "medianMs": 855.645,
+          "p95Ms": 1245.221,
+          "maxMs": 1724.755
+        },
+        "threw": 0
+      }
+    },
+    {
+      "run": 3,
+      "label": "claim-submit-5-tps",
+      "successful": 100,
+      "failed": 0,
+      "offeredTpsObserved": 5.1,
+      "maxLatencySeconds": 3,
+      "minLatencySeconds": 0.31,
+      "averageLatencySeconds": 1.31,
+      "achievedTps": 4.9,
+      "workloadLatency": {
+        "all": {
+          "count": 100,
+          "medianMs": 1263.142,
+          "p95Ms": 2290.611,
+          "maxMs": 2999.816
+        },
+        "reads": null,
+        "writes": {
+          "count": 100,
+          "medianMs": 1263.142,
+          "p95Ms": 2290.611,
+          "maxMs": 2999.816
+        },
+        "threw": 0
+      }
+    },
+    {
+      "run": 3,
+      "label": "claim-submit-10-tps",
+      "successful": 100,
+      "failed": 0,
+      "offeredTpsObserved": 10.2,
+      "maxLatencySeconds": 1.67,
+      "minLatencySeconds": 0.35,
+      "averageLatencySeconds": 0.9,
+      "achievedTps": 9.8,
+      "workloadLatency": {
+        "all": {
+          "count": 100,
+          "medianMs": 880.025,
+          "p95Ms": 1365.179,
+          "maxMs": 1672.035
+        },
+        "reads": null,
+        "writes": {
+          "count": 100,
+          "medianMs": 880.025,
+          "p95Ms": 1365.179,
+          "maxMs": 1672.035
+        },
+        "threw": 0
+      }
+    },
+    {
+      "run": 3,
+      "label": "claim-submit-20-tps",
+      "successful": 100,
+      "failed": 0,
+      "offeredTpsObserved": 20.3,
+      "maxLatencySeconds": 1.57,
+      "minLatencySeconds": 0.37,
+      "averageLatencySeconds": 0.96,
+      "achievedTps": 17.6,
+      "workloadLatency": {
+        "all": {
+          "count": 100,
+          "medianMs": 971.212,
+          "p95Ms": 1386.951,
+          "maxMs": 1567.913
+        },
+        "reads": null,
+        "writes": {
+          "count": 100,
+          "medianMs": 971.212,
+          "p95Ms": 1386.951,
+          "maxMs": 1567.913
+        },
+        "threw": 0
+      }
+    },
+    {
+      "run": 3,
+      "label": "claim-submit-40-tps",
+      "successful": 100,
+      "failed": 0,
+      "offeredTpsObserved": 40.8,
+      "maxLatencySeconds": 2.39,
+      "minLatencySeconds": 0.61,
+      "averageLatencySeconds": 1.63,
+      "achievedTps": 23.6,
+      "workloadLatency": {
+        "all": {
+          "count": 100,
+          "medianMs": 1793.298,
+          "p95Ms": 2216.212,
+          "maxMs": 2386.582
+        },
+        "reads": null,
+        "writes": {
+          "count": 100,
+          "medianMs": 1793.298,
+          "p95Ms": 2216.212,
+          "maxMs": 2386.582
+        },
+        "threw": 0
+      }
+    },
+    {
+      "run": 3,
+      "label": "claim-submit-80-tps",
+      "successful": 100,
+      "failed": 0,
+      "offeredTpsObserved": 79.6,
+      "maxLatencySeconds": 2.36,
+      "minLatencySeconds": 0.6,
+      "averageLatencySeconds": 1.69,
+      "achievedTps": 29.1,
+      "workloadLatency": {
+        "all": {
+          "count": 100,
+          "medianMs": 1783.613,
+          "p95Ms": 2323.359,
+          "maxMs": 2361.225
+        },
+        "reads": null,
+        "writes": {
+          "count": 100,
+          "medianMs": 1783.613,
+          "p95Ms": 2323.359,
+          "maxMs": 2361.225
+        },
+        "threw": 0
+      }
+    },
+    {
+      "run": 3,
+      "label": "claim-submit-160-tps",
+      "successful": 100,
+      "failed": 0,
+      "offeredTpsObserved": 115.9,
+      "maxLatencySeconds": 3.4,
+      "minLatencySeconds": 1.7,
+      "averageLatencySeconds": 2.56,
+      "achievedTps": 25.1,
+      "workloadLatency": {
+        "all": {
+          "count": 100,
+          "medianMs": 2496.162,
+          "p95Ms": 3250.427,
+          "maxMs": 3418.237
+        },
+        "reads": null,
+        "writes": {
+          "count": 100,
+          "medianMs": 2496.162,
+          "p95Ms": 3250.427,
+          "maxMs": 3418.237
+        },
+        "threw": 0
+      }
+    },
+    {
+      "run": 3,
+      "label": "mixed-policy-claim-5-tps",
+      "successful": 100,
+      "failed": 0,
+      "offeredTpsObserved": 5.1,
+      "maxLatencySeconds": 2.9,
+      "minLatencySeconds": 0.01,
+      "averageLatencySeconds": 0.88,
+      "achievedTps": 4.6,
+      "workloadLatency": {
+        "all": {
+          "count": 100,
+          "medianMs": 411.181,
+          "p95Ms": 2602.306,
+          "maxMs": 2899.892
+        },
+        "reads": {
+          "count": 50,
+          "medianMs": 14.94,
+          "p95Ms": 56.907,
+          "maxMs": 103.714
+        },
+        "writes": {
+          "count": 50,
+          "medianMs": 1798.624,
+          "p95Ms": 2607.649,
+          "maxMs": 2899.892
+        },
+        "threw": 0
+      }
+    },
+    {
+      "run": 3,
+      "label": "mixed-policy-claim-10-tps",
+      "successful": 100,
+      "failed": 0,
+      "offeredTpsObserved": 10.2,
+      "maxLatencySeconds": 2.34,
+      "minLatencySeconds": 0.01,
+      "averageLatencySeconds": 0.63,
+      "achievedTps": 9.8,
+      "workloadLatency": {
+        "all": {
+          "count": 100,
+          "medianMs": 251.963,
+          "p95Ms": 2004.075,
+          "maxMs": 2343.747
+        },
+        "reads": {
+          "count": 50,
+          "medianMs": 8.537,
+          "p95Ms": 147.943,
+          "maxMs": 213.293
+        },
+        "writes": {
+          "count": 50,
+          "medianMs": 1205.195,
+          "p95Ms": 2006.827,
+          "maxMs": 2343.747
+        },
+        "threw": 0
+      }
+    },
+    {
+      "run": 3,
+      "label": "mixed-policy-claim-20-tps",
+      "successful": 100,
+      "failed": 0,
+      "offeredTpsObserved": 20.4,
+      "maxLatencySeconds": 2.43,
+      "minLatencySeconds": 0.01,
+      "averageLatencySeconds": 0.66,
+      "achievedTps": 18.7,
+      "workloadLatency": {
+        "all": {
+          "count": 100,
+          "medianMs": 411.302,
+          "p95Ms": 1991.992,
+          "maxMs": 2435.951
+        },
+        "reads": {
+          "count": 50,
+          "medianMs": 34.05,
+          "p95Ms": 342.723,
+          "maxMs": 655.562
+        },
+        "writes": {
+          "count": 50,
+          "medianMs": 1163.542,
+          "p95Ms": 2213.267,
+          "maxMs": 2435.951
+        },
+        "threw": 0
+      }
+    },
+    {
+      "run": 3,
+      "label": "mixed-policy-claim-40-tps",
+      "successful": 100,
+      "failed": 0,
+      "offeredTpsObserved": 40.8,
+      "maxLatencySeconds": 1.34,
+      "minLatencySeconds": 0.01,
+      "averageLatencySeconds": 0.44,
+      "achievedTps": 32.4,
+      "workloadLatency": {
+        "all": {
+          "count": 100,
+          "medianMs": 401.897,
+          "p95Ms": 1048.709,
+          "maxMs": 1343.083
+        },
+        "reads": {
+          "count": 50,
+          "medianMs": 27.678,
+          "p95Ms": 209.494,
+          "maxMs": 247.307
+        },
+        "writes": {
+          "count": 50,
+          "medianMs": 837.852,
+          "p95Ms": 1115.116,
+          "maxMs": 1343.083
+        },
+        "threw": 0
+      }
+    },
+    {
+      "run": 3,
+      "label": "mixed-policy-claim-80-tps",
+      "successful": 100,
+      "failed": 0,
+      "offeredTpsObserved": 81.1,
+      "maxLatencySeconds": 1.94,
+      "minLatencySeconds": 0.01,
+      "averageLatencySeconds": 0.74,
+      "achievedTps": 37.8,
+      "workloadLatency": {
+        "all": {
+          "count": 100,
+          "medianMs": 568.697,
+          "p95Ms": 1626.753,
+          "maxMs": 1942.696
+        },
+        "reads": {
+          "count": 50,
+          "medianMs": 65.754,
+          "p95Ms": 331.944,
+          "maxMs": 380.931
+        },
+        "writes": {
+          "count": 50,
+          "medianMs": 1464.298,
+          "p95Ms": 1676.426,
+          "maxMs": 1942.696
+        },
+        "threw": 0
+      }
+    },
+    {
+      "run": 3,
+      "label": "mixed-policy-claim-160-tps",
+      "successful": 100,
+      "failed": 0,
+      "offeredTpsObserved": 163.4,
+      "maxLatencySeconds": 1.52,
+      "minLatencySeconds": 0.01,
+      "averageLatencySeconds": 0.56,
+      "achievedTps": 53.1,
+      "workloadLatency": {
+        "all": {
+          "count": 100,
+          "medianMs": 498.252,
+          "p95Ms": 1348.583,
+          "maxMs": 1516.144
+        },
+        "reads": {
+          "count": 50,
+          "medianMs": 23.477,
+          "p95Ms": 258.378,
+          "maxMs": 279.35
+        },
+        "writes": {
+          "count": 50,
+          "medianMs": 1117.342,
+          "p95Ms": 1444.603,
+          "maxMs": 1516.144
+        },
+        "threw": 0
+      }
+    }
+  ],
+  "caliper": [
+    {
+      "label": "schema-read",
+      "runs": 3,
+      "successful": 600,
+      "failed": 0,
+      "meanObservedSendTps": 20.2,
+      "meanAchievedTps": 20.17,
+      "achievedTpsRange": [
+        20.1,
+        20.2
+      ],
+      "meanAverageLatencySeconds": 0.03,
+      "averageLatencyRangeSeconds": [
+        0.02,
+        0.04
+      ],
+      "workloadP95MsRange": null
+    },
+    {
+      "label": "oracle-1-of-1",
+      "runs": 3,
+      "successful": 600,
+      "failed": 0,
+      "meanObservedSendTps": 20.23,
+      "meanAchievedTps": 20.2,
+      "achievedTpsRange": [
+        20.2,
+        20.2
+      ],
+      "meanAverageLatencySeconds": 0.027,
+      "averageLatencyRangeSeconds": [
+        0.01,
+        0.06
+      ],
+      "workloadP95MsRange": null
+    },
+    {
+      "label": "oracle-2-of-2",
+      "runs": 3,
+      "successful": 600,
+      "failed": 0,
+      "meanObservedSendTps": 20.2,
+      "meanAchievedTps": 20.2,
+      "achievedTpsRange": [
+        20.2,
+        20.2
+      ],
+      "meanAverageLatencySeconds": 0.01,
+      "averageLatencyRangeSeconds": [
+        0.01,
+        0.01
+      ],
+      "workloadP95MsRange": null
+    },
+    {
+      "label": "oracle-2-of-3",
+      "runs": 3,
+      "successful": 600,
+      "failed": 0,
+      "meanObservedSendTps": 20.2,
+      "meanAchievedTps": 20.17,
+      "achievedTpsRange": [
+        20.1,
+        20.2
+      ],
+      "meanAverageLatencySeconds": 0.013,
+      "averageLatencyRangeSeconds": [
+        0.01,
+        0.02
+      ],
+      "workloadP95MsRange": null
+    },
+    {
+      "label": "anchored-write-5-tps",
+      "runs": 3,
+      "successful": 300,
+      "failed": 0,
+      "meanObservedSendTps": 5.1,
+      "meanAchievedTps": 5,
+      "achievedTpsRange": [
+        5,
+        5
+      ],
+      "meanAverageLatencySeconds": 1.313,
+      "averageLatencyRangeSeconds": [
+        1.14,
+        1.56
+      ],
+      "workloadP95MsRange": [
+        1952.521,
+        3169.052
+      ]
+    },
+    {
+      "label": "anchored-write-10-tps",
+      "runs": 3,
+      "successful": 300,
+      "failed": 0,
+      "meanObservedSendTps": 10.2,
+      "meanAchievedTps": 9.97,
+      "achievedTpsRange": [
+        9.9,
+        10
+      ],
+      "meanAverageLatencySeconds": 0.777,
+      "averageLatencyRangeSeconds": [
+        0.67,
+        0.95
+      ],
+      "workloadP95MsRange": [
+        1125.849,
+        2201.667
+      ]
+    },
+    {
+      "label": "anchored-write-20-tps",
+      "runs": 3,
+      "successful": 300,
+      "failed": 0,
+      "meanObservedSendTps": 20.4,
+      "meanAchievedTps": 18.5,
+      "achievedTpsRange": [
+        18,
+        19.3
+      ],
+      "meanAverageLatencySeconds": 0.867,
+      "averageLatencyRangeSeconds": [
+        0.58,
+        1.14
+      ],
+      "workloadP95MsRange": [
+        836.954,
+        1681.59
+      ]
+    },
+    {
+      "label": "claim-submit-5-tps",
+      "runs": 3,
+      "successful": 300,
+      "failed": 0,
+      "meanObservedSendTps": 5.1,
+      "meanAchievedTps": 4.97,
+      "achievedTpsRange": [
+        4.9,
+        5
+      ],
+      "meanAverageLatencySeconds": 1.263,
+      "averageLatencyRangeSeconds": [
+        1.22,
+        1.31
+      ],
+      "workloadP95MsRange": [
+        2055.669,
+        2290.611
+      ]
+    },
+    {
+      "label": "claim-submit-10-tps",
+      "runs": 3,
+      "successful": 300,
+      "failed": 0,
+      "meanObservedSendTps": 10.2,
+      "meanAchievedTps": 9.67,
+      "achievedTpsRange": [
+        9.3,
+        9.9
+      ],
+      "meanAverageLatencySeconds": 0.9,
+      "averageLatencyRangeSeconds": [
+        0.84,
+        0.96
+      ],
+      "workloadP95MsRange": [
+        1365.179,
+        1626.094
+      ]
+    },
+    {
+      "label": "claim-submit-20-tps",
+      "runs": 3,
+      "successful": 300,
+      "failed": 0,
+      "meanObservedSendTps": 20.37,
+      "meanAchievedTps": 18.67,
+      "achievedTpsRange": [
+        17.6,
+        19.2
+      ],
+      "meanAverageLatencySeconds": 0.7,
+      "averageLatencyRangeSeconds": [
+        0.54,
+        0.96
+      ],
+      "workloadP95MsRange": [
+        768.361,
+        1386.951
+      ]
+    },
+    {
+      "label": "claim-submit-40-tps",
+      "runs": 3,
+      "successful": 300,
+      "failed": 0,
+      "meanObservedSendTps": 40.37,
+      "meanAchievedTps": 24.1,
+      "achievedTpsRange": [
+        22.9,
+        25.8
+      ],
+      "meanAverageLatencySeconds": 1.497,
+      "averageLatencyRangeSeconds": [
+        1.23,
+        1.63
+      ],
+      "workloadP95MsRange": [
+        1761.896,
+        2320.442
+      ]
+    },
+    {
+      "label": "claim-submit-80-tps",
+      "runs": 3,
+      "successful": 300,
+      "failed": 0,
+      "meanObservedSendTps": 68.4,
+      "meanAchievedTps": 23.47,
+      "achievedTpsRange": [
+        20.1,
+        29.1
+      ],
+      "meanAverageLatencySeconds": 2.407,
+      "averageLatencyRangeSeconds": [
+        1.69,
+        2.77
+      ],
+      "workloadP95MsRange": [
+        2323.359,
+        3597.953
+      ]
+    },
+    {
+      "label": "claim-submit-160-tps",
+      "runs": 3,
+      "successful": 300,
+      "failed": 0,
+      "meanObservedSendTps": 135.4,
+      "meanAchievedTps": 20.83,
+      "achievedTpsRange": [
+        12,
+        25.4
+      ],
+      "meanAverageLatencySeconds": 3.597,
+      "averageLatencyRangeSeconds": [
+        2.5,
+        5.73
+      ],
+      "workloadP95MsRange": [
+        3228.102,
+        7767.345
+      ]
+    },
+    {
+      "label": "mixed-policy-claim-5-tps",
+      "runs": 3,
+      "successful": 300,
+      "failed": 0,
+      "meanObservedSendTps": 5.1,
+      "meanAchievedTps": 4.6,
+      "achievedTpsRange": [
+        4.6,
+        4.6
+      ],
+      "meanAverageLatencySeconds": 0.837,
+      "averageLatencyRangeSeconds": [
+        0.77,
+        0.88
+      ],
+      "workloadP95MsRange": [
+        2334.225,
+        2602.306
+      ]
+    },
+    {
+      "label": "mixed-policy-claim-10-tps",
+      "runs": 3,
+      "successful": 300,
+      "failed": 0,
+      "meanObservedSendTps": 10.2,
+      "meanAchievedTps": 9.73,
+      "achievedTpsRange": [
+        9.5,
+        9.9
+      ],
+      "meanAverageLatencySeconds": 0.653,
+      "averageLatencyRangeSeconds": [
+        0.61,
+        0.72
+      ],
+      "workloadP95MsRange": [
+        2004.075,
+        2264.055
+      ]
+    },
+    {
+      "label": "mixed-policy-claim-20-tps",
+      "runs": 3,
+      "successful": 300,
+      "failed": 0,
+      "meanObservedSendTps": 20.4,
+      "meanAchievedTps": 19,
+      "achievedTpsRange": [
+        18.7,
+        19.2
+      ],
+      "meanAverageLatencySeconds": 0.487,
+      "averageLatencyRangeSeconds": [
+        0.39,
+        0.66
+      ],
+      "workloadP95MsRange": [
+        1140.263,
+        1991.992
+      ]
+    },
+    {
+      "label": "mixed-policy-claim-40-tps",
+      "runs": 3,
+      "successful": 300,
+      "failed": 0,
+      "meanObservedSendTps": 40.77,
+      "meanAchievedTps": 31.33,
+      "achievedTpsRange": [
+        26.4,
+        35.2
+      ],
+      "meanAverageLatencySeconds": 0.423,
+      "averageLatencyRangeSeconds": [
+        0.33,
+        0.5
+      ],
+      "workloadP95MsRange": [
+        806.188,
+        1539.217
+      ]
+    },
+    {
+      "label": "mixed-policy-claim-80-tps",
+      "runs": 3,
+      "successful": 300,
+      "failed": 0,
+      "meanObservedSendTps": 81.4,
+      "meanAchievedTps": 38,
+      "achievedTpsRange": [
+        35,
+        41.2
+      ],
+      "meanAverageLatencySeconds": 0.643,
+      "averageLatencyRangeSeconds": [
+        0.59,
+        0.74
+      ],
+      "workloadP95MsRange": [
+        1403.385,
+        1775.357
+      ]
+    },
+    {
+      "label": "mixed-policy-claim-160-tps",
+      "runs": 3,
+      "successful": 300,
+      "failed": 0,
+      "meanObservedSendTps": 151.13,
+      "meanAchievedTps": 48.77,
+      "achievedTpsRange": [
+        44.5,
+        53.1
+      ],
+      "meanAverageLatencySeconds": 0.63,
+      "averageLatencyRangeSeconds": [
+        0.56,
+        0.73
+      ],
+      "workloadP95MsRange": [
+        1348.583,
+        1652.11
+      ]
+    }
+  ],
+  "resources": [
+    {
+      "name": "peer0.insurer.blockinsure.test",
+      "samples": 216,
+      "meanCpuPercent": 11.62,
+      "maxCpuPercent": 92.99,
+      "meanMemoryMiB": 105.53,
+      "maxMemoryMiB": 120.8
+    },
+    {
+      "name": "orderer.blockinsure.test",
+      "samples": 216,
+      "meanCpuPercent": 4.28,
+      "maxCpuPercent": 111.81,
+      "meanMemoryMiB": 76.74,
+      "maxMemoryMiB": 97.48
+    },
+    {
+      "name": "couchdb.insurer.blockinsure.test",
+      "samples": 216,
+      "meanCpuPercent": 12.45,
+      "maxCpuPercent": 226.83,
+      "meanMemoryMiB": 32.24,
+      "maxMemoryMiB": 43.24
+    },
+    {
+      "name": "dev-peer0.insurer.blockinsure.test-insurance-contract_1.4.0-phase2-8141d7f8edeb64f819e682354c0c46dc8b312245c1f2c3ccbfb36005bab8b27c",
+      "samples": 216,
+      "meanCpuPercent": 10.43,
+      "maxCpuPercent": 268.54,
+      "meanMemoryMiB": 193.29,
+      "maxMemoryMiB": 222.3
+    }
+  ],
+  "interpretation": "Protocol operations, full browser tests, and Caliper Gateway transactions have different timing boundaries; the three Caliper runs and three browser trials per profile are local observations rather than population reliability estimates."
+}

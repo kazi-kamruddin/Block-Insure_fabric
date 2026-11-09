@@ -88,6 +88,9 @@ func mergedBankAccount(ctx contractapi.TransactionContextInterface, public *Bank
 }
 
 func persistBankAccount(ctx contractapi.TransactionContextInterface, account *BankAccountReference, create bool) error {
+	if account.BalanceMinor < 0 {
+		return fmt.Errorf("bank account balance cannot be negative or overflow")
+	}
 	if err := validateHash("accountTokenHash", account.AccountTokenHash); err != nil {
 		return err
 	}

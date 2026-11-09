@@ -99,7 +99,6 @@ export function buildRoleDashboard(
   const decisions = assets.decisions ?? [];
   const fraudAssessments = assets.fraudAssessments ?? [];
   const oracleRequests = assets.oracleRequests ?? [];
-  const oracleSnapshots = assets.oracleSnapshots ?? [];
   const appeals = assets.appeals ?? [];
   const partnerAgreements = assets.partnerAgreements ?? [];
   const hospitalInvoices = assets.hospitalInvoices ?? [];
@@ -127,13 +126,13 @@ export function buildRoleDashboard(
       ],
       queueTitle: "Your active coverage",
       queue: [
-        ...appeals.filter((appeal) => appeal.claimantId === subjectId && ["SUBMITTED", "HOSPITAL_VERIFIED", "UNDER_REVIEW"].includes(appeal.status)).map((appeal) => ({
+        ...appeals.filter((appeal) => appeal.claimantId === subjectId && ["SUBMITTED", "HOSPITAL_VERIFIED", "ORACLE_PENDING", "UNDER_REVIEW"].includes(appeal.status)).map((appeal) => ({
           id: appeal.id,
           title: appeal.claimId,
           detail: appeal.status === "SUBMITTED"
-            ? "Corrected Hospital invoice submitted; awaiting insurer cross-check"
-            : appeal.status === "HOSPITAL_VERIFIED"
-              ? "Corrected invoice verified; awaiting fresh Oracle consensus"
+            ? "Correction submitted; awaiting claim processing"
+            : ["HOSPITAL_VERIFIED", "ORACLE_PENDING"].includes(appeal.status)
+              ? "Oracle workers are checking the corrected invoice"
               : "Oracle fallback is with the assigned independent auditors",
           status: appeal.status,
         })),
@@ -172,7 +171,7 @@ export function buildRoleDashboard(
       metrics: [
         { label: "Patient invoices", value: ownInvoices.length, hint: "records owned by this Hospital" },
         { label: "Draft invoices", value: drafts.length, hint: "still editable before finalization" },
-        { label: "Finalized invoices", value: ownInvoices.filter((item) => item.status === "FINALIZED").length, hint: "available for insurer cross-check" },
+        { label: "Finalized invoices", value: ownInvoices.filter((item) => item.status === "FINALIZED").length, hint: "available for Oracle verification" },
         { label: "Agreement active", value: agreement?.status === "ACTIVE" ? 1 : 0, hint: agreement ? `${agreement.name} · ${agreement.tier || "network partner"}` : "no active insurer agreement" },
       ],
       queueTitle: "Draft invoice work",
@@ -263,10 +262,6 @@ export function buildRoleDashboard(
   const reviewQueue = assets.claims.filter((claim) =>
     ["SUBMITTED", "APPEAL_SUBMITTED", "HOSPITAL_VERIFIED", "ORACLE_FAILED", "APPROVED"].includes(claim.status),
   );
-  const latestHospitalSnapshot = [...oracleSnapshots]
-    .filter((snapshot) => snapshot.id.startsWith("registry-hospital-v"))
-    .sort((left, right) => right.version - left.version)[0]
-    ?? [...oracleSnapshots].sort((left, right) => right.version - left.version)[0];
   return {
     title: "Portfolio oversight",
     description: "Govern packages, monitor claims, initiate audit review, and authorize settlements.",
@@ -290,20 +285,17 @@ export function buildRoleDashboard(
       ...reviewQueue.map((claim) => {
       const approved = claim.status === "APPROVED";
       const oracleFailed = claim.status === "ORACLE_FAILED";
-      const needsInvoiceCheck = claim.status === "SUBMITTED" || claim.status === "APPEAL_SUBMITTED";
       return {
         id: claim.id,
         title: claim.id,
         detail: `${money(claim.amountMinor)} · policy ${claim.policyId}${claim.currentAppealId ? " · appeal correction" : ""}`,
         status: claim.status,
-        commandLabel: approved ? "Prepare settlement" : oracleFailed ? "Prepare auditor fallback" : needsInvoiceCheck ? "Cross-check invoice" : "Prepare Oracle request",
+        commandLabel: approved ? "Prepare settlement" : oracleFailed ? "Prepare auditor fallback" : "Start claim processing",
         command: approved
           ? { operation: "authorizeSettlement", settlementId: `settlement-${Date.now()}-${claim.id}`, claimId: claim.id, sourceAccountId: "bank-insurer-premium", destinationAccountId: "showcase-customer-account" }
           : oracleFailed
             ? { operation: "routeOracleFailureToReview", requestId: claim.currentOracleRequestId, reviewId: `review-oracle-${Date.now()}-${claim.id}` }
-            : needsInvoiceCheck
-              ? { operation: "crossCheckClaimInvoice", claimId: claim.id, verificationId: `invoice-check-${Date.now()}-${claim.id}` }
-            : { operation: "requestOracleVerification", requestId: `oracle-request-${Date.now()}-${claim.id}`, claimId: claim.id, snapshotId: latestHospitalSnapshot?.id ?? "registry-demo-v1" },
+            : { operation: "startClaimProcessing", claimId: claim.id },
       };
       }),
     ],
