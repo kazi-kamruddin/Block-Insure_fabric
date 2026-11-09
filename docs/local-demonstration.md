@@ -33,8 +33,12 @@ it does not activate the new evaluator or new transaction methods.
 
 For a practical isolated November rehearsal, retain the existing
 `insurance-workflow-alignment-20261108` ledger and use candidate
-`1.6.2-xgb-alignment`, sequence3, package SHA256
-`15e313b50afa93ddaab5604c4ef48a4995fbac24b423fcdb3fa2ef193ce34cb4`.
+`1.6.3-xgb-alignment`, sequence4, package SHA256
+`bc2a30f5b434c73649f765a31232892941ced4f617c7f5518cf399af8457c44a`.
+Build/select the patched compiler with the commands in
+[the recovery/security guide](workflow-recovery-and-security.md) before starting
+the isolated peers. Keep application/package/schema aligned; the candidate build
+is not a replacement for a preserved channel's matching historical application.
 Inspect current processes/ports before guarded startup and preserve its separate
 Oracle, ciphertext, event and OTP state roots. Restore the same server/worker
 registry token and OTP/session secrets; do not print or regenerate them to bypass
@@ -57,6 +61,16 @@ documented owned-worker controls. A local HTTP email receiver verifies the
 delivery contract, not real inbox receipt. Stop only resources started for the
 rehearsal, retaining all state. Preserved demonstration activation remains a
 separate owner decision.
+
+The 10 November [recovery/security result](results/recovery-security-2026-11-10.md) adds actual lost-response and server
+restart tests, final Go dependency/binary verification and strict provider
+acknowledgement handling. Demonstrate **Check saved action** using the original
+saved command after a response is lost. A pending status does not authorize a new
+instruction; a valid transaction can still record an insufficient-funds business
+failure. Use `@alignment-recovery` only with the exact isolated channel and
+explicit `ALLOW_ISOLATED_APP_RESTART=true`, since that scenario restarts owned
+application processes. Its local PID-control helpers are documented in the
+handoff, not permission to stop another application's processes.
 
 This runbook demonstrates the permissioned insurance journey using the local
 InsurerMSP, HospitalMSP, AuditorMSP, BankMSP, and OracleMSP business network plus

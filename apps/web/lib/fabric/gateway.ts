@@ -20,7 +20,7 @@ function deadlineAfter(seconds: number) {
 
 export async function withFabricContract<T>(
   role: FabricRole,
-  action: (contract: Contract, gateway: Gateway) => Promise<T>,
+  action: (contract: Contract, gateway: Gateway, identity: Identity) => Promise<T>,
   profileUserName?: string,
 ): Promise<T> {
   const config = loadFabricConfig();
@@ -59,7 +59,7 @@ export async function withFabricContract<T>(
   try {
     const network = gateway.getNetwork(config.channelName);
     const contract = network.getContract(config.chaincodeName);
-    return await action(contract, gateway);
+    return await action(contract, gateway, identity);
   } finally {
     gateway.close();
     client.close();

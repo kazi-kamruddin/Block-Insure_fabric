@@ -34,9 +34,9 @@ Fabric runs, builds and tests independently. No runtime, test, build or operatio
 
 Run worker tests, evaluator check, web unit/type/lint gates and Go chaincode tests using only this checkout. Fresh CI also validates the frozen evaluator manifest. Dataset-generation tooling takes an explicit user-provided JSONL input rather than assuming any reference repository exists. Preserve failures under ignored local reports.
 
-The current isolated candidate already exists: `insurance-workflow-alignment-20261108`, version `1.6.2-xgb-alignment`, sequence3, package SHA256 `15e313b50afa93ddaab5604c4ef48a4995fbac24b423fcdb3fa2ef193ce34cb4`. Reuse it and its separate Oracle/evidence/event/OTP state roots; do not recreate or reseed it. All five peers passed installed/approved/committed identity checks and25 packaged runtime files matched source. Local evidence and remaining gates are recorded in the maintained alignment matrix and ignored handoff. Do not use `workflow-demo.ps1 Start` for this candidate: that wrapper selects the preserved older workflow package. A version label alone is insufficient source evidence.
+The current isolated candidate already exists: `insurance-workflow-alignment-20261108`, version `1.6.3-xgb-alignment`, sequence4, package SHA256 `bc2a30f5b434c73649f765a31232892941ced4f617c7f5518cf399af8457c44a`. Reuse it and its separate Oracle/evidence/event/OTP state roots; do not recreate or reseed it. All five peers passed installed/approved/committed identity checks and25 packaged runtime files matched source. Local evidence and remaining gates are recorded in the maintained alignment matrix and ignored handoff. Do not use `workflow-demo.ps1 Start` for this candidate: that wrapper selects the preserved older workflow package. A version label alone is insufficient source evidence.
 
-After a PC restart, first inspect Docker and current ownership, then run `scripts/low-memory-network.ps1 Start -ChaincodeVersion 1.6.2-xgb-alignment -EvidencePath <ignored-local-report.jsonl>`. This resumes state and drains delayed historical runtime starts. Restore the isolated application environment, registry transport token and existing state roots; wait for all worker health endpoints. The alignment Playwright config deliberately assumes this already running stack and refuses a channel outside the alignment namespace. Run one bounded scenario at a time; keep compilers separate from cold startup. The timeout scenario requires only Oracle1 available; one-unavailable requires two available. Record exact worker process ownership before injecting faults, restore them afterward, and preserve every original result.
+After a PC restart, first inspect Docker and current ownership, then run `scripts/low-memory-network.ps1 Start -ChaincodeVersion 1.6.3-xgb-alignment -EvidencePath <ignored-local-report.jsonl>`. This resumes state and drains delayed historical runtime starts. Restore the isolated application environment, registry transport token and existing state roots; wait for all worker health endpoints. The alignment Playwright config deliberately assumes this already running stack and refuses a channel outside the alignment namespace. Run one bounded scenario at a time; keep compilers separate from cold startup. The timeout scenario requires only Oracle1 available; one-unavailable requires two available. Record exact worker process ownership before injecting faults, restore them afterward, and preserve every original result.
 
 Candidate journey: ordinary Hospital login creates/finalizes synthetic invoices and records explicit model facts; holder acquires/pays coverage and submits encrypted evidence; insurer starts processing; three workers verify the pinned source/context, commit and reveal; model review proceeds to the assigned four-person panel, while approval and simulated Bank settlement retain their separate rules. Verify actual decryption, replay, funding and failure journeys before declaring readiness. Remaining Stage B/C work is maintained in the local alignment matrix.
 
@@ -46,7 +46,14 @@ For isolated deployment, `scripts/create-alignment-channel.sh` guards a dated al
 
 ## Payment and evidence recovery changes
 
-The isolated1.6.2/sequence3 package supersedes earlier1.6.0/1 and intermediate
+The current1.6.3/sequence4 candidate adds the patched Go build/dependency chain;
+its business Go source and frozen evaluator remain unchanged from1.6.2. Browser
+critical actions now use saved intent and a durable commit-status journal. The
+[recovery/security guide](workflow-recovery-and-security.md) records its exact
+request, custody, layout-compatibility and activation boundaries. Select the
+patched builder image before isolated startup; no preserved channel is upgraded.
+
+The earlier isolated1.6.2/sequence3 package superseded earlier1.6.0/1 and intermediate
 1.6.1/2; keep their archives and history. Only bank_transfers.go runtime changed:
 exact already-collected installment reconciliation and a distinct non-financial
 event. Model/evaluator, schema, quorum, endorsement and PDC membership remain

@@ -73,6 +73,7 @@ logs/
 Thumbs.db
 
 # Private local context
+/data/workflow-operations*/
 /.project-context/
 /.local-reference/
 

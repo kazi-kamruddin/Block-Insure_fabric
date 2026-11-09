@@ -4,10 +4,12 @@ import { findDemoAccount, workspaceForAccount } from "@/lib/auth/accounts";
 import { currentSession } from "@/lib/auth/current-session";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { WorkspaceClient } from "@/components/workspace-client";
+import { loadFabricConfig } from "@/lib/fabric/config";
 
 export const dynamic = "force-dynamic";
 
 export default async function WorkspacePage() {
+  const config = loadFabricConfig();
   const session = await currentSession().catch(() => null);
   const account = session ? findDemoAccount(session.accountId) ?? null : null;
   if (account) redirect(`/workspace/${workspaceForAccount(account)}`);
@@ -26,7 +28,7 @@ export default async function WorkspacePage() {
           </div>
         </nav>
       </header>
-      <WorkspaceClient initialAccount={null} initialDashboard={null} />
+      <WorkspaceClient initialAccount={null} initialDashboard={null} deployment={`${config.channelName}/${config.chaincodeName}`} />
     </main>
   );
 }

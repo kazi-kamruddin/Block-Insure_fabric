@@ -30,7 +30,8 @@ fi
 
 "${docker_command}" volume create block-insure-go-cache >/dev/null
 "${docker_command}" run --rm \
+  --memory 512m --cpus 1 -e GOMEMLIMIT=384MiB -e GOMAXPROCS=1 -e GOFLAGS=-p=1 \
   -v block-insure-go-cache:/go/pkg/mod \
   -v "${mount_path}:/workspace" \
-  -w /workspace golang:1.25 \
+  -w /workspace golang:1.26.10 \
   bash -c 'test -z "$(/usr/local/go/bin/gofmt -l .)" && /usr/local/go/bin/go vet ./... && /usr/local/go/bin/go test ./...'

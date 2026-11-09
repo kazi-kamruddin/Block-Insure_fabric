@@ -63,6 +63,14 @@ jobs:
         run: go vet ./...
       - name: Test chaincode
         run: go test ./...
+      - name: Set up Node.js for scan validation
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+      - name: Scan reachable Go vulnerabilities
+        run: |
+          go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 -json ./... > "$RUNNER_TEMP/chaincode-govulncheck.jsonl"
+          node ../../scripts/check-go-vulnerabilities.mjs "$RUNNER_TEMP/chaincode-govulncheck.jsonl"
 
   oracle-worker:
     name: Oracle worker protocol and durability
@@ -97,4 +105,4 @@ jobs:
       - name: Check workflow invariants
         run: node formal/insurance-workflow/check-model.mjs
       - name: Test research statistics and security cases
-        run: node --test benchmarks/comparative/statistics.test.mjs benchmarks/security-evaluation/cases.test.mjs
+        run: node --test benchmarks/comparative/statistics.test.mjs benchmarks/security-evaluation/cases.test.mjs scripts/check-go-vulnerabilities.test.mjs

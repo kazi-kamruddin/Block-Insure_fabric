@@ -1,5 +1,34 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
+import { savedActionKey } from "../lib/workflows/saved-action";
+
+test("offline UI restores the original saved action at320px and recovers without generating another identity", async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 800 });
+  await page.request.post("/api/auth/demo-login", { data: { accountId: "policyholder-1" } });
+  await page.goto("/workspace/policyholder");
+  const deployment = `${process.env.FABRIC_CHANNEL_NAME ?? "insurance-channel"}/${process.env.FABRIC_CHAINCODE_NAME ?? "insurance-contract"}`;
+  const key = savedActionKey(deployment, "policyholder-1"), requestId = "synthetic-browser-request-0001";
+  const command = { operation: "submitClaim", id: "saved-browser-claim", policyId: "saved-policy", hospitalId: "hospital-demo", hospitalInvoiceId: "saved-invoice", amountMinor: 1000, incidentDate: "2026-11-09", descriptionHash: "a".repeat(64) };
+  await page.evaluate(({ key, requestId, command }) => localStorage.setItem(key, JSON.stringify({ requestId, command })), { key, requestId, command });
+  let attempts = 0;
+  // UI transport fixture only. Actual Gateway/store recovery has its own live suite.
+  await page.route("**/api/workflows", async route => {
+    expect(route.request().headers()["idempotency-key"]).toBe(requestId);
+    expect(route.request().headers()["x-workflow-deployment"]).toBe(deployment);
+    expect(route.request().headers()["x-workflow-recovery"]).toBe("true");
+    expect(route.request().postDataJSON()).toEqual(command);
+    attempts++;
+    await route.fulfill({ status: attempts === 1 ? 202 : 200, contentType: "application/json", body: JSON.stringify(attempts === 1 ? { state: "PENDING", transactionId: "same-transaction", message: "Commit outcome unresolved" } : { state: "COMMITTED", validationCode: 0, result: { id: command.id } }) });
+  });
+  await page.reload();
+  const card = page.getByRole("article", { name: "Saved workflow action" });
+  await card.getByRole("button", { name: "Check saved action" }).click();
+  await expect(card).toContainText("PENDING");
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+  await page.reload(); await card.getByRole("button", { name: "Check saved action" }).click();
+  await expect(card).toHaveCount(0); expect(attempts).toBe(2);
+  expect(await page.evaluate(key => localStorage.getItem(key), key)).toBeNull();
+});
 
 test("public and sign-in surfaces work without ledger dependencies", async ({ page, request }) => {
   const response = await page.goto("/");

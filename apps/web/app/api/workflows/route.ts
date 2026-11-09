@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
-import { currentSession } from "@/lib/auth/current-session";
+import { currentSession, sessionSecret } from "@/lib/auth/current-session";
+import { runRecoverableOperation } from "@/lib/workflows/operation-journal";
+import { loadFabricConfig } from "@/lib/fabric/config";
 import { canExecute, workflowCommandSchema } from "@/lib/workflows/commands";
 import { executeWorkflowCommand } from "@/lib/workflows/execute";
 import { checkMutationOrigin } from "@/lib/security/request-origin";
@@ -25,6 +27,15 @@ export async function POST(request: Request) {
   }
 
   try {
+    const requestId = request.headers.get("idempotency-key");
+    if (requestId) {
+      const config = loadFabricConfig();
+      if (request.headers.get("x-workflow-deployment") !== `${config.channelName}/${config.chaincodeName}`) {
+        return NextResponse.json({ message: "Saved action belongs to a different deployment" }, { status: 409 });
+      }
+      const outcome = await runRecoverableOperation({ requestId, command: parsed.data, session, secret: sessionSecret(), recoverOnly: request.headers.get("x-workflow-recovery") === "true" }, () => executeWorkflowCommand(parsed.data, session));
+      return NextResponse.json({ ...outcome, message: outcome.message, result: outcome.result }, { status: outcome.state === "COMMITTED" ? 200 : outcome.state === "PENDING" ? 202 : 409 });
+    }
     const result = await executeWorkflowCommand(parsed.data, session);
     return NextResponse.json({ result });
   } catch (error) {

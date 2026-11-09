@@ -63,9 +63,9 @@ package_chaincode() {
     -v "${scripts_mount}:/package-scripts:ro" \
     -v block-insure-go-cache:/go/pkg/mod \
     -e FABRIC_CFG_PATH=/fabric-config \
-    golang:1.25 bash /package-scripts/package-chaincode.sh /chaincode "/artifacts/${chaincode_label}.tar.gz" "${chaincode_label}" /fabric-bin/peer
+    golang:1.26.10 bash /package-scripts/package-chaincode.sh /chaincode "/artifacts/${chaincode_label}.tar.gz" "${chaincode_label}" /fabric-bin/peer
   "${docker_command}" run --rm -v "${artifacts_mount}:/artifacts" \
-    golang:1.25 chmod 0644 "/artifacts/${chaincode_label}.tar.gz"
+    golang:1.26.10 chmod 0644 "/artifacts/${chaincode_label}.tar.gz"
 }
 
 set_peer_context() {
@@ -117,7 +117,22 @@ resolve_chaincode_sequence() {
   chaincode_sequence="$((definition_sequence + 1))"
 }
 
+verify_candidate_builder() {
+  # Prevent a source/test-only toolchain update from silently deploying through
+  # an older peer compiler. This checks configuration, never changes peer state.
+  local expected='block-insure/fabric-ccenv:2.5.16-go1.26.10' docker_cli='docker' org configured
+  if ! command -v docker >/dev/null 2>&1 || ! docker info >/dev/null 2>&1; then docker_cli='docker.exe'; fi
+  for org in insurer hospital auditor bank oracle; do
+    configured="$($docker_cli inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "peer0.${org}.blockinsure.test" | sed -n 's/^CORE_CHAINCODE_BUILDER=//p' | tr -d '\r')"
+    if [[ "$configured" != "$expected" ]]; then
+      echo "Peer ${org} does not select the patched candidate builder. Build it and start the isolated peers with FABRIC_CHAINCODE_BUILDER=${expected}; preserve all volumes." >&2
+      exit 1
+    fi
+  done
+}
+
 resolve_chaincode_sequence
+verify_candidate_builder
 mkdir -p "${artifacts}"
 package_chaincode
 package_id="$(peer lifecycle chaincode calculatepackageid "${package_file}")"

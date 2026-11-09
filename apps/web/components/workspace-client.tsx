@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import {
   demoAccounts,
@@ -12,9 +12,11 @@ import type { RoleDashboard } from "@/lib/dashboard/build-dashboard";
 import { GuidedWorkflowForm, type PreparedWorkflow } from "@/components/guided-workflow-form";
 import { PresentationGuide } from "@/components/presentation-guide";
 import type { WorkflowCommand } from "@/lib/workflows/commands";
-import { bdtToMinor } from "@/lib/workflows/forms";
+import { bdtToMinor, workflowFormDefinitions } from "@/lib/workflows/forms";
 import { decryptEvidenceBytes, encryptEvidenceBytes, sha256Hex } from "@/lib/evidence/browser-crypto";
 import { createEvidenceRecovery, restoreEvidenceRecovery } from "@/lib/evidence/recovery";
+import { recoverableTransactions } from "@/lib/workflows/recoverable";
+import { readSavedAction, parseSavedAction, saveAction, savedActionKey, type SavedWorkflowAction } from "@/lib/workflows/saved-action";
 
 type AssetType = "partner-agreement" | "hospital-invoice" | "package" | "policy" | "claim" | "evidence" | "evidence-batch" | "evidence-grant" | "verification" | "decision" | "review" | "appeal" | "fraud-assessment" | "settlement" | "access" | "claim-history" | "account" | "bank-transfer" | "mandate" | "premium-payment" | "premium-adjustment" | "collection" | "benefit-plan" | "beneficiaries" | "benefit-request" | "liability" | "oracle-snapshot" | "oracle-request" | "oracle-commitment" | "oracle-result" | "oracle-history" | "privacy-credential" | "privacy-presentation";
 type NotificationItem = { id: string; title: string; message: string; assetId: string; blockNumber: string };
@@ -89,12 +91,21 @@ async function responseJson(response: Response) {
   return body;
 }
 
+function subscribeSavedAction(callback: () => void) {
+  window.addEventListener("storage", callback);
+  window.addEventListener("fabric-saved-action", callback);
+  return () => { window.removeEventListener("storage", callback); window.removeEventListener("fabric-saved-action", callback); };
+}
+function notifySavedAction() { window.dispatchEvent(new Event("fabric-saved-action")); }
+
 export function WorkspaceClient({
   initialAccount,
   initialDashboard,
+  deployment,
 }: {
   initialAccount: DemoAccount | null;
   initialDashboard: RoleDashboard | null;
+  deployment: string;
 }) {
   const router = useRouter();
   const [account, setAccount] = useState(initialAccount);
@@ -126,6 +137,14 @@ export function WorkspaceClient({
   const [statementPolicyId, setStatementPolicyId] = useState("");
   const [output, setOutput] = useState("Ready.");
   const [busy, setBusy] = useState(false);
+  const savedSnapshot = useSyncExternalStore(subscribeSavedAction, () => {
+    if (!account) return null;
+    try { return localStorage.getItem(savedActionKey(deployment, account.id)); } catch { return "unavailable"; }
+  }, () => null);
+  const savedAction = useMemo(() => {
+    if (!savedSnapshot) return null;
+    try { return parseSavedAction(savedSnapshot); } catch { return null; }
+  }, [savedSnapshot]);
   const [dashboard, setDashboard] = useState<RoleDashboard | null>(initialDashboard);
   const [dashboardLoading, setDashboardLoading] = useState(Boolean(initialAccount && !initialDashboard));
   const [preparedWorkflow, setPreparedWorkflow] = useState<PreparedWorkflow | null>(null);
@@ -274,14 +293,32 @@ export function WorkspaceClient({
     }
   }
 
-  async function submitWorkflow(payload: WorkflowCommand) {
+  async function submitWorkflow(payload: WorkflowCommand, recoverOnly = false) {
     setBusy(true);
     try {
-      const body = await responseJson(await fetch("/api/workflows", {
+      let action: SavedWorkflowAction | null = null;
+      const storageKey = account ? savedActionKey(deployment, account.id) : "";
+      if (recoverableTransactions[payload.operation]) {
+        if (!account) throw new Error("Sign in before submitting this action");
+        action = readSavedAction(localStorage, storageKey);
+        if (action && JSON.stringify(action.command) !== JSON.stringify(payload)) throw new Error("Recover the saved action before submitting a different instruction");
+        action ??= { requestId: crypto.randomUUID(), command: payload };
+        saveAction(localStorage, storageKey, action); notifySavedAction();
+      }
+      const response = await fetch("/api/workflows", {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: { "content-type": "application/json", ...(action ? { "idempotency-key": action.requestId, "x-workflow-deployment": deployment, "x-workflow-recovery": String(recoverOnly) } : {}) },
         body: JSON.stringify(payload),
-      }));
+      });
+      const body = await response.json();
+      if (action && body.state !== "COMMITTED") {
+        const pending = { ...action, state: body.state ?? "PENDING" };
+        saveAction(localStorage, storageKey, pending); notifySavedAction();
+        setOutput(body.message ?? "Outcome unresolved. Recover the saved action; do not submit another instruction.");
+        return;
+      }
+      if (!response.ok) throw new Error(body.message ?? "Command failed");
+      if (action) { localStorage.removeItem(storageKey); notifySavedAction(); }
       setOutput(JSON.stringify(body.result, null, 2));
       await refreshDashboard();
     } catch (error) {
@@ -717,6 +754,18 @@ export function WorkspaceClient({
       </div>
 
       <div className="workGrid" id="transaction-console">
+        {savedSnapshot && !savedAction && <p className="formError" role="alert">Saved action storage is unavailable or invalid. Preserve it for recovery; nothing new will be sent until storage is usable.</p>}
+        {savedAction && <article className="workCard" aria-label="Saved workflow action">
+          <h2>Recover saved action</h2>
+          <p>{workflowFormDefinitions[savedAction.command.operation].label} · {savedAction.state ?? "Outcome unresolved"}. Check this action before submitting another instruction.</p>
+          <button className="primary button" disabled={busy} onClick={() => submitWorkflow(savedAction.command, true)}>Check saved action</button>
+          {["INVALID", "REJECTED", "NOT_SUBMITTED"].includes(savedAction.state ?? "") && <button className="button" disabled={busy} onClick={() => {
+            if (!account) return;
+            localStorage.removeItem(savedActionKey(deployment, account.id)); notifySavedAction();
+            setPreparedWorkflow({ command: savedAction.command, revision: Date.now() });
+            setOutput("Confirmed failed action cleared. Review the original instruction before explicitly making a new attempt.");
+          }}>Review failed action for a new attempt</button>}
+        </article>}
         <GuidedWorkflowForm
           key={`${account.role}-${preparedWorkflow?.revision ?? 0}`}
           role={account.role}

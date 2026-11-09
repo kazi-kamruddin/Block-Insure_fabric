@@ -12,10 +12,12 @@ An opt-in frozen XGBoost alignment candidate is under verification; see
 [its input contract and verification boundaries](docs/frozen-xgboost-alignment.md).
 It is not activated on preserved channels. Existing research results do not
 validate the new evaluator or establish real-patient classification accuracy.
-The isolated Stage B candidate is1.6.2-xgb-alignment/sequence3. Its
-[dated verification record](docs/results/alignment-stage-b-2026-11-09.md)
-tracks payment reconciliation, evidence/restart and delivery acceptance separately
-from historical results and preserved-channel activation.
+The current isolated candidate is1.6.3-xgb-alignment/sequence4. Its
+[recovery/security guide](docs/workflow-recovery-and-security.md) and
+[dated verification record](docs/results/recovery-security-2026-11-10.md)
+track durable critical actions, the patched Go builder and provider failure
+handling. Earlier [Stage B results](docs/results/alignment-stage-b-2026-11-09.md)
+remain historical. Preserved-channel activation still requires owner review.
 
 The original implementation areas and the policy/premium/benefit expansion are
 joined by a certificate-bound 2-of-3 Oracle consensus subsystem. The source now
@@ -33,13 +35,15 @@ and fault-profile benchmarks. The archived clean local baseline runs
 `insurance-contract` 1.4.0 with schema 14. Its automated code gate and live Fabric
 workflow cover the Phase 1 partner and Hospital boundary.
 
-The current workflow demonstration uses a separate
+The preserved October workflow demonstration uses a separate
 `insurance-workflow-20261005` channel with schema-15 chaincode 1.5.1-workflow.
-Use [the presentation runbook](docs/local-demonstration.md) and
-`scripts/workflow-demo.ps1` to start it. The earlier 3 October hardening gate is
+Its `scripts/workflow-demo.ps1` wrapper selects that older package. Use the
+[presentation runbook](docs/local-demonstration.md) for the current isolated
+candidate and keep its application/package/schema aligned. The earlier3 October hardening gate is
 recorded in [the dated live record](docs/results/hardening-live-20261003.md).
-The default local environment file still selects the older main channel; use
-the workflow wrapper for the current demonstration.
+The default local environment file still selects the older main channel; select
+the isolated candidate environment explicitly for current alignment verification.
+Preserving a channel does not activate the latest source on it.
 
 This is not a production deployment claim. Institutional authentication,
 durable encrypted object storage and key recovery, multi-node/orderer high

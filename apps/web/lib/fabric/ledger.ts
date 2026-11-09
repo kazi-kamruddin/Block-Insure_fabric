@@ -3,6 +3,7 @@ import "server-only";
 import { randomBytes } from "node:crypto";
 import type { Contract } from "@hyperledger/fabric-gateway";
 import { withFabricContract } from "./gateway";
+import { submitJournaled } from "@/lib/workflows/operation-journal";
 import type { FabricRole } from "./config";
 import type {
   AuditorDecision,
@@ -63,9 +64,9 @@ async function submit<T>(
   transactionName: string,
   ...args: Array<string | number>
 ) {
-  return withFabricContract(role, async (contract) =>
+  return withFabricContract(role, async (contract, gateway, identity) =>
     decodeJson<T>(
-      await contract.submitTransaction(transactionName, ...stringifyArguments(args)),
+      await submitJournaled(contract, gateway, identity, role, transactionName, stringifyArguments(args)),
     ),
   );
 }
@@ -94,8 +95,8 @@ async function submitAsAuditor<T>(
   if (!auditorUserName) throw new Error("This auditor account has no server-owned Fabric identity");
   return withFabricContract(
     "auditor",
-    async (contract) => decodeJson<T>(
-      await contract.submitTransaction(transactionName, ...stringifyArguments(args)),
+    async (contract, gateway, identity) => decodeJson<T>(
+      await submitJournaled(contract, gateway, identity, "auditor", transactionName, stringifyArguments(args), auditorUserName),
     ),
     auditorUserName,
   );

@@ -5,12 +5,14 @@ import { WorkspaceClient } from "@/components/workspace-client";
 import { findDemoAccount, workspaceForAccount } from "@/lib/auth/accounts";
 import { currentSession } from "@/lib/auth/current-session";
 import { loadRoleDashboard } from "@/lib/dashboard/load-dashboard";
+import { loadFabricConfig } from "@/lib/fabric/config";
 
 export const dynamic = "force-dynamic";
 
 type PageContext = { params: Promise<{ workspace: string }> };
 
 export default async function RoleWorkspacePage({ params }: PageContext) {
+  const config = loadFabricConfig();
   const session = await currentSession().catch(() => null);
   if (!session) redirect("/workspace");
 
@@ -43,7 +45,7 @@ export default async function RoleWorkspacePage({ params }: PageContext) {
           </div>
         </nav>
       </header>
-      <WorkspaceClient initialAccount={account} initialDashboard={dashboard} />
+      <WorkspaceClient initialAccount={account} initialDashboard={dashboard} deployment={`${config.channelName}/${config.chaincodeName}`} />
     </main>
   );
 }
