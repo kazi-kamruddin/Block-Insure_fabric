@@ -6,6 +6,7 @@ coverage/
 /data/evidence/
 /data/events/
 /data/oracle/
+/data/otp/
 /data/evidence-phase1/
 /data/events-phase1/
 /data/oracle-phase1/
@@ -18,6 +19,14 @@ coverage/
 /data/evidence-workflow/
 /data/events-workflow/
 /data/oracle-workflow/
+/data/oracle-alignment-20261108/
+/data/events-alignment-20261108/
+/data/evidence-alignment-20261108/
+/data/otp-alignment-20261108/
+/data/oracle-alignment-20261108/
+/data/events-alignment-20261108/
+/data/evidence-alignment-20261108/
+/data/otp-alignment-20261108/
 /data/demo-stack/
 /apps/web/data/
 /apps/web/test-results/

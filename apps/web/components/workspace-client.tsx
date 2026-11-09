@@ -14,6 +14,7 @@ import { PresentationGuide } from "@/components/presentation-guide";
 import type { WorkflowCommand } from "@/lib/workflows/commands";
 import { bdtToMinor } from "@/lib/workflows/forms";
 import { decryptEvidenceBytes, encryptEvidenceBytes, sha256Hex } from "@/lib/evidence/browser-crypto";
+import { createEvidenceRecovery, restoreEvidenceRecovery } from "@/lib/evidence/recovery";
 
 type AssetType = "partner-agreement" | "hospital-invoice" | "package" | "policy" | "claim" | "evidence" | "evidence-batch" | "evidence-grant" | "verification" | "decision" | "review" | "appeal" | "fraud-assessment" | "settlement" | "access" | "claim-history" | "account" | "bank-transfer" | "mandate" | "premium-payment" | "premium-adjustment" | "collection" | "benefit-plan" | "beneficiaries" | "benefit-request" | "liability" | "oracle-snapshot" | "oracle-request" | "oracle-commitment" | "oracle-result" | "oracle-history" | "privacy-credential" | "privacy-presentation";
 type NotificationItem = { id: string; title: string; message: string; assetId: string; blockNumber: string };
@@ -108,6 +109,10 @@ export function WorkspaceClient({
   const [plaintextEvidence, setPlaintextEvidence] = useState<File | null>(null);
   const [evidencePassphrase, setEvidencePassphrase] = useState("");
   const [evidencePassphraseConfirmation, setEvidencePassphraseConfirmation] = useState("");
+  const [backupPassword, setBackupPassword] = useState("");
+  const [recoveryDownload, setRecoveryDownload] = useState<{ url: string; name: string } | null>(null);
+  const [recoveryFile, setRecoveryFile] = useState<File | null>(null);
+  const [restorePassword, setRestorePassword] = useState("");
   const [encrypting, setEncrypting] = useState(false);
   const [retrievalEvidenceId, setRetrievalEvidenceId] = useState("");
   const [retrievalGrantId, setRetrievalGrantId] = useState("");
@@ -134,6 +139,7 @@ export function WorkspaceClient({
   useEffect(() => () => {
     if (decryptedEvidence) URL.revokeObjectURL(decryptedEvidence.url);
   }, [decryptedEvidence]);
+  useEffect(() => () => { if (recoveryDownload) URL.revokeObjectURL(recoveryDownload.url); }, [recoveryDownload]);
 
   const refreshNotifications = useCallback(async () => {
     try {
@@ -250,6 +256,14 @@ export function WorkspaceClient({
       setAccount(null);
       setDashboard(null);
       setCommand("");
+      setEvidencePassphrase("");
+      setEvidencePassphraseConfirmation("");
+      setRetrievalPassphrase("");
+      setBackupPassword("");
+      setRestorePassword("");
+      setRecoveryFile(null);
+      setRecoveryDownload(null);
+      setDecryptedEvidence(null);
       setOutput("Signed out.");
       router.push("/workspace");
       router.refresh();
@@ -315,16 +329,20 @@ export function WorkspaceClient({
 
   function updateManualPayment(name: keyof typeof manualPayment, value: string) {
     setManualPayment((current) => ({ ...current, [name]: value,
-      ...(name === "policyId" || name === "sourceAccountId" ? { challengeId: "", otp: "", demoCode: "" } : {}),
+      ...(!["otp", "challengeId", "demoCode"].includes(name) ? { challengeId: "", otp: "", demoCode: "" } : {}),
     }));
   }
 
   async function requestPremiumOtp() {
     setBusy(true);
     try {
+      const externalReferenceHash = await sha256Hex(new TextEncoder().encode(manualPayment.externalReference.trim()));
       const body = await responseJson(await fetch("/api/banking/otp", {
         method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ policyId: manualPayment.policyId, sourceAccountId: manualPayment.sourceAccountId }),
+        body: JSON.stringify({ policyId: manualPayment.policyId, sourceAccountId: manualPayment.sourceAccountId,
+          destinationAccountId: manualPayment.destinationAccountId, transferId: manualPayment.transferId, paymentId: manualPayment.paymentId,
+          periodStartDate: manualPayment.periodStartDate, periodEndDate: manualPayment.periodEndDate,
+          amountMinor: bdtToMinor(manualPayment.amountBdt), externalReferenceHash }),
       }));
       setManualPayment((current) => ({ ...current, challengeId: body.challengeId, demoCode: body.demoCode ?? "", otp: body.demoCode ?? "" }));
       setOutput(body.demoCode ? `Demo OTP ${body.demoCode} expires at ${body.expiresAt}.` : `OTP challenge created and delivered by the configured adapter; expires at ${body.expiresAt}.`);
@@ -338,19 +356,28 @@ export function WorkspaceClient({
   async function submitManualPremium() {
     setBusy(true);
     try {
+      if (!account) throw new Error("Sign in before authorizing a payment.");
       if (!manualPayment.challengeId) throw new Error("Request an OTP first.");
       const externalReferenceHash = await sha256Hex(new TextEncoder().encode(manualPayment.externalReference.trim()));
+      const intent = {
+        transferId: manualPayment.transferId, paymentId: manualPayment.paymentId, policyId: manualPayment.policyId,
+        sourceAccountId: manualPayment.sourceAccountId, destinationAccountId: manualPayment.destinationAccountId,
+        periodStartDate: manualPayment.periodStartDate, periodEndDate: manualPayment.periodEndDate,
+        amountMinor: bdtToMinor(manualPayment.amountBdt), externalReferenceHash,
+      };
+      const pendingKey = `block-insure:premium-intent:${account.id}`;
+      const previous = localStorage.getItem(pendingKey);
+      if (previous && previous !== JSON.stringify(intent)) throw new Error("Recover the saved payment outcome before authorizing a different payment.");
+      localStorage.setItem(pendingKey, JSON.stringify(intent));
       const body = await responseJson(await fetch("/api/banking/premium-payment", {
         method: "POST", headers: { "content-type": "application/json" },
         body: JSON.stringify({
           challengeId: manualPayment.challengeId, otp: manualPayment.otp,
-          transferId: manualPayment.transferId, paymentId: manualPayment.paymentId, policyId: manualPayment.policyId,
-          sourceAccountId: manualPayment.sourceAccountId, destinationAccountId: manualPayment.destinationAccountId,
-          periodStartDate: manualPayment.periodStartDate, periodEndDate: manualPayment.periodEndDate,
-          amountMinor: bdtToMinor(manualPayment.amountBdt), externalReferenceHash,
+          ...intent,
         }),
       }));
       setOutput(JSON.stringify(body.result, null, 2));
+      if (["SETTLED", "BOUNCED"].includes(body.result?.status)) localStorage.removeItem(pendingKey);
       setManualPayment((current) => ({ ...current, challengeId: "", otp: "", demoCode: "", externalReference: "" }));
       await refreshDashboard();
     } catch (error) {
@@ -358,6 +385,22 @@ export function WorkspaceClient({
     } finally {
       setBusy(false);
     }
+  }
+
+  async function recoverManualPremium() {
+    setBusy(true);
+    try {
+      if (!account) throw new Error("Sign in before recovering a payment.");
+      const key = `block-insure:premium-intent:${account.id}`;
+      const saved = localStorage.getItem(key);
+      if (!saved) throw new Error("No saved payment intent is available in this browser.");
+      const outcome = await responseJson(await fetch("/api/banking/premium-payment", {
+        method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...JSON.parse(saved), recoverOnly: true }),
+      }));
+      setOutput(JSON.stringify(outcome, null, 2));
+      if (["SETTLED", "BOUNCED"].includes(outcome.status)) { localStorage.removeItem(key); await refreshDashboard(); }
+    } catch (error) { setOutput(error instanceof Error ? error.message : "Payment recovery unavailable"); }
+    finally { setBusy(false); }
   }
 
   async function uploadEvidence() {
@@ -382,6 +425,7 @@ export function WorkspaceClient({
 
   async function encryptEvidence() {
     setEncrypting(true);
+    setRecoveryDownload(null);
     try {
       if (!plaintextEvidence) throw new Error("Choose the original evidence file.");
       if (evidencePassphrase !== evidencePassphraseConfirmation) throw new Error("Evidence passphrases do not match.");
@@ -391,6 +435,11 @@ export function WorkspaceClient({
         { claimId: evidenceClaimId.trim(), evidenceId: evidenceId.trim() },
       );
       const safeName = plaintextEvidence.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+      if (backupPassword) {
+        const backup = await createEvidenceRecovery(evidencePassphrase, backupPassword,
+          { claimId: evidenceClaimId.trim(), evidenceId: evidenceId.trim() }, encrypted.contentHash);
+        setRecoveryDownload({ url: URL.createObjectURL(new Blob([backup], { type: "application/json" })), name: `${safeName}.bifkey` });
+      }
       const envelopeBuffer = new ArrayBuffer(encrypted.envelope.byteLength);
       new Uint8Array(envelopeBuffer).set(encrypted.envelope);
       const file = new File(
@@ -402,6 +451,7 @@ export function WorkspaceClient({
       setContentHash(encrypted.contentHash);
       setEvidencePassphrase("");
       setEvidencePassphraseConfirmation("");
+      setBackupPassword("");
       setOutput(`Encrypted ${plaintextEvidence.name} locally. Keep the passphrase safe; it cannot be recovered by Block-Insure.`);
     } catch (error) {
       setCiphertext(null);
@@ -410,6 +460,20 @@ export function WorkspaceClient({
     } finally {
       setEncrypting(false);
     }
+  }
+
+  async function restoreEvidenceKey() {
+    setRetrieving(true);
+    try {
+      if (!recoveryFile || recoveryFile.size > 16_384) throw new Error("Select a recovery file of at most 16 KiB.");
+      const recovered = await restoreEvidenceRecovery(await recoveryFile.text(), restorePassword);
+      setRetrievalEvidenceId(recovered.evidenceId);
+      setRetrievalPassphrase(recovered.passphrase);
+      setDecryptedEvidence(null);
+      setRestorePassword("");
+      setOutput(`Recovery key restored for ${recovered.evidenceId}. Retrieve the original ciphertext to verify and decrypt it.`);
+    } catch (error) { setOutput(error instanceof Error ? error.message : "Recovery file could not be opened"); }
+    finally { setRetrieving(false); }
   }
 
   async function retrieveEvidence() {
@@ -665,7 +729,7 @@ export function WorkspaceClient({
           <article className="workCard evidenceCard">
             <span className="kicker">Manual premium</span>
             <h2>Pay with one-time authorization</h2>
-            <p className="cardNote">The connected Bank emails an OTP bound to you, this policy, and the selected account. A valid code triggers one atomic customer debit and insurer credit; no EFT mandate is required.</p>
+            <p className="cardNote">The Bank emails an OTP for the exact payment details and recipient. Changing a detail requires a new code. Payment completes only after a valid committed Bank transfer.</p>
             <div className="evidenceFields">
               <label>Policy ID<input value={manualPayment.policyId} onChange={(event) => updateManualPayment("policyId", event.target.value)} /></label>
               <label>Customer account ID<input value={manualPayment.sourceAccountId} onChange={(event) => updateManualPayment("sourceAccountId", event.target.value)} /></label>
@@ -682,6 +746,7 @@ export function WorkspaceClient({
             <div className="evidenceActions">
               <button className="secondary button" disabled={busy || !manualPayment.policyId || !manualPayment.sourceAccountId} onClick={requestPremiumOtp}>Email OTP</button>
               <button className="primary button" disabled={busy || !manualPayment.challengeId || manualPayment.otp.length !== 6} onClick={submitManualPremium}>Authorize premium</button>
+              <button className="secondary button" disabled={busy} onClick={recoverManualPremium}>Recover saved payment</button>
             </div>
           </article>
         )}
@@ -759,12 +824,13 @@ export function WorkspaceClient({
             <h2>Encrypt, store, and anchor evidence</h2>
             <p className="cardNote">Encryption happens in this browser with AES-256-GCM. The passphrase and plaintext never reach the server; only the generated <code>.enc</code> envelope is stored, and Fabric receives integrity hashes.</p>
             <div className="evidenceFields">
-              <label>Claim ID<input disabled={busy || encrypting} value={evidenceClaimId} onChange={(event) => { setEvidenceClaimId(event.target.value); setCiphertext(null); setContentHash(""); }} placeholder="claim-1" /></label>
-              <label>Evidence ID<input disabled={busy || encrypting} value={evidenceId} onChange={(event) => { setEvidenceId(event.target.value); setCiphertext(null); setContentHash(""); }} placeholder="evidence-1" /></label>
+              <label>Claim ID<input disabled={busy || encrypting} value={evidenceClaimId} onChange={(event) => { setEvidenceClaimId(event.target.value); setCiphertext(null); setContentHash(""); setRecoveryDownload(null); }} placeholder="claim-1" /></label>
+              <label>Evidence ID<input disabled={busy || encrypting} value={evidenceId} onChange={(event) => { setEvidenceId(event.target.value); setCiphertext(null); setContentHash(""); setRecoveryDownload(null); }} placeholder="evidence-1" /></label>
               <label>Document type<input value={documentType} onChange={(event) => setDocumentType(event.target.value)} /></label>
-              <label>Original file<input disabled={busy || encrypting} type="file" onChange={(event) => { setPlaintextEvidence(event.target.files?.[0] ?? null); setCiphertext(null); setContentHash(""); }} /></label>
+              <label>Original file<input disabled={busy || encrypting} type="file" onChange={(event) => { setPlaintextEvidence(event.target.files?.[0] ?? null); setCiphertext(null); setContentHash(""); setRecoveryDownload(null); }} /></label>
               <label>Evidence passphrase<input disabled={busy || encrypting} type="password" autoComplete="new-password" value={evidencePassphrase} onChange={(event) => setEvidencePassphrase(event.target.value)} placeholder="At least 12 characters" /></label>
               <label>Confirm passphrase<input disabled={busy || encrypting} type="password" autoComplete="new-password" value={evidencePassphraseConfirmation} onChange={(event) => setEvidencePassphraseConfirmation(event.target.value)} /></label>
+              <label>Separate backup password (optional)<input disabled={busy || encrypting} type="password" autoComplete="new-password" value={backupPassword} onChange={(event) => setBackupPassword(event.target.value)} placeholder="Protect a downloadable recovery key" /></label>
               <label>Original content SHA-256<input value={contentHash} readOnly placeholder="Calculated after encryption" /></label>
               <div className="encryptionStatus">
                 <strong>{ciphertext ? "Ciphertext ready" : "Not encrypted yet"}</strong>
@@ -774,8 +840,9 @@ export function WorkspaceClient({
             <div className="evidenceActions">
               <button className="secondary button" disabled={busy || encrypting} onClick={encryptEvidence}>{encrypting ? "Encrypting…" : "Encrypt in browser"}</button>
               <button className="primary button" disabled={busy || encrypting || !ciphertext} onClick={uploadEvidence}>Store ciphertext and record reference</button>
+              {recoveryDownload && <a className="secondary button" href={recoveryDownload.url} download={recoveryDownload.name}>Download recovery key</a>}
             </div>
-            <p className="evidenceWarning">Block-Insure never receives or stores the passphrase. Losing it makes the downloaded ciphertext unrecoverable.</p>
+            <p className="evidenceWarning">Keep the evidence passphrase, or download its recovery key and remember the separate backup password. Losing both paths makes the ciphertext unrecoverable. The server cannot restore either secret.</p>
           </article>
         )}
 
@@ -788,9 +855,12 @@ export function WorkspaceClient({
               <label>Evidence ID<input value={retrievalEvidenceId} onChange={(event) => { setRetrievalEvidenceId(event.target.value); setDecryptedEvidence(null); }} placeholder="evidence-1" /></label>
               <label>Grant ID (optional)<input value={retrievalGrantId} onChange={(event) => setRetrievalGrantId(event.target.value)} placeholder="grant-1" /></label>
               <label>Evidence passphrase<input type="password" autoComplete="current-password" value={retrievalPassphrase} onChange={(event) => setRetrievalPassphrase(event.target.value)} /></label>
+              <label>Recovery key file<input type="file" accept=".bifkey,application/json" onChange={(event) => setRecoveryFile(event.target.files?.[0] ?? null)} /></label>
+              <label>Backup password<input type="password" autoComplete="current-password" value={restorePassword} onChange={(event) => setRestorePassword(event.target.value)} /></label>
             </div>
             <div className="evidenceActions">
               <button className="primary button" disabled={busy || retrieving} onClick={retrieveEvidence}>{retrieving ? "Retrieving…" : "Retrieve and decrypt"}</button>
+              <button className="secondary button" disabled={busy || retrieving || !recoveryFile} onClick={restoreEvidenceKey}>Restore recovery key</button>
               {decryptedEvidence && <a className="secondary button" download={decryptedEvidence.name} href={decryptedEvidence.url}>Download verified plaintext</a>}
             </div>
           </article>

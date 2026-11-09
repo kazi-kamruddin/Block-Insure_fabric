@@ -120,6 +120,9 @@ func (c *Contract) openReview(
 	if err := validateReviewRules(assignments, approvalThreshold, rejectionThreshold); err != nil {
 		return nil, err
 	}
+	if err := c.requireXGBoostReviewReadiness(ctx, claim, assignments, approvalThreshold, rejectionThreshold, deadline); err != nil {
+		return nil, err
+	}
 	deadline, err = validateReviewDeadline(ctx, deadline)
 	if err != nil {
 		return nil, err

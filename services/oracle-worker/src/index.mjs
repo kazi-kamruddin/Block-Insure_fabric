@@ -1,5 +1,7 @@
 import { createHash } from "node:crypto";
 import path from "node:path";
+import { pinnedDecision, decisionIdentity } from "./decision-store.mjs";
+import { routeModel, evaluatorVersion, evaluatorHash } from "./xgboost.mjs";
 import { environmentFileArgument, loadEnvironmentFile } from "./environment.mjs";
 
 loadEnvironmentFile(environmentFileArgument());
@@ -62,7 +64,7 @@ async function registryForRequest(request) {
   if (request.registrySnapshotId === registry.snapshotId) return registry;
   if (!config.registryApiUrl) return registry;
   const response = await fetch(`${config.registryApiUrl}/${encodeURIComponent(request.registrySnapshotId)}`, {
-    headers: { accept: "application/json" },
+    headers: { accept: "application/json", ...(config.registryApiToken ? { authorization: `Bearer ${config.registryApiToken}` } : {}) },
     signal: AbortSignal.timeout(config.registryRequestTimeoutMs),
   });
   if (!response.ok) throw new Error(`Hospital registry API returned ${response.status} for ${request.registrySnapshotId}`);
@@ -148,6 +150,19 @@ async function processRequest(requestId) {
   let request = await evaluate("ReadOracleRequest", requestId);
   if (!request.assignedOracleIds.includes(config.oracleId)) return;
   if (request.status !== "PENDING" || await evaluateOrNull("ReadOracleResult", `${request.id}:${config.oracleId}`)) return;
+  // Check deadlines before any archive fetch. Resume the persisted assessment
+  // even when the registry service is unavailable after a successful commit.
+  const existingCommitment = await evaluateOrNull("ReadOracleCommitment", `${request.id}:${config.oracleId}`);
+  if ((!existingCommitment && Date.now() > Date.parse(request.commitDeadline)) || Date.now() > Date.parse(request.revealDeadline)) return;
+  const currentClaim = await evaluate("ReadClaim", request.claimId);
+  if (currentClaim.version !== request.claimVersion || currentClaim.currentOracleRequestId !== request.id) return;
+  const decision = await pinnedDecision({
+    directory: path.join(config.stateRoot, config.oracleId, "decisions"),
+    identity: decisionIdentity(config, runtime.identityFingerprint, request),
+    key: runtime.privateKey,
+    existingCommitment,
+    allowLegacyAdoption: request.modelVersion === "model-v1",
+    create: async () => {
   const [claim, hospitalVerification, appeal, publicPresentation, privatePresentation] = await Promise.all([
     evaluate("ReadClaim", request.claimId),
     evaluate("ReadHospitalVerification", request.hospitalVerificationId),
@@ -163,17 +178,13 @@ async function processRequest(requestId) {
     : [null, null];
   const requestRegistry = await registryForRequest(request);
   if (claim.version !== request.claimVersion || claim.currentOracleRequestId !== request.id) {
-    await updateHealth({ status: "ONLINE", lastProcessedRequestId: request.id, lastError: `Stale request rejected for claim ${request.claimId}` });
-    return;
+    throw new Error(`Stale request rejected for claim ${request.claimId}`);
   }
-  const existingCommitment = await evaluateOrNull("ReadOracleCommitment", `${request.id}:${config.oracleId}`);
   if (!existingCommitment && Date.now() > Date.parse(request.commitDeadline)) {
-    await updateHealth({ status: "ONLINE", lastProcessedRequestId: request.id, lastError: `Commit deadline expired for ${request.id}` });
-    return;
+    throw new Error(`Commit deadline expired for ${request.id}`);
   }
   if (Date.now() > Date.parse(request.revealDeadline)) {
-    await updateHealth({ status: "ONLINE", lastProcessedRequestId: request.id, lastError: `Reveal deadline expired for ${request.id}` });
-    return;
+    throw new Error(`Reveal deadline expired for ${request.id}`);
   }
   let assessment = assessRegistryRecord({
     snapshot: requestRegistry,
@@ -181,8 +192,8 @@ async function processRequest(requestId) {
     claim,
     hospitalVerification,
     appeal,
-    configuredModelVersion: config.modelVersion,
-    configuredModelHash: config.modelHash,
+    configuredModelVersion: request.modelVersion === evaluatorVersion ? evaluatorVersion : config.modelVersion,
+    configuredModelHash: request.modelVersion === evaluatorVersion ? evaluatorHash : config.modelHash,
   });
   const privacyAssessment = privacy.verifySelectiveDisclosurePresentation({
     request, claim, publicPresentation, privatePresentation, invoiceCredential, policyCredential,
@@ -194,9 +205,17 @@ async function processRequest(requestId) {
       recordHash: request.privacyPresentationHash || "0".repeat(64),
     };
   }
+  assessment = routeModel({ snapshot: requestRegistry, request, claim, assessment });
   const resultHash = protocol.buildResultDigest(request, assessment);
   const salt = protocol.buildDeterministicSalt(runtime.privateKey, request.id, config.oracleId);
   const commitmentHash = protocol.buildCommitmentDigest(request, { verified: assessment.verified, resultHash, salt });
+  return { assessment, resultHash, salt, commitmentHash, registry: {
+    sourceId: requestRegistry.sourceId, snapshotId: requestRegistry.snapshotId,
+    version: requestRegistry.version, rootHash: requestRegistry.rootHash, provenance: requestRegistry.provenance,
+  } };
+    },
+  });
+  const { assessment, resultHash, salt, commitmentHash, registry: requestRegistry } = decision;
   const health = healthState.snapshot();
   await updateHealth({
     status: "PROCESSING",

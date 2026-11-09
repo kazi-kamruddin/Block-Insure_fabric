@@ -8,9 +8,12 @@ import { assessClaimFraud } from "@/lib/fraud/assess-claim";
 import type { WorkflowCommand } from "./commands";
 import { refreshHospitalRegistrySnapshot } from "@/lib/oracle/hospital-registry";
 import { buildEvidenceMerkleTree } from "@/lib/evidence/merkle";
+import evaluator from "@/lib/oracle/evaluator.json";
 
 export async function executeWorkflowCommand(command: WorkflowCommand, session: Session) {
   switch (command.operation) {
+    case "recordHospitalModelFacts":
+      return ledger.recordHospitalModelFacts(command, findDemoAccount(session.accountId)?.fabricUserName);
     case "createPartnerAgreement":
       return ledger.createPartnerAgreement(command);
     case "setPartnerAgreementStatus":
@@ -113,7 +116,8 @@ export async function executeWorkflowCommand(command: WorkflowCommand, session: 
       if (!snapshot) throw new Error("No Hospital invoice records are available.");
       return ledger.requestOracleVerification({
         requestId: `oracle-${randomUUID()}`, claimId: claim.id, snapshotId: snapshot.snapshotId,
-        modelVersion: "model-v1", modelHash: "c".repeat(64),
+        modelVersion: process.env.FABRIC_XGBOOST_ENABLED === "true" ? evaluator.evaluatorVersion : "model-v1",
+        modelHash: process.env.FABRIC_XGBOOST_ENABLED === "true" ? evaluator.evaluatorHash : "c".repeat(64),
         assignedOracleIdsJson: '["oracle1","oracle2","oracle3"]', requiredConfirmations: 2,
         commitDeadline: new Date(Date.now() + 60_000).toISOString(),
         revealDeadline: new Date(Date.now() + 180_000).toISOString(),

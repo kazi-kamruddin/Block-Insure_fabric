@@ -3,12 +3,17 @@ param(
     [Parameter(Position = 0)]
     [ValidateSet("Start", "Status")]
     [string]$Action = "Status",
-    [ValidateSet("1.4.1-hardening", "1.5.1-workflow")]
+    [ValidatePattern('^[A-Za-z0-9][A-Za-z0-9.-]{0,79}$')]
     [string]$ChaincodeVersion = "1.4.1-hardening",
-    [switch]$CoreOnly
+    [switch]$CoreOnly,
+    [ValidateRange(30,120)][int]$StabilizationSeconds = 40,
+    [ValidateRange(10,60)][int]$QuietSeconds = 15,
+    [ValidateRange(128,2048)][int]$MinimumGuestAvailableMiB = 128,
+    [string]$EvidencePath
 )
 
 $ErrorActionPreference = "Stop"
+. "$PSScriptRoot/fabric-runtime.ps1"
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $composeCa = Join-Path $projectRoot "network/compose/compose-ca.yaml"
 $composeNetwork = Join-Path $projectRoot "network/compose/compose-network.yaml"
@@ -21,9 +26,8 @@ $coreContainers = @(
 ) + @($organizations | ForEach-Object { "peer0.$_.blockinsure.test" })
 
 function Get-RunningNames {
-    $names = @(& docker ps --format "{{.Names}}")
-    if ($LASTEXITCODE -ne 0) { throw "Docker could not list running containers." }
-    return $names
+    $text = Invoke-FabricDocker -Arguments @('ps', '--format', '{{.Names}}')
+    if ($text) { $text -split '\r?\n' }
 }
 
 function Invoke-ComposeUp {
@@ -34,28 +38,45 @@ function Invoke-ComposeUp {
     $arguments = @("-f", $composeCa, "-f", $composeNetwork, "up", "-d")
     if ($NoDependencies) { $arguments += "--no-deps" }
     $arguments += $Services
-    & docker compose @arguments
-    if ($LASTEXITCODE -ne 0) { throw "Docker Compose could not start: $($Services -join ', ')." }
+    Invoke-FabricDocker -Arguments (@('compose') + $arguments) | Out-Null
 }
 
-function Stop-LegacyRuntimes {
-    param([Parameter(Mandatory)][string]$Organization)
-    $prefix = "dev-peer0.$Organization.blockinsure.test-insurance-contract_"
-    $legacy = @(Get-RunningNames | Where-Object {
-        $_.StartsWith($prefix) -and -not $_.Contains("_${ChaincodeVersion}-")
-    })
-    if ($legacy.Count -eq 0) { return }
-    & docker stop --timeout 2 $legacy | Out-Null
-    if ($LASTEXITCODE -ne 0) { throw "Could not stop legacy chaincode runtimes for $Organization." }
-    Write-Host "Stopped $($legacy.Count) legacy $Organization chaincode runtimes."
+function Get-RuntimeSample {
+    $names = @(Get-RunningNames)
+    $memory = Invoke-FabricDocker -Arguments @('exec', 'orderer.blockinsure.test', 'cat', '/proc/meminfo')
+    $match = [regex]::Match($memory, '(?m)^MemAvailable:\s+(\d+)\s+kB')
+    if (-not $match.Success) { throw 'Cannot measure guest memory; refusing readiness.' }
+    [pscustomobject]@{ Names = $names; AvailableBytes = [long]$match.Groups[1].Value * 1024 }
+}
+
+function Stop-UnselectedRuntimes {
+    param([string[]]$Names)
+    if ($Names.Count) {
+        Invoke-FabricDocker -Arguments (@('stop', '--timeout', '1') + $Names) | Out-Null
+        Write-Host "Stopped $($Names.Count) unselected Fabric runtimes; retained containers and state."
+    }
+}
+
+function Wait-SelectedRuntime {
+    param([string[]]$Required)
+    Wait-FabricRuntimeStable -Sample { Get-RuntimeSample } -StopRuntime { param($names) Stop-UnselectedRuntimes $names } `
+        -Required $Required -Organizations $organizations -Version $ChaincodeVersion -CoreOnly:$CoreOnly `
+        -MinimumSeconds $StabilizationSeconds -QuietSeconds $QuietSeconds -MinimumAvailableBytes ($MinimumGuestAvailableMiB * 1MB) `
+        -Observe { param($sample)
+            if ($EvidencePath) { Add-Content -LiteralPath $EvidencePath -Value ($sample | ConvertTo-Json -Depth 4 -Compress) }
+        }
 }
 
 function Assert-Runtime {
-    $running = @(Get-RunningNames)
+    $sample = Get-RuntimeSample
+    $running = @($sample.Names)
     $missing = @($coreContainers | Where-Object { $_ -notin $running })
     if ($missing.Count -gt 0) { throw "Missing Fabric runtime containers: $($missing -join ', ')." }
+    $unwanted = @(Get-UnselectedFabricRuntime -Names $running -Organizations $organizations -Version $ChaincodeVersion -CoreOnly:$CoreOnly)
+    if ($unwanted.Count) { throw "Unselected Fabric runtimes still running: $($unwanted -join ', ')." }
+    if ($sample.AvailableBytes -lt ($MinimumGuestAvailableMiB * 1MB)) { throw 'Insufficient Fabric guest memory for readiness.' }
     if ($CoreOnly) {
-        Write-Host "Fabric core ready: 11 transaction services." -ForegroundColor Green
+        Write-Host "Fabric core ready: 11 transaction services; no chaincode runtimes; guest available $([math]::Round($sample.AvailableBytes / 1MB)) MiB." -ForegroundColor Green
         return
     }
     foreach ($organization in $organizations) {
@@ -78,34 +99,38 @@ if ($Action -eq "Start") {
         -not (Test-Path -LiteralPath (Join-Path $identityRoot "peerOrganizations/oracle.blockinsure.test"))) {
         throw "Preserved Fabric identities are missing. This script will not bootstrap or reset them."
     }
-    & docker info --format "Docker {{.ServerVersion}} is ready"
-    if ($LASTEXITCODE -ne 0) { throw "Docker Desktop is not ready." }
+    Invoke-FabricDocker -Arguments @('info', '--format', 'Docker {{.ServerVersion}} is ready') | Write-Host
+    $initialNames = @(Get-RunningNames)
+    if ($EvidencePath) {
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent ([IO.Path]::GetFullPath($EvidencePath))) | Out-Null
+        Add-Content -LiteralPath $EvidencePath -Value (@{ event = 'start'; initialNames = $initialNames; coreOnly = [bool]$CoreOnly; version = $ChaincodeVersion } | ConvertTo-Json -Compress)
+    }
 
-    $cas = @(Get-RunningNames | Where-Object { $_.StartsWith("ca.") -and $_.EndsWith(".blockinsure.test") })
+    $cas = @(Get-RunningNames | Where-Object { $_ -match '^ca\.(insurer|hospital|auditor|bank|oracle)\.blockinsure\.test$' })
     if ($cas.Count -gt 0) {
-        & docker stop --timeout 5 $cas | Out-Null
-        if ($LASTEXITCODE -ne 0) { throw "Could not stop unneeded Fabric CAs." }
+        Invoke-FabricDocker -Arguments (@('stop', '--timeout', '5') + $cas) | Out-Null
     }
 
-    Invoke-ComposeUp @("orderer", "couchdb-insurer", "couchdb-hospital", "couchdb-auditor", "couchdb-bank", "couchdb-oracle")
-    foreach ($organization in $organizations) {
-        Invoke-ComposeUp @("peer-$organization") -NoDependencies
-        if ($CoreOnly) { continue }
-        for ($attempt = 0; $attempt -lt 30; $attempt++) {
-            Stop-LegacyRuntimes $organization
-            $prefix = "dev-peer0.$organization.blockinsure.test-insurance-contract_${ChaincodeVersion}-"
-            if (@(Get-RunningNames | Where-Object { $_.StartsWith($prefix) }).Count -eq 1) { break }
-            Start-Sleep -Seconds 1
+    Stop-UnselectedRuntimes @(Get-UnselectedFabricRuntime -Names $initialNames -Organizations $organizations -Version $ChaincodeVersion -CoreOnly:$CoreOnly)
+    try {
+        Invoke-ComposeUp @("orderer", "couchdb-insurer", "couchdb-hospital", "couchdb-auditor", "couchdb-bank", "couchdb-oracle")
+        $required = @($coreContainers | Where-Object { $_ -notlike 'peer0.*' })
+        foreach ($organization in $organizations) {
+            Invoke-ComposeUp @("peer-$organization") -NoDependencies
+            $required += "peer0.$organization.blockinsure.test"
+            # Drain late launches before adding another peer, including CoreOnly.
+            Wait-SelectedRuntime -Required $required
+            Write-Host "Startup stabilized after $organization peer."
         }
+        Wait-SelectedRuntime -Required $coreContainers
+        Assert-Runtime
+    } catch {
+        $failure = $_
+        try {
+            $owned = @(Get-RunningNames | Where-Object { $_ -in $coreContainers -and $_ -notin $initialNames })
+            if ($owned.Count) { Invoke-FabricDocker -Arguments (@('stop', '--timeout', '5') + $owned) | Out-Null }
+        } catch { Write-Warning "Could not stop task-started core services: $_" }
+        throw $failure
     }
-    if ($CoreOnly) {
-        $chaincodeRuntimes = @(Get-RunningNames | Where-Object { $_.StartsWith("dev-peer0.") })
-        if ($chaincodeRuntimes.Count -gt 0) {
-            & docker stop --timeout 2 $chaincodeRuntimes | Out-Null
-            if ($LASTEXITCODE -ne 0) { throw "Could not stop automatically restarted chaincode runtimes." }
-        }
-    }
-    else { foreach ($organization in $organizations) { Stop-LegacyRuntimes $organization } }
 }
-
-Assert-Runtime
+else { Assert-Runtime }

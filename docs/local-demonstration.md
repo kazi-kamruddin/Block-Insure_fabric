@@ -1,5 +1,36 @@
 # Local six-organization demonstration
 
+## Guarded low-memory startup
+
+`scripts/low-memory-network.ps1 Start -CoreOnly` now drains delayed historical
+chaincode launches during a bounded observation window after each peer starts.
+It requires at least 40 seconds of observation and 15 quiet seconds, plus at
+least 128 MiB of guest MemAvailable, before adding load. Each delayed unwanted
+runtime resets the quiet interval. `Status -CoreOnly` fails if chaincode runtimes
+are present; it does not silently stop them. Docker commands time out rather
+than waiting indefinitely when its API is unhealthy.
+
+Use `-EvidencePath <local-ignored-file.jsonl>` to record container/memory samples.
+Only runtime names for the five configured Fabric peers are eligible for cleanup.
+Stopped containers, packages, ledgers, identities and volumes are retained. On a
+startup failure, only newly started core services are stopped; pre-existing
+services are preserved. CAs are left stopped when existing enrollments suffice.
+
+Selected-runtime startup accepts `-ChaincodeVersion <version>`; install/deploy
+the package on an explicitly selected channel separately. No launch command is
+permission to upgrade a preserved channel. Later intentional queries of older
+application deployments can launch their runtimes again, so recheck Status before
+a memory-intensive campaign. The guard is bounded startup verification, not an
+always-running process monitor. Keep compilers and network startup separate.
+
+Run `./scripts/test-fabric-runtime.ps1` for deterministic late-start, timeout,
+memory-floor and resource-selection regressions without Docker or ledger writes.
+
+For the November candidate deployed only to its isolated alignment channel, use the
+[candidate contract and isolated verification guide](frozen-xgboost-alignment.md).
+The wrapper below deliberately selects the older preserved workflow deployment;
+it does not activate the new evaluator or new transaction methods.
+
 This runbook demonstrates the permissioned insurance journey using the local
 InsurerMSP, HospitalMSP, AuditorMSP, BankMSP, and OracleMSP business network plus
 the development orderer. It assumes the documented

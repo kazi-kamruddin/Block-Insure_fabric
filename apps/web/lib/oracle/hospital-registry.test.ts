@@ -4,7 +4,7 @@ import type { HospitalInvoice, OracleRegistrySnapshot } from "@/lib/fabric/types
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/events/state-file", () => ({ persistJsonFile: vi.fn().mockResolvedValue(undefined) }));
 vi.mock("@/lib/fabric/ledger", () => ({ ledger: {
-  listHospitalInvoices: vi.fn(), listOracleRegistrySnapshots: vi.fn(), publishOracleRegistrySnapshot: vi.fn(),
+  listHospitalInvoices: vi.fn(), listOracleRegistrySnapshots: vi.fn(), publishOracleRegistrySnapshot: vi.fn(), readHospitalModelFacts: vi.fn(),
 } }));
 
 import { ledger } from "@/lib/fabric/ledger";
@@ -16,6 +16,7 @@ describe("Hospital registry publication", () => {
   let published: OracleRegistrySnapshot[];
   beforeEach(() => {
     vi.resetAllMocks();
+    vi.unstubAllEnvs();
     invoices = [{ id: "invoice-1", hospitalId: "hospital-1", patientReferenceHash: "a".repeat(64),
       invoiceReferenceHash: "b".repeat(64), treatmentHash: "c".repeat(64), amountMinor: 10_000,
       admissionDate: "2026-01-01", dischargeDate: "2026-01-02", status: "FINALIZED" } as HospitalInvoice];
@@ -54,5 +55,19 @@ describe("Hospital registry publication", () => {
     expect(await refreshHospitalRegistrySnapshot()).toBeNull();
     expect(persistJsonFile).not.toHaveBeenCalled();
     expect(ledger.publishOracleRegistrySnapshot).not.toHaveBeenCalled();
+  });
+
+  it("pins private explicit model facts and marks unavailable history without inventing records", async () => {
+    vi.stubEnv("FABRIC_XGBOOST_ENABLED", "true");
+    vi.stubEnv("ORACLE_REGISTRY_API_TOKEN", "test-token-never-deploy-000000000000000000");
+    vi.mocked(ledger.readHospitalModelFacts).mockRejectedValueOnce(new Error("private facts does not exist"));
+    const unavailable = await refreshHospitalRegistrySnapshot();
+    expect(unavailable?.modelContext?.incompleteInvoiceIds).toEqual(["invoice-1"]);
+    vi.mocked(ledger.readHospitalModelFacts).mockResolvedValue({ invoiceId: "invoice-1", treatmentType: "SURGERY", diagnosisCode: "", invoiceDate: "2026-01-02", expectedMinMinor: 100, expectedMaxMinor: 20000, licenseStatus: "ACTIVE" });
+    const available = await refreshHospitalRegistrySnapshot();
+    expect(available?.rootHash).not.toBe(unavailable?.rootHash);
+    expect(available?.modelContext?.incompleteInvoiceIds).toEqual([]);
+    expect(available?.modelContext?.records[0]).toMatchObject({ patientIssuerMsp: "InsurerMSP", hospitalMsp: "HospitalMSP", patientReferenceHash: invoices[0].patientReferenceHash });
+    vi.unstubAllEnvs();
   });
 });

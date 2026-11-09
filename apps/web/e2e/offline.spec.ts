@@ -64,3 +64,31 @@ test("changing an evidence binding invalidates previously encrypted bytes", asyn
   await expect(card.getByLabel("Original content SHA-256")).toHaveValue("");
   await expect(card.getByRole("button", { name: "Store ciphertext and record reference" })).toBeDisabled();
 });
+
+test("encrypted recovery backup restores the original evidence key at 320px without a ledger write", async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 320, height: 780 });
+  await page.request.post("/api/auth/demo-login", { data: { accountId: "policyholder-1" } });
+  await page.goto("/workspace/policyholder");
+  const upload = page.getByRole("article").filter({ hasText: "Encrypt, store, and anchor evidence" });
+  await upload.getByLabel("Claim ID").fill("claim-backup-browser");
+  await upload.getByLabel("Evidence ID").fill("evidence-backup-browser");
+  await upload.getByLabel("Original file").setInputFiles({ name: "synthetic-invoice.pdf", mimeType: "application/pdf", buffer: Buffer.from("synthetic invoice for browser encryption") });
+  await upload.getByLabel("Evidence passphrase", { exact: true }).fill("synthetic original passphrase");
+  await upload.getByLabel("Confirm passphrase").fill("synthetic original passphrase");
+  await upload.getByLabel("Separate backup password (optional)").fill("synthetic backup password");
+  await upload.getByRole("button", { name: "Encrypt in browser" }).click();
+  const downloadEvent = page.waitForEvent("download");
+  await upload.getByRole("link", { name: "Download recovery key" }).click();
+  const download = await downloadEvent;
+  const filename = testInfo.outputPath("synthetic-recovery.bifkey");
+  await download.saveAs(filename);
+  const retrieval = page.getByRole("article").filter({ hasText: "Retrieve and decrypt evidence" });
+  await retrieval.getByLabel("Recovery key file").setInputFiles(filename);
+  await retrieval.getByLabel("Backup password", { exact: true }).fill("synthetic backup password");
+  await retrieval.getByRole("button", { name: "Restore recovery key" }).click();
+  await expect(retrieval.getByLabel("Evidence ID", { exact: true })).toHaveValue("evidence-backup-browser");
+  await expect(retrieval.getByLabel("Evidence passphrase", { exact: true })).toHaveValue("synthetic original passphrase");
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
+  await upload.getByLabel("Claim ID").fill("changed-claim");
+  await expect(upload.getByRole("link", { name: "Download recovery key" })).toHaveCount(0);
+});

@@ -38,6 +38,35 @@ var oracleVerificationCodes = map[string]bool{
 	"PRIVACY_CREDENTIAL_INACTIVE":  true,
 }
 
+// Historical requests retain their fixed-code validator. The Fabric evaluator
+// binds the full inference/context digest to the existing exact-result quorum.
+func validateOracleRoutingCode(modelVersion, code string, verified bool) error {
+	if modelVersion == "fabric-xgb-synthetic-v1" {
+		for _, prefix := range []string{"XGB_AUTO:", "XGB_REVIEW:"} {
+			if strings.HasPrefix(code, prefix) {
+				if err := validateHash("inference result digest", strings.TrimPrefix(code, prefix)); err != nil {
+					return err
+				}
+				if verified != (prefix == "XGB_AUTO:") {
+					return fmt.Errorf("verified disagrees with XGBoost routing code")
+				}
+				return nil
+			}
+		}
+		if !verified && (code == "XGB_CONTEXT_OR_INFERENCE_UNAVAILABLE" || code == "XGB_EVALUATOR_UNAVAILABLE" || (oracleVerificationCodes[code] && code != "VERIFIED")) {
+			return nil
+		}
+		return fmt.Errorf("unsupported XGBoost routing result")
+	}
+	if !oracleVerificationCodes[code] {
+		return fmt.Errorf("verificationCode %s is not supported", code)
+	}
+	if verified != (code == "VERIFIED") {
+		return fmt.Errorf("verified must be true exactly when verificationCode is VERIFIED")
+	}
+	return nil
+}
+
 func canonicalProtocolHash(domain string, values ...string) string {
 	var canonical strings.Builder
 	canonical.WriteString(domain)
@@ -358,6 +387,14 @@ func (c *Contract) RequestOracleVerification(
 	if err != nil {
 		return nil, err
 	}
+	if modelVersion == "fabric-xgb-synthetic-v1" && (len(assignments) != 3 || requiredConfirmations != 2) {
+		return nil, fmt.Errorf("Fabric XGBoost requires exactly three Oracles and two matching results")
+	}
+	if modelVersion == "fabric-xgb-synthetic-v1" {
+		if _, err := c.requireXGBoostEvidence(ctx, claim); err != nil {
+			return nil, err
+		}
+	}
 	commitDeadline, revealDeadline, err = parseOracleDeadlines(ctx, commitDeadline, revealDeadline)
 	if err != nil {
 		return nil, err
@@ -514,11 +551,8 @@ func (c *Contract) RevealOracleResult(
 		return nil, fmt.Errorf("model version mismatch")
 	}
 	verificationCode = strings.ToUpper(strings.TrimSpace(verificationCode))
-	if !oracleVerificationCodes[verificationCode] {
-		return nil, fmt.Errorf("verificationCode %s is not supported", verificationCode)
-	}
-	if verified != (verificationCode == "VERIFIED") {
-		return nil, fmt.Errorf("verified must be true exactly when verificationCode is VERIFIED")
+	if err := validateOracleRoutingCode(request.ModelVersion, verificationCode, verified); err != nil {
+		return nil, err
 	}
 	for _, field := range []struct {
 		name  string

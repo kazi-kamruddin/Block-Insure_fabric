@@ -173,6 +173,19 @@ func (c *Contract) AddEvidenceReference(ctx contractapi.TransactionContextInterf
 	return evidence, nil
 }
 
+// New clients pin the version they encrypted and prepared. The historical
+// entrypoint remains available for compatible retained clients.
+func (c *Contract) AddEvidenceReferenceForVersion(ctx contractapi.TransactionContextInterface, claimID, evidenceID, documentType, contentHash, storageReferenceHash string, expectedClaimVersion int) (*EvidenceReference, error) {
+	claim, err := c.ReadClaim(ctx, claimID)
+	if err != nil {
+		return nil, err
+	}
+	if claim.Version != expectedClaimVersion {
+		return nil, fmt.Errorf("evidence claim version changed; reconcile the original upload")
+	}
+	return c.AddEvidenceReference(ctx, claimID, evidenceID, documentType, contentHash, storageReferenceHash)
+}
+
 func (c *Contract) VerifyClaim(ctx contractapi.TransactionContextInterface, claimID, verificationID, outcome, clinicalReferenceHash string) (*HospitalVerification, error) {
 	_, err := requireIdentity(ctx, "HospitalMSP", "hospitalOfficer")
 	if err != nil {

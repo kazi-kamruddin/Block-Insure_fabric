@@ -1,6 +1,7 @@
 import http from "node:http";
 import { promises as fs } from "node:fs";
 import { persistJsonFile } from "./state-file.mjs";
+import { evaluatorVersion, evaluatorHash } from "./xgboost.mjs";
 
 const emptyCounts = () => ({ requests: 0, commitments: 0, reveals: 0, verified: 0, failed: 0 });
 
@@ -38,6 +39,7 @@ export function createHealthState(config, registry, previous = null) {
     registryInputSha256: registry.provenance?.inputSha256 ?? null,
     registryTransformationVersion: registry.provenance?.transformationVersion ?? null,
     modelVersion: config.modelVersion,
+    supportedEvaluators: [{ version: config.modelVersion, hash: config.modelHash }, { version: evaluatorVersion, hash: evaluatorHash }],
     startedAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     lastProcessedBlock: previous?.lastProcessedBlock ?? null,

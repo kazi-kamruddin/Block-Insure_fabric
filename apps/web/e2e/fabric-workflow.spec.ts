@@ -351,7 +351,9 @@ test("policy, premium, mandate, benefit, and banking lifecycles complete across 
     await command(policyholder, { operation: "requestBankMandate", id: ids.mandate, policyId: ids.policy, accountReferenceId: ids.account, expiryDate: "2026-12-31" });
     await command(bank, { operation: "reviewBankMandate", id: ids.mandate, outcome: "APPROVE", decisionHash: digest("mandate-approval") });
 
-    const otpResponse = await policyholder.post("/api/banking/otp", { data: { policyId: ids.policy, sourceAccountId: ids.account } });
+    const otpResponse = await policyholder.post("/api/banking/otp", { data: { policyId: ids.policy, sourceAccountId: ids.account,
+      transferId: ids.transfer1, paymentId: ids.payment1, destinationAccountId: ids.insurerAccount,
+      periodStartDate: "2026-01-01", periodEndDate: "2026-01-30", amountMinor: 10_000, externalReferenceHash: digest("manual-receipt") } });
     expect(otpResponse.ok(), await otpResponse.text()).toBe(true);
     const otp = await otpResponse.json();
     expect(otp.demoCode).toMatch(/^\d{6}$/);
@@ -383,7 +385,9 @@ test("policy, premium, mandate, benefit, and banking lifecycles complete across 
 
     await command(insurer, { operation: "advancePolicyLifecycle", id: ids.policy, asOfDate: "2026-03-03" });
     await command(insurer, { operation: "advancePolicyLifecycle", id: ids.policy, asOfDate: "2026-03-20" });
-    const reinstatementOtpResponse = await policyholder.post("/api/banking/otp", { data: { policyId: ids.policy, sourceAccountId: ids.account } });
+    const reinstatementOtpResponse = await policyholder.post("/api/banking/otp", { data: { policyId: ids.policy, sourceAccountId: ids.account,
+      transferId: ids.transfer3, paymentId: ids.payment3, destinationAccountId: ids.insurerAccount,
+      periodStartDate: "2026-03-02", periodEndDate: "2026-03-31", amountMinor: 10_000, externalReferenceHash: digest("reinstatement-receipt") } });
     expect(reinstatementOtpResponse.ok(), await reinstatementOtpResponse.text()).toBe(true);
     const reinstatementOtp = await reinstatementOtpResponse.json();
     const reinstatementPayment = await policyholder.post("/api/banking/premium-payment", { data: {

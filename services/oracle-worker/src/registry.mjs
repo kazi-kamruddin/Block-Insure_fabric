@@ -1,6 +1,7 @@
 import { promises as fs } from "node:fs";
 import { createHash } from "node:crypto";
 import { canonicalProtocolHash, ORACLE_PROTOCOL_VERSION } from "./protocol.mjs";
+import { hash as modelContextHash } from "./xgboost.mjs";
 
 function requireHash(name, value) {
   if (!/^[a-f0-9]{64}$/i.test(String(value ?? ""))) {
@@ -54,6 +55,7 @@ export function registryRootHash(snapshot) {
     requireId("rulesVersion", snapshot.rulesVersion),
     requireHash("rulesHash", snapshot.rulesHash),
     ...recordHashes,
+    ...(snapshot.modelContext ? [modelContextHash(snapshot.modelContext)] : []),
   );
 }
 
@@ -100,7 +102,11 @@ export function validateRegistrySnapshot(snapshot) {
   if (!snapshot || typeof snapshot !== "object" || !Array.isArray(snapshot.records)) {
     throw new Error("Oracle registry snapshot must contain a records array");
   }
+  if (snapshot.modelContext && (!Array.isArray(snapshot.modelContext.records) || snapshot.modelContext.records.length > 10000)) {
+    throw new Error("Model context archive must be explicit and bounded to 10000 records");
+  }
   const normalized = {
+    ...(snapshot.modelContext ? { modelContext: snapshot.modelContext } : {}),
     sourceId: requireId("sourceId", snapshot.sourceId),
     snapshotId: requireId("snapshotId", snapshot.snapshotId),
     version: Number(snapshot.version),

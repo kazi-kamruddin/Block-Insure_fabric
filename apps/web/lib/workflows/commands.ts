@@ -6,6 +6,9 @@ const hash = z.string().trim().regex(/^[a-fA-F0-9]{64}$/).transform((value) => v
 const money = z.number().int().positive().safe();
 
 export const workflowCommandSchema = z.discriminatedUnion("operation", [
+  z.object({ operation: z.literal("recordHospitalModelFacts"), invoiceId: id, treatmentType: z.string().trim().min(1).max(80),
+    diagnosisCode: z.string().trim().max(40), invoiceDate: date, expectedMinMinor: z.number().int().nonnegative().safe(),
+    expectedMaxMinor: money, licenseStatus: z.enum(["ACTIVE", "SUSPENDED", "BLACKLISTED"]) }),
   z.object({
     operation: z.literal("createPartnerAgreement"), id,
     partnerType: z.enum(["HOSPITAL", "BANK"]), partnerId: id,
@@ -162,6 +165,7 @@ export const requiredRoleByOperation = {
   markBenefitPaymentReady: "insurerAdmin",
   confirmBenefitPayment: "bankOfficer",
   createHospitalInvoice: "hospitalOfficer",
+  recordHospitalModelFacts: "hospitalOfficer",
   updateHospitalInvoice: "hospitalOfficer",
   submitClaim: "policyholder",
   crossCheckClaimInvoice: "insurerAdmin",

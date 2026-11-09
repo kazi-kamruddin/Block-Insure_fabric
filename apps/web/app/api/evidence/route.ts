@@ -4,7 +4,9 @@ import { ledgerIdSchema } from "@/lib/fabric/validation";
 import { currentSession } from "@/lib/auth/current-session";
 import {
   evidenceStorageRoot,
-  removeCiphertext,
+  readCiphertext,
+  hashValue,
+  evidenceStorageReference,
   storeCiphertext,
 } from "@/lib/evidence/storage";
 import { ledger } from "@/lib/fabric/ledger";
@@ -13,7 +15,7 @@ import { checkMutationOrigin } from "@/lib/security/request-origin";
 const metadataSchema = z.object({
   claimId: ledgerIdSchema,
   evidenceId: ledgerIdSchema,
-  documentType: z.string().trim().min(1).max(100),
+  documentType: z.string().trim().min(1).max(100).transform((value) => value.toUpperCase()),
   contentHash: z.string().trim().regex(/^[a-fA-F0-9]{64}$/).transform((value) => value.toLowerCase()),
 });
 
@@ -54,24 +56,48 @@ export async function POST(request: Request) {
 
   const root = evidenceStorageRoot();
   const { claimId, evidenceId, documentType, contentHash } = parsed.data;
-  let stored = false;
   try {
+    const claim = await ledger.readClaim(claimId);
+    if (claim.claimantId !== session.subjectId) return NextResponse.json({ message: "This claim belongs to another subject" }, { status: 403 });
     const ciphertext = new Uint8Array(await file.arrayBuffer());
-    const storage = await storeCiphertext(root, session.subjectId, evidenceId, ciphertext);
-    stored = true;
-    const ledgerReference = await ledger.addEvidenceReference({
+    const subjectId = session.subjectId;
+    const storage = await storeCiphertext(root, subjectId, evidenceId, ciphertext).catch(async (error: NodeJS.ErrnoException) => {
+      if (error.code !== "EEXIST") throw error;
+      const retained = await readCiphertext(root, subjectId, evidenceId);
+      if (hashValue(retained) !== hashValue(ciphertext)) throw new Error("Existing evidence ciphertext differs; preserve the original bytes");
+      const reference = evidenceStorageReference(subjectId, evidenceId);
+      return { reference, referenceHash: hashValue(reference), ciphertextHash: hashValue(retained) };
+    });
+    async function recoverReference() {
+      const found = await ledger.readEvidenceReference(evidenceId).catch((error: unknown) => {
+        if (String(error).includes("does not exist")) return null;
+        throw error;
+      });
+      if (found && (found.claimId !== claimId || found.claimVersion !== claim.version || found.submittedBy !== subjectId ||
+          found.documentType !== documentType || found.contentHash !== contentHash || found.storageReferenceHash !== storage.referenceHash)) {
+        throw new Error("Existing evidence reference conflicts with this upload; do not replace original bytes");
+      }
+      return found;
+    }
+    const existing = await recoverReference();
+    if (existing) return NextResponse.json({ result: existing, ciphertextHash: storage.ciphertextHash, recovered: true });
+    try {
+      const ledgerReference = await ledger.addEvidenceReference({
       claimId,
       evidenceId,
       documentType,
       contentHash,
       storageReferenceHash: storage.referenceHash,
-    });
-    return NextResponse.json({
-      result: ledgerReference,
-      ciphertextHash: storage.ciphertextHash,
-    });
+      expectedClaimVersion: claim.version,
+      });
+      return NextResponse.json({ result: ledgerReference, ciphertextHash: storage.ciphertextHash });
+    } catch {
+      const committed = await recoverReference().catch(() => null);
+      if (committed) return NextResponse.json({ result: committed, ciphertextHash: storage.ciphertextHash, recovered: true });
+      return NextResponse.json({ status: "PENDING_RECONCILIATION", evidenceId, ciphertextHash: storage.ciphertextHash,
+        message: "Ciphertext retained. Ledger linkage is unresolved; retry these exact bytes and identifiers to recover, without uploading replacement evidence." }, { status: 202 });
+    }
   } catch (error) {
-    if (stored) await removeCiphertext(root, session.subjectId, evidenceId).catch(() => undefined);
     console.error("Evidence upload failed", error);
     const conflict = error instanceof Error && /exist/i.test(error.message);
     return NextResponse.json(

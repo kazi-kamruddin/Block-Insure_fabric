@@ -34,6 +34,11 @@ export type HospitalInvoice = {
   updatedAt: LedgerTimestamp;
 };
 
+export type HospitalModelFacts = {
+  invoiceId: string; treatmentType: string; diagnosisCode: string; invoiceDate: string;
+  expectedMinMinor: number; expectedMaxMinor: number; licenseStatus: "ACTIVE" | "SUSPENDED" | "BLACKLISTED";
+};
+
 export type PolicyPackage = {
   assetType: "policyPackage";
   schemaVersion: number;

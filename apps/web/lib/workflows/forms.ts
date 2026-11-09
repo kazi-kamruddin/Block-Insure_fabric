@@ -26,12 +26,18 @@ export type HashText = (value: string) => Promise<string>;
 export const operationsByRole = {
   insurerAdmin: ["startClaimProcessing", "createPartnerAgreement", "setPartnerAgreementStatus", "createPolicyPackage", "configurePolicyPackagePartners", "publishPolicyPackage", "retirePolicyPackage", "createBenefitPlan", "publishBenefitPlan", "retireBenefitPlan", "issuePolicy", "issuePolicyPrivacyCredential", "revokePolicyPrivacyCredential", "advancePolicyLifecycle", "cancelPolicyAsInsurer", "queuePremiumCollection", "decideBenefitRequest", "markBenefitPaymentReady", "publishEvidenceMerkleBatch", "assessClaimFraud", "publishOracleRegistrySnapshot", "requestOracleVerification", "finalizeOracleTimeout", "routeOracleFailureToReview", "openClaimReview", "finalizeExpiredReview", "authorizeSettlement"],
   policyholder: ["acquirePolicy", "requestBankMandate", "cancelBankMandate", "setBeneficiaries", "submitBenefitRequest", "renewPolicy", "cancelPolicy", "submitClaim", "registerClaimPrivacyPresentation", "submitClaimAppeal", "grantEvidenceAccess", "revokeEvidenceAccess"],
-  hospitalOfficer: ["createHospitalInvoice", "updateHospitalInvoice"],
+  hospitalOfficer: ["createHospitalInvoice", "updateHospitalInvoice", "recordHospitalModelFacts"],
   auditor: ["recordAuditorDecision"],
   bankOfficer: ["openBankAccount", "adjustBankAccountBalance", "reviewBankMandate", "recordPremiumAdjustment", "processPremiumCollection", "expireBankMandate", "confirmBenefitPayment", "confirmSettlement"],
 } as const satisfies Record<FabricRole, readonly WorkflowOperation[]>;
 
 export const workflowFormDefinitions: Record<WorkflowOperation, WorkflowFormDefinition> = {
+  recordHospitalModelFacts: { label: "Record model source facts", description: "Immutable private source facts for the synthetic thesis model. Use explicit categories and expected ranges; source attestations do not establish medical truth.", fields: [
+    { name: "invoiceId", label: "Finalized invoice ID" }, { name: "treatmentType", label: "Treatment category" },
+    { name: "diagnosisCode", label: "Diagnosis code (empty if unknown)" }, { name: "invoiceDate", label: "Invoice date", kind: "date" },
+    { name: "expectedMinBdt", label: "Expected minimum BDT", kind: "money" }, { name: "expectedMaxBdt", label: "Expected maximum BDT", kind: "money" },
+    { name: "licenseStatus", label: "Recorded provider license status", kind: "select", options: ["ACTIVE", "SUSPENDED", "BLACKLISTED"] },
+  ] },
   startClaimProcessing: { label: "Start claim processing", description: "Send this claim to three Oracle workers to match its Hospital invoice. Two matching results determine the Oracle outcome.", fields: [{ name: "claimId", label: "Claim ID" }] },
   createPartnerAgreement: {
     label: "Register partner agreement",
@@ -453,6 +459,7 @@ export function createWorkflowFormValues(
 ): WorkflowFormValues {
   const today = dateOffset(0);
   const defaults: Record<WorkflowOperation, WorkflowFormValues> = {
+    recordHospitalModelFacts: { invoiceId: "", treatmentType: "", diagnosisCode: "", invoiceDate: today, expectedMinBdt: "", expectedMaxBdt: "", licenseStatus: "ACTIVE" },
     createPartnerAgreement: { id: generatedId("agreement", idFactory), partnerType: "HOSPITAL", partnerId: "", name: "", location: "", tier: "Preferred", accessScope: "Read-only invoice verification fields", effectiveDate: today, expiryDate: dateOffset(3) },
     setPartnerAgreementStatus: { id: "", status: "ACTIVE" },
     createPolicyPackage: { id: generatedId("package", idFactory), name: "", description: "", premiumBdt: "", coverageLimitBdt: "", termsText: "" },
@@ -686,6 +693,12 @@ export async function buildWorkflowCommand(
       break;
     case "confirmBenefitPayment":
       command = { operation, id: required(values, "id", "Benefit request ID"), bankReferenceHash: await digest("bankReferenceText", "Bank transfer reference") };
+      break;
+    case "recordHospitalModelFacts":
+      command = { operation, invoiceId: required(values, "invoiceId", "Invoice ID"), treatmentType: required(values, "treatmentType", "Treatment category"),
+        diagnosisCode: values.diagnosisCode ?? "", invoiceDate: required(values, "invoiceDate", "Invoice date"),
+        expectedMinMinor: nonNegativeBdtToMinor(required(values, "expectedMinBdt", "Expected minimum")),
+        expectedMaxMinor: bdtToMinor(required(values, "expectedMaxBdt", "Expected maximum")), licenseStatus: required(values, "licenseStatus", "License status") };
       break;
     case "createHospitalInvoice":
     case "updateHospitalInvoice":

@@ -10,6 +10,7 @@ async function deliverTemplate(input: { recipient: string; template: string; var
     return { adapter: "demo", recipient: input.recipient };
   }
   const response = await fetch(gatewayUrl, {
+    signal: AbortSignal.timeout(10_000),
     method: "POST",
     headers: {
       "content-type": "application/json",

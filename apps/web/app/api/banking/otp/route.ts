@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { z } from "zod";
-import { ledgerIdSchema } from "@/lib/fabric/validation";
+import { premiumIntentSchema, premiumOtpBinding } from "@/lib/banking/premium-intent";
 import { currentSession, sessionSecret } from "@/lib/auth/current-session";
 import { findDemoAccount } from "@/lib/auth/accounts";
 import { ledger } from "@/lib/fabric/ledger";
@@ -8,7 +7,7 @@ import { otpChallenges } from "@/lib/banking/otp";
 import { deliverBankOtp } from "@/lib/banking/email-gateway";
 import { checkMutationOrigin } from "@/lib/security/request-origin";
 
-const requestSchema = z.object({ policyId: ledgerIdSchema, sourceAccountId: ledgerIdSchema });
+const requestSchema = premiumIntentSchema;
 export const runtime = "nodejs";
 
 function otpSecret() {
@@ -26,20 +25,24 @@ export async function POST(request: Request) {
   const parsed = requestSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ message: "Invalid OTP request" }, { status: 400 });
   try {
-    const [policy, account] = await Promise.all([
+    const [policy, account, destination] = await Promise.all([
       ledger.readPolicy(parsed.data.policyId),
       ledger.readBankAccountReference(parsed.data.sourceAccountId),
+      ledger.readBankAccountReference(parsed.data.destinationAccountId),
     ]);
     if (policy.policyholderId !== session.subjectId || account.ownerId !== session.subjectId
       || account.accountType !== "CUSTOMER" || account.status !== "VERIFIED"
-      || !policy.bankIds?.includes(account.bankId)) {
+      || !policy.bankIds?.includes(account.bankId) || destination.accountType !== "INSURER" || destination.ownerId !== "insurer"
+      || destination.status !== "VERIFIED" || destination.bankId !== account.bankId || parsed.data.amountMinor !== policy.premiumMinor) {
       return NextResponse.json({ message: "The selected customer account cannot fund this policy" }, { status: 403 });
     }
     const ttl = Number(process.env.OTP_TTL_SECONDS ?? 300);
-    const challenge = otpChallenges.issue({ ...parsed.data, subjectId: session.subjectId }, otpSecret(), ttl);
     const recipient = findDemoAccount(session.accountId)?.email ?? process.env.POLICYHOLDER_OTP_EMAIL;
     if (!recipient) throw new Error("No OTP email address is configured for this policyholder");
-    const delivery = await deliverBankOtp({ recipient, code: challenge.code, expiresAt: challenge.expiresAt, policyId: policy.id });
+    const challenge = otpChallenges.issue(premiumOtpBinding(parsed.data, session.subjectId, recipient), otpSecret(), ttl);
+    let delivery;
+    try { delivery = await deliverBankOtp({ recipient, code: challenge.code, expiresAt: challenge.expiresAt, policyId: policy.id }); }
+    catch (error) { otpChallenges.revoke(challenge.challengeId, otpSecret()); throw error; }
     const demoDelivery = process.env.ENABLE_DEMO_AUTH === "true" ? { demoCode: challenge.code } : {};
     return NextResponse.json({ challengeId: challenge.challengeId, expiresAt: new Date(challenge.expiresAt).toISOString(), delivery, ...demoDelivery });
   } catch (error) {

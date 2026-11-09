@@ -55,6 +55,7 @@ package_chaincode() {
   fi
 
   "${docker_command}" run --rm \
+    --memory 512m --cpus 1 -e GOMEMLIMIT=384MiB -e GOMAXPROCS=1 -e GOFLAGS=-p=1 \
     -v "${chaincode_mount}:/chaincode:ro" \
     -v "${artifacts_mount}:/artifacts" \
     -v "${bin_mount}:/fabric-bin:ro" \

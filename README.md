@@ -8,6 +8,11 @@ identities and Fabric ledger controls.
 
 ## Project status
 
+An opt-in frozen XGBoost alignment candidate is under verification; see
+[its input contract and verification boundaries](docs/frozen-xgboost-alignment.md).
+It is not activated on preserved channels. Existing research results do not
+validate the new evaluator or establish real-patient classification accuracy.
+
 The original implementation areas and the policy/premium/benefit expansion are
 joined by a certificate-bound 2-of-3 Oracle consensus subsystem. The source now
 defines partner agreements, policy-specific provider networks, an independent

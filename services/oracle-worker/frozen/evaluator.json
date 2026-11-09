@@ -1,0 +1,13 @@
+{
+  "evaluatorVersion": "fabric-xgb-synthetic-v1",
+  "evaluatorHash": "4954e2d2c71422d415c1d50d32687412479fee5bf61a3a9e283760726e6120b4",
+  "adapterContract": {
+    "version": "fabric-xgb-synthetic-v1",
+    "amountMinorPerModelUnit": 10000000,
+    "amountMeaning": "Synthetic normalization only; not an exchange rate or real-patient validation",
+    "identity": "MSP-qualified subject; no wallet/address conversion; explicit authorized patient linkage",
+    "history": "Complete committed archive, maximum 10000 entries, strictly prior UTC days within 90 days",
+    "dates": "Explicit admission/discharge/invoice dates; no inferred diagnosis, treatment or invoice availability",
+    "routing": "Mandatory integrity or frozen score >= thresholdUnits; uncertainty remains diagnostic"
+  }
+}

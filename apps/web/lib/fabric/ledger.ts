@@ -23,6 +23,7 @@ import type {
   EvidenceAccessGrant,
   HospitalVerification,
   HospitalInvoice,
+  HospitalModelFacts,
   FraudAssessment,
   Liability,
   OracleCommitment,
@@ -116,6 +117,13 @@ async function submitAsHospital<T>(
 }
 
 export const ledger = {
+  readHospitalModelFacts(invoiceId: string) {
+    return evaluate<HospitalModelFacts>("insurerAdmin", "ReadHospitalModelFacts", invoiceId);
+  },
+  recordHospitalModelFacts(facts: HospitalModelFacts, hospitalUserName?: string) {
+    return submitWithTransient<HospitalModelFacts>("hospitalOfficer", "RecordHospitalModelFacts", [facts.invoiceId],
+      { hospitalModelFacts: JSON.stringify(facts) }, hospitalUserName);
+  },
   async schemaVersion() {
     return withFabricContract("insurerAdmin", async (contract: Contract) => {
       const payload = await contract.evaluateTransaction("GetSchemaVersion");
@@ -630,15 +638,17 @@ export const ledger = {
     documentType: string;
     contentHash: string;
     storageReferenceHash: string;
+    expectedClaimVersion?: number;
   }) {
     return submit<EvidenceReference>(
       "policyholder",
-      "AddEvidenceReference",
+      input.expectedClaimVersion === undefined ? "AddEvidenceReference" : "AddEvidenceReferenceForVersion",
       input.claimId,
       input.evidenceId,
       input.documentType,
       input.contentHash,
       input.storageReferenceHash,
+      ...(input.expectedClaimVersion === undefined ? [] : [input.expectedClaimVersion]),
     );
   },
 
