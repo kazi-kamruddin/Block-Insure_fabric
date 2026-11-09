@@ -31,6 +31,33 @@ For the November candidate deployed only to its isolated alignment channel, use 
 The wrapper below deliberately selects the older preserved workflow deployment;
 it does not activate the new evaluator or new transaction methods.
 
+For a practical isolated November rehearsal, retain the existing
+`insurance-workflow-alignment-20261108` ledger and use candidate
+`1.6.2-xgb-alignment`, sequence3, package SHA256
+`15e313b50afa93ddaab5604c4ef48a4995fbac24b423fcdb3fa2ef193ce34cb4`.
+Inspect current processes/ports before guarded startup and preserve its separate
+Oracle, ciphertext, event and OTP state roots. Restore the same server/worker
+registry token and OTP/session secrets; do not print or regenerate them to bypass
+recovery. Use the candidate environment contract in the linked guide, then wait
+for web, ledger and all three Oracle health endpoints. Never recreate or reseed
+this used channel. Check exact peer packages and current source, not labels alone.
+
+Demonstrate ordinary Hospital source entry, immutable private model facts,
+policyholder encrypted invoice submission, insurer processing, exact2-of-3
+Oracle outcome, four-person review where required, and separate Insurer
+authorization/Bank confirmation. Show the reviewer decrypting with the owner
+offline, appeal document/version isolation, a coordinated installment, and its
+statement. The dated [Stage B record](results/alignment-stage-b-2026-11-09.md)
+identifies verified synthetic cases and preserved original failures. To repeat
+the maintained API scenarios, run the alignment Playwright config against this
+already-running isolated stack, selecting `@alignment-stage-b`,
+`@alignment-payments`, `@alignment-model-only` or `@alignment-context` as needed.
+Use a single worker and unique fixture IDs; fault-injection tests require their
+documented owned-worker controls. A local HTTP email receiver verifies the
+delivery contract, not real inbox receipt. Stop only resources started for the
+rehearsal, retaining all state. Preserved demonstration activation remains a
+separate owner decision.
+
 This runbook demonstrates the permissioned insurance journey using the local
 InsurerMSP, HospitalMSP, AuditorMSP, BankMSP, and OracleMSP business network plus
 the development orderer. It assumes the documented

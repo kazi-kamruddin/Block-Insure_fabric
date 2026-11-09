@@ -3,7 +3,7 @@ import "server-only";
 export type OtpDelivery = { adapter: "demo" | "email-gateway"; recipient: string; messageId?: string };
 export type EmailDelivery = OtpDelivery;
 
-async function deliverTemplate(input: { recipient: string; template: string; variables: Record<string, string | number | boolean> }): Promise<EmailDelivery> {
+async function deliverTemplate(input: { recipient: string; template: string; variables: Record<string, string | number | boolean>; idempotencyKey?: string }): Promise<EmailDelivery> {
   const gatewayUrl = process.env.EMAIL_GATEWAY_URL?.trim();
   if (!gatewayUrl) {
     if (process.env.ENABLE_DEMO_AUTH !== "true") throw new Error("EMAIL_GATEWAY_URL is required outside demo mode");
@@ -14,6 +14,7 @@ async function deliverTemplate(input: { recipient: string; template: string; var
     method: "POST",
     headers: {
       "content-type": "application/json",
+      ...(input.idempotencyKey ? { "idempotency-key": input.idempotencyKey } : {}),
       ...(process.env.EMAIL_GATEWAY_TOKEN ? { authorization: `Bearer ${process.env.EMAIL_GATEWAY_TOKEN}` } : {}),
     },
     body: JSON.stringify({ to: input.recipient, template: input.template, variables: input.variables }),
@@ -31,6 +32,6 @@ export async function deliverBankOtp(input: { recipient: string; code: string; e
   });
 }
 
-export function deliverBankCommunication(input: { recipient: string; template: string; variables: Record<string, string | number | boolean> }) {
+export function deliverBankCommunication(input: { recipient: string; template: string; variables: Record<string, string | number | boolean>; idempotencyKey?: string }) {
   return deliverTemplate(input);
 }

@@ -358,6 +358,64 @@ func (c *Contract) ExecuteManualPremiumPayment(ctx contractapi.TransactionContex
 	return transfer, nil
 }
 
+// A queued collection represents an installment, not an entitlement to debit
+// again after another payment method has collected that exact installment.
+func (c *Contract) reconcileCollectedPremium(ctx contractapi.TransactionContextInterface, collection *PremiumCollection, policy *Policy, destinationAccountID, periodEndDate string) (*PremiumCollection, error) {
+	if _, err := validateDate("periodEndDate", periodEndDate); err != nil {
+		return nil, err
+	}
+	if collection.DueDate >= policy.NextPremiumDueDate || periodEndDate > policy.PaidThroughDate {
+		return nil, nil
+	}
+	payments, err := c.ListPremiumPayments(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var matched *PremiumPayment
+	for index := range payments {
+		payment := &payments[index]
+		if payment.PolicyID != policy.ID || payment.PeriodStartDate != collection.DueDate || payment.PeriodEndDate != periodEndDate ||
+			payment.AmountMinor != collection.AmountMinor || payment.DestinationAccountID != destinationAccountID || payment.TransferID == "" {
+			continue
+		}
+		if matched != nil {
+			return nil, fmt.Errorf("queued installment has ambiguous committed premium payments")
+		}
+		transfer, err := c.ReadBankTransfer(ctx, payment.TransferID)
+		if err != nil {
+			return nil, err
+		}
+		if transfer.Status != "SETTLED" || (transfer.Method != "OTP" && transfer.Method != "EFT") || transfer.Method != payment.Method ||
+			transfer.PolicyID != payment.PolicyID || transfer.PaymentID != payment.ID || transfer.AmountMinor != payment.AmountMinor ||
+			transfer.SourceAccountID != payment.SourceAccountID || transfer.DestinationAccountID != payment.DestinationAccountID ||
+			transfer.ExternalReferenceHash != payment.ExternalReferenceHash {
+			return nil, fmt.Errorf("queued installment payment has inconsistent settled transfer linkage")
+		}
+		matched = payment
+	}
+	if matched == nil {
+		return nil, nil
+	}
+	now, err := timestamp(ctx)
+	if err != nil {
+		return nil, err
+	}
+	collection.Status = "COMPLETED"
+	collection.PaymentID = matched.ID
+	collection.TransferID = matched.TransferID
+	collection.FailureCode = ""
+	collection.FailureHash = ""
+	collection.UpdatedAt = now
+	// Preserve AttemptCount: recognizing an earlier payment is not a debit attempt.
+	if err := overwriteAsset(ctx, "premiumCollection", collection.ID, collection); err != nil {
+		return nil, err
+	}
+	if err := emit(ctx, "PremiumCollectionReconciled", collection); err != nil {
+		return nil, err
+	}
+	return collection, nil
+}
+
 func (c *Contract) ProcessPremiumCollection(ctx contractapi.TransactionContextInterface, collectionID, paymentID, transferID, destinationAccountID, periodEndDate, externalReferenceHash string) (*PremiumCollection, error) {
 	if _, err := requireIdentity(ctx, "BankMSP", "bankOfficer"); err != nil {
 		return nil, err
@@ -382,6 +440,9 @@ func (c *Contract) ProcessPremiumCollection(ctx contractapi.TransactionContextIn
 	policy, err := c.ReadPolicy(ctx, collection.PolicyID)
 	if err != nil {
 		return nil, err
+	}
+	if reconciled, err := c.reconcileCollectedPremium(ctx, collection, policy, destinationAccountID, periodEndDate); err != nil || reconciled != nil {
+		return reconciled, err
 	}
 	if err := validatePremiumPeriod(policy, collection.DueDate, periodEndDate, collection.AmountMinor); err != nil {
 		return nil, err

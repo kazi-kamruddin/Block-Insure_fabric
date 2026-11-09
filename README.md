@@ -12,6 +12,10 @@ An opt-in frozen XGBoost alignment candidate is under verification; see
 [its input contract and verification boundaries](docs/frozen-xgboost-alignment.md).
 It is not activated on preserved channels. Existing research results do not
 validate the new evaluator or establish real-patient classification accuracy.
+The isolated Stage B candidate is1.6.2-xgb-alignment/sequence3. Its
+[dated verification record](docs/results/alignment-stage-b-2026-11-09.md)
+tracks payment reconciliation, evidence/restart and delivery acceptance separately
+from historical results and preserved-channel activation.
 
 The original implementation areas and the policy/premium/benefit expansion are
 joined by a certificate-bound 2-of-3 Oracle consensus subsystem. The source now
