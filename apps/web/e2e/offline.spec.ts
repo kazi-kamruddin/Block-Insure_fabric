@@ -2,6 +2,44 @@ import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 import { savedActionKey } from "../lib/workflows/saved-action";
 
+for (const firstOutcome of ["pending", "response-loss"] as const) {
+  test(`offline evidence ${firstOutcome} preserves original bytes and freezes bindings until recovery`, async ({ page }) => {
+    await page.request.post("/api/auth/demo-login", { data: { accountId: "policyholder-1" } });
+    await page.goto("/workspace/policyholder");
+    const card = page.getByRole("article").filter({ hasText: "Encrypt, store, and anchor evidence" });
+    await card.getByLabel("Claim ID", { exact: true }).fill("synthetic-pending-claim");
+    await card.getByLabel("Evidence ID", { exact: true }).fill("synthetic-pending-evidence");
+    await card.getByLabel("Original file").setInputFiles({ name: "synthetic.txt", mimeType: "text/plain", buffer: Buffer.from("synthetic pending ciphertext fixture") });
+    await card.getByLabel("Evidence passphrase", { exact: true }).fill("synthetic pending evidence secret");
+    await card.getByLabel("Confirm passphrase").fill("synthetic pending evidence secret");
+    await card.getByRole("button", { name: "Encrypt in browser", exact: true }).click();
+    await expect(card.getByText("Ciphertext ready", { exact: true })).toBeVisible();
+    const requests: Buffer[] = [];
+    // UI transport fixture only; actual endorsement rejection has a live case.
+    await page.route("**/api/evidence", async route => {
+      const bytes = route.request().postDataBuffer(); if (!bytes) throw new Error("Missing original upload bytes");
+      // Multipart boundaries change on retry. Compare the BIF1 encrypted envelope.
+      const marker = bytes.indexOf(Buffer.from("BIF1")); expect(marker).toBeGreaterThanOrEqual(0);
+      const end = bytes.lastIndexOf(Buffer.from("\r\n------"));
+      requests.push(bytes.subarray(marker, end));
+      if (requests.length === 1 && firstOutcome === "response-loss") return route.abort("connectionreset");
+      await route.fulfill({ status: requests.length === 1 ? 202 : 200, contentType: "application/json", body: JSON.stringify(requests.length === 1
+        ? { status: "PENDING_RECONCILIATION", message: "Synthetic unresolved status" }
+        : { result: { id: "synthetic-pending-evidence" } }) });
+    });
+    await card.getByRole("button", { name: "Store ciphertext and record reference", exact: true }).click();
+    await expect(card.getByRole("status")).toContainText(/unresolved/);
+    await expect(card.getByLabel("Claim ID", { exact: true })).toBeDisabled();
+    await expect(card.getByLabel("Evidence ID", { exact: true })).toBeDisabled();
+    await expect(card.getByLabel("Document type", { exact: true })).toBeDisabled();
+    await expect(card.getByRole("button", { name: "Encrypt in browser", exact: true })).toBeDisabled();
+    await card.getByRole("button", { name: "Retry original ciphertext", exact: true }).click();
+    await expect(card.getByRole("status")).toContainText("linked to the current claim version");
+    expect(requests).toHaveLength(2); expect(requests[1]).toEqual(requests[0]);
+    await expect(card.getByLabel("Evidence ID", { exact: true })).toBeEnabled();
+  });
+}
+
 test("offline UI restores the original saved action at320px and recovers without generating another identity", async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 800 });
   await page.request.post("/api/auth/demo-login", { data: { accountId: "policyholder-1" } });

@@ -105,4 +105,4 @@ jobs:
       - name: Check workflow invariants
         run: node formal/insurance-workflow/check-model.mjs
       - name: Test research statistics and security cases
-        run: node --test benchmarks/comparative/statistics.test.mjs benchmarks/security-evaluation/cases.test.mjs scripts/check-go-vulnerabilities.test.mjs
+        run: node --test benchmarks/comparative/statistics.test.mjs benchmarks/security-evaluation/cases.test.mjs scripts/check-go-vulnerabilities.test.mjs scripts/start-background-node.test.mjs

@@ -5,8 +5,9 @@ The November recovery/security candidate uses the existing isolated channel
 `1.6.3-xgb-alignment`, sequence4, package SHA256
 `bc2a30f5b434c73649f765a31232892941ced4f617c7f5518cf399af8457c44a`.
 Preserved main, demonstration and audit channels have not been upgraded.
-Use the candidate application and package together; the older workflow wrapper
-selects its preserved package and is not the candidate launcher.
+Use the candidate application and package together. `scripts/workflow-demo.ps1`
+now defaults to this candidate; `-Profile Historical` explicitly selects the
+preserved October workflow. See [the maintained startup guide](candidate-demonstration.md).
 
 ## Resume the existing isolated candidate
 

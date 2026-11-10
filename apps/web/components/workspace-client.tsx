@@ -117,6 +117,8 @@ export function WorkspaceClient({
   const [documentType, setDocumentType] = useState("DISCHARGE_SUMMARY");
   const [contentHash, setContentHash] = useState("");
   const [ciphertext, setCiphertext] = useState<File | null>(null);
+  const [uploadNotice, setUploadNotice] = useState<{ pending: boolean; message: string } | null>(null);
+  const uploadPending = uploadNotice?.pending === true;
   const [plaintextEvidence, setPlaintextEvidence] = useState<File | null>(null);
   const [evidencePassphrase, setEvidencePassphrase] = useState("");
   const [evidencePassphraseConfirmation, setEvidencePassphraseConfirmation] = useState("");
@@ -258,9 +260,12 @@ export function WorkspaceClient({
         body: JSON.stringify({ accountId }),
       }));
       const signedInAccount = body.account as DemoAccount;
-      setAccount(signedInAccount);
-      setOutput(`Signed in as ${body.account.displayName}.`);
-      router.push(`/workspace/${workspaceForAccount(signedInAccount)}`);
+      // Session changes require a fresh server-authorized workspace. Rendering
+      // optimistic forms here races the pending route and can discard a click.
+      setOutput("Opening your workspace…");
+      // A new document is intentional at this cookie/role boundary.
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+      window.location.assign(`/workspace/${workspaceForAccount(signedInAccount)}`);
     } catch (error) {
       setOutput(error instanceof Error ? error.message : "Sign-in failed");
     } finally {
@@ -283,6 +288,7 @@ export function WorkspaceClient({
       setRecoveryFile(null);
       setRecoveryDownload(null);
       setDecryptedEvidence(null);
+      setUploadNotice(null);
       setOutput("Signed out.");
       router.push("/workspace");
       router.refresh();
@@ -442,6 +448,8 @@ export function WorkspaceClient({
 
   async function uploadEvidence() {
     setBusy(true);
+    let uploadStarted = false;
+    let definitivelyRejected = false;
     try {
       if (!ciphertext) throw new Error("Choose a client-encrypted .enc file.");
       const form = new FormData();
@@ -450,10 +458,20 @@ export function WorkspaceClient({
       form.set("documentType", documentType);
       form.set("contentHash", contentHash);
       form.set("ciphertext", ciphertext);
-      const body = await responseJson(await fetch("/api/evidence", { method: "POST", body: form }));
+      uploadStarted = true;
+      const response = await fetch("/api/evidence", { method: "POST", body: form });
+      definitivelyRejected = response.status >= 400 && response.status < 500;
+      const body = await responseJson(response);
+      setUploadNotice({ pending: body.status === "PENDING_RECONCILIATION", message: body.status === "PENDING_RECONCILIATION"
+        ? "Registration is unresolved. Keep this page open and retry the original ciphertext; do not re-encrypt or change its identifiers."
+        : "Ciphertext is linked to the current claim version on Fabric." });
       setOutput(JSON.stringify(body, null, 2));
       await refreshDashboard();
     } catch (error) {
+      const pending = uploadStarted && !definitivelyRejected;
+      setUploadNotice({ pending, message: pending
+        ? "Upload outcome unresolved. Keep this page open and retry the original ciphertext without changing its identifiers."
+        : error instanceof Error ? error.message : "Evidence upload failed" });
       setOutput(error instanceof Error ? error.message : "Evidence upload failed");
     } finally {
       setBusy(false);
@@ -462,6 +480,7 @@ export function WorkspaceClient({
 
   async function encryptEvidence() {
     setEncrypting(true);
+    setUploadNotice(null);
     setRecoveryDownload(null);
     try {
       if (!plaintextEvidence) throw new Error("Choose the original evidence file.");
@@ -873,10 +892,10 @@ export function WorkspaceClient({
             <h2>Encrypt, store, and anchor evidence</h2>
             <p className="cardNote">Encryption happens in this browser with AES-256-GCM. The passphrase and plaintext never reach the server; only the generated <code>.enc</code> envelope is stored, and Fabric receives integrity hashes.</p>
             <div className="evidenceFields">
-              <label>Claim ID<input disabled={busy || encrypting} value={evidenceClaimId} onChange={(event) => { setEvidenceClaimId(event.target.value); setCiphertext(null); setContentHash(""); setRecoveryDownload(null); }} placeholder="claim-1" /></label>
-              <label>Evidence ID<input disabled={busy || encrypting} value={evidenceId} onChange={(event) => { setEvidenceId(event.target.value); setCiphertext(null); setContentHash(""); setRecoveryDownload(null); }} placeholder="evidence-1" /></label>
-              <label>Document type<input value={documentType} onChange={(event) => setDocumentType(event.target.value)} /></label>
-              <label>Original file<input disabled={busy || encrypting} type="file" onChange={(event) => { setPlaintextEvidence(event.target.files?.[0] ?? null); setCiphertext(null); setContentHash(""); setRecoveryDownload(null); }} /></label>
+              <label>Claim ID<input disabled={busy || encrypting || uploadPending} value={evidenceClaimId} onChange={(event) => { setEvidenceClaimId(event.target.value); setCiphertext(null); setContentHash(""); setRecoveryDownload(null); setUploadNotice(null); }} placeholder="claim-1" /></label>
+              <label>Evidence ID<input disabled={busy || encrypting || uploadPending} value={evidenceId} onChange={(event) => { setEvidenceId(event.target.value); setCiphertext(null); setContentHash(""); setRecoveryDownload(null); setUploadNotice(null); }} placeholder="evidence-1" /></label>
+              <label>Document type<input disabled={busy || encrypting || uploadPending} value={documentType} onChange={(event) => { setDocumentType(event.target.value); setUploadNotice(null); }} /></label>
+              <label>Original file<input disabled={busy || encrypting || uploadPending} type="file" onChange={(event) => { setPlaintextEvidence(event.target.files?.[0] ?? null); setCiphertext(null); setContentHash(""); setRecoveryDownload(null); setUploadNotice(null); }} /></label>
               <label>Evidence passphrase<input disabled={busy || encrypting} type="password" autoComplete="new-password" value={evidencePassphrase} onChange={(event) => setEvidencePassphrase(event.target.value)} placeholder="At least 12 characters" /></label>
               <label>Confirm passphrase<input disabled={busy || encrypting} type="password" autoComplete="new-password" value={evidencePassphraseConfirmation} onChange={(event) => setEvidencePassphraseConfirmation(event.target.value)} /></label>
               <label>Separate backup password (optional)<input disabled={busy || encrypting} type="password" autoComplete="new-password" value={backupPassword} onChange={(event) => setBackupPassword(event.target.value)} placeholder="Protect a downloadable recovery key" /></label>
@@ -887,10 +906,12 @@ export function WorkspaceClient({
               </div>
             </div>
             <div className="evidenceActions">
-              <button className="secondary button" disabled={busy || encrypting} onClick={encryptEvidence}>{encrypting ? "Encrypting…" : "Encrypt in browser"}</button>
-              <button className="primary button" disabled={busy || encrypting || !ciphertext} onClick={uploadEvidence}>Store ciphertext and record reference</button>
+              <button className="secondary button" disabled={busy || encrypting || uploadPending} onClick={encryptEvidence}>{encrypting ? "Encrypting…" : "Encrypt in browser"}</button>
+              <button className="primary button" disabled={busy || encrypting || !ciphertext} onClick={uploadEvidence}>{uploadPending ? "Retry original ciphertext" : "Store ciphertext and record reference"}</button>
               {recoveryDownload && <a className="secondary button" href={recoveryDownload.url} download={recoveryDownload.name}>Download recovery key</a>}
             </div>
+            {uploadNotice && <p className="evidenceWarning" role="status">{uploadNotice.message}</p>}
+            <p className="cardNote">After rejection, the appeal accepts only APPEAL_DOCUMENT matching its committed evidence hash. Add supported optional documents with the initial claim.</p>
             <p className="evidenceWarning">Keep the evidence passphrase, or download its recovery key and remember the separate backup password. Losing both paths makes the ciphertext unrecoverable. The server cannot restore either secret.</p>
           </article>
         )}

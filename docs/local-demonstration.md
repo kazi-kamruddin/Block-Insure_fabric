@@ -28,8 +28,10 @@ memory-floor and resource-selection regressions without Docker or ledger writes.
 
 For the November candidate deployed only to its isolated alignment channel, use the
 [candidate contract and isolated verification guide](frozen-xgboost-alignment.md).
-The wrapper below deliberately selects the older preserved workflow deployment;
-it does not activate the new evaluator or new transaction methods.
+The maintained wrapper now defaults to this November candidate. Use
+`-Profile Historical` for the preserved October deployment described later.
+The [candidate demonstration guide](candidate-demonstration.md) is the current
+Start/Status/Stop and browser rehearsal entry point.
 
 For a practical isolated November rehearsal, retain the existing
 `insurance-workflow-alignment-20261108` ledger and use candidate
@@ -79,11 +81,11 @@ WSL2, Docker Desktop, Fabric, Go, and Node prerequisites are already available.
 
 ## Current workflow rehearsal (6 October 2026)
 
-From the repository root, use `./scripts/workflow-demo.ps1 Start` and open
+From the repository root, use `./scripts/workflow-demo.ps1 Start -Profile Historical` and open
 `http://localhost:3000/workspace`. The wrapper selects the isolated
 `insurance-workflow-20261005` channel and keeps the low-memory runtime. Check
-it with `./scripts/workflow-demo.ps1 Status`; stop the managed application with
-`./scripts/workflow-demo.ps1 Stop`. The earlier 1.4.1 hardening instructions
+it with `./scripts/workflow-demo.ps1 Status -Profile Historical`; stop the managed application with
+`./scripts/workflow-demo.ps1 Stop -Profile Historical`. The earlier 1.4.1 hardening instructions
 below document the previous research rehearsal.
 
 `Start` is safe to rerun: it keeps an already healthy workflow running, or
