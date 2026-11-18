@@ -25,11 +25,8 @@ uses its own channel and introduces verified patient associations, reimbursement
 statements and episode-based claim reservations. Use the matching November
 checkout for rehearsals of the previously verified deployment.
 The [medical review and OCR acceptance record](docs/results/medical-review-ocr-2026-11-19.md)
-tracks the staged 1.8.0-medical package. It covers pre-vote clarification,
-same-panel appeals, evidence readiness and browser-local invoice OCR.
-The [medical review and OCR acceptance record](docs/results/medical-review-ocr-2026-11-19.md)
-tracks the staged 1.8.0-medical package. It covers pre-vote clarification,
-same-panel appeals, evidence readiness and browser-local invoice OCR.
+records the live 1.8.0-medical sequence-2 rehearsal through clarification,
+decryption, browser-local OCR, same-panel appeal and one Bank payout.
 
 The original implementation areas and the policy/premium/benefit expansion are
 joined by a certificate-bound 2-of-3 Oracle consensus subsystem. The source now

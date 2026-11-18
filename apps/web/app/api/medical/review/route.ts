@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { EndorseError } from "@hyperledger/fabric-gateway";
 import { currentSession } from "@/lib/auth/current-session";
 import type { Session } from "@/lib/auth/session-token";
 import { findDemoAccount } from "@/lib/auth/accounts";
@@ -79,6 +80,12 @@ export async function POST(request: Request) {
   try {
     return reply({ result: await ledger.medicalReviewAction(session.role, input.data, findDemoAccount(session.accountId)?.fabricUserName) });
   } catch (error) {
+    if (input.data.action === "open" && error instanceof EndorseError) {
+      const missing = error.details.map(detail =>
+        /\bauditor[1-4] must confirm decryption of [A-Za-z0-9._-]+\b/.exec(detail.message)?.[0],
+      ).find(Boolean);
+      if (missing) return reply({ message: missing }, 409);
+    }
     const hasPrivateMessage = "message" in input.data && Boolean(input.data.message);
     return reply({ message: error instanceof Error && !hasPrivateMessage
       ? error.message.slice(0, 300) : "The action was not confirmed. Refresh the case before retrying." }, 409);

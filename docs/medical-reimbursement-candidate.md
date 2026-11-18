@@ -5,10 +5,13 @@ The isolated candidate passed its first full browser rehearsal on 19 November
 [live acceptance record](results/medical-rehearsal-2026-11-19.md) for the exact
 package, outcome, startup fixes and preservation checks.
 
-Items 12–15 are staged for the separate 1.8.0-medical package. Keep
-`FABRIC_MEDICAL_REVIEW_ENABLED` unset for the live 1.7.0-medical build.
+The isolated medical channel now runs `1.8.0-medical` at sequence 2 and
+schema 15. Use the matching web build with `FABRIC_MEDICAL_REVIEW_ENABLED=true`
+and its retained server-held review note key. The 1.7.0-medical payout is
+historical evidence for sequence 1 on this channel.
 See the [review and OCR acceptance record](results/medical-review-ocr-2026-11-19.md)
-for the rehearsal order, feature gate and package verification.
+for the passed combined browser rehearsal through one new BDT 40 payout,
+the feature gate and package verification.
 
 The existing November demonstration is tied to source revision `cc37af2` and
 its verified `1.6.3-xgb-alignment` package. Keep its built application, channel,
@@ -43,15 +46,8 @@ rules. The prior channel retains its existing workflows.
 
 ## Isolated run
 
-With guarded Fabric core services already running under the patched builder and
-Fabric command-line tools available, create or resume only this channel:
-
-```bash
-CHANNEL_NAME=insurance-medical-reimbursement CHAINCODE_VERSION=1.7.0-medical \
-  bash network/scripts/create-workflow-channel.sh
-```
-
-Medical setup skips historical showcase seeding. Verify all five peer definitions
+The current medical channel is already committed at sequence 2. To resume,
+use the read-only checks below. Verify all five peer definitions
 and compare the package archive to the source before running the app. Use schema
 15, the medical channel name, `FABRIC_XGBOOST_ENABLED=true`, a protected local Oracle
 registry token, and separate evidence, operation journal, OTP, event and Oracle
@@ -69,6 +65,9 @@ dedicated browser rehearsal from the Fabric root:
 
 ```powershell
 $env:FABRIC_CHANNEL_NAME = 'insurance-medical-reimbursement'
+$env:MEDICAL_REVIEW_LIVE = 'true'
+$env:MEDICAL_BENCHMARK_EXISTS = 'true'
+$env:PLAYWRIGHT_OUTPUT_DIR = Join-Path (Get-Location) ".local-reference/medical-live-$(Get-Date -Format yyyyMMdd-HHmmss)"
 node apps/web/node_modules/@playwright/test/cli.js test --config apps/web/playwright.medical.config.ts
 ```
 
@@ -79,9 +78,9 @@ without another lifecycle deployment:
 ```powershell
 $env:FABRIC_ORACLE_HOST_PORT = '23051'
 $env:FABRIC_CHAINCODE_BUILDER = 'block-insure/fabric-ccenv:2.5.16-go1.26.10'
-$live = '.local-reference/medical-reimbursement-20261118/live'
+$live = '.local-reference/medical-review-20261119/live-180'
 $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
-.\scripts\low-memory-network.ps1 Start -CoreOnly -ChaincodeVersion 1.7.0-medical
+.\scripts\low-memory-network.ps1 Start -CoreOnly -ChaincodeVersion 1.8.0-medical
 & "$live/run-native.ps1" -Action warm -LogName "warm-resume-$stamp.log"
 & "$live/server-controller.ps1"
 ```

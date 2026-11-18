@@ -1,8 +1,54 @@
 # Medical review, appeal and OCR acceptance
 
 19 November 2026. Fabric items 12–15, developed from `2e431a0` for schema 15.
-The live BDT 40 rehearsal remains associated with `1.7.0-medical`, sequence 1,
+The original BDT 40 rehearsal was on `1.7.0-medical`, sequence 1,
 on `insurance-medical-reimbursement`.
+
+## Live activation and combined rehearsal
+
+**PASSED** on 19 November 2026. All five peers reported the source-matched
+`1.8.0-medical` package at sequence 2 and schema 15 on
+`insurance-medical-reimbursement`. Lifecycle approvals were limited to that
+channel. The collection definition and endorsement policy were retained.
+
+The final Playwright run passed 1/1 in 9.8 minutes with zero retries. It
+used the real Next.js Gateway, three Oracle worker identities and all
+five Fabric peers. The combined case covered these checks.
+
+| Check | Live result |
+| --- | --- |
+| Clarification | A BDT 950.00 synthetic bill triggered `XGB_REVIEW`. Voting was disabled while the clarification was pending. The holder committed and uploaded the exact encrypted attachment, version 2 received fresh matching Oracle results, and the old review was superseded. |
+| Review and OCR | The four assigned auditors decrypted the evidence after the holder signed out. Three confirmations denied opening with an actionable message. The fourth opened voting. Auditor 1 confirmed and downloaded a corrected OCR receipt for the PNG invoice, and the test matched the `MedicalOCRConfirmed` ledger event to the same evidence and hashes. Two reasoned rejections closed the initial review. |
+| Corrected appeal | Hospital corrected the bill to BDT 500.00. The holder confirmed the recalculated BDT 40.00 amount and uploaded the new evidence. Version 3 reached positive exact Oracle consensus and still required adjudication. The same four auditors received fresh grants and confirmed both documents. The prior grant was denied. Three approvals overturned the appeal. |
+| Finality | The Bank made exactly one BDT 40.00 payout, duplicate confirmation was denied, and independent readback found the new claim `SETTLED` and its appeal `OVERTURNED`. The earlier sequence-1 claim remained `SETTLED`. |
+| Preservation | All 20 protected peer/channel heads and all 49 original Docker volumes matched before and after. The November demo build and the sibling Solidity repository were left intact. |
+
+The final claim is `medical-0a05d6af-19a2-49c6-8792-4c72cfa6fe38`. The
+appeal is `appeal-6dd2226d-e7ab-4aca-94dd-19dfe895854c`, the OCR receipt is
+`ocr-1679ddbf-ee97-4983-96a6-c4fc04cbb023`, and the Bank transfer is
+`med-payout-c0791a6e-ef0`. The frozen evaluator was
+`fabric-xgb-synthetic-v1` at
+`4954e2d2c71422d415c1d50d32687412479fee5bf61a3a9e283760726e6120b4`.
+Typecheck, lint, production build and all 125 web tests passed after the
+Gateway error fix.
+
+The first live browser run was interrupted after Playwright stalled reading
+the OCR response body. Its download and committed OCR event were recorded.
+The revised test checks the actual downloaded JSON and ledger event. The
+second run confirmed the ledger denied early voting but exposed the Gateway's
+generic error. The web route now returns the missing-auditor message. The
+same three-confirmation case reproduced the expected denial with readable
+feedback before the full rerun. Both partial cases had zero payouts.
+
+Local evidence is under `.local-reference/medical-review-20261119/live-180/`.
+See `deploy-180.log`, `warm-180.log`, `browser-03/report.json`,
+`live-verified.json`, `preservation.json`, `browser-01-disposition.json`,
+`browser-02/report.json`, `review-denial-rerun.json` and
+`resource-shutdown.json`. Shutdown stopped the five owned app processes and
+16 owned containers and released the rehearsal ports.
+Live deadline expiry and procedural recovery, and live PDF/JPEG OCR remain
+UNTESTED in this combined case. The source and isolated browser results below
+describe their separate coverage.
 
 ## Changes and acceptance
 
@@ -23,7 +69,7 @@ reviewer's private reference. The frozen evaluator, its operating point, and
 the exact 2-of-3 Oracle agreement remain in use. The worker recognizes the
 new version-pinned non-appeal clarification successor.
 
-## Verification evidence
+## Offline verification before activation
 
 - **PASSED** Go tests, vet, module verification and offline package/source
   comparison using the patched Fabric builder. The combined Go test runs
@@ -53,9 +99,8 @@ new version-pinned non-appeal clarification successor.
 - **FAILED, fixed and rerun** lint after a build picked up the browser assets
   copied from dependencies. The lint configuration now excludes that generated
   directory.
-- **UNTESTED** live 1.8.0-medical review, appeal, cross-peer private-data
-  authorization and end-to-end OCR receipt commit. The successful 1.7.0
-  browser payout remains a separate deployment result.
+- The live 1.8.0-medical paths were UNTESTED at this offline checkpoint.
+  The live results above apply to the later activation.
 
 Local logs and outputs are under `.local-reference/medical-review-20261119/`.
 See `package-03/build.log`, `package-03/source-audit.json`, `build-03.log`,
@@ -66,13 +111,11 @@ The source audit matched all 36 deployable Go files and module manifests.
 Docker showed zero running containers and 49 volumes after verification.
 This run did not start a Fabric peer or write to a channel.
 
-## Rehearsal after authorized activation
+## Repeat rehearsal on the activated medical channel
 
 Keep the existing demo bound to its original build, package and data roots.
-Before using this candidate, review a medical-channel-only activation,
-capture the existing definitions and ledger heads, verify the exact new
-package and collection definition on all five peers, and confirm the next
-lifecycle sequence. Use an isolated web build, worker roots and evidence
+Verify the committed medical channel, sequence and exact package on all five
+peers before starting the matching app. Use an isolated web build, worker roots and evidence
 stores. Set `FABRIC_MEDICAL_REVIEW_ENABLED=true` for that web profile and
 provision `FABRIC_MEDICAL_REVIEW_NOTE_KEY` as 32 random bytes encoded as 64
 hex characters. Preserve the same key across restarts and protect its backup.
@@ -101,3 +144,20 @@ matching registry and channel.
 5. Confirm the appeal's evidence with the new grants. Open voting, record
    three approvals, and verify Bank settlement and duplicate denial. On a
    separate claim, exercise expired preparation and the single recovery.
+
+The combined browser test runs with the isolated application ready on port
+3210. It begins with a synthetic BDT 950.00 bill outside the registered
+SURGERY benchmark and ends with a corrected BDT 500.00 bill. Both quotes
+retain the BDT 40.00 coverage cap. It uses a new fixture identity per run.
+
+```powershell
+$env:FABRIC_CHANNEL_NAME = 'insurance-medical-reimbursement'
+$env:MEDICAL_REVIEW_LIVE = 'true'
+$env:MEDICAL_BENCHMARK_EXISTS = 'true'
+$env:PLAYWRIGHT_OUTPUT_DIR = Join-Path (Get-Location) ".local-reference/medical-live-$(Get-Date -Format yyyyMMdd-HHmmss)"
+node apps/web/node_modules/@playwright/test/cli.js test --config apps/web/playwright.medical.config.ts
+```
+
+Set `MEDICAL_BENCHMARK_EXISTS` after confirming the previously registered
+synthetic SURGERY benchmark. Set `MEDICAL_PRIOR_CLAIM_ID` to include the
+before-and-after readback of an earlier settled synthetic claim.
