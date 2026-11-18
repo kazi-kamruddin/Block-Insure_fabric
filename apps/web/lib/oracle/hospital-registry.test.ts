@@ -4,6 +4,7 @@ import type { HospitalInvoice, OracleRegistrySnapshot } from "@/lib/fabric/types
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/events/state-file", () => ({ persistJsonFile: vi.fn().mockResolvedValue(undefined) }));
 vi.mock("@/lib/fabric/ledger", () => ({ ledger: {
+  listMedicalOracleSources: vi.fn(),
   listHospitalInvoices: vi.fn(), listOracleRegistrySnapshots: vi.fn(), publishOracleRegistrySnapshot: vi.fn(), readHospitalModelFacts: vi.fn(),
 } }));
 
@@ -69,5 +70,24 @@ describe("Hospital registry publication", () => {
     expect(available?.modelContext?.incompleteInvoiceIds).toEqual([]);
     expect(available?.modelContext?.records[0]).toMatchObject({ patientIssuerMsp: "InsurerMSP", hospitalMsp: "HospitalMSP", patientReferenceHash: invoices[0].patientReferenceHash });
     vi.unstubAllEnvs();
+  });
+
+  it("publishes only approved medical episode projections and pins benchmark provenance", async () => {
+    vi.stubEnv("FABRIC_CHANNEL_NAME", "insurance-medical-reimbursement");
+    vi.stubEnv("FABRIC_XGBOOST_ENABLED", "true");
+    vi.stubEnv("ORACLE_REGISTRY_API_TOKEN", "test-token-never-deploy-000000000000000000");
+    const benchmarkHash = "d".repeat(64);
+    const facts = { invoiceId: invoices[0].id, treatmentType: "SURGERY", diagnosisCode: "", invoiceDate: "2026-01-02",
+      expectedMinMinor: 100, expectedMaxMinor: 20000, licenseStatus: "ACTIVE" } as const;
+    vi.mocked(ledger.listMedicalOracleSources).mockResolvedValue([
+      { invoice: invoices[0], facts, benchmarkHash, complete: true },
+      { invoice: { id: "unlinked-revision" } as HospitalInvoice, facts, benchmarkHash: "", complete: false },
+    ]);
+    const result = await refreshHospitalRegistrySnapshot();
+    expect(ledger.listHospitalInvoices).not.toHaveBeenCalled();
+    expect(ledger.readHospitalModelFacts).not.toHaveBeenCalled();
+    expect(result?.records.map(record => record.invoiceId)).toEqual([invoices[0].id]);
+    expect(result?.modelContext?.incompleteInvoiceIds).toEqual(["unlinked-revision"]);
+    expect(result?.modelContext?.records[0]).toMatchObject({ benchmarkHash, invoiceHash: invoices[0].invoiceReferenceHash });
   });
 });

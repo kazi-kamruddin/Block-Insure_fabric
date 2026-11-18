@@ -4,8 +4,25 @@ import { ledgerDateSchema as date, ledgerIdSchema as id } from "@/lib/fabric/val
 
 const hash = z.string().trim().regex(/^[a-fA-F0-9]{64}$/).transform((value) => value.toLowerCase());
 const money = z.number().int().positive().safe();
+const nonnegative = z.number().int().nonnegative().safe();
+const medicalService = z.enum(["SURGERY", "CONSULTATION", "DIAGNOSTIC", "INPATIENT", "OTHER"]);
+export const medicalCandidateChannel = "insurance-medical-reimbursement";
 
 export const workflowCommandSchema = z.discriminatedUnion("operation", [
+  z.strictObject({ operation: z.literal("saveMedicalEpisode"), episodeReferenceHash: hash, expectedRevision: nonnegative,
+    patientReferenceHash: hash, service: medicalService, serviceDate: z.union([date, z.literal("")]),
+    admissionDate: date, dischargeDate: date, billMinor: money, invoiceDate: z.union([date, z.literal("")]), diagnosisCode: z.string().trim().max(40) }),
+  z.strictObject({ operation: z.literal("configureMedicalRules"), packageId: id, service: medicalService,
+    sublimit: money, deductibleBps: nonnegative, deductibleCap: nonnegative, shareBps: money,
+    waitingDays: nonnegative, filingDays: money, evidenceRequired: z.boolean() }),
+  z.strictObject({ operation: z.literal("acquireMedicalPolicy"), id, packageId: id, startDate: date, endDate: date, acceptedTermsHash: hash }),
+  z.strictObject({ operation: z.literal("verifyMedicalAssociation"), episodeId: hash, revision: money,
+    beneficiaryId: id, decisionBasisHash: hash, verified: z.boolean() }),
+  z.strictObject({ operation: z.literal("registerMedicalOracleBenchmark"), hospitalId: id, service: medicalService,
+    minimum: nonnegative, maximum: money, licenseStatus: z.enum(["ACTIVE", "SUSPENDED", "BLACKLISTED"]), sourceHash: hash }),
+  z.strictObject({ operation: z.literal("prepareMedicalClaim"), id, policyId: id, episodeId: hash, revision: money }),
+  z.strictObject({ operation: z.literal("submitMedicalClaim"), id, policyId: id, episodeId: hash, revision: money, statementHash: hash }),
+  z.strictObject({ operation: z.literal("acceptMedicalCorrection"), id, revision: money, statementHash: hash }),
   z.object({ operation: z.literal("recordHospitalModelFacts"), invoiceId: id, treatmentType: z.string().trim().min(1).max(80),
     diagnosisCode: z.string().trim().max(40), invoiceDate: date, expectedMinMinor: z.number().int().nonnegative().safe(),
     expectedMaxMinor: money, licenseStatus: z.enum(["ACTIVE", "SUSPENDED", "BLACKLISTED"]) }),
@@ -166,6 +183,14 @@ export const requiredRoleByOperation = {
   confirmBenefitPayment: "bankOfficer",
   createHospitalInvoice: "hospitalOfficer",
   recordHospitalModelFacts: "hospitalOfficer",
+  saveMedicalEpisode: "hospitalOfficer",
+  configureMedicalRules: "insurerAdmin",
+  acquireMedicalPolicy: "policyholder",
+  verifyMedicalAssociation: "insurerAdmin",
+  registerMedicalOracleBenchmark: "insurerAdmin",
+  prepareMedicalClaim: "policyholder",
+  submitMedicalClaim: "policyholder",
+  acceptMedicalCorrection: "policyholder",
   updateHospitalInvoice: "hospitalOfficer",
   submitClaim: "policyholder",
   crossCheckClaimInvoice: "insurerAdmin",

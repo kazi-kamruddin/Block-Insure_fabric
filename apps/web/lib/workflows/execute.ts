@@ -12,6 +12,25 @@ import evaluator from "@/lib/oracle/evaluator.json";
 
 export async function executeWorkflowCommand(command: WorkflowCommand, session: Session) {
   switch (command.operation) {
+    case "saveMedicalEpisode": {
+      const { operation, ...facts } = command;
+      void operation;
+      return ledger.saveMedicalEpisode(facts, findDemoAccount(session.accountId)?.fabricUserName);
+    }
+    case "configureMedicalRules":
+      return ledger.configureMedicalRules(command);
+    case "acquireMedicalPolicy":
+      return ledger.acquireMedicalPolicy(command);
+    case "verifyMedicalAssociation":
+      return ledger.verifyMedicalAssociation(command);
+    case "registerMedicalOracleBenchmark":
+      return ledger.registerMedicalOracleBenchmark(command);
+    case "prepareMedicalClaim":
+      return ledger.prepareMedicalClaim(command);
+    case "submitMedicalClaim":
+      return ledger.submitMedicalClaim(command);
+    case "acceptMedicalCorrection":
+      return ledger.acceptMedicalCorrection(command);
     case "recordHospitalModelFacts":
       return ledger.recordHospitalModelFacts(command, findDemoAccount(session.accountId)?.fabricUserName);
     case "createPartnerAgreement":
@@ -110,6 +129,7 @@ export async function executeWorkflowCommand(command: WorkflowCommand, session: 
       return ledger.publishOracleRegistrySnapshot(command);
     case "startClaimProcessing": {
       const claim = await ledger.readClaim(command.claimId);
+      if (claim.episodeId && process.env.FABRIC_XGBOOST_ENABLED !== "true") throw new Error("The isolated medical channel requires the frozen Fabric evaluator");
       if (claim.status === "ORACLE_PENDING" && claim.currentOracleRequestId) return ledger.readOracleRequest(claim.currentOracleRequestId);
       if (!["SUBMITTED", "APPEAL_SUBMITTED", "HOSPITAL_VERIFIED"].includes(claim.status)) throw new Error("This claim is not awaiting processing.");
       const snapshot = await refreshHospitalRegistrySnapshot();

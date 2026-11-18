@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { FabricRole } from "@/lib/fabric/config";
+import type { PublishedMedicalOffer } from "@/lib/fabric/medical";
 import type { WorkflowCommand, WorkflowOperation } from "@/lib/workflows/commands";
 import {
   applyCommandPreset,
@@ -28,14 +29,19 @@ export function GuidedWorkflowForm({
   busy,
   prepared,
   onSubmit,
+  medical = false,
 }: {
   role: FabricRole;
   busy: boolean;
   prepared: PreparedWorkflow | null;
   onSubmit: (command: WorkflowCommand) => Promise<void>;
+  medical?: boolean;
 }) {
   const [maintenance, setMaintenance] = useState(false);
-  const operations: readonly WorkflowOperation[] = role === "hospitalOfficer" && maintenance
+  const operations: readonly WorkflowOperation[] = medical && role === "hospitalOfficer" ? ["saveMedicalEpisode"]
+    : medical && role === "insurerAdmin" ? [...operationsByRole[role].filter((operation) => operation !== "issuePolicy"), "configureMedicalRules", "verifyMedicalAssociation", "registerMedicalOracleBenchmark"]
+    : medical && role === "policyholder" ? ["acquireMedicalPolicy", ...operationsByRole[role].filter((operation) => !["acquirePolicy", "renewPolicy", "submitClaim", "submitClaimAppeal"].includes(operation))]
+    : role === "hospitalOfficer" && maintenance
     ? [...operationsByRole[role], "issueInvoicePrivacyCredential", "revokeInvoicePrivacyCredential"]
     : operationsByRole[role];
   const preparedOperation = typeof prepared?.command.operation === "string"
@@ -51,17 +57,37 @@ export function GuidedWorkflowForm({
       : initial;
   });
   const [formError, setFormError] = useState("");
+  const [offers, setOffers] = useState<PublishedMedicalOffer[]>([]);
+  const selectedOffer = offers.find(offer => offer.id === values.packageId);
+  const exampleEligible = selectedOffer ? Math.min(10_000, selectedOffer.rules.serviceSublimitMinor) : 0;
+  const exampleDeductible = selectedOffer ? Math.min(Math.floor(exampleEligible * selectedOffer.rules.deductibleBps / 10_000), selectedOffer.rules.deductibleCapMinor) : 0;
+  const exampleShare = selectedOffer ? Math.floor((exampleEligible - exampleDeductible) * selectedOffer.rules.insurerShareBps / 10_000) : 0;
+  const examplePayable = Math.min(exampleShare, selectedOffer?.coverageLimitMinor ?? 0);
+  const termDays = (Date.parse(values.endDate) - Date.parse(values.startDate)) / 86_400_000 + 1;
   const definition = workflowFormDefinitions[operation];
   const portalCopy = role === "bankOfficer"
     ? { kicker: "Banking instruction", heading: "Process a banking operation", submit: "Submit bank instruction" }
     : role === "hospitalOfficer"
-      ? { kicker: "Invoice desk", heading: "Update the patient billing register", submit: "Save invoice record" }
+      ? { kicker: "Intake desk", heading: medical ? "Save patient intake" : "Update the patient billing register", submit: medical ? "Save intake" : "Save invoice record" }
       : { kicker: "Guided transaction", heading: "Complete your next ledger action", submit: "Submit verified transaction" };
 
   function selectOperation(nextOperation: WorkflowOperation) {
     setOperation(nextOperation);
     setValues(createWorkflowFormValues(nextOperation));
     setFormError("");
+  }
+
+  async function loadOffers() {
+    try {
+      setFormError("");
+      const response = await fetch("/api/medical/offers", { cache: "no-store" });
+      if (!response.ok) throw new Error("Published medical offers are unavailable.");
+      const result = await response.json() as { offers: PublishedMedicalOffer[] };
+      setOffers(result.offers);
+      if (!result.offers.length) setFormError("No medical packages have been published.");
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : "Could not load medical offers.");
+    }
   }
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
@@ -78,11 +104,11 @@ export function GuidedWorkflowForm({
     <article className="workCard guidedCard" id="guided-workflow">
       <span className="kicker">{portalCopy.kicker}</span>
       <h2>{portalCopy.heading}</h2>
-      {role === "hospitalOfficer" && <details><summary>Credential maintenance</summary>
+      {role === "hospitalOfficer" && !medical && <details><summary>Credential maintenance</summary>
         <p>Credentials are issued automatically when an invoice is finalized. Voiding that invoice revokes its automatic credential.</p>
         <label><input type="checkbox" checked={maintenance} onChange={(event) => { setMaintenance(event.target.checked); selectOperation("createHospitalInvoice"); }} />Show issuer maintenance actions</label>
       </details>}
-      <label>Action
+      {operations.length > 1 && <label>Action
         <select
           aria-label="Workflow action"
           value={operation}
@@ -92,10 +118,28 @@ export function GuidedWorkflowForm({
             <option key={candidate} value={candidate}>{workflowFormDefinitions[candidate].label}</option>
           ))}
         </select>
-      </label>
+      </label>}
       <p className="cardNote workflowDescription">{definition.description}</p>
+      {operation === "acquireMedicalPolicy" && <div className="guidedForm">
+        <button type="button" className="secondary button" onClick={loadOffers}>Load published packages</button>
+        <label>Medical package<select value={values.packageId ?? ""} onChange={(event) => {
+          setValues(current => ({ ...current, packageId: event.target.value, acceptedTermsHash: "" }));
+        }}><option value="">Select a package</option>
+          {offers.map(offer => <option key={offer.id} value={offer.id}>{offer.name}</option>)}
+        </select></label>
+        {selectedOffer && <div className="wideField">
+          <p>BDT {(selectedOffer.premiumMinor / 100).toFixed(2)} per 30-day period, due at the start of each period. Coverage starts after payment. An overdue installment can enter grace and then lapse after 15 days. Only paid dates qualify.</p>
+          <p>{selectedOffer.rules.service} is covered. Other service categories are excluded. Service sublimit BDT {(selectedOffer.rules.serviceSublimitMinor / 100).toFixed(2)}, deductible {selectedOffer.rules.deductibleBps / 100}% capped at BDT {(selectedOffer.rules.deductibleCapMinor / 100).toFixed(2)}, insurer share {selectedOffer.rules.insurerShareBps / 100}%, overall limit BDT {(selectedOffer.coverageLimitMinor / 100).toFixed(2)}.</p>
+          <p>Wait {selectedOffer.rules.waitingDays} days from policy start. File within {selectedOffer.rules.filingDays} days of service, Asia/Dhaka. {selectedOffer.rules.evidenceRequired ? "Upload supporting invoice evidence." : "A complete verified episode can support routine processing."} Each monetary adjustment rounds down to the minor unit.</p>
+          {Number.isFinite(termDays) && termDays > 1 && <p>{Math.ceil(termDays / 30)} installments for the dates selected below. The first is due on {values.startDate}, then every 30 days through the final coverage period.</p>}
+          <p>Example: a BDT 100.00 bill yields BDT {(exampleEligible / 100).toFixed(2)} eligible, BDT {(exampleDeductible / 100).toFixed(2)} deductible and BDT {(exampleShare / 100).toFixed(2)} insurer share. With the full policy limit still available, BDT {(examplePayable / 100).toFixed(2)} is payable.</p>
+          <label><input type="checkbox" checked={values.acceptedTermsHash === selectedOffer.rules.termsHash} onChange={(event) => {
+            setValues(current => ({ ...current, acceptedTermsHash: event.target.checked ? selectedOffer.rules.termsHash : "" }));
+          }} />I accept these published terms</label>
+        </div>}
+      </div>}
       <form className="guidedForm" onSubmit={submit}>
-        {definition.fields.map((field) => (
+        {definition.fields.filter(field => operation !== "acquireMedicalPolicy" || !["packageId", "acceptedTermsHash"].includes(field.name)).map((field) => (
           <label className={field.kind === "textarea" ? "wideField" : undefined} key={field.name}>
             {field.label}
             {field.kind === "select" ? (

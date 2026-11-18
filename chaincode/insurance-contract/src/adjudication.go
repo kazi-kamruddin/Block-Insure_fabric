@@ -178,6 +178,9 @@ func (c *Contract) SubmitClaimAppeal(
 	proposedAmountMinor int64,
 	proposedIncidentDate, proposedDescriptionHash, proposedClinicalReferenceHash string,
 ) (*ClaimAppeal, error) {
+	if isMedicalCandidate(ctx) {
+		return nil, fmt.Errorf("medical appeal requires the versioned medical appeal workflow")
+	}
 	if _, err := requireIdentity(ctx, "InsurerMSP", "policyholder"); err != nil {
 		return nil, err
 	}

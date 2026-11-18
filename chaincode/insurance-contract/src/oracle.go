@@ -331,7 +331,12 @@ func (c *Contract) RequestOracleVerification(
 		return nil, fmt.Errorf("claim %s requires a current verified hospital attestation", claimID)
 	}
 	var verification *HospitalVerification
-	if invoiceFlow {
+	if claim.EpisodeID != "" {
+		if modelVersion != "fabric-xgb-synthetic-v1" || !strings.EqualFold(modelHash, "4954e2d2c71422d415c1d50d32687412479fee5bf61a3a9e283760726e6120b4") {
+			return nil, fmt.Errorf("medical claims require the pinned frozen Fabric evaluator")
+		}
+		verification, err = c.bindMedicalOracle(ctx, claim, requestID)
+	} else if invoiceFlow {
 		verification, err = c.bindOracleInvoice(ctx, claim, requestID)
 	} else {
 		verification, err = c.ReadHospitalVerification(ctx, claim.HospitalVerificationID)
@@ -580,12 +585,18 @@ func (c *Contract) RevealOracleResult(
 		return nil, fmt.Errorf("Oracle request %s reveal phase has ended", requestID)
 	}
 	if verified && request.RulesVersion == "hospital-invoice-rules-v2" {
-		invoice, err := c.ReadHospitalInvoice(ctx, claim.HospitalInvoiceID)
-		if err != nil {
-			return nil, err
-		}
-		if invoice.Status != "FINALIZED" || invoice.PatientReferenceHash != patientSubjectHash(claim.ClaimantID) {
-			return nil, fmt.Errorf("hospital invoice %s is no longer valid for a positive Oracle result", invoice.ID)
+		if claim.EpisodeID != "" {
+			if _, err := currentMedicalHead(ctx, claim); err != nil {
+				return nil, err
+			}
+		} else {
+			invoice, err := c.ReadHospitalInvoice(ctx, claim.HospitalInvoiceID)
+			if err != nil {
+				return nil, err
+			}
+			if invoice.Status != "FINALIZED" || invoice.PatientReferenceHash != patientSubjectHash(claim.ClaimantID) {
+				return nil, fmt.Errorf("hospital invoice %s is no longer valid for a positive Oracle result", invoice.ID)
+			}
 		}
 	}
 	if verified && request.PrivacyPresentationID != "" {

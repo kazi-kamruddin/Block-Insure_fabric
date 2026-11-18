@@ -1,0 +1,87 @@
+# Isolated medical reimbursement candidate
+
+The existing November demonstration is tied to source revision `cc37af2` and
+its verified `1.6.3-xgb-alignment` package. Keep its built application, channel,
+identities, secrets and data roots together. The existing launcher checks the
+package against its checkout. Use the matching revision in a separate local
+checkout for that demonstration while developing the medical candidate.
+
+The new medical workflow is scoped to `insurance-medical-reimbursement`.
+Do not point development commands at a preserved channel. Production-shaped
+rules and synthetic fixture dates should be explicit, including the billing
+intervals, published waiting and filing periods, and Asia/Dhaka dates.
+
+The insurer configures one covered service on a draft package, then publishes
+it. A holder accepts the resulting terms digest and activates coverage by
+paying the first installment. Hospital users on this candidate have one
+intake action. They use the same opaque institution references for corrections
+and provide the current revision. Patient reference commitments and routine
+clinical fields enter Fabric as transient inputs and are retained in the
+Hospital/Insurer/Oracle private collection. A digest and revision number
+identify the committed record. Use synthetic data for rehearsal.
+
+## Acceptance scope
+
+Items 1–5 add issued medical terms, the existing shared OTP/EFT schedule,
+hospital intake without suspicion labels, and stable private episode revisions.
+Items 6–10 add insurer verification of patient associations, private discovery,
+filing receipts, prefilled and reconfirmed claims, reimbursement quotes, coverage
+reservation, and version-pinned frozen XGBoost verification. The Bank reads only
+the existing financial claim and settlement fields. Legacy claim submission and
+appeals are unavailable on the new channel so they cannot bypass the medical
+rules. The prior channel retains its existing workflows.
+
+## Isolated run
+
+With guarded Fabric core services already running under the patched builder and
+Fabric command-line tools available, create or resume only this channel:
+
+```bash
+CHANNEL_NAME=insurance-medical-reimbursement CHAINCODE_VERSION=1.7.0-medical \
+  bash network/scripts/create-workflow-channel.sh
+```
+
+Medical setup skips historical showcase seeding. Verify all five peer definitions
+and compare the package archive to the source before running the app. Use schema
+15, the medical channel name, `FABRIC_XGBOOST_ENABLED=true`, a protected local Oracle
+registry token, and separate evidence, operation journal, OTP, event and Oracle
+state roots. Build and start the web server in a separate Fabric checkout or
+build directory so the November standalone demo stays intact. Configure three
+existing Oracle profiles for the same medical channel, its private registry URL,
+and those deployment-specific worker roots. Use local demo delivery when rehearsing.
+
+1. Register synthetic Hospital and Bank partners and accounts, publish a package
+   with medical rules, acquire it as the holder and pay a covered installment.
+2. Save a synthetic Hospital episode with its documented service and invoice
+   dates. Find it in the insurer's queue and verify the association using a
+   source reference known to the insurer. Use another synthetic episode to
+   exercise an ambiguous association without exposing it to the holder.
+3. Register an insurer-sourced benchmark for each participating hospital and
+   service. Its expected charge range and recorded license status must come
+   from the documented fixture. The frozen evaluator will fall back to review
+   when required context is missing, including unlinked history. It never fills
+   missing values with inferred hospital labels.
+4. Load verified episodes as the holder. Prepare the claim, review the calculation
+   and submit using the same original deadline. Attach the invoice if required.
+   Start processing as insurer and confirm the pinned request uses the calendar
+   and model identity expected by all three workers.
+
+Source tests use the BDT 100/80/8/57.60/40 example, an unverified association,
+a second claimant and a corrected revision. A live browser rehearsal and
+new-package/channel verification are separate from these source tests.
+
+## Verification on 18 November 2026
+
+| Checkpoint | Result |
+| --- | --- |
+| After items 1–5 | PASSED full Go suite, 122 web unit tests and web typecheck |
+| After items 6–10 | PASSED full Go suite and Go vet, 123 web unit tests, lint and typecheck, 27 worker tests and the frozen evaluator hash check |
+| Isolated standalone build | PASSED on final source, with existing filesystem tracing warnings. The first refresh failed on stale copied TypeScript types. Synchronizing the matching source files resolved it. The filing warning was moved out of render and uses the recorded preparation timestamp |
+| Medical package | PASSED offline source match for all 30 runtime files, `1.7.0-medical`, SHA-256 `29a873fb43d093482b53f536e8ce83c1a76da7c1a79152c3bee61538d7d53594` |
+| Live medical channel | UNTESTED. The archive has not been installed, approved or committed to peers. No medical browser rehearsal or Bank payout was executed |
+
+Final local package and evidence are under
+`.local-reference/medical-reimbursement-20261118/`. Use the archive in
+`final-package/`, which includes the duplicate association confirmation fix.
+The intermediate archive is retained as earlier evidence. Existing Fabric
+volumes and channel definitions were not reset or upgraded.

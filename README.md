@@ -20,6 +20,10 @@ handling. Earlier [Stage B results](docs/results/alignment-stage-b-2026-11-09.md
 remain historical. Preserved-channel activation still requires owner review.
 The maintained candidate launcher and full ordinary-form browser rehearsal now
 pass scoped local acceptance; see the [10 November demonstration results](docs/results/candidate-rehearsal-2026-11-10.md).
+The new [medical reimbursement candidate](docs/medical-reimbursement-candidate.md)
+uses its own channel and introduces verified patient associations, reimbursement
+statements and episode-based claim reservations. Use the matching November
+checkout for rehearsals of the previously verified deployment.
 
 The original implementation areas and the policy/premium/benefit expansion are
 joined by a certificate-bound 2-of-3 Oracle consensus subsystem. The source now

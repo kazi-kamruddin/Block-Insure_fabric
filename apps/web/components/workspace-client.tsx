@@ -10,6 +10,8 @@ import {
 } from "@/lib/auth/accounts";
 import type { RoleDashboard } from "@/lib/dashboard/build-dashboard";
 import { GuidedWorkflowForm, type PreparedWorkflow } from "@/components/guided-workflow-form";
+import { medicalCandidateChannel } from "@/lib/workflows/commands";
+import { MedicalIntake } from "@/components/medical-intake";
 import { PresentationGuide } from "@/components/presentation-guide";
 import type { WorkflowCommand } from "@/lib/workflows/commands";
 import { bdtToMinor, workflowFormDefinitions } from "@/lib/workflows/forms";
@@ -773,6 +775,11 @@ export function WorkspaceClient({
       </div>
 
       <div className="workGrid" id="transaction-console">
+        {deployment.startsWith(`${medicalCandidateChannel}/`) && (account.role === "insurerAdmin" || account.role === "policyholder") &&
+          <MedicalIntake insurer={account.role === "insurerAdmin"} onAssociation={prepared => {
+            setPreparedWorkflow(prepared);
+            document.getElementById("guided-workflow")?.scrollIntoView({ behavior: "smooth" });
+          }} />}
         {savedSnapshot && !savedAction && <p className="formError" role="alert">Saved action storage is unavailable or invalid. Preserve it for recovery; nothing new will be sent until storage is usable.</p>}
         {savedAction && <article className="workCard" aria-label="Saved workflow action">
           <h2>Recover saved action</h2>
@@ -786,6 +793,7 @@ export function WorkspaceClient({
           }}>Review failed action for a new attempt</button>}
         </article>}
         <GuidedWorkflowForm
+          medical={deployment.startsWith(`${medicalCandidateChannel}/`)}
           key={`${account.role}-${preparedWorkflow?.revision ?? 0}`}
           role={account.role}
           busy={busy}

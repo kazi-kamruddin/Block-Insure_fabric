@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { currentSession, sessionSecret } from "@/lib/auth/current-session";
 import { runRecoverableOperation } from "@/lib/workflows/operation-journal";
 import { loadFabricConfig } from "@/lib/fabric/config";
-import { canExecute, workflowCommandSchema } from "@/lib/workflows/commands";
+import { canExecute, medicalCandidateChannel, workflowCommandSchema } from "@/lib/workflows/commands";
 import { executeWorkflowCommand } from "@/lib/workflows/execute";
 import { checkMutationOrigin } from "@/lib/security/request-origin";
 
@@ -27,6 +27,9 @@ export async function POST(request: Request) {
   }
 
   try {
+    if (session.role === "hospitalOfficer" && loadFabricConfig().channelName === medicalCandidateChannel && parsed.data.operation !== "saveMedicalEpisode") {
+      return NextResponse.json({ message: "Hospital accounts can only save factual episode intake." }, { status: 403 });
+    }
     const requestId = request.headers.get("idempotency-key");
     if (requestId) {
       const config = loadFabricConfig();

@@ -5,6 +5,7 @@ import type { Contract } from "@hyperledger/fabric-gateway";
 import { withFabricContract } from "./gateway";
 import { submitJournaled } from "@/lib/workflows/operation-journal";
 import type { FabricRole } from "./config";
+import type { MedicalEpisode, MedicalPreparation, MedicalQuote, MedicalRules } from "./medical";
 import type {
   AuditorDecision,
   BankAccountReference,
@@ -118,6 +119,50 @@ async function submitAsHospital<T>(
 }
 
 export const ledger = {
+  listMedicalEpisodes(role: "insurerAdmin" | "policyholder") {
+    return evaluate<MedicalEpisode[]>(role, "ListMedicalEpisodes");
+  },
+  listMedicalOracleSources() {
+    return evaluate<Array<{ invoice: HospitalInvoice; facts: HospitalModelFacts; benchmarkHash: string; complete: boolean }>>("insurerAdmin", "ListMedicalOracleSources");
+  },
+  quoteMedicalClaim(policyId: string, episodeId: string, revision: string) {
+    return evaluate<MedicalQuote>("policyholder", "QuoteMedicalClaim", policyId, episodeId, revision);
+  },
+  quoteMedicalCorrection(claimId: string, revision: string) {
+    return evaluate<MedicalQuote>("policyholder", "QuoteMedicalCorrection", claimId, revision);
+  },
+  prepareMedicalClaim(input: { id: string; policyId: string; episodeId: string; revision: number }) {
+    return submit<MedicalPreparation>("policyholder", "PrepareMedicalClaim", input.id, input.policyId, input.episodeId, input.revision);
+  },
+  submitMedicalClaim(input: { id: string; policyId: string; episodeId: string; revision: number; statementHash: string }) {
+    return submit<Claim>("policyholder", "SubmitMedicalClaim", input.id, input.policyId, input.episodeId, input.revision, input.statementHash);
+  },
+  acceptMedicalCorrection(input: { id: string; revision: number; statementHash: string }) {
+    return submit<Claim>("policyholder", "AcceptMedicalCorrection", input.id, input.revision, input.statementHash);
+  },
+  verifyMedicalAssociation(input: { episodeId: string; revision: number; beneficiaryId: string; decisionBasisHash: string; verified: boolean }) {
+    return submit("insurerAdmin", "VerifyMedicalAssociation", input.episodeId, input.revision, input.beneficiaryId, input.decisionBasisHash, String(input.verified));
+  },
+  registerMedicalOracleBenchmark(input: { hospitalId: string; service: string; minimum: number; maximum: number; licenseStatus: string; sourceHash: string }) {
+    return submit("insurerAdmin", "RegisterMedicalOracleBenchmark", input.hospitalId, input.service, input.minimum, input.maximum, input.licenseStatus, input.sourceHash);
+  },
+  readMedicalRules(packageId: string) {
+    return evaluate<MedicalRules>("insurerAdmin", "ReadMedicalRules", packageId);
+  },
+  saveMedicalEpisode(input: { episodeReferenceHash: string; expectedRevision: number; patientReferenceHash: string;
+    service: string; serviceDate: string; admissionDate: string; dischargeDate: string; billMinor: number; invoiceDate: string; diagnosisCode: string }, userName?: string) {
+    if (!userName) throw new Error("No Fabric Hospital identity for this account");
+    const { episodeReferenceHash, expectedRevision, ...facts } = input;
+    return submitWithTransient("hospitalOfficer", "SaveMedicalEpisode", [episodeReferenceHash, expectedRevision], { medicalEpisode: JSON.stringify(facts) }, userName);
+  },
+  configureMedicalRules(input: { packageId: string; service: string; sublimit: number; deductibleBps: number; deductibleCap: number;
+    shareBps: number; waitingDays: number; filingDays: number; evidenceRequired: boolean }) {
+    return submit("insurerAdmin", "ConfigureMedicalRules", input.packageId, input.service, input.sublimit, input.deductibleBps,
+      input.deductibleCap, input.shareBps, input.waitingDays, input.filingDays, String(input.evidenceRequired));
+  },
+  acquireMedicalPolicy(input: { id: string; packageId: string; startDate: string; endDate: string; acceptedTermsHash: string }) {
+    return submit<Policy>("policyholder", "AcquireMedicalPolicy", input.id, input.packageId, input.startDate, input.endDate, input.acceptedTermsHash);
+  },
   readHospitalModelFacts(invoiceId: string) {
     return evaluate<HospitalModelFacts>("insurerAdmin", "ReadHospitalModelFacts", invoiceId);
   },

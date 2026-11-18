@@ -22,6 +22,9 @@ func (c *Contract) SubmitInvoiceClaim(ctx contractapi.TransactionContextInterfac
 }
 
 func (c *Contract) submitClaim(ctx contractapi.TransactionContextInterface, id, policyID, hospitalID, hospitalInvoiceID string, amountMinor int64, incidentDate, descriptionHash string) (*Claim, error) {
+	if isMedicalCandidate(ctx) {
+		return nil, fmt.Errorf("use the verified medical episode claim flow")
+	}
 	if _, err := requireIdentity(ctx, "InsurerMSP", "policyholder"); err != nil {
 		return nil, err
 	}

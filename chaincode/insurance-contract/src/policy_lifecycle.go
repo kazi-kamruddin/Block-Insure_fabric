@@ -16,7 +16,8 @@ func policyFromPackage(id string, policyPackage *PolicyPackage, ownerID, startDa
 	return &Policy{
 		AssetType: "policy", SchemaVersion: SchemaVersion, ID: id,
 		PackageID: policyPackage.ID, PackageVersion: policyPackage.Version, PolicyholderID: ownerID,
-		StartDate: startDate, EndDate: endDate, PremiumMinor: policyPackage.PremiumMinor,
+		MedicalRulesVersion: policyPackage.MedicalRulesVersion,
+		StartDate:           startDate, EndDate: endDate, PremiumMinor: policyPackage.PremiumMinor,
 		CoverageLimitMinor: policyPackage.CoverageLimitMinor, TermsHash: policyPackage.TermsHash,
 		HospitalIDs: append([]string{}, policyPackage.HospitalIDs...), BankIDs: append([]string{}, policyPackage.BankIDs...),
 		Status: status, PremiumIntervalDays: defaultPremiumIntervalDays, GracePeriodDays: defaultGracePeriodDays,
@@ -26,6 +27,20 @@ func policyFromPackage(id string, policyPackage *PolicyPackage, ownerID, startDa
 }
 
 func (c *Contract) AcquirePolicy(ctx contractapi.TransactionContextInterface, id, packageID, startDate, endDate string) (*Policy, error) {
+	return c.acquirePolicy(ctx, id, packageID, startDate, endDate, "")
+}
+
+func (c *Contract) AcquireMedicalPolicy(ctx contractapi.TransactionContextInterface, id, packageID, startDate, endDate, acceptedTermsHash string) (*Policy, error) {
+	if !isMedicalCandidate(ctx) {
+		return nil, fmt.Errorf("medical purchase requires the isolated medical channel")
+	}
+	if err := validateHash("acceptedTermsHash", acceptedTermsHash); err != nil {
+		return nil, err
+	}
+	return c.acquirePolicy(ctx, id, packageID, startDate, endDate, acceptedTermsHash)
+}
+
+func (c *Contract) acquirePolicy(ctx contractapi.TransactionContextInterface, id, packageID, startDate, endDate, acceptedTermsHash string) (*Policy, error) {
 	if _, err := requireIdentity(ctx, "InsurerMSP", "policyholder"); err != nil {
 		return nil, err
 	}
@@ -50,6 +65,12 @@ func (c *Contract) AcquirePolicy(ctx contractapi.TransactionContextInterface, id
 	}
 	if policyPackage.Status != "PUBLISHED" {
 		return nil, fmt.Errorf("policy package %s is not published", packageID)
+	}
+	if policyPackage.MedicalRulesVersion != 0 && acceptedTermsHash != policyPackage.TermsHash {
+		return nil, fmt.Errorf("accept the published medical terms before purchase")
+	}
+	if acceptedTermsHash != "" && policyPackage.MedicalRulesVersion == 0 {
+		return nil, fmt.Errorf("this package does not publish medical reimbursement rules")
 	}
 	now, err := timestamp(ctx)
 	if err != nil {
@@ -166,6 +187,9 @@ func (c *Contract) CancelPolicy(ctx contractapi.TransactionContextInterface, id,
 }
 
 func (c *Contract) RenewPolicy(ctx contractapi.TransactionContextInterface, newID, existingID, newEndDate string) (*Policy, error) {
+	if isMedicalCandidate(ctx) {
+		return nil, fmt.Errorf("acquire a new policy with explicit acceptance of its medical terms")
+	}
 	if _, err := requireIdentity(ctx, "InsurerMSP", "policyholder"); err != nil {
 		return nil, err
 	}

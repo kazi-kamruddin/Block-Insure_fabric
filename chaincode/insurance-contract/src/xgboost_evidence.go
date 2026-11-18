@@ -22,7 +22,7 @@ func (c *Contract) requireXGBoostEvidence(ctx contractapi.TransactionContextInte
 			}
 		}
 	}
-	if !primary {
+	if !primary && (claim.EpisodeID == "" || claim.MedicalEvidenceRequired) {
 		return nil, fmt.Errorf("current-version primary invoice evidence (or committed appeal document) is required")
 	}
 	return current, nil

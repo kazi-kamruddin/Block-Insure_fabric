@@ -40,6 +40,7 @@ export type HospitalModelFacts = {
 };
 
 export type PolicyPackage = {
+  medicalRulesVersion?: number;
   assetType: "policyPackage";
   schemaVersion: number;
   id: string;
@@ -57,6 +58,7 @@ export type PolicyPackage = {
 };
 
 export type Policy = {
+  medicalRulesVersion?: number;
   assetType: "policy";
   schemaVersion: number;
   id: string;
@@ -269,6 +271,9 @@ export type ClaimStatus =
   | "SETTLED";
 
 export type Claim = {
+  episodeId?: string;
+  episodeRevision?: number;
+  medicalAssociationVersion?: number;
   assetType: "claim";
   schemaVersion: number;
   id: string;
