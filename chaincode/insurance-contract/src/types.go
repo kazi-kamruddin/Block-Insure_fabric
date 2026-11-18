@@ -275,6 +275,10 @@ type Liability struct {
 }
 
 type Claim struct {
+	MedicalClarificationID    string   `json:"medicalClarificationId"`
+	MedicalRecoveryUsed       bool     `json:"medicalRecoveryUsed"`
+	MedicalRevisionKind       string   `json:"medicalRevisionKind"`
+	MedicalSupplementHash     string   `json:"medicalSupplementHash"`
 	EpisodeID                 string   `json:"episodeId"`
 	EpisodeRevision           int      `json:"episodeRevision"`
 	MedicalEvidenceRequired   bool     `json:"medicalEvidenceRequired"`
@@ -500,22 +504,23 @@ type EvidenceAccessRecord struct {
 }
 
 type EvidenceAccessGrant struct {
-	AssetType      string `json:"assetType"`
-	SchemaVersion  int    `json:"schemaVersion"`
-	ID             string `json:"id"`
-	EvidenceID     string `json:"evidenceId"`
-	ClaimID        string `json:"claimId"`
-	OwnerID        string `json:"ownerId"`
-	GranteeMSP     string `json:"granteeMsp"`
-	GranteeRole    string `json:"granteeRole"`
-	GranteeSubject string `json:"granteeSubject"`
-	Purpose        string `json:"purpose"`
-	ExpiresAt      string `json:"expiresAt"`
-	MaxAccesses    int    `json:"maxAccesses"`
-	AccessCount    int    `json:"accessCount"`
-	Status         string `json:"status"`
-	CreatedAt      string `json:"createdAt"`
-	RevokedAt      string `json:"revokedAt"`
+	MedicalReviewID string `json:"medicalReviewId"`
+	AssetType       string `json:"assetType"`
+	SchemaVersion   int    `json:"schemaVersion"`
+	ID              string `json:"id"`
+	EvidenceID      string `json:"evidenceId"`
+	ClaimID         string `json:"claimId"`
+	OwnerID         string `json:"ownerId"`
+	GranteeMSP      string `json:"granteeMsp"`
+	GranteeRole     string `json:"granteeRole"`
+	GranteeSubject  string `json:"granteeSubject"`
+	Purpose         string `json:"purpose"`
+	ExpiresAt       string `json:"expiresAt"`
+	MaxAccesses     int    `json:"maxAccesses"`
+	AccessCount     int    `json:"accessCount"`
+	Status          string `json:"status"`
+	CreatedAt       string `json:"createdAt"`
+	RevokedAt       string `json:"revokedAt"`
 }
 
 type EvidenceReference struct {
@@ -562,6 +567,7 @@ type EvidenceInclusionVerification struct {
 }
 
 type HospitalVerification struct {
+	MedicalRevisionKind   string `json:"medicalRevisionKind"`
 	AssetType             string `json:"assetType"`
 	SchemaVersion         int    `json:"schemaVersion"`
 	ID                    string `json:"id"`
@@ -576,6 +582,7 @@ type HospitalVerification struct {
 }
 
 type AuditorDecision struct {
+	ReasonCode      string `json:"reasonCode"`
 	AssetType       string `json:"assetType"`
 	SchemaVersion   int    `json:"schemaVersion"`
 	ID              string `json:"id"`
@@ -590,6 +597,8 @@ type AuditorDecision struct {
 }
 
 type ClaimReview struct {
+	MedicalVersion     int      `json:"medicalVersion"`
+	PrepareBy          string   `json:"prepareBy"`
 	AssetType          string   `json:"assetType"`
 	SchemaVersion      int      `json:"schemaVersion"`
 	ID                 string   `json:"id"`
@@ -610,6 +619,8 @@ type ClaimReview struct {
 }
 
 type ClaimAppeal struct {
+	MedicalPriorReviewID          string `json:"medicalPriorReviewId"`
+	DisputedDecisionID            string `json:"disputedDecisionId"`
 	AssetType                     string `json:"assetType"`
 	SchemaVersion                 int    `json:"schemaVersion"`
 	ID                            string `json:"id"`

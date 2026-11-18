@@ -263,6 +263,9 @@ export type ClaimStatus =
   | "HOSPITAL_VERIFIED"
   | "ORACLE_PENDING"
   | "ORACLE_FAILED"
+  | "MEDICAL_REVIEW_REQUIRED"
+  | "MEDICAL_REVIEW_PREPARING"
+  | "NO_PAYABLE_AMOUNT"
   | "UNDER_REVIEW"
   | "APPEAL_SUBMITTED"
   | "APPROVED"
@@ -271,6 +274,9 @@ export type ClaimStatus =
   | "SETTLED";
 
 export type Claim = {
+  medicalClarificationId?: string;
+  medicalRecoveryUsed?: boolean;
+  medicalSupplementHash?: string;
   episodeId?: string;
   episodeRevision?: number;
   medicalAssociationVersion?: number;
@@ -444,6 +450,7 @@ export type EvidenceAccessRecord = {
 };
 
 export type EvidenceAccessGrant = {
+  medicalReviewId?: string;
   assetType: "evidenceGrant";
   schemaVersion: number;
   id: string;
@@ -517,6 +524,7 @@ export type HospitalVerification = {
 };
 
 export type AuditorDecision = {
+  reasonCode?: string;
   assetType: "auditorDecision";
   schemaVersion: number;
   id: string;
@@ -531,6 +539,8 @@ export type AuditorDecision = {
 };
 
 export type ClaimReview = {
+  medicalVersion?: number;
+  prepareBy?: string;
   assetType: "claimReview";
   schemaVersion: number;
   id: string;
@@ -544,13 +554,15 @@ export type ClaimReview = {
   approvals: number;
   rejections: number;
   votesCast: number;
-  status: "OPEN" | "APPROVED" | "REJECTED" | "TIMED_OUT";
+  status: "PREPARING" | "OPEN" | "APPROVED" | "REJECTED" | "TIMED_OUT" | "ACCESS_FAILED" | "SUPERSEDED";
   deadline: LedgerTimestamp;
   openedAt: LedgerTimestamp;
   closedAt: LedgerTimestamp;
 };
 
 export type ClaimAppeal = {
+  medicalPriorReviewId?: string;
+  disputedDecisionId?: string;
   assetType: "claimAppeal";
   schemaVersion: number;
   id: string;

@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import path from "node:path";
 import { pinnedDecision, decisionIdentity } from "./decision-store.mjs";
 import { routeModel, evaluatorVersion, evaluatorHash } from "./xgboost.mjs";
+import { registryAssessmentRequest } from "./medical-revision.mjs";
 import { environmentFileArgument, loadEnvironmentFile } from "./environment.mjs";
 
 loadEnvironmentFile(environmentFileArgument());
@@ -188,7 +189,7 @@ async function processRequest(requestId) {
   }
   let assessment = assessRegistryRecord({
     snapshot: requestRegistry,
-    request,
+    request: registryAssessmentRequest(config.fabric.channelName, request, claim, hospitalVerification),
     claim,
     hospitalVerification,
     appeal,

@@ -93,7 +93,7 @@ func (c *Contract) ListMedicalOracleSources(ctx contractapi.TransactionContextIn
 }
 
 func (c *Contract) bindMedicalOracle(ctx contractapi.TransactionContextInterface, claim *Claim, requestID string) (*HospitalVerification, error) {
-	if claim.Status != "SUBMITTED" {
+	if claim.Status != "SUBMITTED" && claim.Status != "APPEAL_SUBMITTED" {
 		return nil, fmt.Errorf("medical claim is not awaiting verification")
 	}
 	head, err := currentMedicalHead(ctx, claim)
@@ -131,9 +131,10 @@ func (c *Contract) bindMedicalOracle(ctx contractapi.TransactionContextInterface
 	}
 	binding := &HospitalVerification{AssetType: "hospitalVerification", SchemaVersion: SchemaVersion,
 		ID: "oracle-invoice-" + patientSubjectHash(requestID), ClaimID: claim.ID, ClaimVersion: claim.Version,
-		HospitalIdentity: claim.HospitalID, Outcome: "SOURCE_BOUND", ClinicalReferenceHash: head.RevisionHash, CreatedAt: now}
+		HospitalIdentity: claim.HospitalID, Outcome: "SOURCE_BOUND", ClinicalReferenceHash: head.RevisionHash, CreatedAt: now,
+		AppealID: claim.CurrentAppealID, MedicalRevisionKind: claim.MedicalRevisionKind}
 	binding.AttestationHash = canonicalProtocolHash("fabric-medical-oracle-binding-v1", claim.ID, strconv.Itoa(claim.Version),
-		claim.EpisodeID, head.RevisionHash, policy.TermsHash, claim.DescriptionHash, manifest, strconv.Itoa(association.Version))
+		claim.EpisodeID, head.RevisionHash, policy.TermsHash, claim.DescriptionHash, manifest, strconv.Itoa(association.Version), claim.MedicalRevisionKind)
 	if err := putState(ctx, "hospitalVerification", binding.ID, binding); err != nil {
 		return nil, err
 	}

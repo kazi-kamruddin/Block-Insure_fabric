@@ -45,7 +45,8 @@ export default async function RoleWorkspacePage({ params }: PageContext) {
           </div>
         </nav>
       </header>
-      <WorkspaceClient initialAccount={account} initialDashboard={dashboard} deployment={`${config.channelName}/${config.chaincodeName}`} />
+      <WorkspaceClient initialAccount={account} initialDashboard={dashboard} deployment={`${config.channelName}/${config.chaincodeName}`}
+        medicalReviewEnabled={process.env.FABRIC_MEDICAL_REVIEW_ENABLED === "true"} />
     </main>
   );
 }

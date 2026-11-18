@@ -12,6 +12,8 @@ import type { RoleDashboard } from "@/lib/dashboard/build-dashboard";
 import { GuidedWorkflowForm, type PreparedWorkflow } from "@/components/guided-workflow-form";
 import { medicalCandidateChannel } from "@/lib/workflows/commands";
 import { MedicalIntake } from "@/components/medical-intake";
+import { MedicalReview } from "@/components/medical-review";
+import { MedicalOCR } from "@/components/medical-ocr";
 import { PresentationGuide } from "@/components/presentation-guide";
 import type { WorkflowCommand } from "@/lib/workflows/commands";
 import { bdtToMinor, workflowFormDefinitions } from "@/lib/workflows/forms";
@@ -104,10 +106,12 @@ export function WorkspaceClient({
   initialAccount,
   initialDashboard,
   deployment,
+  medicalReviewEnabled = false,
 }: {
   initialAccount: DemoAccount | null;
   initialDashboard: RoleDashboard | null;
   deployment: string;
+  medicalReviewEnabled?: boolean;
 }) {
   const router = useRouter();
   const [account, setAccount] = useState(initialAccount);
@@ -133,7 +137,8 @@ export function WorkspaceClient({
   const [retrievalGrantId, setRetrievalGrantId] = useState("");
   const [retrievalPassphrase, setRetrievalPassphrase] = useState("");
   const [retrieving, setRetrieving] = useState(false);
-  const [decryptedEvidence, setDecryptedEvidence] = useState<{ url: string; name: string } | null>(null);
+  const [decryptedEvidence, setDecryptedEvidence] = useState<{ url: string; name: string; blob: Blob; id: string; accessId: string; reviewId: string; digest: string } | null>(null);
+  const medicalReview = medicalReviewEnabled && deployment.startsWith(`${medicalCandidateChannel}/`);
   const [auditClaimId, setAuditClaimId] = useState("");
   const [proofEvidenceId, setProofEvidenceId] = useState("");
   const [proofBatchId, setProofBatchId] = useState("");
@@ -536,6 +541,7 @@ export function WorkspaceClient({
 
   async function retrieveEvidence() {
     setRetrieving(true);
+    setDecryptedEvidence(null);
     try {
       const id = retrievalEvidenceId.trim();
       if (!id) throw new Error("Enter an evidence ID to retrieve.");
@@ -561,7 +567,9 @@ export function WorkspaceClient({
       if (await sha256Hex(plaintext) !== expectedHash) throw new Error("Decrypted evidence failed its ledger integrity check.");
       const plaintextBuffer = new ArrayBuffer(plaintext.byteLength);
       new Uint8Array(plaintextBuffer).set(plaintext);
-      const next = { url: URL.createObjectURL(new Blob([plaintextBuffer])), name: `${id}.decrypted` };
+      const blob = new Blob([plaintextBuffer]);
+      const next = { url: URL.createObjectURL(blob), name: `${id}.decrypted`, blob, id, digest: expectedHash,
+        accessId: response.headers.get("x-evidence-access-id") ?? "", reviewId: response.headers.get("x-evidence-medical-review-id") ?? "" };
       setDecryptedEvidence(next);
       setRetrievalPassphrase("");
       setOutput(`Evidence ${id} decrypted locally and matched its Fabric content hash.`);
@@ -572,6 +580,20 @@ export function WorkspaceClient({
     } finally {
       setRetrieving(false);
     }
+  }
+
+  async function confirmMedicalReadiness() {
+    if (!decryptedEvidence?.reviewId || !decryptedEvidence.accessId) return;
+    setBusy(true);
+    try {
+      const response = await fetch("/api/medical/review", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "confirm", reviewId: decryptedEvidence.reviewId, evidenceId: decryptedEvidence.id,
+          accessId: decryptedEvidence.accessId, contentHash: decryptedEvidence.digest }) });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.message);
+      setOutput("Decryption confirmed for the current medical review. Refresh the case to see readiness.");
+    } catch (error) { setOutput(error instanceof Error ? error.message : "Decryption confirmation failed"); }
+    finally { setBusy(false); }
   }
 
   if (!account) {
@@ -775,6 +797,11 @@ export function WorkspaceClient({
       </div>
 
       <div className="workGrid" id="transaction-console">
+        {medicalReview && (account.role === "policyholder" || account.role === "insurerAdmin" || account.role === "auditor") &&
+          <MedicalReview role={account.role} onEvidence={(id, grant) => {
+            setRetrievalEvidenceId(id); setRetrievalGrantId(grant); setDecryptedEvidence(null);
+            document.getElementById("retrieve-evidence")?.scrollIntoView({ behavior: "smooth" });
+          }} />}
         {deployment.startsWith(`${medicalCandidateChannel}/`) && (account.role === "insurerAdmin" || account.role === "policyholder") &&
           <MedicalIntake insurer={account.role === "insurerAdmin"} onAssociation={prepared => {
             setPreparedWorkflow(prepared);
@@ -919,7 +946,9 @@ export function WorkspaceClient({
               {recoveryDownload && <a className="secondary button" href={recoveryDownload.url} download={recoveryDownload.name}>Download recovery key</a>}
             </div>
             {uploadNotice && <p className="evidenceWarning" role="status">{uploadNotice.message}</p>}
-            <p className="cardNote">After rejection, the appeal accepts only APPEAL_DOCUMENT matching its committed evidence hash. Add supported optional documents with the initial claim.</p>
+            <p className="cardNote">{medicalReview
+              ? "For a clarification or appeal, use the document type shown on the case and upload the exact file committed there."
+              : "After rejection, the appeal accepts only APPEAL_DOCUMENT matching its committed evidence hash. Add supported optional documents with the initial claim."}</p>
             <p className="evidenceWarning">Keep the evidence passphrase, or download its recovery key and remember the separate backup password. Losing both paths makes the ciphertext unrecoverable. The server cannot restore either secret.</p>
           </article>
         )}
@@ -927,11 +956,11 @@ export function WorkspaceClient({
         {account.role !== "bankOfficer" && account.role !== "hospitalOfficer" && (
           <article className="workCard evidenceCard">
             <span className="kicker">Authorized evidence access</span>
-            <h2>Retrieve and decrypt evidence</h2>
+            <h2 id="retrieve-evidence">Retrieve and decrypt evidence</h2>
             <p className="cardNote">The server validates your organization and the claim state, records this access on Fabric, and returns ciphertext. Decryption and integrity verification happen only in this browser.</p>
             <div className="evidenceFields">
-              <label>Evidence ID<input value={retrievalEvidenceId} onChange={(event) => { setRetrievalEvidenceId(event.target.value); setDecryptedEvidence(null); }} placeholder="evidence-1" /></label>
-              <label>Grant ID (optional)<input value={retrievalGrantId} onChange={(event) => setRetrievalGrantId(event.target.value)} placeholder="grant-1" /></label>
+              <label>Evidence ID<input disabled={retrieving} value={retrievalEvidenceId} onChange={(event) => { setRetrievalEvidenceId(event.target.value); setDecryptedEvidence(null); }} placeholder="evidence-1" /></label>
+              <label>Grant ID (optional)<input disabled={retrieving} value={retrievalGrantId} onChange={(event) => { setRetrievalGrantId(event.target.value); setDecryptedEvidence(null); }} placeholder="grant-1" /></label>
               <label>Evidence passphrase<input type="password" autoComplete="current-password" value={retrievalPassphrase} onChange={(event) => setRetrievalPassphrase(event.target.value)} /></label>
               <label>Recovery key file<input type="file" accept=".bifkey,application/json" onChange={(event) => setRecoveryFile(event.target.files?.[0] ?? null)} /></label>
               <label>Backup password<input type="password" autoComplete="current-password" value={restorePassword} onChange={(event) => setRestorePassword(event.target.value)} /></label>
@@ -940,7 +969,10 @@ export function WorkspaceClient({
               <button className="primary button" disabled={busy || retrieving} onClick={retrieveEvidence}>{retrieving ? "Retrieving…" : "Retrieve and decrypt"}</button>
               <button className="secondary button" disabled={busy || retrieving || !recoveryFile} onClick={restoreEvidenceKey}>Restore recovery key</button>
               {decryptedEvidence && <a className="secondary button" download={decryptedEvidence.name} href={decryptedEvidence.url}>Download verified plaintext</a>}
+              {medicalReview && decryptedEvidence?.reviewId && <button className="secondary button" disabled={busy} onClick={confirmMedicalReadiness}>Confirm decryption for this review</button>}
             </div>
+            {medicalReview && decryptedEvidence && (account.role === "policyholder" || account.role === "auditor") &&
+              <MedicalOCR key={decryptedEvidence.accessId} file={decryptedEvidence.blob} evidenceId={decryptedEvidence.id} accessId={decryptedEvidence.accessId} />}
           </article>
         )}
 

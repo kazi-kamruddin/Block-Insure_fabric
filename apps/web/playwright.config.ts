@@ -37,7 +37,7 @@ const oracleServers = [
 
 export default defineConfig({
   testDir: "./e2e",
-  testIgnore: "**/medical-rehearsal.spec.ts",
+  testIgnore: ["**/medical-rehearsal.spec.ts", "**/medical-ocr.spec.ts"],
   outputDir: process.env.PLAYWRIGHT_OUTPUT_DIR ?? "test-results",
   fullyParallel: false,
   // The live Fabric tests intentionally share one channel and world state.

@@ -65,6 +65,9 @@ func (c *Contract) GrantEvidenceAccess(ctx contractapi.TransactionContextInterfa
 	if err := validateEvidenceGrantee(granteeMSP, granteeRole, purpose); err != nil {
 		return nil, err
 	}
+	if claim.EpisodeID != "" && granteeRole == "hospitalOfficer" {
+		return nil, fmt.Errorf("medical evidence is outside the hospital intake role")
+	}
 	if granteeSubject == "" {
 		return nil, fmt.Errorf("granteeSubject is required; use * for any identity in the scoped organization role")
 	}
@@ -89,12 +92,46 @@ func (c *Contract) GrantEvidenceAccess(ctx contractapi.TransactionContextInterfa
 	if expiry.After(nowTime.AddDate(1, 0, 0)) {
 		return nil, fmt.Errorf("expiresAt cannot be more than one year after creation")
 	}
+	medicalReviewID := ""
+	if claim.EpisodeID != "" && granteeRole == "auditor" {
+		review, _, err := c.currentMedicalReview(ctx, claim.CurrentReviewID)
+		if err != nil {
+			return nil, err
+		}
+		if review.Status != "PREPARING" && review.Status != "OPEN" {
+			return nil, fmt.Errorf("current medical review required for a grant")
+		}
+		for _, auditor := range review.AssignedAuditorIDs {
+			if auditor == granteeSubject {
+				medicalReviewID = review.ID
+				break
+			}
+		}
+		if medicalReviewID == "" {
+			return nil, fmt.Errorf("a medical grant must name a current assigned auditor")
+		}
+		docs, err := c.requireXGBoostEvidence(ctx, claim)
+		if err != nil {
+			return nil, err
+		}
+		found := false
+		for _, doc := range docs {
+			if doc.ID == evidence.ID {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return nil, fmt.Errorf("evidence is not in the current medical review")
+		}
+	}
 	grant := &EvidenceAccessGrant{
 		AssetType: "evidenceGrant", SchemaVersion: SchemaVersion, ID: id,
 		EvidenceID: evidenceID, ClaimID: evidence.ClaimID, OwnerID: ownerID,
 		GranteeMSP: granteeMSP, GranteeRole: granteeRole, GranteeSubject: granteeSubject,
 		Purpose: purpose, ExpiresAt: expiry.UTC().Format(time.RFC3339), MaxAccesses: maxAccesses,
 		AccessCount: 0, Status: "ACTIVE", CreatedAt: now,
+		MedicalReviewID: medicalReviewID,
 	}
 	if err := putState(ctx, "evidenceGrant", id, grant); err != nil {
 		return nil, err
@@ -146,12 +183,18 @@ func (c *Contract) authorizeWorkflowEvidence(ctx contractapi.TransactionContextI
 		subject, err := callerSubject(ctx)
 		return err == nil && subject == claim.ClaimantID && subject == evidence.SubmittedBy, err
 	case mspID == "HospitalMSP" && role == "hospitalOfficer":
+		if claim.EpisodeID != "" {
+			return false, nil
+		}
 		subject, err := callerSubject(ctx)
 		if err != nil {
 			return false, err
 		}
 		return subject == claim.HospitalID && (claim.Status == "SUBMITTED" || claim.Status == "APPEAL_SUBMITTED"), nil
 	case mspID == "AuditorMSP" && role == "auditor":
+		if claim.EpisodeID != "" {
+			return false, nil
+		}
 		if claim.CurrentReviewID == "" {
 			return false, nil
 		}
@@ -256,6 +299,26 @@ func (c *Contract) RecordGrantedEvidenceAccess(ctx contractapi.TransactionContex
 	}
 	if grant.Status != "ACTIVE" || grant.GranteeMSP != mspID || grant.GranteeRole != role || grant.Purpose != purpose || (grant.GranteeSubject != "*" && grant.GranteeSubject != subject) {
 		return nil, fmt.Errorf("access denied: grant scope does not match caller and purpose")
+	}
+	if role == "auditor" {
+		claim, err := c.ReadClaim(ctx, evidence.ClaimID)
+		if err != nil {
+			return nil, err
+		}
+		if claim.EpisodeID != "" {
+			review, _, err := c.currentMedicalReview(ctx, claim.CurrentReviewID)
+			if err != nil {
+				return nil, err
+			}
+			if err := checkMedicalAuditGrant(claim, review, evidence.ID, subject, grant); err != nil {
+				return nil, err
+			}
+			if review.Status == "PREPARING" {
+				if _, err := medicalReviewClock(ctx, review.PrepareBy); err != nil {
+					return nil, fmt.Errorf("review preparation expired")
+				}
+			}
+		}
 	}
 	now, err := timestamp(ctx)
 	if err != nil {

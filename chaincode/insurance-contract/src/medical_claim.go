@@ -289,6 +289,18 @@ func (c *Contract) AcceptMedicalCorrection(ctx contractapi.TransactionContextInt
 	if err != nil {
 		return nil, err
 	}
+	if claim.Status == "REJECTED" || claim.CurrentAppealID != "" {
+		return nil, fmt.Errorf("apply a rejected-claim correction through medical appeal")
+	}
+	if claim.MedicalClarificationID != "" {
+		note, err := c.readClarification(ctx, claim.MedicalClarificationID)
+		if err != nil {
+			return nil, err
+		}
+		if note.Status == "PENDING" {
+			return nil, fmt.Errorf("answer or expire the clarification before accepting a correction")
+		}
+	}
 	if quote.StatementHash != acceptedStatementHash {
 		return nil, fmt.Errorf("review the corrected statement before reconfirming")
 	}
@@ -303,7 +315,7 @@ func (c *Contract) AcceptMedicalCorrection(ctx contractapi.TransactionContextInt
 		if err != nil {
 			return nil, err
 		}
-		if review.Status == "OPEN" {
+		if review.Status == "OPEN" || review.Status == "PREPARING" {
 			review.Status = "SUPERSEDED"
 			if err := overwriteAsset(ctx, "claimReview", review.ID, review); err != nil {
 				return nil, err
@@ -320,6 +332,7 @@ func (c *Contract) AcceptMedicalCorrection(ctx contractapi.TransactionContextInt
 	claim.CurrentOracleRequestID, claim.CurrentReviewID, claim.HospitalVerificationID = "", "", ""
 	claim.CurrentAppealID, claim.PrivacyPresentationID, claim.MedicalSettlementID = "", "", ""
 	claim.EvidenceIDs = []string{}
+	claim.MedicalRevisionKind, claim.MedicalSupplementHash = "CORRECTION", ""
 	claim.Version++
 	claim.UpdatedAt, err = timestamp(ctx)
 	if err != nil {

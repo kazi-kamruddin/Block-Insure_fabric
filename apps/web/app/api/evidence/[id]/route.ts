@@ -36,13 +36,13 @@ export async function POST(request: Request, context: RouteContext) {
     const evidence = await ledger.readEvidenceReference(id.data);
     const claim = await ledger.readClaim(evidence.claimId);
     const account = findDemoAccount(session.accountId);
-    const auditorAssigned = session.role === "auditor" && Boolean(claim.currentReviewId)
-      ? (await ledger.readClaimReview(claim.currentReviewId)).assignedAuditorIds.includes(session.subjectId ?? "")
-      : false;
+    const review = session.role === "auditor" && claim.currentReviewId ? await ledger.readClaimReview(claim.currentReviewId) : null;
+    const auditorAssigned = review?.assignedAuditorIds.includes(session.subjectId ?? "") ?? false;
+    const medicalAudit = Boolean(claim.episodeId && review?.medicalVersion && session.role === "auditor");
     const workflowAuthorized =
       session.role === "insurerAdmin" ||
       (session.role === "policyholder" && claim.claimantId === session.subjectId) ||
-      (session.role === "auditor" && auditorAssigned && !["SUBMITTED", "HOSPITAL_VERIFIED"].includes(claim.status));
+      (session.role === "auditor" && !medicalAudit && auditorAssigned && !["SUBMITTED", "HOSPITAL_VERIFIED"].includes(claim.status));
     let grantAuthorized = false;
     if (retrieval.data.grantId && account) {
       const grant = await ledger.readEvidenceAccessGrant(retrieval.data.grantId);
@@ -52,6 +52,11 @@ export async function POST(request: Request, context: RouteContext) {
         grant.accessCount < grant.maxAccesses && grant.granteeMsp === account.organization &&
         grant.granteeRole === session.role && grant.purpose === expectedPurpose &&
         (grant.granteeSubject === "*" || grant.granteeSubject === session.subjectId);
+      if (medicalAudit) {
+        grantAuthorized = grantAuthorized && auditorAssigned && review?.medicalVersion === claim.version &&
+          grant.medicalReviewId === review?.id && grant.granteeSubject === session.subjectId &&
+          ["PREPARING", "OPEN"].includes(review?.status ?? "") && claim.evidenceIds.includes(evidence.id);
+      }
     }
     if (!workflowAuthorized && !grantAuthorized) return NextResponse.json({ message: "This account cannot retrieve that evidence" }, { status: 403 });
 
@@ -81,6 +86,8 @@ export async function POST(request: Request, context: RouteContext) {
         "x-ciphertext-sha256": hashValue(ciphertext),
         "x-content-sha256": evidence.contentHash,
         "x-evidence-claim-id": evidence.claimId,
+        "x-evidence-access-id": accessInput.id,
+        "x-evidence-medical-review-id": medicalAudit && review?.status === "PREPARING" ? review.id : "",
       },
     });
   } catch (error) {

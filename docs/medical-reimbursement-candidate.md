@@ -5,6 +5,11 @@ The isolated candidate passed its first full browser rehearsal on 19 November
 [live acceptance record](results/medical-rehearsal-2026-11-19.md) for the exact
 package, outcome, startup fixes and preservation checks.
 
+Items 12–15 are staged for the separate 1.8.0-medical package. Keep
+`FABRIC_MEDICAL_REVIEW_ENABLED` unset for the live 1.7.0-medical build.
+See the [review and OCR acceptance record](results/medical-review-ocr-2026-11-19.md)
+for the rehearsal order, feature gate and package verification.
+
 The existing November demonstration is tied to source revision `cc37af2` and
 its verified `1.6.3-xgb-alignment` package. Keep its built application, channel,
 identities, secrets and data roots together. The existing launcher checks the

@@ -707,7 +707,9 @@ func (c *Contract) finalizeOracleRequest(ctx contractapi.TransactionContextInter
 	if verified {
 		request.Status = "CONSENSUS"
 		claim.Status = "APPROVED"
-		if claim.CurrentAppealID != "" {
+		if claim.EpisodeID != "" && (claim.CurrentAppealID != "" || claim.MedicalSupplementHash != "") {
+			claim.Status = "MEDICAL_REVIEW_REQUIRED"
+		} else if claim.CurrentAppealID != "" {
 			appeal, err := c.ReadClaimAppeal(ctx, claim.CurrentAppealID)
 			if err != nil {
 				return err
@@ -794,6 +796,9 @@ func (c *Contract) RouteOracleFailureToReview(
 	}
 	if claim.Status != "ORACLE_FAILED" || claim.Version != request.ClaimVersion || claim.CurrentOracleRequestID != request.ID {
 		return nil, fmt.Errorf("Oracle request %s is not the claim's current failed request", requestID)
+	}
+	if claim.EpisodeID != "" {
+		return nil, fmt.Errorf("use the medical preparation and evidence readiness workflow")
 	}
 	appealID := ""
 	kind := "INITIAL"

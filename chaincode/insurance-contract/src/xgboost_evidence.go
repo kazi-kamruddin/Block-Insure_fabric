@@ -2,6 +2,8 @@ package insurance
 
 import (
 	"fmt"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/hyperledger/fabric-contract-api-go/v2/contractapi"
@@ -14,13 +16,33 @@ func (c *Contract) requireXGBoostEvidence(ctx contractapi.TransactionContextInte
 	}
 	current := []EvidenceReference{}
 	primary := false
+	supplementReady := claim.MedicalSupplementHash == ""
+	var appeal *ClaimAppeal
+	if claim.EpisodeID != "" && claim.CurrentAppealID != "" {
+		appeal, err = c.ReadClaimAppeal(ctx, claim.CurrentAppealID)
+		if err != nil {
+			return nil, err
+		}
+	}
+	appealReady := appeal == nil || appeal.EvidenceHash == ""
 	for _, evidence := range all {
-		if evidence.ClaimID == claim.ID && evidence.ClaimVersion == claim.Version && evidence.SubmittedBy == claim.ClaimantID {
+		currentVersion := evidence.ClaimVersion == claim.Version
+		carried := claim.EpisodeID != "" && evidence.ClaimVersion < claim.Version && slices.Contains(claim.EvidenceIDs, evidence.ID)
+		if evidence.ClaimID == claim.ID && (currentVersion || carried) && evidence.SubmittedBy == claim.ClaimantID {
 			current = append(current, evidence)
 			if evidence.DocumentType == "INVOICE" || (claim.Version > 1 && evidence.DocumentType == "APPEAL_DOCUMENT") {
 				primary = true
 			}
+			if currentVersion && evidence.DocumentType == "CLARIFICATION_DOCUMENT" && strings.EqualFold(evidence.ContentHash, claim.MedicalSupplementHash) {
+				supplementReady = true
+			}
+			if appeal != nil && evidence.DocumentType == "APPEAL_DOCUMENT" && strings.EqualFold(evidence.ContentHash, appeal.EvidenceHash) {
+				appealReady = true
+			}
 		}
+	}
+	if !appealReady || !supplementReady {
+		return nil, fmt.Errorf("upload the committed successor evidence before verification")
 	}
 	if !primary && (claim.EpisodeID == "" || claim.MedicalEvidenceRequired) {
 		return nil, fmt.Errorf("current-version primary invoice evidence (or committed appeal document) is required")
