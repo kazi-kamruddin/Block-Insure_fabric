@@ -46,11 +46,44 @@ See `deploy-180.log`, `warm-180.log`, `browser-03/report.json`,
 `browser-02/report.json`, `review-denial-rerun.json` and
 `resource-shutdown.json`. Shutdown stopped the five owned app processes and
 16 owned containers and released the rehearsal ports.
-Live deadline expiry and procedural recovery, and live PDF/JPEG OCR remain
-UNTESTED in this combined case. The source and isolated browser results below
-describe their separate coverage.
+The combined case used PNG and completed on time. A separate live case below
+exercised expiry, procedural recovery, PDF and JPEG.
 
-## Changes and acceptance
+## Live deadline recovery and PDF/JPEG follow-up
+
+**PASSED** on the same package, sequence 2 and schema 15. All five peers
+verified the package on resume.
+
+1. Fabric denied early expiry. After the preparation deadline, a valid
+   commit closed the original review as `ACCESS_FAILED`. One procedural
+   recovery kept the same four auditors, the same claim version and the
+   BDT 40.00 reservation.
+2. The recovered round denied an original grant. Each assigned auditor
+   decrypted both freshly granted documents while the holder was signed out
+   and acknowledged readiness. The same-origin browser extracted the
+   invoice number, service date and total from the PDF and JPEG. It accepted
+   an edited total, downloaded each private receipt, and matched both
+   receipts to committed Fabric events.
+3. Fabric denied opening with only three confirmations per document. Voting
+   opened with all four. One approval did not reach quorum. Actual voting
+   expiry committed `TIMED_OUT`, the claim remained `REJECTED`, and Fabric
+   denied a second procedural recovery. This fixture made zero payouts.
+
+The first run committed preparation expiry and recovery, then timed out
+during a browser role switch. The runner now allows up to 45 seconds for
+role navigation. The resumed test checked the recorded claim, review and
+attachment IDs, then continued the same case without paying another
+premium. The resumed run passed 1/1 in 4.3 minutes. The case ID is
+`medical-ccf57591-37fc-443f-a5e8-ec03d1a774fb`.
+
+All 20 protected peer/channel heads and 49 Docker volumes matched. The
+prior successful appeal claim was still settled. The five owned app
+processes and 16 owned containers were stopped. Evidence is retained under
+`.local-reference/medical-deadline-ocr-20261119/`, including both browser
+reports, `live-verified.json`, `preservation.json` and
+`resource-shutdown.json`.
+
+## Implementation and initial source acceptance
 
 | Item | Requirement and behavior | Result |
 | --- | --- | --- |

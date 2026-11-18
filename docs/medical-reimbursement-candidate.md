@@ -71,6 +71,12 @@ $env:PLAYWRIGHT_OUTPUT_DIR = Join-Path (Get-Location) ".local-reference/medical-
 node apps/web/node_modules/@playwright/test/cli.js test --config apps/web/playwright.medical.config.ts
 ```
 
+Set `MEDICAL_DEADLINE_LIVE=true` for the separate recovery and PDF/JPEG
+rehearsal. Set `MEDICAL_EVENT_PROJECTION_PATH` to the isolated medical event
+projection JSON to match OCR receipts against committed events. Short
+deadlines are supplied through the authenticated API for the test. Reviewer
+access and OCR use the ordinary browser controls.
+
 On the rehearsal machine the medical channel and fixtures already exist.
 If no other Fabric profile is running, the retained local helpers can resume it
 without another lifecycle deployment:

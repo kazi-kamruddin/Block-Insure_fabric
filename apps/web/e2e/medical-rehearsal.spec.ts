@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
+import { invoicePDF } from "./invoice-pdf";
 
 const roles = {
   insurer: ["Insurer Administrator", "insurer"],
@@ -13,19 +14,26 @@ const roles = {
   auditor4: ["Independent Auditor Four", "auditor"],
 } as const;
 
-const governed = process.env.MEDICAL_REVIEW_LIVE === "true";
+const deadlines = process.env.MEDICAL_DEADLINE_LIVE === "true";
+const governed = deadlines || process.env.MEDICAL_REVIEW_LIVE === "true";
 
 function day(offset: number) {
   return new Date(Date.now() + 6 * 3_600_000 + offset * 86_400_000).toISOString().slice(0, 10);
 }
 
-test(governed ? "live medical clarification, review, appeal and OCR through one Bank payout" : "ordinary medical browser journey through one Bank payout", async ({ page }, info) => {
+const journey = deadlines ? "live medical deadlines, single recovery, and PDF and JPEG OCR"
+  : governed ? "live medical clarification, review, appeal and OCR through one Bank payout" : "ordinary medical browser journey through one Bank payout";
+
+test(journey, async ({ page }, info) => {
   test.setTimeout(900_000);
   const health = await page.request.get("/api/fabric/health");
   expect(health.ok(), await health.text()).toBe(true);
   expect(await health.json()).toMatchObject({ channel: "insurance-medical-reimbursement", chaincode: "insurance-contract", schemaVersion: 15 });
 
-  const suffix = randomUUID().slice(0, 12);
+  const resumeClaim = deadlines ? process.env.MEDICAL_DEADLINE_RESUME_CLAIM : undefined;
+  const resumeSuffix = process.env.MEDICAL_DEADLINE_RESUME_SUFFIX;
+  if (resumeClaim && !resumeSuffix) throw new Error("Supply the interrupted fixture suffix");
+  const suffix = resumeClaim && resumeSuffix ? resumeSuffix : randomUUID().slice(0, 12);
   const id = (prefix: string) => "med-" + prefix + "-" + suffix;
   const start = day(-1), service = day(0), firstEnd = day(28), end = day(59);
   const journal: unknown[] = [];
@@ -38,7 +46,7 @@ test(governed ? "live medical clarification, review, appeal and OCR through one 
     if (role) await page.getByRole("button", { name: "Sign out", exact: true }).click();
     else await page.goto("/workspace");
     await page.getByRole("button", { name: "Sign in as " + roles[next][0], exact: true }).click();
-    await expect(page).toHaveURL(new RegExp("/workspace/" + roles[next][1] + "$"));
+    await expect(page).toHaveURL(new RegExp("/workspace/" + roles[next][1] + "$"), { timeout: 45_000 });
     await expect(page.getByRole("heading", { name: roles[next][0], exact: true })).toBeVisible();
     role = next;
   }
@@ -126,7 +134,7 @@ test(governed ? "live medical clarification, review, appeal and OCR through one 
   }
 
   const panel = ["auditor1", "auditor2", "auditor3", "auditor4"] as const;
-  async function confirmReviewDocuments(claimId: string, documentIds: string[], ocrEvidenceId?: string) {
+  async function confirmReviewDocuments(claimId: string, documentIds: string[], ocr: Record<string, string> = {}, version = 2) {
     const retrieval = page.locator("article").filter({ has: page.getByRole("heading", { name: "Retrieve and decrypt evidence" }) });
     for (const auditor of panel) {
       await login(auditor);
@@ -143,9 +151,9 @@ test(governed ? "live medical clarification, review, appeal and OCR through one 
         const reviewId = response.headers()["x-evidence-medical-review-id"];
         expect(accessId).toBeTruthy();
         expect(reviewId).toBeTruthy();
-        if (auditor === "auditor1" && evidenceId === ocrEvidenceId) {
+        if (auditor === "auditor1" && ocr[evidenceId]) {
           await retrieval.getByRole("button", { name: "Extract invoice fields" }).click();
-          await expect(retrieval.getByLabel("Invoice number", { exact: true })).toHaveValue("MED-250", { timeout: 90_000 });
+          await expect(retrieval.getByLabel("Invoice number", { exact: true })).toHaveValue(ocr[evidenceId], { timeout: 90_000 });
           await expect(retrieval.getByLabel("Documented service date")).toHaveValue(service);
           await expect(retrieval.getByLabel("Invoice total in BDT")).toHaveValue("950.00");
           await retrieval.getByLabel("Invoice total in BDT").fill("950.01");
@@ -164,7 +172,7 @@ test(governed ? "live medical clarification, review, appeal and OCR through one 
           });
           const projectionPath = process.env.MEDICAL_EVENT_PROJECTION_PATH;
           if (projectionPath) {
-            const committed = { id: sent.id, claimId, claimVersion: 2, confirmedBy: auditor, ...source,
+            const committed = { id: sent.id, claimId, claimVersion: version, confirmedBy: auditor, ...source,
               suggestionsHash: sent.suggestionsHash, confirmedHash: sent.confirmedHash };
             await expect.poll(async () => {
               const projection = JSON.parse(await readFile(projectionPath, "utf8"));
@@ -197,7 +205,9 @@ test(governed ? "live medical clarification, review, appeal and OCR through one 
       await expect(reviewCard.getByRole("heading", { name: "Medical review and appeal" })).toBeVisible();
       if (priorClaimId) expect(await asset("claim", priorClaimId)).toMatchObject({ status: "SETTLED", amountMinor: 4000 });
     }
-    await test.step("register partners and publish the medical policy", async () => {
+    let claimId = resumeClaim ?? "";
+    let episodeId = "";
+    if (!resumeClaim) await test.step("register partners and publish the medical policy", async () => {
       await login("insurer");
       const existing = await assets("partner-agreement") as { partnerId: string; status: string }[];
       for (const [partnerType, partnerId, name] of [
@@ -216,7 +226,7 @@ test(governed ? "live medical clarification, review, appeal and OCR through one 
       await form("publishPolicyPackage", { id: id("package") });
     });
 
-    await test.step("accept policy terms and pay the first installment with OTP", async () => {
+    if (!resumeClaim) await test.step("accept policy terms and pay the first installment with OTP", async () => {
       await login("bank");
       for (const [name, ownerId, accountType, openingBalanceBdt] of [
         ["customer", "policyholder1", "CUSTOMER", "100.00"],
@@ -247,9 +257,7 @@ test(governed ? "live medical clarification, review, appeal and OCR through one 
       expect(await asset("policy", id("policy"))).toMatchObject({ status: "ACTIVE", paidThroughDate: firstEnd });
     });
 
-    let claimId = "";
-    let episodeId = "";
-    await test.step("intake stays hidden until verified and the quote is pinned to the submitted claim", async () => {
+    if (!resumeClaim) await test.step("intake stays hidden until verified and the quote is pinned to the submitted claim", async () => {
       await login("hospital");
       await expect(page.locator("#guided-workflow").getByLabel("Workflow action")).toHaveCount(0);
       const forbidden = await page.request.post("/api/workflows", { data: { operation: "recordHospitalModelFacts",
@@ -290,6 +298,106 @@ test(governed ? "live medical clarification, review, appeal and OCR through one 
       expect(claim).toMatchObject({ id: receipt.id, version: 1, amountMinor: 4000, episodeId: episode.id, episodeRevision: 1 });
       claimId = claim.id;
     });
+    if (deadlines) {
+      await test.step("expire preparation, recover once, commit OCR for both formats, and expire voting", async () => {
+        const pdf = id("invoice-pdf"), jpeg = id("invoice-jpeg");
+        if (!resumeClaim) {
+          await uploadDocument(claimId, pdf, "INVOICE", {
+            name: "invoice.pdf", mimeType: "application/pdf", buffer: Buffer.from(invoicePDF("MED-250", service, "950.00")),
+          }, 1);
+          const image = await page.evaluate(date => {
+            const canvas = document.createElement("canvas");
+            canvas.width = 1000;
+            canvas.height = 330;
+            const brush = canvas.getContext("2d")!;
+            brush.fillStyle = "white";
+            brush.fillRect(0, 0, 1000, 330);
+            brush.fillStyle = "black";
+            brush.font = "42px Arial";
+            ["Invoice number: MED-251", "Service date: " + date, "Total due: BDT 950.00"].forEach((text, i) => brush.fillText(text, 50, 85 + i * 82));
+            return canvas.toDataURL("image/jpeg", 0.94).split(",")[1];
+          }, service);
+          await uploadDocument(claimId, jpeg, "MEDICAL_REPORT", {
+            name: "invoice-scan.jpg", mimeType: "image/jpeg", buffer: Buffer.from(image, "base64"),
+          }, 1);
+          await login("insurer");
+          await freshVerification(claimId, 1);
+        }
+        const command = async (data: object, status = 200) => {
+          const response = await page.request.post("/api/medical/review", { data });
+          const body = await response.json();
+          journal.push({ actor: role, status: response.status(), data, ...body });
+          expect(response.status(), JSON.stringify(body)).toBe(status);
+          return body.result;
+        };
+        const until = (seconds: number) => new Date(Date.now() + seconds * 1000).toISOString();
+        const after = async (timestamp: string) => {
+          await expect.poll(() => Date.now(), { timeout: 105_000, intervals: [1000] }).toBeGreaterThan(Date.parse(timestamp) + 1000);
+        };
+
+        let recovered;
+        let oldGrants;
+        if (resumeClaim) {
+          await login("insurer");
+          const view = await loadReview(claimId);
+          const original = await asset("review", id("prepare-expiry"));
+          expect(original).toMatchObject({ claimId, status: "ACCESS_FAILED", assignedAuditorIds: panel });
+          expect(view.facts.serviceDate).toBe(service);
+          expect(view.documents.map((doc: { id: string }) => doc.id).sort()).toEqual([pdf, jpeg].sort());
+          expect(view.review).toMatchObject({ status: "PREPARING", assignedAuditorIds: panel, medicalVersion: 1 });
+          recovered = view.review;
+          const grants = await assets("evidence-grant");
+          oldGrants = grants.filter((grant: { medicalReviewId: string }) => grant.medicalReviewId === original.id);
+        } else {
+          const initial = await command({ action: "prepare", claimId, reviewId: id("prepare-expiry"), prepareBy: until(60) });
+          expect(initial.assignedAuditorIds).toEqual(panel);
+          await command({ action: "expire", reviewId: initial.id }, 409);
+          await login("holder");
+          oldGrants = await command({ action: "share", reviewId: initial.id, expiresAt: until(3600) });
+          expect(oldGrants).toHaveLength(8);
+          await login("insurer");
+          await after(initial.prepareBy);
+          await loadReview(claimId);
+          expect(await reviewAction("Finalize expired review")).toMatchObject({ id: initial.id, status: "ACCESS_FAILED" });
+          recovered = await reviewAction("Use one procedural recovery");
+          expect(recovered).toMatchObject({ assignedAuditorIds: panel, medicalVersion: 1, status: "PREPARING" });
+          expect(recovered.id).not.toBe(initial.id);
+        }
+        expect(oldGrants).toHaveLength(8);
+        expect((await loadReview(claimId)).claim).toMatchObject({ medicalRecoveryUsed: true, amountMinor: 4000 });
+
+        await login("auditor1");
+        const old = oldGrants.find((grant: { granteeSubject: string; evidenceId: string }) => grant.granteeSubject === "auditor1" && grant.evidenceId === pdf);
+        const stale = await page.request.post("/api/evidence/" + pdf, { data: { grantId: old.id } });
+        expect(stale.status(), await stale.text()).toBe(403);
+        await login("holder");
+        await loadReview(claimId);
+        expect(await reviewAction("Grant listed evidence to these four reviewers")).toHaveLength(8);
+        const remote: string[] = [];
+        page.context().on("request", request => {
+          const url = new URL(request.url());
+          if (url.protocol.startsWith("http") && url.origin !== "http://127.0.0.1:3210") remote.push(url.hostname);
+        });
+        await confirmReviewDocuments(claimId, [pdf, jpeg], { [pdf]: "MED-250", [jpeg]: "MED-251" }, 1);
+        expect(remote).toEqual([]);
+
+        await login("insurer");
+        const voting = await command({ action: "open", reviewId: recovered.id, deadline: until(60) });
+        expect(voting.status).toBe("OPEN");
+        await login("auditor1");
+        await loadReview(claimId);
+        await reviewCard.getByLabel("Reason reference").fill("Synthetic sample vote before absence of quorum.");
+        await reviewAction("Record reasoned vote");
+        await login("insurer");
+        await after(voting.deadline);
+        await loadReview(claimId);
+        expect(await reviewAction("Finalize expired review")).toMatchObject({ id: recovered.id, status: "TIMED_OUT" });
+        await command({ action: "recover", reviewId: recovered.id, newId: id("prohibited"), prepareBy: until(3600) }, 409);
+        expect((await loadReview(claimId)).claim).toMatchObject({ status: "REJECTED", medicalRecoveryUsed: true });
+        expect(errors).toEqual([]);
+      });
+      return;
+    }
 
     if (governed) await test.step("clarification, four-auditor decryption, OCR and corrected appeal", async () => {
       await login("insurer");
@@ -337,7 +445,7 @@ test(governed ? "live medical clarification, review, appeal and OCR through one 
       await loadReview(claimId);
       const initialGrants = await reviewAction("Grant listed evidence to these four reviewers");
       expect(initialGrants).toHaveLength(4);
-      await confirmReviewDocuments(claimId, [invoiceId], invoiceId);
+      await confirmReviewDocuments(claimId, [invoiceId], { [invoiceId]: "MED-250" });
       await login("insurer");
       await loadReview(claimId);
       await reviewAction("Open voting for 24 hours");
