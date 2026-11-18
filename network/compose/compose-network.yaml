@@ -202,5 +202,5 @@ services:
       - ../.fabric/fabric-samples/config/core.yaml:/etc/hyperledger/peercfg/core.yaml:ro
       - /var/run:/host/var/run
       - peer0.oracle.blockinsure.test:/var/hyperledger/production
-    ports: ["13051:7051", "9448:9444"]
+    ports: ["${FABRIC_ORACLE_HOST_PORT:-13051}:7051", "9448:9444"]
     depends_on: [couchdb-oracle]

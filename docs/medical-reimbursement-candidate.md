@@ -1,5 +1,10 @@
 # Isolated medical reimbursement candidate
 
+The isolated candidate passed its first full browser rehearsal on 19 November
+2026. It completed one BDT 40.00 Bank payout. See the
+[live acceptance record](results/medical-rehearsal-2026-11-19.md) for the exact
+package, outcome, startup fixes and preservation checks.
+
 The existing November demonstration is tied to source revision `cc37af2` and
 its verified `1.6.3-xgb-alignment` package. Keep its built application, channel,
 identities, secrets and data roots together. The existing launcher checks the
@@ -49,6 +54,37 @@ state roots. Build and start the web server in a separate Fabric checkout or
 build directory so the November standalone demo stays intact. Configure three
 existing Oracle profiles for the same medical channel, its private registry URL,
 and those deployment-specific worker roots. Use local demo delivery when rehearsing.
+On Windows, check the host TCP reservation ranges if the Oracle peer port is
+unavailable. Set `FABRIC_ORACLE_HOST_PORT` before guarded Compose startup and
+point `FABRIC_ORACLE_PEER_ENDPOINT` at the same host port. The peer's internal
+port and identity stay the same. The default host port is 13051.
+
+After the medical web server on port 3210 and all three workers are ready, run the
+dedicated browser rehearsal from the Fabric root:
+
+```powershell
+$env:FABRIC_CHANNEL_NAME = 'insurance-medical-reimbursement'
+node apps/web/node_modules/@playwright/test/cli.js test --config apps/web/playwright.medical.config.ts
+```
+
+On the rehearsal machine the medical channel and fixtures already exist.
+If no other Fabric profile is running, the retained local helpers can resume it
+without another lifecycle deployment:
+
+```powershell
+$env:FABRIC_ORACLE_HOST_PORT = '23051'
+$env:FABRIC_CHAINCODE_BUILDER = 'block-insure/fabric-ccenv:2.5.16-go1.26.10'
+$live = '.local-reference/medical-reimbursement-20261118/live'
+$stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
+.\scripts\low-memory-network.ps1 Start -CoreOnly -ChaincodeVersion 1.7.0-medical
+& "$live/run-native.ps1" -Action warm -LogName "warm-resume-$stamp.log"
+& "$live/server-controller.ps1"
+```
+
+Use the port if it is still available. The existing local controller uses
+23051 and serves the app on `http://127.0.0.1:3210/workspace`. It reads the
+already built medical app and private medical state. The `warm` action audits
+the exact archive, peer definitions and schema without writing business state.
 
 1. Register synthetic Hospital and Bank partners and accounts, publish a package
    with medical rules, acquire it as the holder and pay a covered installment.
@@ -78,7 +114,7 @@ new-package/channel verification are separate from these source tests.
 | After items 6–10 | PASSED full Go suite and Go vet, 123 web unit tests, lint and typecheck, 27 worker tests and the frozen evaluator hash check |
 | Isolated standalone build | PASSED on final source, with existing filesystem tracing warnings. The first refresh failed on stale copied TypeScript types. Synchronizing the matching source files resolved it. The filing warning was moved out of render and uses the recorded preparation timestamp |
 | Medical package | PASSED offline source match for all 30 runtime files, `1.7.0-medical`, SHA-256 `29a873fb43d093482b53f536e8ce83c1a76da7c1a79152c3bee61538d7d53594` |
-| Live medical channel | UNTESTED. The archive has not been installed, approved or committed to peers. No medical browser rehearsal or Bank payout was executed |
+| Live medical channel | UNTESTED at this source checkpoint. See the 19 November live acceptance record above for the subsequent deployment and browser results |
 
 Final local package and evidence are under
 `.local-reference/medical-reimbursement-20261118/`. Use the archive in

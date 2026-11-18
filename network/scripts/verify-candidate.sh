@@ -7,7 +7,7 @@ expected='insurance-contract_1.6.3-xgb-alignment:bc2a30f5b434c73649f765a31232892
 for org in insurer hospital auditor bank oracle; do
   case "$org" in
     insurer) msp=InsurerMSP; port=7051;; hospital) msp=HospitalMSP; port=8051;;
-    auditor) msp=AuditorMSP; port=9051;; bank) msp=BankMSP; port=12051;; oracle) msp=OracleMSP; port=13051;;
+    auditor) msp=AuditorMSP; port=9051;; bank) msp=BankMSP; port=12051;; oracle) msp=OracleMSP; port=${FABRIC_ORACLE_HOST_PORT:-13051};;
   esac
   domain="$org.blockinsure.test"
   export CORE_PEER_TLS_ENABLED=true CORE_PEER_LOCALMSPID="$msp"
@@ -26,7 +26,7 @@ if [ "${1:-}" = '--warm' ]; then
   for org in insurer hospital auditor bank oracle; do
     case "$org" in
       insurer) msp=InsurerMSP; port=7051;; hospital) msp=HospitalMSP; port=8051;;
-      auditor) msp=AuditorMSP; port=9051;; bank) msp=BankMSP; port=12051;; oracle) msp=OracleMSP; port=13051;;
+      auditor) msp=AuditorMSP; port=9051;; bank) msp=BankMSP; port=12051;; oracle) msp=OracleMSP; port=${FABRIC_ORACLE_HOST_PORT:-13051};;
     esac
     domain="$org.blockinsure.test"
     export CORE_PEER_LOCALMSPID="$msp" CORE_PEER_ADDRESS="host.docker.internal:$port" CORE_PEER_TLS_SERVERHOSTOVERRIDE="peer0.$domain"

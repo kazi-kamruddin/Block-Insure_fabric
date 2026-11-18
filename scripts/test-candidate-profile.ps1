@@ -31,15 +31,18 @@ $env:FABRIC_CHANNEL_NAME='insurance-channel'
 $env:ORACLE_ID='oracle3'
 $env:ORACLE_MODEL_HASH='inherited-wrong-profile'
 $env:EMAIL_GATEWAY_URL='https://external.invalid/never-send'
+$env:FABRIC_ORACLE_HOST_PORT='23051'
 $restore=@{}
 Set-CandidateEnvironment $candidate $secrets -Restore $restore
 Assert ($env:FABRIC_CHANNEL_NAME -eq $candidate.Channel) 'Inherited main channel was retained.'
 Assert ($null -eq $env:ORACLE_ID -and $null -eq $env:ORACLE_MODEL_HASH) 'Role-specific profile inherited the wrong Oracle settings.'
 Assert ($env:EMAIL_GATEWAY_URL.Trim() -eq '') 'External email provider leaked into local profile.'
+Assert ($env:FABRIC_ORACLE_PEER_ENDPOINT -eq 'localhost:23051') 'Oracle Gateway ignored a configured alternate port.'
 Assert ($env:WORKFLOW_OPERATION_ROOT -eq (Join-Path $candidate.Root 'data/workflow-operations-alignment-20261108')) 'Journal root changed.'
 Assert ($env:AUTH_SECRET -eq $secrets.AUTH_SECRET -and $env:OTP_SECRET -eq $secrets.OTP_SECRET) 'Existing custody secrets changed.'
 Assert ($env:EVENT_WORKER_SECRET.Length -eq 64 -and $env:BANKING_WORKER_SECRET.Length -eq 64) 'Worker credentials not initialized.'
 Restore-CandidateEnvironment $restore
 Assert ($env:FABRIC_CHANNEL_NAME -eq 'insurance-channel' -and $env:ORACLE_ID -eq 'oracle3') 'Candidate configuration leaked into its caller.'
 Assert ($env:EMAIL_GATEWAY_URL -eq 'https://external.invalid/never-send') 'Caller delivery settings were changed.'
+Assert ($env:FABRIC_ORACLE_HOST_PORT -eq '23051') 'Oracle host port was changed by candidate setup.'
 'PASSED: candidate boundaries, stale PID denial, missing/invalid secret recovery, preserved roots and external delivery isolation.'

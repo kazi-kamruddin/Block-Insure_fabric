@@ -47,11 +47,15 @@ function Get-CandidateSecrets {
 function Set-CandidateEnvironment {
     param([Parameter(Mandatory)]$Candidate, [Parameter(Mandatory)]$Secrets, [hashtable]$Restore=@{})
     $profileKeys=@('ORACLE_ID','ORACLE_LABEL','ORACLE_HEALTH_PORT','ORACLE_REGISTRY_PATH','ORACLE_MODEL_VERSION','ORACLE_MODEL_HASH','FABRIC_EVENT_START_BLOCK')
+    $oracleHostPort = if ($env:FABRIC_ORACLE_HOST_PORT) { $env:FABRIC_ORACLE_HOST_PORT } else { '13051' }
+    if ($oracleHostPort -notmatch '^\d{1,5}$' -or [int]$oracleHostPort -lt 1024 -or [int]$oracleHostPort -gt 65535) {
+        throw 'FABRIC_ORACLE_HOST_PORT must be a port between 1024 and 65535.'
+    }
     $values = @{
         FABRIC_CHANNEL_NAME=$Candidate.Channel; FABRIC_CHAINCODE_NAME=$Candidate.Chaincode
         FABRIC_EXPECTED_SCHEMA_VERSION=[string]$Candidate.Schema
         FABRIC_NETWORK_ROOT=(Join-Path $Candidate.Root 'network'); FABRIC_XGBOOST_ENABLED='true'
-        FABRIC_ORACLE_PEER_ENDPOINT='localhost:13051'; FABRIC_ORACLE_PEER_HOST_ALIAS='peer0.oracle.blockinsure.test'
+        FABRIC_ORACLE_PEER_ENDPOINT="localhost:$oracleHostPort"; FABRIC_ORACLE_PEER_HOST_ALIAS='peer0.oracle.blockinsure.test'
         FABRIC_CHAINCODE_BUILDER=$Candidate.Builder
         ORACLE_STATE_ROOT=(Join-Path $Candidate.Root 'data/oracle-alignment-20261108')
         EVIDENCE_STORAGE_ROOT=(Join-Path $Candidate.Root 'data/evidence-alignment-20261108')

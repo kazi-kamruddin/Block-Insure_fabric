@@ -123,7 +123,7 @@ function Start-Candidate {
             & "$PSScriptRoot/low-memory-network.ps1" Start -CoreOnly -ChaincodeVersion $candidate.Version -EvidencePath (Join-Path $candidate.StateRoot 'startup.jsonl')
         }
         Save-NetworkOwnership $initial
-        $verify=Invoke-FabricDocker -Arguments @('run','--rm','--memory=96m','--cpus=0.5','-e','GOMEMLIMIT=64MiB','-e','GOMAXPROCS=1',
+        $verify=Invoke-FabricDocker -Arguments @('run','--rm','--memory=96m','--cpus=0.5','-e','GOMEMLIMIT=64MiB','-e','GOMAXPROCS=1','-e','FABRIC_ORACLE_HOST_PORT',
             '--mount',"type=bind,source=$($candidate.Root)/network/organizations,target=/organizations,readonly",
             '--mount',"type=bind,source=$($candidate.Root)/network/scripts/verify-candidate.sh,target=/verify.sh,readonly",
             'hyperledger/fabric-tools:2.5.16','sh','/verify.sh','--warm') -TimeoutSeconds 120
