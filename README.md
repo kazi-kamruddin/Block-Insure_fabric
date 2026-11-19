@@ -1,5 +1,9 @@
 # Block-Insure Fabric
 
+[![Fabric CI](https://github.com/kazi-kamruddin/Block-Insure_fabric/actions/workflows/quality.yml/badge.svg?branch=main&event=push)](https://github.com/kazi-kamruddin/Block-Insure_fabric/actions/workflows/quality.yml)
+
+**[Verified medical demo](docs/results/medical-final-acceptance-2026-11-19.md)** — live isolated Fabric rehearsal covering medical intake, OCR, appeal, and Bank payout.
+
 Block-Insure Fabric is the permissioned Hyperledger Fabric evolution of the
 Block-Insure insurance platform. It retains the insurance workflows from
 the Ethereum prototype—policies, claims, clinical cross-checking, auditor
@@ -30,9 +34,6 @@ decryption, browser-local OCR, same-panel appeal and one Bank payout.
 The follow-up verified deadline recovery and committed PDF and JPEG OCR
 receipts. The [synthetic challenger comparison](docs/fabric-ml-challengers.md)
 records the two offline alternatives at the same review workload.
-The [final medical acceptance record](docs/results/medical-final-acceptance-2026-11-19.md)
-tracks Bank commit recovery, private patient matching, separate insurer
-investigation outcomes and live challenger shadow scoring.
 The [final medical acceptance record](docs/results/medical-final-acceptance-2026-11-19.md)
 tracks Bank commit recovery, private patient matching, separate insurer
 investigation outcomes and live challenger shadow scoring.
