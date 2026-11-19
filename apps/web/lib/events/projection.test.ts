@@ -2,6 +2,19 @@ import { describe, expect, it } from "vitest";
 import { applyFabricEvent, emptyEventProjection, notificationsFor } from "./projection";
 
 describe("Fabric event projection", () => {
+  it("records queued-installment reconciliation without sending another payment receipt", () => {
+    const paid = applyFabricEvent(emptyEventProjection(), {
+      id: "1:otp:PremiumPaymentRecorded", blockNumber: "1", transactionId: "otp", eventName: "PremiumPaymentRecorded",
+      payload: { id: "payment-1", transferId: "transfer-1", policyId: "policy-1", method: "OTP", amountMinor: 10000 },
+    }, "2026-11-09T00:00:00Z");
+    const event = { id: "2:reconcile:PremiumCollectionReconciled", blockNumber: "2", transactionId: "reconcile", eventName: "PremiumCollectionReconciled",
+      payload: { id: "collection-1", policyId: "policy-1", paymentId: "payment-1", transferId: "transfer-1", amountMinor: 10000, status: "COMPLETED", attemptCount: 0 } };
+    const reconciled = applyFabricEvent(paid, event, "2026-11-09T00:01:00Z");
+    expect(reconciled.communications).toEqual(paid.communications);
+    expect(reconciled.communications[0].variables.method).toBe("OTP");
+    expect(notificationsFor(reconciled, "bankOfficer")).toEqual([expect.objectContaining({ assetId: "collection-1" })]);
+    expect(applyFabricEvent(reconciled, event, "2026-11-09T00:02:00Z")).toEqual(reconciled);
+  });
   it("keeps subjectless policyholder notices scoped to owned assets", () => {
     const projection = applyFabricEvent(emptyEventProjection(), {
       id: "9:tx-private:ClaimHospitalVerified", blockNumber: "9", transactionId: "tx-private", eventName: "ClaimHospitalVerified",

@@ -6,6 +6,8 @@ import path from "node:path";
 import { ledger } from "@/lib/fabric/ledger";
 import type { HospitalInvoice } from "@/lib/fabric/types";
 import { persistJsonFile } from "@/lib/events/state-file";
+import { loadFabricConfig } from "@/lib/fabric/config";
+import { medicalCandidateChannel } from "@/lib/workflows/commands";
 
 const protocolVersion = "block-insure-oracle-v1";
 const rulesVersion = "hospital-invoice-rules-v2";
@@ -103,7 +105,14 @@ function recordsFromInvoices(invoices: HospitalInvoice[]) {
 }
 
 async function publishHospitalRegistrySnapshot() {
-  const [invoices, published] = await Promise.all([ledger.listHospitalInvoices(), ledger.listOracleRegistrySnapshots()]);
+  const medical = loadFabricConfig().channelName === medicalCandidateChannel;
+  if (medical && process.env.FABRIC_XGBOOST_ENABLED !== "true") throw new Error("Medical snapshots require the frozen evaluator and private Oracle access");
+  const [legacyInvoices, medicalSources, published] = await Promise.all([
+    medical ? Promise.resolve([]) : ledger.listHospitalInvoices(),
+    medical ? ledger.listMedicalOracleSources() : Promise.resolve([]),
+    ledger.listOracleRegistrySnapshots(),
+  ]);
+  const invoices = medical ? medicalSources.map(source => source.invoice).filter(invoice => invoice.status === "FINALIZED") : legacyInvoices;
   const records = recordsFromInvoices(invoices);
   if (records.length === 0) return null;
   const latest = published.filter((item) => /^registry-hospital-v[1-9][0-9]*$/.test(item.id))
@@ -115,11 +124,14 @@ async function publishHospitalRegistrySnapshot() {
   if (process.env.FABRIC_XGBOOST_ENABLED === "true") {
     if ((process.env.ORACLE_REGISTRY_API_TOKEN ?? "").length < 32) throw new Error("Private model context requires a configured Oracle registry token");
     const modelRecords: unknown[] = [];
-    const incompleteInvoiceIds: string[] = [];
+    const incompleteInvoiceIds = medicalSources.filter(source => !source.complete).map(source => source.invoice.id).sort();
+    const medicalFacts = new Map(medicalSources.filter(source => source.complete).map(source => [source.invoice.id, source]));
     for (const invoice of [...invoices].sort((a, b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0)) {
       try {
-        const facts = await ledger.readHospitalModelFacts(invoice.id);
-        modelRecords.push({ ...facts, invoiceHash: invoice.invoiceReferenceHash.toLowerCase(),
+        const source = medicalFacts.get(invoice.id);
+        if (medical && !source) continue;
+        const facts = source?.facts ?? await ledger.readHospitalModelFacts(invoice.id);
+        modelRecords.push({ ...facts, ...(source ? { benchmarkHash: source.benchmarkHash } : {}), invoiceHash: invoice.invoiceReferenceHash.toLowerCase(),
           hospitalMsp: "HospitalMSP", hospitalId: invoice.hospitalId, patientIssuerMsp: "InsurerMSP",
           patientReferenceHash: invoice.patientReferenceHash.toLowerCase(), treatmentHash: invoice.treatmentHash.toLowerCase(),
           amountMinor: invoice.amountMinor, admissionDate: invoice.admissionDate, dischargeDate: invoice.dischargeDate,

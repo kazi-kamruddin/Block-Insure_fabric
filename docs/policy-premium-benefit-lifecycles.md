@@ -119,6 +119,15 @@ bank adapter and reconciliation evidence.
 
 ## Verification
 
+An EFT collection queued before an OTP payment can reconcile that same paid
+installment. Bank authorization still applies. Reconciliation requires exactly
+one payment matching policy, due date, end date, amount and destination, backed
+by a consistent SETTLED transfer. It retains the original financial identifiers,
+marks the collection COMPLETED, and adds neither a debit nor an attempt.
+Missing, inconsistent or ambiguous linkage fails closed. The distinct
+PremiumCollectionReconciled event creates an operations notice, without another
+payment receipt. It does not authorize collecting a different period.
+
 The Go suite covers authorization, invalid allocation totals, balanced manual
 and EFT transfers, insufficient-funds bounce, payment replay, reversal limits,
 policy grace/lapse/reinstatement, mandate/collection state, and

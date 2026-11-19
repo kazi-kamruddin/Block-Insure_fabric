@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { EndorseError, CommitError } from "@hyperledger/fabric-gateway";
 vi.mock("@/lib/auth/current-session", () => ({ currentSession: vi.fn(async () => ({ role: "policyholder", subjectId: "holder1" })) }));
 vi.mock("@/lib/security/request-origin", () => ({ checkMutationOrigin: () => ({ trusted: true }) }));
 vi.mock("@/lib/fabric/ledger", () => ({ ledger: { addEvidenceReference: vi.fn(), readEvidenceReference: vi.fn(), readClaim: vi.fn() } }));
@@ -32,6 +33,23 @@ describe("evidence commit uncertainty", () => {
     vi.mocked(ledger.addEvidenceReference).mockRejectedValue(new Error("commit status unavailable"));
     const response = await POST(request());
     expect(response.status).toBe(202);
+    expect(removeCiphertext).not.toHaveBeenCalled();
+  });
+  it("reports a definite pre-submit endorsement rejection instead of indefinite pending", async () => {
+    vi.mocked(ledger.readEvidenceReference).mockRejectedValue(new Error("does not exist"));
+    vi.mocked(ledger.addEvidenceReference).mockRejectedValue(new EndorseError({ code: 10, transactionId: "synthetic-rejected-tx", cause: new Error("rejected") as never,
+      details: [{ address: "synthetic-peer", mspId: "InsurerMSP", message: "only APPEAL_DOCUMENT evidence may be added after rejection" }] }));
+    const response = await POST(request());
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ status: "REJECTED", transactionId: "synthetic-rejected-tx", message: expect.stringContaining("APPEAL_DOCUMENT") });
+    expect(removeCiphertext).not.toHaveBeenCalled();
+  });
+  it("reports authoritative INVALID/MVCC without treating its endorsed reference as success", async () => {
+    vi.mocked(ledger.readEvidenceReference).mockRejectedValue(new Error("does not exist"));
+    vi.mocked(ledger.addEvidenceReference).mockRejectedValue(new CommitError({ code: 11, transactionId: "synthetic-invalid-tx" }));
+    const response = await POST(request());
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ status: "INVALID", transactionId: "synthetic-invalid-tx", validationCode: 11 });
     expect(removeCiphertext).not.toHaveBeenCalled();
   });
   it("rejects another owner before writing ciphertext or invoking a transaction", async () => {

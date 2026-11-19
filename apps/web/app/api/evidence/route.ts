@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { EndorseError, CommitError } from "@hyperledger/fabric-gateway";
 import { ledgerIdSchema } from "@/lib/fabric/validation";
 import { currentSession } from "@/lib/auth/current-session";
 import {
@@ -91,9 +92,20 @@ export async function POST(request: Request) {
       expectedClaimVersion: claim.version,
       });
       return NextResponse.json({ result: ledgerReference, ciphertextHash: storage.ciphertextHash });
-    } catch {
+    } catch (error) {
       const committed = await recoverReference().catch(() => null);
       if (committed) return NextResponse.json({ result: committed, ciphertextHash: storage.ciphertextHash, recovered: true });
+      // SDK phase-specific errors establish rejection/invalidity. A failed
+      // endorsement never reached Submit; an unknown submit/status still may.
+      if (error instanceof EndorseError) {
+        const reason = error.details.map(detail => detail.message).find(Boolean)?.slice(0, 500) ?? "Endorsement unavailable";
+        return NextResponse.json({ status: "REJECTED", evidenceId, ciphertextHash: storage.ciphertextHash, transactionId: error.transactionId,
+          message: `Evidence registration rejected before submission: ${reason}. Ciphertext retained; review the instruction before retrying.` }, { status: 409 });
+      }
+      if (error instanceof CommitError) {
+        return NextResponse.json({ status: "INVALID", evidenceId, ciphertextHash: storage.ciphertextHash, transactionId: error.transactionId, validationCode: error.code,
+          message: `Evidence transaction committed INVALID (${error.code}). Ciphertext retained; review current claim state before retrying.` }, { status: 409 });
+      }
       return NextResponse.json({ status: "PENDING_RECONCILIATION", evidenceId, ciphertextHash: storage.ciphertextHash,
         message: "Ciphertext retained. Ledger linkage is unresolved; retry these exact bytes and identifiers to recover, without uploading replacement evidence." }, { status: 202 });
     }

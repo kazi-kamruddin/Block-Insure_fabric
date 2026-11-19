@@ -17,6 +17,7 @@ import (
 
 type memoryStub struct {
 	shim.ChaincodeStubInterface
+	channelID    string
 	state        map[string][]byte
 	privateState map[string]map[string][]byte
 	transient    map[string][]byte
@@ -24,6 +25,8 @@ type memoryStub struct {
 	eventValue   []byte
 	timestamp    *timestamppb.Timestamp
 }
+
+func (s *memoryStub) GetChannelID() string { return s.channelID }
 
 type memoryStateIterator struct {
 	entries []*queryresult.KV

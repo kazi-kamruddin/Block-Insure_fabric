@@ -32,6 +32,40 @@ export const operationsByRole = {
 } as const satisfies Record<FabricRole, readonly WorkflowOperation[]>;
 
 export const workflowFormDefinitions: Record<WorkflowOperation, WorkflowFormDefinition> = {
+  saveMedicalEpisode: { label: "Save patient intake", description: "Use the hospital's existing episode and patient references. For a correction, enter the revision shown after the previous save.", fields: [
+    { name: "episodeReference", label: "Hospital episode reference" }, { name: "expectedRevision", label: "Current revision (0 for a new episode)" },
+    { name: "patientReference", label: "Hospital patient reference" },
+    { name: "service", label: "Service performed", kind: "select", options: ["SURGERY", "CONSULTATION", "DIAGNOSTIC", "INPATIENT", "OTHER"] },
+    { name: "admissionDate", label: "Admission date", kind: "date" }, { name: "dischargeDate", label: "Discharge date", kind: "date" },
+    { name: "serviceDate", label: "Documented service date (if known)", kind: "date" }, { name: "billBdt", label: "Billed BDT", kind: "money" },
+    { name: "invoiceDate", label: "Billing date (if documented)", kind: "date" }, { name: "diagnosisCode", label: "Diagnosis code (if recorded)" },
+  ] },
+  configureMedicalRules: { label: "Configure reimbursement terms", description: "Set the rules for a draft package before publishing it. Days follow Asia/Dhaka; calculations round down to the minor unit.", fields: [
+    { name: "packageId", label: "Draft package ID" },
+    { name: "service", label: "Covered service", kind: "select", options: ["SURGERY", "CONSULTATION", "DIAGNOSTIC", "INPATIENT", "OTHER"] },
+    { name: "sublimit", label: "Service sublimit (BDT)", kind: "money" }, { name: "deductibleBps", label: "Deductible (basis points)" },
+    { name: "deductibleCap", label: "Deductible cap (BDT)", kind: "money" }, { name: "shareBps", label: "Insurer share (basis points)" },
+    { name: "waitingDays", label: "Waiting days" }, { name: "filingDays", label: "Filing days after service" },
+    { name: "evidenceRequired", label: "Always require uploaded evidence", kind: "select", options: ["No", "Yes"] },
+  ] },
+  acquireMedicalPolicy: { label: "Accept terms and acquire medical policy", description: "Review the published terms before accepting their digest. A premium payment activates coverage.", fields: [
+    { name: "id", label: "Policy ID" }, { name: "packageId", label: "Published package ID" },
+    { name: "startDate", label: "Coverage start", kind: "date" }, { name: "endDate", label: "Coverage end", kind: "date" },
+    { name: "acceptedTermsHash", label: "Accepted terms digest" },
+  ] },
+  verifyMedicalAssociation: { label: "Verify patient association", description: "Confirm or revoke the identity match using the verified source and this exact revision.", fields: [
+    { name: "episodeId", label: "Episode ID" }, { name: "revision", label: "Episode revision" }, { name: "beneficiaryId", label: "Covered patient subject" },
+    { name: "decisionBasis", label: "Decision basis reference" }, { name: "associationDecision", label: "Association", kind: "select", options: ["VERIFY", "REVOKE"] },
+  ] },
+  registerMedicalOracleBenchmark: { label: "Register Oracle benchmark facts", description: "Use a documented insurer reference for expected charges and recorded provider status. Hospital intake does not supply these values.", fields: [
+    { name: "hospitalId", label: "Hospital subject" }, { name: "service", label: "Service", kind: "select", options: ["SURGERY", "CONSULTATION", "DIAGNOSTIC", "INPATIENT", "OTHER"] },
+    { name: "minimum", label: "Expected minimum BDT", kind: "money" }, { name: "maximum", label: "Expected maximum BDT", kind: "money" },
+    { name: "licenseStatus", label: "Recorded license status", kind: "select", options: ["ACTIVE", "SUSPENDED", "BLACKLISTED"] },
+    { name: "sourceReference", label: "Benchmark source reference" },
+  ] },
+  prepareMedicalClaim: { label: "Prepare medical claim", description: "Save a receipt for the selected episode version.", fields: [] },
+  submitMedicalClaim: { label: "Submit medical claim", description: "Accept the current reimbursement statement.", fields: [] },
+  acceptMedicalCorrection: { label: "Accept medical correction", description: "Review the corrected statement.", fields: [] },
   recordHospitalModelFacts: { label: "Record model source facts", description: "Immutable private source facts for the synthetic thesis model. Use explicit categories and expected ranges; source attestations do not establish medical truth.", fields: [
     { name: "invoiceId", label: "Finalized invoice ID" }, { name: "treatmentType", label: "Treatment category" },
     { name: "diagnosisCode", label: "Diagnosis code (empty if unknown)" }, { name: "invoiceDate", label: "Invoice date", kind: "date" },
@@ -459,6 +493,14 @@ export function createWorkflowFormValues(
 ): WorkflowFormValues {
   const today = dateOffset(0);
   const defaults: Record<WorkflowOperation, WorkflowFormValues> = {
+    saveMedicalEpisode: { episodeReference: "", expectedRevision: "0", patientReference: "", service: "SURGERY", admissionDate: today, dischargeDate: today, serviceDate: "", invoiceDate: "", diagnosisCode: "", billBdt: "" },
+    configureMedicalRules: { packageId: "", service: "SURGERY", sublimit: "", deductibleBps: "1000", deductibleCap: "", shareBps: "8000", waitingDays: "0", filingDays: "30", evidenceRequired: "No" },
+    acquireMedicalPolicy: { id: generatedId("policy", idFactory), packageId: "", startDate: today, endDate: dateOffset(1), acceptedTermsHash: "" },
+    verifyMedicalAssociation: { episodeId: "", revision: "", beneficiaryId: "", decisionBasis: "", associationDecision: "VERIFY" },
+    registerMedicalOracleBenchmark: { hospitalId: "", service: "SURGERY", minimum: "", maximum: "", licenseStatus: "ACTIVE", sourceReference: "" },
+    prepareMedicalClaim: {},
+    submitMedicalClaim: {},
+    acceptMedicalCorrection: {},
     recordHospitalModelFacts: { invoiceId: "", treatmentType: "", diagnosisCode: "", invoiceDate: today, expectedMinBdt: "", expectedMaxBdt: "", licenseStatus: "ACTIVE" },
     createPartnerAgreement: { id: generatedId("agreement", idFactory), partnerType: "HOSPITAL", partnerId: "", name: "", location: "", tier: "Preferred", accessScope: "Read-only invoice verification fields", effectiveDate: today, expiryDate: dateOffset(3) },
     setPartnerAgreementStatus: { id: "", status: "ACTIVE" },
@@ -580,6 +622,30 @@ export async function buildWorkflowCommand(
   let command: unknown;
 
   switch (operation) {
+    case "saveMedicalEpisode":
+      command = { operation, episodeReferenceHash: await digest("episodeReference", "Hospital episode reference"),
+        expectedRevision: Number(required(values, "expectedRevision", "Revision")), patientReferenceHash: await digest("patientReference", "Hospital patient reference"),
+        service: values.service, admissionDate: values.admissionDate, dischargeDate: values.dischargeDate, serviceDate: values.serviceDate ?? "",
+        billMinor: bdtToMinor(required(values, "billBdt", "Bill")), invoiceDate: values.invoiceDate ?? "", diagnosisCode: values.diagnosisCode ?? "" };
+      break;
+    case "configureMedicalRules":
+      command = { operation, packageId: values.packageId, service: values.service, sublimit: bdtToMinor(required(values, "sublimit", "Sublimit")),
+        deductibleBps: Number(required(values, "deductibleBps", "Deductible")), deductibleCap: values.deductibleCap === "0" ? 0 : bdtToMinor(required(values, "deductibleCap", "Deductible cap")),
+        shareBps: Number(required(values, "shareBps", "Insurer share")), waitingDays: Number(required(values, "waitingDays", "Waiting days")),
+        filingDays: Number(required(values, "filingDays", "Filing days")), evidenceRequired: values.evidenceRequired === "Yes" };
+      break;
+    case "acquireMedicalPolicy":
+      command = { operation, id: values.id, packageId: values.packageId, startDate: values.startDate, endDate: values.endDate, acceptedTermsHash: values.acceptedTermsHash };
+      break;
+    case "verifyMedicalAssociation":
+      command = { operation, episodeId: values.episodeId, revision: Number(values.revision), beneficiaryId: values.beneficiaryId,
+        decisionBasisHash: await digest("decisionBasis", "Decision basis reference"), verified: values.associationDecision === "VERIFY" };
+      break;
+    case "registerMedicalOracleBenchmark":
+      command = { operation, hospitalId: values.hospitalId, service: values.service, minimum: values.minimum === "0" ? 0 : bdtToMinor(required(values, "minimum", "Expected minimum")),
+        maximum: bdtToMinor(required(values, "maximum", "Expected maximum")), licenseStatus: values.licenseStatus,
+        sourceHash: await digest("sourceReference", "Benchmark source reference") };
+      break;
     case "createPartnerAgreement":
       command = {
         operation, id: required(values, "id", "Agreement ID"), partnerType: required(values, "partnerType", "Partner type"),

@@ -28,8 +28,51 @@ memory-floor and resource-selection regressions without Docker or ledger writes.
 
 For the November candidate deployed only to its isolated alignment channel, use the
 [candidate contract and isolated verification guide](frozen-xgboost-alignment.md).
-The wrapper below deliberately selects the older preserved workflow deployment;
-it does not activate the new evaluator or new transaction methods.
+The maintained wrapper now defaults to this November candidate. Use
+`-Profile Historical` for the preserved October deployment described later.
+The [candidate demonstration guide](candidate-demonstration.md) is the current
+Start/Status/Stop and browser rehearsal entry point.
+
+For a practical isolated November rehearsal, retain the existing
+`insurance-workflow-alignment-20261108` ledger and use candidate
+`1.6.3-xgb-alignment`, sequence4, package SHA256
+`bc2a30f5b434c73649f765a31232892941ced4f617c7f5518cf399af8457c44a`.
+Build/select the patched compiler with the commands in
+[the recovery/security guide](workflow-recovery-and-security.md) before starting
+the isolated peers. Keep application/package/schema aligned; the candidate build
+is not a replacement for a preserved channel's matching historical application.
+Inspect current processes/ports before guarded startup and preserve its separate
+Oracle, ciphertext, event and OTP state roots. Restore the same server/worker
+registry token and OTP/session secrets; do not print or regenerate them to bypass
+recovery. Use the candidate environment contract in the linked guide, then wait
+for web, ledger and all three Oracle health endpoints. Never recreate or reseed
+this used channel. Check exact peer packages and current source, not labels alone.
+
+Demonstrate ordinary Hospital source entry, immutable private model facts,
+policyholder encrypted invoice submission, insurer processing, exact2-of-3
+Oracle outcome, four-person review where required, and separate Insurer
+authorization/Bank confirmation. Show the reviewer decrypting with the owner
+offline, appeal document/version isolation, a coordinated installment, and its
+statement. The dated [Stage B record](results/alignment-stage-b-2026-11-09.md)
+identifies verified synthetic cases and preserved original failures. To repeat
+the maintained API scenarios, run the alignment Playwright config against this
+already-running isolated stack, selecting `@alignment-stage-b`,
+`@alignment-payments`, `@alignment-model-only` or `@alignment-context` as needed.
+Use a single worker and unique fixture IDs; fault-injection tests require their
+documented owned-worker controls. A local HTTP email receiver verifies the
+delivery contract, not real inbox receipt. Stop only resources started for the
+rehearsal, retaining all state. Preserved demonstration activation remains a
+separate owner decision.
+
+The 10 November [recovery/security result](results/recovery-security-2026-11-10.md) adds actual lost-response and server
+restart tests, final Go dependency/binary verification and strict provider
+acknowledgement handling. Demonstrate **Check saved action** using the original
+saved command after a response is lost. A pending status does not authorize a new
+instruction; a valid transaction can still record an insufficient-funds business
+failure. Use `@alignment-recovery` only with the exact isolated channel and
+explicit `ALLOW_ISOLATED_APP_RESTART=true`, since that scenario restarts owned
+application processes. Its local PID-control helpers are documented in the
+handoff, not permission to stop another application's processes.
 
 This runbook demonstrates the permissioned insurance journey using the local
 InsurerMSP, HospitalMSP, AuditorMSP, BankMSP, and OracleMSP business network plus
@@ -38,11 +81,11 @@ WSL2, Docker Desktop, Fabric, Go, and Node prerequisites are already available.
 
 ## Current workflow rehearsal (6 October 2026)
 
-From the repository root, use `./scripts/workflow-demo.ps1 Start` and open
+From the repository root, use `./scripts/workflow-demo.ps1 Start -Profile Historical` and open
 `http://localhost:3000/workspace`. The wrapper selects the isolated
 `insurance-workflow-20261005` channel and keeps the low-memory runtime. Check
-it with `./scripts/workflow-demo.ps1 Status`; stop the managed application with
-`./scripts/workflow-demo.ps1 Stop`. The earlier 1.4.1 hardening instructions
+it with `./scripts/workflow-demo.ps1 Status -Profile Historical`; stop the managed application with
+`./scripts/workflow-demo.ps1 Stop -Profile Historical`. The earlier 1.4.1 hardening instructions
 below document the previous research rehearsal.
 
 `Start` is safe to rerun: it keeps an already healthy workflow running, or

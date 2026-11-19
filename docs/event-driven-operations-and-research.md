@@ -82,6 +82,19 @@ causal, or real-world fraud validation.
 
 ## Verification
 
+Bank communication delivery sends a stable Idempotency-Key qualified by channel,
+chaincode, event identity and recipient. The HTTP provider must honor this key
+across retries; a successful send followed by a lost response remains FAILED
+locally until reconciliation. This is not an unconditional exactly-once email
+guarantee. Missing recipient mappings remain visibly FAILED. A generic
+POLICYHOLDER_TRANSACTION_EMAIL fallback requires an exact matching
+POLICYHOLDER_TRANSACTION_SUBJECT; it cannot receive another owner's receipt.
+OTP delivery failures revoke the challenge and remain visible to the requester.
+HTTP success also requires a valid nonempty messageId acknowledgement; malformed
+JSON, an empty acknowledgement and the bounded timeout remain unresolved failures.
+DELIVERED denotes gateway acknowledgement, not verified inbox receipt. See the
+[recovery/security contract](workflow-recovery-and-security.md) for current tests.
+
 Go tests cover grant ownership, invalid grantees, use limits, revocation, and
 auditor assignment. TypeScript tests cover event replay deduplication, targeted
 notifications, stable standalone checkpoint discovery, grant-state aggregation,

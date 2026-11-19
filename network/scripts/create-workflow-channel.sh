@@ -8,7 +8,12 @@ organizations="${network_root}/organizations"
 artifacts="${network_root}/channel-artifacts"
 channel_name="${CHANNEL_NAME:-insurance-workflow-20261005}"
 chaincode_version="${CHAINCODE_VERSION:-1.5.1-workflow}"
-if [[ ! "${channel_name}" =~ ^insurance-workflow-[a-z0-9-]+$ ]]; then
+if [[ "${channel_name}" == "insurance-medical-reimbursement" ]]; then
+  if [[ ! "${chaincode_version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+-medical(-[a-z0-9]+)?$ ]]; then
+    echo "Select a distinct medical chaincode package version for the medical channel." >&2
+    exit 2
+  fi
+elif [[ ! "${channel_name}" =~ ^insurance-workflow-[a-z0-9-]+$ ]]; then
   echo "Workflow channel names must start with insurance-workflow- and contain lowercase letters, digits, or hyphens." >&2
   exit 2
 fi
@@ -53,5 +58,7 @@ for entry in "insurer InsurerMSP 7051" "hospital HospitalMSP 8051" "auditor Audi
 done
 
 CHANNEL_NAME="${channel_name}" CHAINCODE_VERSION="${chaincode_version}" bash "${script_dir}/deploy-chaincode.sh"
-CHANNEL_NAME="${channel_name}" bash "${script_dir}/seed-showcase.sh"
+if [[ "${channel_name}" != "insurance-medical-reimbursement" ]]; then
+  CHANNEL_NAME="${channel_name}" bash "${script_dir}/seed-showcase.sh"
+fi
 echo "Workflow demonstration channel is ready: ${channel_name}. Preserved insurance-channel was not modified."

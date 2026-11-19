@@ -94,6 +94,10 @@ function notificationTargets(event: IndexedFabricEvent) {
       { role: "policyholder", subject: text(p, "ownerId"), title: `EFT mandate ${text(p, "status").toLowerCase()}`, asset: text(p, "id") },
     ];
     case "PremiumCollectionProcessed": return [{ role: "insurerAdmin", subject: "", title: `Premium collection ${text(p, "status").toLowerCase()}`, asset: text(p, "id") }];
+    case "PremiumCollectionReconciled": return [
+      { role: "insurerAdmin", subject: "", title: "Queued premium was already collected", asset: text(p, "id") },
+      { role: "bankOfficer", subject: "", title: "Queued premium was already collected", asset: text(p, "id") },
+    ];
     case "BenefitRequested": return [{ role: "insurerAdmin", subject: "", title: "Benefit request submitted", asset: text(p, "id") }];
     case "BenefitPaymentReady": return [{ role: "bankOfficer", subject: "", title: "Benefit payment ready", asset: text(p, "id") }];
     case "BenefitPaymentConfirmed": return [

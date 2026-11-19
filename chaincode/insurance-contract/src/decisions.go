@@ -20,6 +20,19 @@ func (c *Contract) AuthorizeSettlement(ctx contractapi.TransactionContextInterfa
 	if claim.Status != "APPROVED" {
 		return nil, fmt.Errorf("claim %s must be APPROVED to authorize settlement", claimID)
 	}
+	if claim.EpisodeID != "" {
+		if _, err := currentMedicalHead(ctx, claim); err != nil {
+			return nil, err
+		}
+		policy, err := c.ReadPolicy(ctx, claim.PolicyID)
+		if err != nil {
+			return nil, err
+		}
+		if err := c.requirePaidMedicalPeriod(ctx, policy, claim.IncidentDate); err != nil {
+			return nil, err
+		}
+		claim.MedicalSettlementID = settlementID
+	}
 	if _, _, err := c.validateSettlementAccounts(ctx, claim, sourceAccountID, destinationAccountID); err != nil {
 		return nil, err
 	}
@@ -102,6 +115,21 @@ func (c *Contract) ConfirmSettlement(ctx contractapi.TransactionContextInterface
 	claim, err := c.ReadClaim(ctx, settlement.ClaimID)
 	if err != nil {
 		return nil, err
+	}
+	if claim.EpisodeID != "" {
+		if claim.MedicalSettlementID != settlement.ID || claim.Status != "SETTLEMENT_AUTHORIZED" || claim.AmountMinor != settlement.AmountMinor {
+			return nil, fmt.Errorf("settlement belongs to a superseded medical claim version")
+		}
+		if _, err := currentMedicalHead(ctx, claim); err != nil {
+			return nil, err
+		}
+		policy, err := c.ReadPolicy(ctx, claim.PolicyID)
+		if err != nil {
+			return nil, err
+		}
+		if err := c.requirePaidMedicalPeriod(ctx, policy, claim.IncidentDate); err != nil {
+			return nil, err
+		}
 	}
 	now, err := timestamp(ctx)
 	if err != nil {

@@ -21,6 +21,9 @@ type HospitalModelFacts struct {
 }
 
 func (c *Contract) RecordHospitalModelFacts(ctx contractapi.TransactionContextInterface, invoiceID string) (*HospitalModelFacts, error) {
+	if isMedicalCandidate(ctx) {
+		return nil, fmt.Errorf("hospital staff may only save factual episode intake")
+	}
 	if _, err := requireIdentity(ctx, "HospitalMSP", "hospitalOfficer"); err != nil {
 		return nil, err
 	}

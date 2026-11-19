@@ -37,23 +37,25 @@ type HospitalInvoice struct {
 }
 
 type PolicyPackage struct {
-	AssetType          string   `json:"assetType"`
-	SchemaVersion      int      `json:"schemaVersion"`
-	ID                 string   `json:"id"`
-	Version            int      `json:"version"`
-	Name               string   `json:"name"`
-	Description        string   `json:"description"`
-	PremiumMinor       int64    `json:"premiumMinor"`
-	CoverageLimitMinor int64    `json:"coverageLimitMinor"`
-	TermsHash          string   `json:"termsHash"`
-	HospitalIDs        []string `json:"hospitalIds"`
-	BankIDs            []string `json:"bankIds"`
-	Status             string   `json:"status"`
-	CreatedAt          string   `json:"createdAt"`
-	UpdatedAt          string   `json:"updatedAt"`
+	MedicalRulesVersion int      `json:"medicalRulesVersion"`
+	AssetType           string   `json:"assetType"`
+	SchemaVersion       int      `json:"schemaVersion"`
+	ID                  string   `json:"id"`
+	Version             int      `json:"version"`
+	Name                string   `json:"name"`
+	Description         string   `json:"description"`
+	PremiumMinor        int64    `json:"premiumMinor"`
+	CoverageLimitMinor  int64    `json:"coverageLimitMinor"`
+	TermsHash           string   `json:"termsHash"`
+	HospitalIDs         []string `json:"hospitalIds"`
+	BankIDs             []string `json:"bankIds"`
+	Status              string   `json:"status"`
+	CreatedAt           string   `json:"createdAt"`
+	UpdatedAt           string   `json:"updatedAt"`
 }
 
 type Policy struct {
+	MedicalRulesVersion    int      `json:"medicalRulesVersion"`
 	AssetType              string   `json:"assetType"`
 	SchemaVersion          int      `json:"schemaVersion"`
 	ID                     string   `json:"id"`
@@ -273,31 +275,41 @@ type Liability struct {
 }
 
 type Claim struct {
-	AssetType              string   `json:"assetType"`
-	SchemaVersion          int      `json:"schemaVersion"`
-	ID                     string   `json:"id"`
-	PolicyID               string   `json:"policyId"`
-	ClaimantID             string   `json:"claimantId"`
-	HospitalID             string   `json:"hospitalId"`
-	HospitalInvoiceID      string   `json:"hospitalInvoiceId"`
-	AmountMinor            int64    `json:"amountMinor"`
-	IncidentDate           string   `json:"incidentDate"`
-	DescriptionHash        string   `json:"descriptionHash"`
-	EvidenceIDs            []string `json:"evidenceIds"`
-	HospitalVerificationID string   `json:"hospitalVerificationId"`
-	AuditorDecisionID      string   `json:"auditorDecisionId"`
-	CurrentReviewID        string   `json:"currentReviewId"`
-	CurrentAppealID        string   `json:"currentAppealId"`
-	CurrentOracleRequestID string   `json:"currentOracleRequestId"`
-	PrivacyPresentationID  string   `json:"privacyPresentationId"`
-	OracleOutcome          string   `json:"oracleOutcome"`
-	OracleResultHash       string   `json:"oracleResultHash"`
-	Version                int      `json:"version"`
-	ReviewRound            int      `json:"reviewRound"`
-	AppealCount            int      `json:"appealCount"`
-	Status                 string   `json:"status"`
-	CreatedAt              string   `json:"createdAt"`
-	UpdatedAt              string   `json:"updatedAt"`
+	MedicalClarificationID    string   `json:"medicalClarificationId"`
+	MedicalRecoveryUsed       bool     `json:"medicalRecoveryUsed"`
+	MedicalRevisionKind       string   `json:"medicalRevisionKind"`
+	MedicalSupplementHash     string   `json:"medicalSupplementHash"`
+	EpisodeID                 string   `json:"episodeId"`
+	EpisodeRevision           int      `json:"episodeRevision"`
+	MedicalEvidenceRequired   bool     `json:"medicalEvidenceRequired"`
+	MedicalSettlementID       string   `json:"medicalSettlementId"`
+	MedicalAssociationKey     string   `json:"medicalAssociationKey"`
+	MedicalAssociationVersion int      `json:"medicalAssociationVersion"`
+	AssetType                 string   `json:"assetType"`
+	SchemaVersion             int      `json:"schemaVersion"`
+	ID                        string   `json:"id"`
+	PolicyID                  string   `json:"policyId"`
+	ClaimantID                string   `json:"claimantId"`
+	HospitalID                string   `json:"hospitalId"`
+	HospitalInvoiceID         string   `json:"hospitalInvoiceId"`
+	AmountMinor               int64    `json:"amountMinor"`
+	IncidentDate              string   `json:"incidentDate"`
+	DescriptionHash           string   `json:"descriptionHash"`
+	EvidenceIDs               []string `json:"evidenceIds"`
+	HospitalVerificationID    string   `json:"hospitalVerificationId"`
+	AuditorDecisionID         string   `json:"auditorDecisionId"`
+	CurrentReviewID           string   `json:"currentReviewId"`
+	CurrentAppealID           string   `json:"currentAppealId"`
+	CurrentOracleRequestID    string   `json:"currentOracleRequestId"`
+	PrivacyPresentationID     string   `json:"privacyPresentationId"`
+	OracleOutcome             string   `json:"oracleOutcome"`
+	OracleResultHash          string   `json:"oracleResultHash"`
+	Version                   int      `json:"version"`
+	ReviewRound               int      `json:"reviewRound"`
+	AppealCount               int      `json:"appealCount"`
+	Status                    string   `json:"status"`
+	CreatedAt                 string   `json:"createdAt"`
+	UpdatedAt                 string   `json:"updatedAt"`
 }
 
 // PrivacyCredential is the public, Fabric-signed anchor for a credential whose
@@ -492,22 +504,23 @@ type EvidenceAccessRecord struct {
 }
 
 type EvidenceAccessGrant struct {
-	AssetType      string `json:"assetType"`
-	SchemaVersion  int    `json:"schemaVersion"`
-	ID             string `json:"id"`
-	EvidenceID     string `json:"evidenceId"`
-	ClaimID        string `json:"claimId"`
-	OwnerID        string `json:"ownerId"`
-	GranteeMSP     string `json:"granteeMsp"`
-	GranteeRole    string `json:"granteeRole"`
-	GranteeSubject string `json:"granteeSubject"`
-	Purpose        string `json:"purpose"`
-	ExpiresAt      string `json:"expiresAt"`
-	MaxAccesses    int    `json:"maxAccesses"`
-	AccessCount    int    `json:"accessCount"`
-	Status         string `json:"status"`
-	CreatedAt      string `json:"createdAt"`
-	RevokedAt      string `json:"revokedAt"`
+	MedicalReviewID string `json:"medicalReviewId"`
+	AssetType       string `json:"assetType"`
+	SchemaVersion   int    `json:"schemaVersion"`
+	ID              string `json:"id"`
+	EvidenceID      string `json:"evidenceId"`
+	ClaimID         string `json:"claimId"`
+	OwnerID         string `json:"ownerId"`
+	GranteeMSP      string `json:"granteeMsp"`
+	GranteeRole     string `json:"granteeRole"`
+	GranteeSubject  string `json:"granteeSubject"`
+	Purpose         string `json:"purpose"`
+	ExpiresAt       string `json:"expiresAt"`
+	MaxAccesses     int    `json:"maxAccesses"`
+	AccessCount     int    `json:"accessCount"`
+	Status          string `json:"status"`
+	CreatedAt       string `json:"createdAt"`
+	RevokedAt       string `json:"revokedAt"`
 }
 
 type EvidenceReference struct {
@@ -554,6 +567,7 @@ type EvidenceInclusionVerification struct {
 }
 
 type HospitalVerification struct {
+	MedicalRevisionKind   string `json:"medicalRevisionKind"`
 	AssetType             string `json:"assetType"`
 	SchemaVersion         int    `json:"schemaVersion"`
 	ID                    string `json:"id"`
@@ -568,6 +582,7 @@ type HospitalVerification struct {
 }
 
 type AuditorDecision struct {
+	ReasonCode      string `json:"reasonCode"`
 	AssetType       string `json:"assetType"`
 	SchemaVersion   int    `json:"schemaVersion"`
 	ID              string `json:"id"`
@@ -582,6 +597,8 @@ type AuditorDecision struct {
 }
 
 type ClaimReview struct {
+	MedicalVersion     int      `json:"medicalVersion"`
+	PrepareBy          string   `json:"prepareBy"`
 	AssetType          string   `json:"assetType"`
 	SchemaVersion      int      `json:"schemaVersion"`
 	ID                 string   `json:"id"`
@@ -602,6 +619,8 @@ type ClaimReview struct {
 }
 
 type ClaimAppeal struct {
+	MedicalPriorReviewID          string `json:"medicalPriorReviewId"`
+	DisputedDecisionID            string `json:"disputedDecisionId"`
 	AssetType                     string `json:"assetType"`
 	SchemaVersion                 int    `json:"schemaVersion"`
 	ID                            string `json:"id"`

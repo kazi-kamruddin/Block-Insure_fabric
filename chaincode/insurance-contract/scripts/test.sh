@@ -3,6 +3,7 @@ set -euo pipefail
 
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 contract_root="$(cd -- "${script_dir}/.." && pwd -P)"
+source "${contract_root}/../../network/scripts/chaincode-toolchain.sh"
 docker_command=""
 
 for attempt in {1..10}; do
@@ -30,7 +31,8 @@ fi
 
 "${docker_command}" volume create block-insure-go-cache >/dev/null
 "${docker_command}" run --rm \
+  --memory 512m --cpus 1 -e GOTOOLCHAIN=local -e GOMEMLIMIT=384MiB -e GOMAXPROCS=1 -e GOFLAGS=-p=1 \
   -v block-insure-go-cache:/go/pkg/mod \
-  -v "${mount_path}:/workspace" \
-  -w /workspace golang:1.25 \
+  -v "${mount_path}:/workspace:ro" \
+  -w /workspace "$chaincode_go_image" \
   bash -c 'test -z "$(/usr/local/go/bin/gofmt -l .)" && /usr/local/go/bin/go vet ./... && /usr/local/go/bin/go test ./...'

@@ -113,6 +113,9 @@ func (c *Contract) openReview(
 	approvalThreshold, rejectionThreshold int,
 	deadline string,
 ) (*ClaimReview, error) {
+	if claim.EpisodeID != "" {
+		return nil, fmt.Errorf("use the medical review preparation workflow")
+	}
 	assignments, err := parseAuditorAssignments(assignedAuditorIDsJSON)
 	if err != nil {
 		return nil, err
@@ -178,6 +181,9 @@ func (c *Contract) SubmitClaimAppeal(
 	proposedAmountMinor int64,
 	proposedIncidentDate, proposedDescriptionHash, proposedClinicalReferenceHash string,
 ) (*ClaimAppeal, error) {
+	if isMedicalCandidate(ctx) {
+		return nil, fmt.Errorf("medical appeal requires the versioned medical appeal workflow")
+	}
 	if _, err := requireIdentity(ctx, "InsurerMSP", "policyholder"); err != nil {
 		return nil, err
 	}
@@ -345,6 +351,25 @@ func containsAssignment(assignments []string, auditorID string) bool {
 }
 
 func (c *Contract) RecordAuditorDecision(ctx contractapi.TransactionContextInterface, reviewID, decisionID, outcome, reasonHash string) (*AuditorDecision, error) {
+	return c.recordAuditorDecision(ctx, reviewID, decisionID, outcome, reasonHash, "")
+}
+
+func (c *Contract) RecordMedicalAuditorDecision(ctx contractapi.TransactionContextInterface, reviewID, decisionID, outcome, reasonCode, reasonHash string) (*AuditorDecision, error) {
+	if err := validateHash("reasonHash", reasonHash); err != nil {
+		return nil, err
+	}
+	switch reasonCode {
+	case "TERMS_AND_EVIDENCE_SUPPORT", "EVIDENCE_DOES_NOT_SUPPORT_SERVICE", "INSUFFICIENT_REQUIRED_EVIDENCE", "EPISODE_FACTS_CONFLICT":
+	default:
+		return nil, fmt.Errorf("select a review reason")
+	}
+	if (outcome == "APPROVE") != (reasonCode == "TERMS_AND_EVIDENCE_SUPPORT") {
+		return nil, fmt.Errorf("review reason does not match the decision")
+	}
+	return c.recordAuditorDecision(ctx, reviewID, decisionID, outcome, canonicalProtocolHash("medical-reason-v1", reasonCode, reasonHash), reasonCode)
+}
+
+func (c *Contract) recordAuditorDecision(ctx contractapi.TransactionContextInterface, reviewID, decisionID, outcome, reasonHash, reasonCode string) (*AuditorDecision, error) {
 	auditorIdentity, err := requireIdentity(ctx, "AuditorMSP", "auditor")
 	if err != nil {
 		return nil, err
@@ -359,6 +384,20 @@ func (c *Contract) RecordAuditorDecision(ctx contractapi.TransactionContextInter
 	}
 	if review.Status != "OPEN" {
 		return nil, fmt.Errorf("review %s is already finalized", reviewID)
+	}
+	claim, err := c.ReadClaim(ctx, review.ClaimID)
+	if err != nil {
+		return nil, err
+	}
+	if review.MedicalVersion != 0 {
+		if reasonCode == "" || claim.Version != review.MedicalVersion || claim.CurrentReviewID != review.ID || claim.Status != "UNDER_REVIEW" {
+			return nil, fmt.Errorf("current reasoned medical vote required")
+		}
+		if _, err := currentMedicalHead(ctx, claim); err != nil {
+			return nil, err
+		}
+	} else if reasonCode != "" {
+		return nil, fmt.Errorf("medical vote requires a medical review")
 	}
 	if !containsAssignment(review.AssignedAuditorIDs, auditorID) {
 		return nil, fmt.Errorf("auditor %s is not assigned to review %s", auditorID, reviewID)
@@ -397,7 +436,7 @@ func (c *Contract) RecordAuditorDecision(ctx contractapi.TransactionContextInter
 		AssetType: "auditorDecision", SchemaVersion: SchemaVersion, ID: decisionID,
 		ClaimID: review.ClaimID, ReviewID: reviewID, ReviewRound: review.Round,
 		AuditorID: auditorID, AuditorIdentity: auditorIdentity, Outcome: outcome,
-		ReasonHash: strings.ToLower(reasonHash), CreatedAt: now,
+		ReasonHash: strings.ToLower(reasonHash), CreatedAt: now, ReasonCode: reasonCode,
 	}
 	if err := putState(ctx, "auditorDecision", decisionID, decision); err != nil {
 		return nil, err
@@ -412,10 +451,6 @@ func (c *Contract) RecordAuditorDecision(ctx contractapi.TransactionContextInter
 	}
 	review.VotesCast++
 
-	claim, err := c.ReadClaim(ctx, review.ClaimID)
-	if err != nil {
-		return nil, err
-	}
 	finalized := review.Approvals >= review.ApprovalThreshold || review.Rejections >= review.RejectionThreshold
 	if finalized {
 		approved := review.Approvals >= review.ApprovalThreshold
@@ -465,7 +500,8 @@ func (c *Contract) FinalizeExpiredReview(ctx contractapi.TransactionContextInter
 	if err != nil {
 		return nil, err
 	}
-	if review.Status != "OPEN" {
+	preparation := review.MedicalVersion != 0 && review.Status == "PREPARING"
+	if review.Status != "OPEN" && !preparation {
 		return nil, fmt.Errorf("review %s is already finalized", reviewID)
 	}
 	txTime, err := ctx.GetStub().GetTxTimestamp()
@@ -473,6 +509,9 @@ func (c *Contract) FinalizeExpiredReview(ctx contractapi.TransactionContextInter
 		return nil, fmt.Errorf("read transaction timestamp: %w", err)
 	}
 	deadline, _ := time.Parse(time.RFC3339, review.Deadline)
+	if preparation {
+		deadline, _ = time.Parse(time.RFC3339, review.PrepareBy)
+	}
 	if !txTime.AsTime().After(deadline) {
 		return nil, fmt.Errorf("review %s deadline is still active", reviewID)
 	}
@@ -481,14 +520,38 @@ func (c *Contract) FinalizeExpiredReview(ctx contractapi.TransactionContextInter
 		return nil, err
 	}
 	review.Status = "TIMED_OUT"
+	if preparation {
+		review.Status = "ACCESS_FAILED"
+	}
 	review.ClosedAt = now
 	claim, err := c.ReadClaim(ctx, review.ClaimID)
 	if err != nil {
 		return nil, err
 	}
+	if review.MedicalVersion != 0 {
+		if claim.CurrentReviewID != review.ID || claim.Version != review.MedicalVersion {
+			return nil, fmt.Errorf("medical review is stale")
+		}
+		if preparation && claim.MedicalClarificationID != "" {
+			note, err := c.readClarification(ctx, claim.MedicalClarificationID)
+			if err != nil {
+				return nil, err
+			}
+			if note.Status == "PENDING" {
+				note.Status, note.ResolvedAt = "EXPIRED", now
+				key, err := privateStateKey(ctx, "medicalClarification", note.ID)
+				if err != nil {
+					return nil, err
+				}
+				if err := writeMedicalPrivate(ctx, key, note); err != nil {
+					return nil, err
+				}
+			}
+		}
+	}
 	claim.Status = "REJECTED"
 	claim.UpdatedAt = now
-	if review.AppealID != "" {
+	if review.AppealID != "" && review.MedicalVersion == 0 {
 		appeal, readErr := c.ReadClaimAppeal(ctx, review.AppealID)
 		if readErr != nil {
 			return nil, readErr

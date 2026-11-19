@@ -22,6 +22,9 @@ func (c *Contract) SubmitInvoiceClaim(ctx contractapi.TransactionContextInterfac
 }
 
 func (c *Contract) submitClaim(ctx contractapi.TransactionContextInterface, id, policyID, hospitalID, hospitalInvoiceID string, amountMinor int64, incidentDate, descriptionHash string) (*Claim, error) {
+	if isMedicalCandidate(ctx) {
+		return nil, fmt.Errorf("use the verified medical episode claim flow")
+	}
 	if _, err := requireIdentity(ctx, "InsurerMSP", "policyholder"); err != nil {
 		return nil, err
 	}
@@ -128,10 +131,14 @@ func (c *Contract) AddEvidenceReference(ctx contractapi.TransactionContextInterf
 	if documentType == "" {
 		return nil, fmt.Errorf("documentType is required")
 	}
+	if claim.EpisodeID != "" && claim.Status != "SUBMITTED" && claim.Status != "APPEAL_SUBMITTED" {
+		return nil, fmt.Errorf("medical evidence is frozen for this claim version")
+	}
 	if claim.Status != "SUBMITTED" && claim.Status != "REJECTED" && claim.Status != "APPEAL_SUBMITTED" {
 		return nil, fmt.Errorf("evidence cannot be added while claim %s is %s", claimID, claim.Status)
 	}
-	if claim.Status != "SUBMITTED" && documentType != "APPEAL_DOCUMENT" {
+	if claim.Status != "SUBMITTED" && documentType != "APPEAL_DOCUMENT" &&
+		!(claim.EpisodeID != "" && claim.Status == "APPEAL_SUBMITTED" && documentType == "CLARIFICATION_DOCUMENT") {
 		return nil, fmt.Errorf("only APPEAL_DOCUMENT evidence may be added after rejection")
 	}
 	if err := validateHash("contentHash", contentHash); err != nil {
@@ -140,7 +147,11 @@ func (c *Contract) AddEvidenceReference(ctx contractapi.TransactionContextInterf
 	if err := validateHash("storageReferenceHash", storageReferenceHash); err != nil {
 		return nil, err
 	}
-	if claim.Status == "APPEAL_SUBMITTED" {
+	if claim.EpisodeID != "" && documentType == "CLARIFICATION_DOCUMENT" &&
+		(claim.MedicalSupplementHash == "" || !strings.EqualFold(contentHash, claim.MedicalSupplementHash)) {
+		return nil, fmt.Errorf("clarification evidence does not match the current response commitment")
+	}
+	if claim.Status == "APPEAL_SUBMITTED" && documentType == "APPEAL_DOCUMENT" {
 		appeal, readErr := c.ReadClaimAppeal(ctx, claim.CurrentAppealID)
 		if readErr != nil {
 			return nil, readErr

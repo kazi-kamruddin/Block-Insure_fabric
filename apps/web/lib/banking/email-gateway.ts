@@ -3,7 +3,7 @@ import "server-only";
 export type OtpDelivery = { adapter: "demo" | "email-gateway"; recipient: string; messageId?: string };
 export type EmailDelivery = OtpDelivery;
 
-async function deliverTemplate(input: { recipient: string; template: string; variables: Record<string, string | number | boolean> }): Promise<EmailDelivery> {
+async function deliverTemplate(input: { recipient: string; template: string; variables: Record<string, string | number | boolean>; idempotencyKey?: string }): Promise<EmailDelivery> {
   const gatewayUrl = process.env.EMAIL_GATEWAY_URL?.trim();
   if (!gatewayUrl) {
     if (process.env.ENABLE_DEMO_AUTH !== "true") throw new Error("EMAIL_GATEWAY_URL is required outside demo mode");
@@ -14,13 +14,17 @@ async function deliverTemplate(input: { recipient: string; template: string; var
     method: "POST",
     headers: {
       "content-type": "application/json",
+      ...(input.idempotencyKey ? { "idempotency-key": input.idempotencyKey } : {}),
       ...(process.env.EMAIL_GATEWAY_TOKEN ? { authorization: `Bearer ${process.env.EMAIL_GATEWAY_TOKEN}` } : {}),
     },
     body: JSON.stringify({ to: input.recipient, template: input.template, variables: input.variables }),
   });
   if (!response.ok) throw new Error(`Email gateway rejected ${input.template} delivery (${response.status})`);
-  const result = await response.json().catch(() => ({})) as { messageId?: string };
-  return { adapter: "email-gateway", recipient: input.recipient, messageId: result.messageId };
+  const result: unknown = await response.json().catch(() => null);
+  if (!result || typeof result !== "object" || !("messageId" in result) || typeof result.messageId !== "string" || !result.messageId.trim() || result.messageId.length > 200) {
+    throw new Error("Email gateway returned an invalid acknowledgement; delivery is unresolved");
+  }
+  return { adapter: "email-gateway", recipient: input.recipient, messageId: result.messageId.trim() };
 }
 
 export async function deliverBankOtp(input: { recipient: string; code: string; expiresAt: number; policyId: string }) : Promise<OtpDelivery> {
@@ -31,6 +35,6 @@ export async function deliverBankOtp(input: { recipient: string; code: string; e
   });
 }
 
-export function deliverBankCommunication(input: { recipient: string; template: string; variables: Record<string, string | number | boolean> }) {
+export function deliverBankCommunication(input: { recipient: string; template: string; variables: Record<string, string | number | boolean>; idempotencyKey?: string }) {
   return deliverTemplate(input);
 }

@@ -8,6 +8,7 @@ samples_root="${network_root}/.fabric/fabric-samples"
 organizations="${network_root}/organizations"
 artifacts="${network_root}/channel-artifacts"
 chaincode_root="${project_root}/chaincode/insurance-contract"
+source "${script_dir}/chaincode-toolchain.sh"
 
 channel_name="${CHANNEL_NAME:-insurance-channel}"
 chaincode_name="${CHAINCODE_NAME:-insurance-contract}"
@@ -23,8 +24,8 @@ export PATH="${samples_root}/bin:${PATH}"
 export FABRIC_CFG_PATH="${samples_root}/config"
 
 package_chaincode() {
-  if command -v go >/dev/null 2>&1; then
-    bash "${script_dir}/package-chaincode.sh" "${chaincode_root}" "${package_file}" "${chaincode_label}"
+  if command -v go >/dev/null 2>&1 && [[ "$(GOTOOLCHAIN=local go env GOVERSION)" == "go$chaincode_go_version" ]]; then
+    GOTOOLCHAIN=local bash "${script_dir}/package-chaincode.sh" "${chaincode_root}" "${package_file}" "${chaincode_label}"
     return
   fi
 
@@ -50,12 +51,12 @@ package_chaincode() {
     fi
   done
   if [ -z "${docker_command}" ]; then
-    echo "Go is unavailable and Docker Desktop cannot provide the isolated Go packager after 10 attempts." >&2
+    echo "Go $chaincode_go_version is unavailable and Docker cannot provide the pinned Go packager after 10 attempts." >&2
     exit 1
   fi
 
   "${docker_command}" run --rm \
-    --memory 512m --cpus 1 -e GOMEMLIMIT=384MiB -e GOMAXPROCS=1 -e GOFLAGS=-p=1 \
+    --memory 512m --cpus 1 -e GOTOOLCHAIN=local -e GOMEMLIMIT=384MiB -e GOMAXPROCS=1 -e GOFLAGS=-p=1 \
     -v "${chaincode_mount}:/chaincode:ro" \
     -v "${artifacts_mount}:/artifacts" \
     -v "${bin_mount}:/fabric-bin:ro" \
@@ -63,9 +64,9 @@ package_chaincode() {
     -v "${scripts_mount}:/package-scripts:ro" \
     -v block-insure-go-cache:/go/pkg/mod \
     -e FABRIC_CFG_PATH=/fabric-config \
-    golang:1.25 bash /package-scripts/package-chaincode.sh /chaincode "/artifacts/${chaincode_label}.tar.gz" "${chaincode_label}" /fabric-bin/peer
+    "$chaincode_go_image" bash /package-scripts/package-chaincode.sh /chaincode "/artifacts/${chaincode_label}.tar.gz" "${chaincode_label}" /fabric-bin/peer
   "${docker_command}" run --rm -v "${artifacts_mount}:/artifacts" \
-    golang:1.25 chmod 0644 "/artifacts/${chaincode_label}.tar.gz"
+    "$chaincode_go_image" chmod 0644 "/artifacts/${chaincode_label}.tar.gz"
 }
 
 set_peer_context() {
@@ -117,7 +118,22 @@ resolve_chaincode_sequence() {
   chaincode_sequence="$((definition_sequence + 1))"
 }
 
+verify_candidate_builder() {
+  # Prevent a source/test-only toolchain update from silently deploying through
+  # an older peer compiler. This checks configuration, never changes peer state.
+  local expected="$chaincode_builder_image" docker_cli='docker' org configured
+  if ! command -v docker >/dev/null 2>&1 || ! docker info >/dev/null 2>&1; then docker_cli='docker.exe'; fi
+  for org in insurer hospital auditor bank oracle; do
+    configured="$($docker_cli inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "peer0.${org}.blockinsure.test" | sed -n 's/^CORE_CHAINCODE_BUILDER=//p' | tr -d '\r')"
+    if [[ "$configured" != "$expected" ]]; then
+      echo "Peer ${org} does not select the patched candidate builder. Build it and start the isolated peers with FABRIC_CHAINCODE_BUILDER=${expected}; preserve all volumes." >&2
+      exit 1
+    fi
+  done
+}
+
 resolve_chaincode_sequence
+verify_candidate_builder
 mkdir -p "${artifacts}"
 package_chaincode
 package_id="$(peer lifecycle chaincode calculatepackageid "${package_file}")"

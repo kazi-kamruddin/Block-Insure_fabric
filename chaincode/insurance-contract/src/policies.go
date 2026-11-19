@@ -117,6 +117,9 @@ func (c *Contract) IssuePolicy(ctx contractapi.TransactionContextInterface, id, 
 	if policyPackage.Status != "PUBLISHED" {
 		return nil, fmt.Errorf("policy package %s is not published", packageID)
 	}
+	if policyPackage.MedicalRulesVersion != 0 {
+		return nil, fmt.Errorf("medical policies must be acquired by the holder and activated by a premium payment")
+	}
 	now, err := timestamp(ctx)
 	if err != nil {
 		return nil, err

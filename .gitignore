@@ -28,6 +28,7 @@ coverage/
 /data/evidence-alignment-20261108/
 /data/otp-alignment-20261108/
 /data/demo-stack/
+/data/candidate-demo/
 /apps/web/data/
 /apps/web/test-results/
 /apps/web/playwright-report/
@@ -73,8 +74,10 @@ logs/
 Thumbs.db
 
 # Private local context
+/data/workflow-operations*/
 /.project-context/
 /.local-reference/
+/apps/web/public/ocr-assets/
 
 # Permanent local-only Ethereum reference implementation
 /reference/

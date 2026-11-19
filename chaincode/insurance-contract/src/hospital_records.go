@@ -56,6 +56,9 @@ func (c *Contract) CreateHospitalInvoiceWithCredential(ctx contractapi.Transacti
 }
 
 func (c *Contract) createHospitalInvoice(ctx contractapi.TransactionContextInterface, id, patientReferenceHash, invoiceReferenceHash, treatmentHash string, amountMinor int64, admissionDate, dischargeDate, status string, automaticCredential bool) (*HospitalInvoice, error) {
+	if isMedicalCandidate(ctx) {
+		return nil, fmt.Errorf("use SaveMedicalEpisode to record factual intake")
+	}
 	if _, err := requireIdentity(ctx, "HospitalMSP", "hospitalOfficer"); err != nil {
 		return nil, err
 	}
@@ -114,6 +117,9 @@ func (c *Contract) UpdateHospitalInvoiceWithCredential(ctx contractapi.Transacti
 }
 
 func (c *Contract) updateHospitalInvoice(ctx contractapi.TransactionContextInterface, id, patientReferenceHash, invoiceReferenceHash, treatmentHash string, amountMinor int64, admissionDate, dischargeDate, status string, automaticCredential bool) (*HospitalInvoice, error) {
+	if isMedicalCandidate(ctx) {
+		return nil, fmt.Errorf("use SaveMedicalEpisode to correct factual intake")
+	}
 	if _, err := requireIdentity(ctx, "HospitalMSP", "hospitalOfficer"); err != nil {
 		return nil, err
 	}

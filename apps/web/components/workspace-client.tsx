@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import {
   demoAccounts,
@@ -10,11 +10,18 @@ import {
 } from "@/lib/auth/accounts";
 import type { RoleDashboard } from "@/lib/dashboard/build-dashboard";
 import { GuidedWorkflowForm, type PreparedWorkflow } from "@/components/guided-workflow-form";
+import { medicalCandidateChannel } from "@/lib/workflows/commands";
+import { MedicalIntake } from "@/components/medical-intake";
+import { MedicalReview } from "@/components/medical-review";
+import { MedicalOCR } from "@/components/medical-ocr";
 import { PresentationGuide } from "@/components/presentation-guide";
+import { StatusBadge } from "@/components/status-badge";
 import type { WorkflowCommand } from "@/lib/workflows/commands";
-import { bdtToMinor } from "@/lib/workflows/forms";
+import { bdtToMinor, workflowFormDefinitions } from "@/lib/workflows/forms";
 import { decryptEvidenceBytes, encryptEvidenceBytes, sha256Hex } from "@/lib/evidence/browser-crypto";
 import { createEvidenceRecovery, restoreEvidenceRecovery } from "@/lib/evidence/recovery";
+import { recoverableTransactions } from "@/lib/workflows/recoverable";
+import { readSavedAction, parseSavedAction, saveAction, savedActionKey, type SavedWorkflowAction } from "@/lib/workflows/saved-action";
 
 type AssetType = "partner-agreement" | "hospital-invoice" | "package" | "policy" | "claim" | "evidence" | "evidence-batch" | "evidence-grant" | "verification" | "decision" | "review" | "appeal" | "fraud-assessment" | "settlement" | "access" | "claim-history" | "account" | "bank-transfer" | "mandate" | "premium-payment" | "premium-adjustment" | "collection" | "benefit-plan" | "beneficiaries" | "benefit-request" | "liability" | "oracle-snapshot" | "oracle-request" | "oracle-commitment" | "oracle-result" | "oracle-history" | "privacy-credential" | "privacy-presentation";
 type NotificationItem = { id: string; title: string; message: string; assetId: string; blockNumber: string };
@@ -89,12 +96,62 @@ async function responseJson(response: Response) {
   return body;
 }
 
+function subscribeSavedAction(callback: () => void) {
+  window.addEventListener("storage", callback);
+  window.addEventListener("fabric-saved-action", callback);
+  return () => { window.removeEventListener("storage", callback); window.removeEventListener("fabric-saved-action", callback); };
+}
+function notifySavedAction() { window.dispatchEvent(new Event("fabric-saved-action")); }
+
+type GatewaySummary = {
+  status?: string;
+  operation?: string;
+  identifier?: string;
+  version?: string;
+  txId?: string;
+  count?: number;
+};
+
+function parseGatewaySummary(raw: string): GatewaySummary | null {
+  const trimmed = raw.trim();
+  if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) return null;
+  try {
+    const parsed = JSON.parse(trimmed) as unknown;
+    if (Array.isArray(parsed)) {
+      return { operation: "List query", count: parsed.length };
+    }
+    if (!parsed || typeof parsed !== "object") return null;
+    const obj = parsed as Record<string, unknown>;
+    const summary: GatewaySummary = {};
+    if (typeof obj.status === "string") summary.status = obj.status;
+    else if (typeof obj.state === "string") summary.status = obj.state;
+    else if (typeof obj.outcome === "string") summary.status = obj.outcome;
+    if (typeof obj.operation === "string") summary.operation = obj.operation;
+    else if (typeof obj.docType === "string") summary.operation = obj.docType;
+    else if (typeof obj.type === "string") summary.operation = obj.type;
+    const idCandidate = obj.id ?? obj.claimId ?? obj.policyId ?? obj.settlementId ?? obj.requestId ?? obj.reviewId ?? obj.evidenceId ?? obj.invoiceId;
+    if (typeof idCandidate === "string" && idCandidate) summary.identifier = idCandidate;
+    if (typeof obj.version === "number" || typeof obj.version === "string") summary.version = String(obj.version);
+    const txCandidate = obj.txId ?? obj.transactionId;
+    if (typeof txCandidate === "string" && txCandidate) summary.txId = txCandidate;
+    return Object.keys(summary).length > 0 ? summary : null;
+  } catch {
+    return null;
+  }
+}
+
 export function WorkspaceClient({
   initialAccount,
   initialDashboard,
+  deployment,
+  medicalReviewEnabled = false,
+  investigationEnabled = false,
 }: {
   initialAccount: DemoAccount | null;
   initialDashboard: RoleDashboard | null;
+  deployment: string;
+  medicalReviewEnabled?: boolean;
+  investigationEnabled?: boolean;
 }) {
   const router = useRouter();
   const [account, setAccount] = useState(initialAccount);
@@ -106,6 +163,8 @@ export function WorkspaceClient({
   const [documentType, setDocumentType] = useState("DISCHARGE_SUMMARY");
   const [contentHash, setContentHash] = useState("");
   const [ciphertext, setCiphertext] = useState<File | null>(null);
+  const [uploadNotice, setUploadNotice] = useState<{ pending: boolean; message: string } | null>(null);
+  const uploadPending = uploadNotice?.pending === true;
   const [plaintextEvidence, setPlaintextEvidence] = useState<File | null>(null);
   const [evidencePassphrase, setEvidencePassphrase] = useState("");
   const [evidencePassphraseConfirmation, setEvidencePassphraseConfirmation] = useState("");
@@ -118,16 +177,28 @@ export function WorkspaceClient({
   const [retrievalGrantId, setRetrievalGrantId] = useState("");
   const [retrievalPassphrase, setRetrievalPassphrase] = useState("");
   const [retrieving, setRetrieving] = useState(false);
-  const [decryptedEvidence, setDecryptedEvidence] = useState<{ url: string; name: string } | null>(null);
+  const [decryptedEvidence, setDecryptedEvidence] = useState<{ url: string; name: string; blob: Blob; id: string; accessId: string; reviewId: string; digest: string } | null>(null);
+  const medicalReview = medicalReviewEnabled && deployment.startsWith(`${medicalCandidateChannel}/`);
   const [auditClaimId, setAuditClaimId] = useState("");
   const [proofEvidenceId, setProofEvidenceId] = useState("");
   const [proofBatchId, setProofBatchId] = useState("");
   const [manualPayment, setManualPayment] = useState({ policyId: "", sourceAccountId: "", destinationAccountId: "bank-insurer-premium", transferId: "", paymentId: "", periodStartDate: "", periodEndDate: "", amountBdt: "", externalReference: "", challengeId: "", otp: "", demoCode: "" });
   const [statementPolicyId, setStatementPolicyId] = useState("");
   const [output, setOutput] = useState("Ready.");
+  const [copiedOutput, setCopiedOutput] = useState(false);
   const [busy, setBusy] = useState(false);
+  const gatewaySummary = useMemo(() => parseGatewaySummary(output), [output]);
+  const savedSnapshot = useSyncExternalStore(subscribeSavedAction, () => {
+    if (!account) return null;
+    try { return localStorage.getItem(savedActionKey(deployment, account.id)); } catch { return "unavailable"; }
+  }, () => null);
+  const savedAction = useMemo(() => {
+    if (!savedSnapshot) return null;
+    try { return parseSavedAction(savedSnapshot); } catch { return null; }
+  }, [savedSnapshot]);
   const [dashboard, setDashboard] = useState<RoleDashboard | null>(initialDashboard);
   const [dashboardLoading, setDashboardLoading] = useState(Boolean(initialAccount && !initialDashboard));
+  const [dashboardError, setDashboardError] = useState<string | null>(null);
   const [preparedWorkflow, setPreparedWorkflow] = useState<PreparedWorkflow | null>(null);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [bankCommunications, setBankCommunications] = useState<BankCommunicationItem[]>([]);
@@ -160,14 +231,32 @@ export function WorkspaceClient({
     }
   }, []);
 
+  const refreshDashboard = useCallback(async () => {
+    setDashboardLoading(true);
+    setDashboardError(null);
+    try {
+      const body = await responseJson(await fetch("/api/dashboard", { cache: "no-store" }));
+      setDashboard(body.dashboard);
+      setDashboardError(null);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Dashboard failed to load";
+      setDashboard(null);
+      setDashboardError(message);
+      setOutput(message);
+    } finally {
+      setDashboardLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (!account) return;
     const timer = window.setTimeout(() => {
+      if (!initialDashboard) void refreshDashboard();
       void refreshNotifications();
       if (account.role === "bankOfficer") void refreshBankCommunications();
     }, 0);
     return () => window.clearTimeout(timer);
-  }, [account, refreshNotifications, refreshBankCommunications]);
+  }, [account, initialDashboard, refreshDashboard, refreshNotifications, refreshBankCommunications]);
 
   async function synchronizeEvents() {
     setBusy(true);
@@ -217,18 +306,15 @@ export function WorkspaceClient({
     }
   }
 
-  const refreshDashboard = useCallback(async () => {
-    setDashboardLoading(true);
+  const copyGatewayOutput = useCallback(async () => {
     try {
-      const body = await responseJson(await fetch("/api/dashboard", { cache: "no-store" }));
-      setDashboard(body.dashboard);
-    } catch (error) {
-      setDashboard(null);
-      setOutput(error instanceof Error ? error.message : "Dashboard failed to load");
-    } finally {
-      setDashboardLoading(false);
+      await navigator.clipboard.writeText(output);
+      setCopiedOutput(true);
+      window.setTimeout(() => setCopiedOutput(false), 2000);
+    } catch {
+      setCopiedOutput(false);
     }
-  }, []);
+  }, [output]);
 
   async function login(accountId: string) {
     setBusy(true);
@@ -239,9 +325,12 @@ export function WorkspaceClient({
         body: JSON.stringify({ accountId }),
       }));
       const signedInAccount = body.account as DemoAccount;
-      setAccount(signedInAccount);
-      setOutput(`Signed in as ${body.account.displayName}.`);
-      router.push(`/workspace/${workspaceForAccount(signedInAccount)}`);
+      // Session changes require a fresh server-authorized workspace. Rendering
+      // optimistic forms here races the pending route and can discard a click.
+      setOutput("Opening your workspace…");
+      // A new document is intentional at this cookie/role boundary.
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+      window.location.assign(`/workspace/${workspaceForAccount(signedInAccount)}`);
     } catch (error) {
       setOutput(error instanceof Error ? error.message : "Sign-in failed");
     } finally {
@@ -264,6 +353,7 @@ export function WorkspaceClient({
       setRecoveryFile(null);
       setRecoveryDownload(null);
       setDecryptedEvidence(null);
+      setUploadNotice(null);
       setOutput("Signed out.");
       router.push("/workspace");
       router.refresh();
@@ -274,14 +364,32 @@ export function WorkspaceClient({
     }
   }
 
-  async function submitWorkflow(payload: WorkflowCommand) {
+  async function submitWorkflow(payload: WorkflowCommand, recoverOnly = false) {
     setBusy(true);
     try {
-      const body = await responseJson(await fetch("/api/workflows", {
+      let action: SavedWorkflowAction | null = null;
+      const storageKey = account ? savedActionKey(deployment, account.id) : "";
+      if (recoverableTransactions[payload.operation]) {
+        if (!account) throw new Error("Sign in before submitting this action");
+        action = readSavedAction(localStorage, storageKey);
+        if (action && JSON.stringify(action.command) !== JSON.stringify(payload)) throw new Error("Recover the saved action before submitting a different instruction");
+        action ??= { requestId: crypto.randomUUID(), command: payload };
+        saveAction(localStorage, storageKey, action); notifySavedAction();
+      }
+      const response = await fetch("/api/workflows", {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: { "content-type": "application/json", ...(action ? { "idempotency-key": action.requestId, "x-workflow-deployment": deployment, "x-workflow-recovery": String(recoverOnly) } : {}) },
         body: JSON.stringify(payload),
-      }));
+      });
+      const body = await response.json();
+      if (action && body.state !== "COMMITTED") {
+        const pending = { ...action, state: body.state ?? "PENDING" };
+        saveAction(localStorage, storageKey, pending); notifySavedAction();
+        setOutput(body.message ?? "Outcome unresolved. Recover the saved action; do not submit another instruction.");
+        return;
+      }
+      if (!response.ok) throw new Error(body.message ?? "Command failed");
+      if (action) { localStorage.removeItem(storageKey); notifySavedAction(); }
       setOutput(JSON.stringify(body.result, null, 2));
       await refreshDashboard();
     } catch (error) {
@@ -405,6 +513,8 @@ export function WorkspaceClient({
 
   async function uploadEvidence() {
     setBusy(true);
+    let uploadStarted = false;
+    let definitivelyRejected = false;
     try {
       if (!ciphertext) throw new Error("Choose a client-encrypted .enc file.");
       const form = new FormData();
@@ -413,10 +523,20 @@ export function WorkspaceClient({
       form.set("documentType", documentType);
       form.set("contentHash", contentHash);
       form.set("ciphertext", ciphertext);
-      const body = await responseJson(await fetch("/api/evidence", { method: "POST", body: form }));
+      uploadStarted = true;
+      const response = await fetch("/api/evidence", { method: "POST", body: form });
+      definitivelyRejected = response.status >= 400 && response.status < 500;
+      const body = await responseJson(response);
+      setUploadNotice({ pending: body.status === "PENDING_RECONCILIATION", message: body.status === "PENDING_RECONCILIATION"
+        ? "Registration is unresolved. Keep this page open and retry the original ciphertext; do not re-encrypt or change its identifiers."
+        : "Ciphertext is linked to the current claim version on Fabric." });
       setOutput(JSON.stringify(body, null, 2));
       await refreshDashboard();
     } catch (error) {
+      const pending = uploadStarted && !definitivelyRejected;
+      setUploadNotice({ pending, message: pending
+        ? "Upload outcome unresolved. Keep this page open and retry the original ciphertext without changing its identifiers."
+        : error instanceof Error ? error.message : "Evidence upload failed" });
       setOutput(error instanceof Error ? error.message : "Evidence upload failed");
     } finally {
       setBusy(false);
@@ -425,6 +545,7 @@ export function WorkspaceClient({
 
   async function encryptEvidence() {
     setEncrypting(true);
+    setUploadNotice(null);
     setRecoveryDownload(null);
     try {
       if (!plaintextEvidence) throw new Error("Choose the original evidence file.");
@@ -478,6 +599,7 @@ export function WorkspaceClient({
 
   async function retrieveEvidence() {
     setRetrieving(true);
+    setDecryptedEvidence(null);
     try {
       const id = retrievalEvidenceId.trim();
       if (!id) throw new Error("Enter an evidence ID to retrieve.");
@@ -503,7 +625,9 @@ export function WorkspaceClient({
       if (await sha256Hex(plaintext) !== expectedHash) throw new Error("Decrypted evidence failed its ledger integrity check.");
       const plaintextBuffer = new ArrayBuffer(plaintext.byteLength);
       new Uint8Array(plaintextBuffer).set(plaintext);
-      const next = { url: URL.createObjectURL(new Blob([plaintextBuffer])), name: `${id}.decrypted` };
+      const blob = new Blob([plaintextBuffer]);
+      const next = { url: URL.createObjectURL(blob), name: `${id}.decrypted`, blob, id, digest: expectedHash,
+        accessId: response.headers.get("x-evidence-access-id") ?? "", reviewId: response.headers.get("x-evidence-medical-review-id") ?? "" };
       setDecryptedEvidence(next);
       setRetrievalPassphrase("");
       setOutput(`Evidence ${id} decrypted locally and matched its Fabric content hash.`);
@@ -516,6 +640,20 @@ export function WorkspaceClient({
     }
   }
 
+  async function confirmMedicalReadiness() {
+    if (!decryptedEvidence?.reviewId || !decryptedEvidence.accessId) return;
+    setBusy(true);
+    try {
+      const response = await fetch("/api/medical/review", { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "confirm", reviewId: decryptedEvidence.reviewId, evidenceId: decryptedEvidence.id,
+          accessId: decryptedEvidence.accessId, contentHash: decryptedEvidence.digest }) });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.message);
+      setOutput("Decryption confirmed for the current medical review. Refresh the case to see readiness.");
+    } catch (error) { setOutput(error instanceof Error ? error.message : "Decryption confirmation failed"); }
+    finally { setBusy(false); }
+  }
+
   if (!account) {
     return (
       <section className="shell signInPanel">
@@ -525,11 +663,11 @@ export function WorkspaceClient({
         <p className="presentationOrder"><strong>Suggested handoff:</strong> Insurer → Hospital → Policyholder → Bank → Insurer &amp; Oracles → Auditor → Bank</p>
         <div className="accountGroups">
           {accountGroups.map((group) => <section className="accountGroup" key={group.label}>
-            <header className="accountGroupHeader"><div><span className="kicker">{group.label}</span><p>{group.description}</p></div><small>{group.accountIds.length} {group.accountIds.length === 1 ? "identity" : "identities"}</small></header>
+            <header className="accountGroupHeader"><div><h2 className="kicker" style={{ margin: 0, lineHeight: 1.4 }}>{group.label}</h2><p>{group.description}</p></div><small>{group.accountIds.length} {group.accountIds.length === 1 ? "identity" : "identities"}</small></header>
             <div className="accountGrid">
               {group.accountIds.map((accountId) => {
                 const candidate = demoAccounts[accountId];
-                return <button aria-label={`Sign in as ${candidate.displayName}`} disabled={busy} key={candidate.id} onClick={() => login(candidate.id)}>
+                return <button type="button" aria-label={`Sign in as ${candidate.displayName}`} disabled={busy} key={candidate.id} onClick={() => login(candidate.id)}>
                   <span className="accountCardTop"><em>{roleLabels[candidate.role]}</em><b aria-hidden="true">↗</b></span>
                   <strong>{candidate.displayName}</strong>
                   <span className="accountIdentity">{candidate.organization}{"subjectId" in candidate ? ` · ${candidate.subjectId}` : ""}</span>
@@ -553,7 +691,7 @@ export function WorkspaceClient({
         </div>
         <div className="workspaceHeaderActions">
           <a className="secondary button" href="/showcase">Presentation board</a>
-          <button className="secondary button" onClick={logout}>Sign out</button>
+          <button type="button" className="secondary button" onClick={logout}>Sign out</button>
         </div>
       </header>
 
@@ -569,10 +707,33 @@ export function WorkspaceClient({
         <div className="dashboardIntro">
           <div>
             <span className="kicker">Organization-scoped overview</span>
-            <h2>{dashboard?.title ?? "Loading ledger overview…"}</h2>
+            <h2>{dashboard?.title ?? (dashboardLoading ? "Loading ledger overview…" : "Overview unavailable offline")}</h2>
           </div>
-          <p>{dashboard?.description ?? "Evaluating current world state through Fabric Gateway."}</p>
+          <p>{dashboard?.description ?? (dashboardLoading ? "Evaluating current world state through Fabric Gateway." : "Start or verify the Fabric network, then retry to query organization-scoped ledger state.")}</p>
         </div>
+
+        {dashboardLoading && !dashboard && (
+          <div className="metricGrid" aria-hidden="true">
+            {[0, 1, 2, 3].map((slot) => (
+              <div className="skeletonCard" key={slot}>
+                <div className="skeletonLine" style={{ width: "42%" }} />
+                <div className="skeletonMetric" />
+                <div className="skeletonLine" />
+              </div>
+            ))}
+          </div>
+        )}
+
+        {!dashboardLoading && !dashboard && (
+          <div className="dashboardUnavailable" role="status">
+            <div>
+              <StatusBadge status="DEGRADED" label="Ledger overview unavailable" tone="pending" />
+              <h2>Unable to reach Fabric Gateway overview</h2>
+              <p>{dashboardError ?? "Live ledger metrics could not be loaded. Transaction recovery and client-side tools below remain accessible."}</p>
+            </div>
+            <button type="button" className="primary button" onClick={refreshDashboard} disabled={dashboardLoading}>Retry overview</button>
+          </div>
+        )}
 
         {dashboard && (
           <>
@@ -599,7 +760,7 @@ export function WorkspaceClient({
               <article className="queuePanel">
                 <div className="panelHeading">
                   <div><span className="kicker">Actionable now</span><h3>{dashboard.queueTitle}</h3></div>
-                  <button className="textButton" disabled={dashboardLoading} onClick={refreshDashboard}>Refresh</button>
+                  <button type="button" className="textButton" disabled={dashboardLoading} onClick={refreshDashboard}>Refresh</button>
                 </div>
                 {dashboard.queue.length === 0 ? (
                   <p className="emptyState">No ledger records currently require this role.</p>
@@ -608,10 +769,11 @@ export function WorkspaceClient({
                     {dashboard.queue.map((item) => (
                       <div className="queueItem" key={item.id}>
                         <div>
-                          <div className="queueTitle"><strong>{item.title}</strong><span className={`status status-${item.status.toLowerCase()}`}>{item.status.replaceAll("_", " ")}</span></div>
+                          <div className="queueTitle"><strong>{item.title}</strong><StatusBadge status={item.status} label={item.status.replaceAll("_", " ")} /></div>
                           <p>{item.detail}</p>
+                          {item.command && <div className="queueItemMeta">Prefills Guided form below · explicit submit required</div>}
                         </div>
-                        {item.command && <button onClick={() => {
+                        {item.command && <button type="button" onClick={() => {
                           if (!item.command) return;
                           setPreparedWorkflow({ command: item.command, revision: Date.now() });
                           document.getElementById("guided-workflow")?.scrollIntoView({ behavior: "smooth" });
@@ -636,9 +798,9 @@ export function WorkspaceClient({
                 {dashboard.recentClaims.length === 0 ? <p className="emptyState">No visible claims yet.</p> : (
                   <div className="recentList">
                     {dashboard.recentClaims.map((claim) => (
-                      <button key={claim.id} onClick={() => { setAssetType("claim"); setAssetId(claim.id); }}>
+                      <button type="button" key={claim.id} onClick={() => { setAssetType("claim"); setAssetId(claim.id); }}>
                         <span><strong>{claim.id}</strong><small>{claim.policyId}</small></span>
-                        <i className={`status status-${claim.status.toLowerCase()}`}>{claim.status.replaceAll("_", " ")}</i>
+                        <StatusBadge status={claim.status} label={claim.status.replaceAll("_", " ")} />
                       </button>
                     ))}
                   </div>
@@ -654,11 +816,13 @@ export function WorkspaceClient({
           <span className="kicker">Event-driven operations</span>
           <h2>Fabric activity inbox</h2>
           <p className="cardNote">Durable, replay-safe projection checkpoint: {eventCheckpoint}. Notifications are derived from committed chaincode events.</p>
-          {account.role === "insurerAdmin" && <button className="secondary button" disabled={busy} onClick={synchronizeEvents}>Synchronize Fabric events</button>}
-          <button className="textButton" disabled={busy} onClick={refreshNotifications}>Refresh inbox</button>
+          <div className="medicalButtonGroup" style={{ marginBottom: 14 }}>
+            {account.role === "insurerAdmin" && <button type="button" className="secondary button" disabled={busy} onClick={synchronizeEvents}>Synchronize Fabric events</button>}
+            <button type="button" className="textButton" disabled={busy} onClick={refreshNotifications}>Refresh inbox</button>
+          </div>
           {notifications.length === 0 ? <p className="emptyState">No projected events currently require this identity.</p> : (
             <div className="recentList">{notifications.slice(0, 8).map((item) => (
-              <div className="queueItem" key={item.id}><div><strong>{item.title}</strong><p>{item.assetId || item.message}</p></div><span className="status">Block {item.blockNumber}</span></div>
+              <div className="queueItem" key={item.id}><div><strong>{item.title}</strong><p>{item.assetId || item.message}</p></div><StatusBadge status="BLOCK" label={`Block ${item.blockNumber}`} tone="neutral" /></div>
             ))}</div>
           )}
         </article>
@@ -667,12 +831,14 @@ export function WorkspaceClient({
           <span className="kicker">Bank communications</span>
           <h2>Customer delivery monitor</h2>
           <p className="cardNote">Committed transfers, mandate decisions, and benefit payouts create replay-safe email deliveries. This screen exposes delivery metadata, never OTP codes.</p>
-          <button className="textButton" disabled={busy} onClick={refreshBankCommunications}>Refresh deliveries</button>
+          <div className="medicalButtonGroup" style={{ marginBottom: 14 }}>
+            <button type="button" className="textButton" disabled={busy} onClick={refreshBankCommunications}>Refresh deliveries</button>
+          </div>
           {bankCommunications.length === 0 ? <p className="emptyState">No transaction communications have been projected yet.</p> : (
             <div className="recentList">{bankCommunications.slice(0, 12).map((item) => (
               <div className="queueItem" key={item.id}>
                 <div><strong>{item.title}</strong><p>{item.assetId} · {new Intl.NumberFormat("en-BD", { style: "currency", currency: item.currency || "BDT" }).format(item.amountMinor / 100)}</p><small>{item.recipient || "recipient pending"}{item.error ? ` · ${item.error}` : ""}</small></div>
-                <span className={`status status-${item.status.toLowerCase()}`}>{item.status}{item.adapter ? ` · ${item.adapter}` : ""}</span>
+                <StatusBadge status={item.status} label={`${item.status}${item.adapter ? ` · ${item.adapter}` : ""}`} />
               </div>
             ))}</div>
           )}
@@ -683,33 +849,33 @@ export function WorkspaceClient({
           <h2>Ledger-derived thesis snapshot</h2>
           <p className="cardNote">Current-world-state metrics carry Fabric provenance and a reproducibility hash. They do not claim clinical or causal validity.</p>
           <div className="evidenceActions">
-            <button className="primary button" disabled={busy} onClick={refreshResearchSnapshot}>Refresh metrics</button>
+            <button type="button" className="primary button" disabled={busy} onClick={refreshResearchSnapshot}>Refresh metrics</button>
             <a className="secondary button" href="/research">Open full dashboard</a>
             <a className="secondary button" download href="/api/research/snapshot?download=1">Download snapshot</a>
           </div>
-          {researchSnapshot && <div className="metricGrid">
+          {researchSnapshot && <div className="metricGrid" style={{ marginTop: 16 }}>
             <div className="metricCard"><span>Policies / claims</span><strong>{researchSnapshot.portfolio.policies} / {researchSnapshot.portfolio.claims}</strong><small>Current ledger assets</small></div>
             <div className="metricCard"><span>Reviews / appeals</span><strong>{researchSnapshot.adjudication.reviewRounds} / {researchSnapshot.adjudication.appeals}</strong><small>Immutable rounds</small></div>
             <div className="metricCard"><span>Fraud assessments</span><strong>{researchSnapshot.fraudDecisionSupport.assessments}</strong><small>{researchSnapshot.fraudDecisionSupport.advisoryOnly ? "Advisory only" : "Boundary violation"}</small></div>
             <div className="metricCard"><span>Evidence grants / access</span><strong>{researchSnapshot.evidenceGovernance.grants} / {researchSnapshot.evidenceGovernance.accesses}</strong><small>{researchSnapshot.evidenceGovernance.grantBackedAccesses} grant-backed</small></div>
             <div className="metricCard"><span>Private credentials / proofs</span><strong>{researchSnapshot.privacyPreservingVerification.credentials} / {researchSnapshot.privacyPreservingVerification.presentations}</strong><small>{researchSnapshot.privacyPreservingVerification.privacyBoundOracleRequests} requests bound</small></div>
           </div>}
-          {researchSnapshot && <p className="cardNote">Schema {researchSnapshot.provenance.ledgerSchemaVersion}; indexed events {researchSnapshot.provenance.indexedEvents}; hash <code>{researchSnapshot.reproducibilityHash.slice(0, 16)}…</code></p>}
+          {researchSnapshot && <p className="cardNote" style={{ marginTop: 14 }}>Schema {researchSnapshot.provenance.ledgerSchemaVersion}; indexed events {researchSnapshot.provenance.indexedEvents}; hash <code>{researchSnapshot.reproducibilityHash.slice(0, 16)}…</code></p>}
         </article>}
 
-        {(account.role === "insurerAdmin" || account.role === "auditor") && <article className="workCard">
+        {(account.role === "insurerAdmin" || account.role === "auditor") && <article className="workCard workCardWide">
           <span className="kicker">Certificate-bound services</span>
           <h2>Oracle operations and consensus</h2>
           <p className="cardNote">Each worker uses a different OracleMSP certificate and independently validates the exact committed registry snapshot. Unrevealed results are never displayed.</p>
-          <button className="primary button" disabled={busy} onClick={refreshOracleOperations}>Refresh Oracle health</button>
+          <button type="button" className="primary button" disabled={busy} onClick={refreshOracleOperations}>Refresh Oracle health</button>
           {oracleOperations && <>
-            <div className="metricGrid">
+            <div className="metricGrid" style={{ marginTop: 16 }}>
               <div className="metricCard"><span>Requests / pending</span><strong>{oracleOperations.metrics.requests} / {oracleOperations.metrics.pending}</strong><small>Ledger requests</small></div>
               <div className="metricCard"><span>Exact agreements</span><strong>{oracleOperations.metrics.agreements}</strong><small>positive and negative</small></div>
               <div className="metricCard"><span>Conflicts / timeouts</span><strong>{oracleOperations.metrics.conflicts} / {oracleOperations.metrics.timeouts}</strong><small>auditor fallback outcomes</small></div>
             </div>
-            <div className="queueList">{oracleOperations.workers.map((worker) => <div className="queueItem" key={worker.oracleId}>
-              <div><div className="queueTitle"><strong>{worker.label} · {worker.oracleId}</strong><span className={`status status-${worker.status.toLowerCase()}`}>{worker.status}</span></div><p>{worker.registrySource} · snapshot {worker.registrySnapshotId || "unavailable"} v{worker.registryVersion} · model {worker.modelVersion || "unavailable"}</p>{worker.registryDatasetId && <small>{worker.registryDatasetId}@{worker.registryDatasetVersion} · transform {worker.registryTransformationVersion} · input {worker.registryInputSha256?.slice(0, 12)}…</small>}<small>Block {worker.lastProcessedBlock ?? "—"} · request {worker.lastProcessedRequestId ?? "—"} · {worker.lastProcessingLatencyMs ?? "—"} ms</small>{worker.lastError && <p className="evidenceWarning">{worker.lastError}</p>}</div>
+            <div className="queueList" style={{ marginTop: 14 }}>{oracleOperations.workers.map((worker) => <div className="queueItem" key={worker.oracleId}>
+              <div><div className="queueTitle"><strong>{worker.label} · {worker.oracleId}</strong><StatusBadge status={worker.status} /></div><p>{worker.registrySource} · snapshot {worker.registrySnapshotId || "unavailable"} v{worker.registryVersion} · model {worker.modelVersion || "unavailable"}</p>{worker.registryDatasetId && <small>{worker.registryDatasetId}@{worker.registryDatasetVersion} · transform {worker.registryTransformationVersion} · input {worker.registryInputSha256?.slice(0, 12)}…</small>}<small>Block {worker.lastProcessedBlock ?? "—"} · request {worker.lastProcessedRequestId ?? "—"} · {worker.lastProcessingLatencyMs ?? "—"} ms</small>{worker.lastError && <p className="evidenceWarning">{worker.lastError}</p>}</div>
               <span>{worker.counts.commitments} commit / {worker.counts.reveals} reveal</span>
             </div>)}</div>
           </>}
@@ -717,7 +883,35 @@ export function WorkspaceClient({
       </div>
 
       <div className="workGrid" id="transaction-console">
+        {medicalReview && (account.role === "policyholder" || account.role === "insurerAdmin" || account.role === "auditor") &&
+          <MedicalReview role={account.role} investigationEnabled={investigationEnabled} onEvidence={(id, grant) => {
+            setRetrievalEvidenceId(id); setRetrievalGrantId(grant); setDecryptedEvidence(null);
+            document.getElementById("retrieve-evidence")?.scrollIntoView({ behavior: "smooth" });
+          }} />}
+        {deployment.startsWith(`${medicalCandidateChannel}/`) && (account.role === "insurerAdmin" || account.role === "policyholder") &&
+          <MedicalIntake insurer={account.role === "insurerAdmin"} onAssociation={prepared => {
+            setPreparedWorkflow(prepared);
+            document.getElementById("guided-workflow")?.scrollIntoView({ behavior: "smooth" });
+          }} />}
+        {savedSnapshot && !savedAction && <p className="formError" role="alert">Saved action storage is unavailable or invalid. Preserve it for recovery; nothing new will be sent until storage is usable.</p>}
+        {savedAction && <article className="workCard workCardWide" aria-label="Saved workflow action">
+          <div className="reviewSummaryRow">
+            <h2>Recover saved action</h2>
+            <StatusBadge status={savedAction.state ?? "PENDING"} />
+          </div>
+          <p>{workflowFormDefinitions[savedAction.command.operation].label} · {savedAction.state ?? "Outcome unresolved"}. Check this action before submitting another instruction.</p>
+          <div className="evidenceActions">
+            <button type="button" className="primary button" disabled={busy} onClick={() => submitWorkflow(savedAction.command, true)}>Check saved action</button>
+            {["INVALID", "REJECTED", "NOT_SUBMITTED"].includes(savedAction.state ?? "") && <button type="button" className="secondary button" disabled={busy} onClick={() => {
+              if (!account) return;
+              localStorage.removeItem(savedActionKey(deployment, account.id)); notifySavedAction();
+              setPreparedWorkflow({ command: savedAction.command, revision: Date.now() });
+              setOutput("Confirmed failed action cleared. Review the original instruction before explicitly making a new attempt.");
+            }}>Review failed action for a new attempt</button>}
+          </div>
+        </article>}
         <GuidedWorkflowForm
+          medical={deployment.startsWith(`${medicalCandidateChannel}/`)}
           key={`${account.role}-${preparedWorkflow?.revision ?? 0}`}
           role={account.role}
           busy={busy}
@@ -731,33 +925,47 @@ export function WorkspaceClient({
             <h2>Pay with one-time authorization</h2>
             <p className="cardNote">The Bank emails an OTP for the exact payment details and recipient. Changing a detail requires a new code. Payment completes only after a valid committed Bank transfer.</p>
             <div className="evidenceFields">
-              <label>Policy ID<input value={manualPayment.policyId} onChange={(event) => updateManualPayment("policyId", event.target.value)} /></label>
-              <label>Customer account ID<input value={manualPayment.sourceAccountId} onChange={(event) => updateManualPayment("sourceAccountId", event.target.value)} /></label>
-              <label>Insurer account ID<input value={manualPayment.destinationAccountId} onChange={(event) => updateManualPayment("destinationAccountId", event.target.value)} /></label>
-              <label>Transfer ID<input value={manualPayment.transferId} onChange={(event) => updateManualPayment("transferId", event.target.value)} /></label>
-              <label>Payment ID<input value={manualPayment.paymentId} onChange={(event) => updateManualPayment("paymentId", event.target.value)} /></label>
+              <label>Policy ID<input spellCheck={false} autoComplete="off" value={manualPayment.policyId} onChange={(event) => updateManualPayment("policyId", event.target.value)} /></label>
+              <label>Customer account ID<input spellCheck={false} autoComplete="off" value={manualPayment.sourceAccountId} onChange={(event) => updateManualPayment("sourceAccountId", event.target.value)} /></label>
+              <label>Insurer account ID<input spellCheck={false} autoComplete="off" value={manualPayment.destinationAccountId} onChange={(event) => updateManualPayment("destinationAccountId", event.target.value)} /></label>
+              <label>Transfer ID<input spellCheck={false} autoComplete="off" value={manualPayment.transferId} onChange={(event) => updateManualPayment("transferId", event.target.value)} /></label>
+              <label>Payment ID<input spellCheck={false} autoComplete="off" value={manualPayment.paymentId} onChange={(event) => updateManualPayment("paymentId", event.target.value)} /></label>
               <label>Period starts<input type="date" value={manualPayment.periodStartDate} onChange={(event) => updateManualPayment("periodStartDate", event.target.value)} /></label>
               <label>Period ends<input type="date" value={manualPayment.periodEndDate} onChange={(event) => updateManualPayment("periodEndDate", event.target.value)} /></label>
               <label>Premium (BDT)<input inputMode="decimal" value={manualPayment.amountBdt} onChange={(event) => updateManualPayment("amountBdt", event.target.value)} /></label>
-              <label>External bank receipt<input value={manualPayment.externalReference} onChange={(event) => updateManualPayment("externalReference", event.target.value)} /></label>
-              <label>Six-digit OTP<input inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={manualPayment.otp} onChange={(event) => updateManualPayment("otp", event.target.value.replace(/\D/g, ""))} /></label>
+              <label>External bank receipt<input spellCheck={false} autoComplete="off" value={manualPayment.externalReference} onChange={(event) => updateManualPayment("externalReference", event.target.value)} /></label>
             </div>
-            {manualPayment.demoCode && <p className="evidenceWarning">Local demo delivery code: <strong>{manualPayment.demoCode}</strong></p>}
-            <div className="evidenceActions">
-              <button className="secondary button" disabled={busy || !manualPayment.policyId || !manualPayment.sourceAccountId} onClick={requestPremiumOtp}>Email OTP</button>
-              <button className="primary button" disabled={busy || !manualPayment.challengeId || manualPayment.otp.length !== 6} onClick={submitManualPremium}>Authorize premium</button>
-              <button className="secondary button" disabled={busy} onClick={recoverManualPremium}>Recover saved payment</button>
+            <div className="otpSection">
+              <span className="kicker">Step 2 · Challenge code</span>
+              <h3>Confirm one-time authorization code</h3>
+              <div className="evidenceFields">
+                <label>Six-digit OTP<input inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={manualPayment.otp} onChange={(event) => updateManualPayment("otp", event.target.value.replace(/\D/g, ""))} /></label>
+              </div>
+              {manualPayment.demoCode && <p className="evidenceWarning">Local demo delivery code: <strong>{manualPayment.demoCode}</strong></p>}
+              <div className="evidenceActions" style={{ marginTop: 14 }}>
+                <button type="button" className="secondary button" disabled={busy || !manualPayment.policyId || !manualPayment.sourceAccountId} onClick={requestPremiumOtp}>Email OTP</button>
+                <button type="button" className="primary button" disabled={busy || !manualPayment.challengeId || manualPayment.otp.length !== 6} onClick={submitManualPremium}>Authorize premium</button>
+                <button type="button" className="secondary button" disabled={busy} onClick={recoverManualPremium}>Recover saved payment</button>
+              </div>
             </div>
           </article>
         )}
 
         {account.role === "policyholder" && (
-          <article className="workCard">
+          <article className="workCard workCardWide">
             <span className="kicker">Policy statement</span>
             <h2>Export coverage and payment history</h2>
             <p className="cardNote">Download premiums, reversals, mandates, collections, claims, benefits, and liabilities reconciled to one owned policy.</p>
-            <label>Policy ID<input value={statementPolicyId} onChange={(event) => setStatementPolicyId(event.target.value)} placeholder="policy-1" /></label>
-            <a aria-disabled={!statementPolicyId.trim()} className={`primary button${statementPolicyId.trim() ? "" : " disabledLink"}`} download href={statementPolicyId.trim() ? `/api/policies/${encodeURIComponent(statementPolicyId.trim())}/statement` : undefined}>Download statement JSON</a>
+            <div className="auditExport">
+              <label>Policy ID<input spellCheck={false} autoComplete="off" value={statementPolicyId} onChange={(event) => setStatementPolicyId(event.target.value)} placeholder="policy-1" /></label>
+              <a
+                aria-disabled={!statementPolicyId.trim()}
+                tabIndex={statementPolicyId.trim() ? undefined : -1}
+                className={`primary button${statementPolicyId.trim() ? "" : " disabledLink"}`}
+                download
+                href={statementPolicyId.trim() ? `/api/policies/${encodeURIComponent(statementPolicyId.trim())}/statement` : undefined}
+              >Download statement JSON</a>
+            </div>
           </article>
         )}
 
@@ -795,10 +1003,10 @@ export function WorkspaceClient({
               </>}
             </select>
           </label>
-          <label>Asset ID<input value={assetId} onChange={(event) => setAssetId(event.target.value)} placeholder="claim-1" /></label>
+          <label>Asset ID<input spellCheck={false} autoComplete="off" value={assetId} onChange={(event) => setAssetId(event.target.value)} placeholder="claim-1" /></label>
           <div className="queryActions">
-            <button className="primary button" disabled={busy || assetType === "access"} onClick={queryAsset}>Find by ID</button>
-            <button className="secondary button" disabled={busy || assetType === "claim-history" || assetType === "oracle-history"} onClick={listAssets}>List all allowed</button>
+            <button type="button" className="primary button" disabled={busy || assetType === "access"} onClick={queryAsset}>Find by ID</button>
+            <button type="button" className="secondary button" disabled={busy || assetType === "claim-history" || assetType === "oracle-history"} onClick={listAssets}>List all allowed</button>
           </div>
         </article>
 
@@ -813,8 +1021,8 @@ export function WorkspaceClient({
                 <button type="button" key={label} onClick={() => setCommand(JSON.stringify(template, null, 2))}>{label}</button>
               ))}
             </div>
-            <textarea value={command} onChange={(event) => setCommand(event.target.value)} placeholder="Select a command template" spellCheck={false} />
-            <button className="primary button" disabled={busy || !command} onClick={submitCommand}>Submit raw command</button>
+            <textarea aria-label="Command JSON payload" value={command} onChange={(event) => setCommand(event.target.value)} placeholder="Select a command template" spellCheck={false} />
+            <button type="button" className="primary button" disabled={busy || !command} onClick={submitCommand}>Submit raw command</button>
           </details>
         </article>}
 
@@ -823,25 +1031,39 @@ export function WorkspaceClient({
             <span className="kicker">Ciphertext evidence</span>
             <h2>Encrypt, store, and anchor evidence</h2>
             <p className="cardNote">Encryption happens in this browser with AES-256-GCM. The passphrase and plaintext never reach the server; only the generated <code>.enc</code> envelope is stored, and Fabric receives integrity hashes.</p>
+            <div className="stepBanner">
+              <span><strong>Step 1:</strong> Encrypt original file in browser</span>
+              <span><strong>Step 2:</strong> Store ciphertext and anchor integrity hashes on Fabric</span>
+            </div>
             <div className="evidenceFields">
-              <label>Claim ID<input disabled={busy || encrypting} value={evidenceClaimId} onChange={(event) => { setEvidenceClaimId(event.target.value); setCiphertext(null); setContentHash(""); setRecoveryDownload(null); }} placeholder="claim-1" /></label>
-              <label>Evidence ID<input disabled={busy || encrypting} value={evidenceId} onChange={(event) => { setEvidenceId(event.target.value); setCiphertext(null); setContentHash(""); setRecoveryDownload(null); }} placeholder="evidence-1" /></label>
-              <label>Document type<input value={documentType} onChange={(event) => setDocumentType(event.target.value)} /></label>
-              <label>Original file<input disabled={busy || encrypting} type="file" onChange={(event) => { setPlaintextEvidence(event.target.files?.[0] ?? null); setCiphertext(null); setContentHash(""); setRecoveryDownload(null); }} /></label>
+              <label>Claim ID<input spellCheck={false} autoComplete="off" disabled={busy || encrypting || uploadPending} value={evidenceClaimId} onChange={(event) => { setEvidenceClaimId(event.target.value); setCiphertext(null); setContentHash(""); setRecoveryDownload(null); setUploadNotice(null); }} placeholder="claim-1" /></label>
+              <label>Evidence ID<input spellCheck={false} autoComplete="off" disabled={busy || encrypting || uploadPending} value={evidenceId} onChange={(event) => { setEvidenceId(event.target.value); setCiphertext(null); setContentHash(""); setRecoveryDownload(null); setUploadNotice(null); }} placeholder="evidence-1" /></label>
+              <label>Document type<input spellCheck={false} autoComplete="off" disabled={busy || encrypting || uploadPending} value={documentType} onChange={(event) => { setDocumentType(event.target.value); setUploadNotice(null); }} /></label>
+              <label>Original file<input disabled={busy || encrypting || uploadPending} type="file" onChange={(event) => { setPlaintextEvidence(event.target.files?.[0] ?? null); setCiphertext(null); setContentHash(""); setRecoveryDownload(null); setUploadNotice(null); }} /></label>
               <label>Evidence passphrase<input disabled={busy || encrypting} type="password" autoComplete="new-password" value={evidencePassphrase} onChange={(event) => setEvidencePassphrase(event.target.value)} placeholder="At least 12 characters" /></label>
               <label>Confirm passphrase<input disabled={busy || encrypting} type="password" autoComplete="new-password" value={evidencePassphraseConfirmation} onChange={(event) => setEvidencePassphraseConfirmation(event.target.value)} /></label>
               <label>Separate backup password (optional)<input disabled={busy || encrypting} type="password" autoComplete="new-password" value={backupPassword} onChange={(event) => setBackupPassword(event.target.value)} placeholder="Protect a downloadable recovery key" /></label>
-              <label>Original content SHA-256<input value={contentHash} readOnly placeholder="Calculated after encryption" /></label>
+              <label>Original content SHA-256<input className="monoWrap" value={contentHash} readOnly placeholder="Calculated after encryption" /></label>
               <div className="encryptionStatus">
                 <strong>{ciphertext ? "Ciphertext ready" : "Not encrypted yet"}</strong>
                 <span>{ciphertext ? `${ciphertext.name} · ${ciphertext.size} bytes` : "Choose a file and protect it with a passphrase."}</span>
               </div>
             </div>
             <div className="evidenceActions">
-              <button className="secondary button" disabled={busy || encrypting} onClick={encryptEvidence}>{encrypting ? "Encrypting…" : "Encrypt in browser"}</button>
-              <button className="primary button" disabled={busy || encrypting || !ciphertext} onClick={uploadEvidence}>Store ciphertext and record reference</button>
+              <button type="button" className="secondary button" disabled={busy || encrypting || uploadPending} onClick={encryptEvidence}>{encrypting ? "Encrypting…" : "Encrypt in browser"}</button>
+              <button type="button" className="primary button" disabled={busy || encrypting || !ciphertext} onClick={uploadEvidence}>{uploadPending ? "Retry original ciphertext" : "Store ciphertext and record reference"}</button>
               {recoveryDownload && <a className="secondary button" href={recoveryDownload.url} download={recoveryDownload.name}>Download recovery key</a>}
             </div>
+            {uploadPending && uploadNotice && (
+              <div className="pendingFreezeBanner" role="status">
+                <strong>Ciphertext upload is awaiting retry — identity fields locked to prevent digest mismatch</strong>
+                <p>{uploadNotice.message}</p>
+              </div>
+            )}
+            {!uploadPending && uploadNotice && <p className="evidenceWarning" role="status">{uploadNotice.message}</p>}
+            <p className="cardNote" style={{ marginTop: 16 }}>{medicalReview
+              ? "For a clarification or appeal, use the document type shown on the case and upload the exact file committed there."
+              : "After rejection, the appeal accepts only APPEAL_DOCUMENT matching its committed evidence hash. Add supported optional documents with the initial claim."}</p>
             <p className="evidenceWarning">Keep the evidence passphrase, or download its recovery key and remember the separate backup password. Losing both paths makes the ciphertext unrecoverable. The server cannot restore either secret.</p>
           </article>
         )}
@@ -849,20 +1071,23 @@ export function WorkspaceClient({
         {account.role !== "bankOfficer" && account.role !== "hospitalOfficer" && (
           <article className="workCard evidenceCard">
             <span className="kicker">Authorized evidence access</span>
-            <h2>Retrieve and decrypt evidence</h2>
+            <h2 id="retrieve-evidence">Retrieve and decrypt evidence</h2>
             <p className="cardNote">The server validates your organization and the claim state, records this access on Fabric, and returns ciphertext. Decryption and integrity verification happen only in this browser.</p>
             <div className="evidenceFields">
-              <label>Evidence ID<input value={retrievalEvidenceId} onChange={(event) => { setRetrievalEvidenceId(event.target.value); setDecryptedEvidence(null); }} placeholder="evidence-1" /></label>
-              <label>Grant ID (optional)<input value={retrievalGrantId} onChange={(event) => setRetrievalGrantId(event.target.value)} placeholder="grant-1" /></label>
+              <label>Evidence ID<input spellCheck={false} autoComplete="off" disabled={retrieving} value={retrievalEvidenceId} onChange={(event) => { setRetrievalEvidenceId(event.target.value); setDecryptedEvidence(null); }} placeholder="evidence-1" /></label>
+              <label>Grant ID (optional)<input spellCheck={false} autoComplete="off" disabled={retrieving} value={retrievalGrantId} onChange={(event) => { setRetrievalGrantId(event.target.value); setDecryptedEvidence(null); }} placeholder="grant-1" /></label>
               <label>Evidence passphrase<input type="password" autoComplete="current-password" value={retrievalPassphrase} onChange={(event) => setRetrievalPassphrase(event.target.value)} /></label>
               <label>Recovery key file<input type="file" accept=".bifkey,application/json" onChange={(event) => setRecoveryFile(event.target.files?.[0] ?? null)} /></label>
               <label>Backup password<input type="password" autoComplete="current-password" value={restorePassword} onChange={(event) => setRestorePassword(event.target.value)} /></label>
             </div>
             <div className="evidenceActions">
-              <button className="primary button" disabled={busy || retrieving} onClick={retrieveEvidence}>{retrieving ? "Retrieving…" : "Retrieve and decrypt"}</button>
-              <button className="secondary button" disabled={busy || retrieving || !recoveryFile} onClick={restoreEvidenceKey}>Restore recovery key</button>
+              <button type="button" className="primary button" disabled={busy || retrieving} onClick={retrieveEvidence}>{retrieving ? "Retrieving…" : "Retrieve and decrypt"}</button>
+              <button type="button" className="secondary button" disabled={busy || retrieving || !recoveryFile} onClick={restoreEvidenceKey}>Restore recovery key</button>
               {decryptedEvidence && <a className="secondary button" download={decryptedEvidence.name} href={decryptedEvidence.url}>Download verified plaintext</a>}
+              {medicalReview && decryptedEvidence?.reviewId && <button type="button" className="secondary button" disabled={busy} onClick={confirmMedicalReadiness}>Confirm decryption for this review</button>}
             </div>
+            {medicalReview && decryptedEvidence && (account.role === "policyholder" || account.role === "auditor") &&
+              <MedicalOCR key={decryptedEvidence.accessId} file={decryptedEvidence.blob} evidenceId={decryptedEvidence.id} accessId={decryptedEvidence.accessId} />}
           </article>
         )}
 
@@ -872,9 +1097,10 @@ export function WorkspaceClient({
             <h2>Export claim dossier</h2>
             <p className="cardNote">Download the ledger-backed claim timeline, Oracle request/commitments/reveals and registry/model provenance, evidence access, reviews, every auditor vote, appeals, fraud advisories, and settlement as one JSON record.</p>
             <div className="auditExport">
-              <label>Claim ID<input value={auditClaimId} onChange={(event) => setAuditClaimId(event.target.value)} placeholder="claim-1" /></label>
+              <label>Claim ID<input spellCheck={false} autoComplete="off" value={auditClaimId} onChange={(event) => setAuditClaimId(event.target.value)} placeholder="claim-1" /></label>
               <a
                 aria-disabled={!auditClaimId.trim()}
+                tabIndex={auditClaimId.trim() ? undefined : -1}
                 className={`primary button${auditClaimId.trim() ? "" : " disabledLink"}`}
                 download
                 href={auditClaimId.trim() ? `/api/audit/claims/${encodeURIComponent(auditClaimId.trim())}` : undefined}
@@ -889,19 +1115,49 @@ export function WorkspaceClient({
             <h2>Verify anchored evidence</h2>
             <p className="cardNote">Reconstruct an evidence leaf from its Fabric reference, apply the inclusion path, and compare the computed root with the insurer-published batch root.</p>
             <div className="evidenceFields">
-              <label>Evidence ID<input value={proofEvidenceId} onChange={(event) => setProofEvidenceId(event.target.value)} placeholder="evidence-1001" /></label>
-              <label>Merkle batch ID<input value={proofBatchId} onChange={(event) => setProofBatchId(event.target.value)} placeholder="evidence-batch-1001" /></label>
+              <label>Evidence ID<input spellCheck={false} autoComplete="off" value={proofEvidenceId} onChange={(event) => setProofEvidenceId(event.target.value)} placeholder="evidence-1001" /></label>
+              <label>Merkle batch ID<input spellCheck={false} autoComplete="off" value={proofBatchId} onChange={(event) => setProofBatchId(event.target.value)} placeholder="evidence-batch-1001" /></label>
             </div>
             <div className="evidenceActions">
-              <button className="primary button" disabled={busy || !proofEvidenceId.trim() || !proofBatchId.trim()} onClick={verifyEvidenceProof}>Verify proof</button>
-              <a className={`secondary button${proofEvidenceId.trim() && proofBatchId.trim() ? "" : " disabledLink"}`} download href={proofEvidenceId.trim() && proofBatchId.trim() ? `/api/evidence/${encodeURIComponent(proofEvidenceId.trim())}/proof?batchId=${encodeURIComponent(proofBatchId.trim())}&download=1` : undefined}>Download proof JSON</a>
+              <button type="button" className="primary button" disabled={busy || !proofEvidenceId.trim() || !proofBatchId.trim()} onClick={verifyEvidenceProof}>Verify proof</button>
+              <a
+                aria-disabled={!proofEvidenceId.trim() || !proofBatchId.trim()}
+                tabIndex={proofEvidenceId.trim() && proofBatchId.trim() ? undefined : -1}
+                className={`secondary button${proofEvidenceId.trim() && proofBatchId.trim() ? "" : " disabledLink"}`}
+                download
+                href={proofEvidenceId.trim() && proofBatchId.trim() ? `/api/evidence/${encodeURIComponent(proofEvidenceId.trim())}/proof?batchId=${encodeURIComponent(proofBatchId.trim())}&download=1` : undefined}
+              >Download proof JSON</a>
             </div>
           </article>
         )}
       </div>
 
-      <div className="resultHeading" id="gateway-proof"><span className="kicker">Gateway response</span><span>{busy ? "Working…" : "Ready"}</span></div>
-      <pre className="console">{output}</pre>
+      <div className="consoleToolbar" id="gateway-proof">
+        <div className="resultHeading" style={{ margin: 0, gap: 12 }}>
+          <span className="kicker">Gateway response</span>
+          <span>{busy ? "Working…" : "Ready"}</span>
+        </div>
+        <div className="evidenceActions" style={{ alignItems: "center" }}>
+          <span role="status" style={{ fontSize: 12, color: "var(--text-muted)" }}>{copiedOutput ? "Copied" : ""}</span>
+          <button type="button" className="secondary button" onClick={copyGatewayOutput} disabled={!output}>Copy JSON</button>
+        </div>
+      </div>
+      {gatewaySummary && (
+        <div className="responseSummary">
+          <div className="reviewSummaryRow">
+            <strong>Parsed ledger summary</strong>
+            {gatewaySummary.status && <StatusBadge status={gatewaySummary.status} />}
+          </div>
+          <div className="responseSummaryGrid">
+            {gatewaySummary.identifier && <div><span>Identifier</span><strong>{gatewaySummary.identifier}</strong></div>}
+            {gatewaySummary.operation && <div><span>Operation / Asset</span><strong>{gatewaySummary.operation}</strong></div>}
+            {gatewaySummary.version && <div><span>Version</span><strong>{gatewaySummary.version}</strong></div>}
+            {gatewaySummary.count !== undefined && <div><span>Items returned</span><strong>{gatewaySummary.count}</strong></div>}
+            {gatewaySummary.txId && <div><span>Transaction ID</span><strong>{gatewaySummary.txId}</strong></div>}
+          </div>
+        </div>
+      )}
+      <pre aria-live="polite" className="console">{output}</pre>
     </section>
   );
 }

@@ -69,11 +69,18 @@ export function PresentationGuide({ role }: { role: FabricRole }) {
       </div>
 
       <ol className="presentationJourney" aria-label="End-to-end insurance journey">
-        {stages.map((stage) => (
-          <li className={stage.roles.includes(role) ? "isCurrent" : ""} key={stage.number}>
-            <span>{stage.number}</span><strong>{stage.label}</strong>
-          </li>
-        ))}
+        {stages.map((stage) => {
+          const isCurrent = stage.roles.includes(role);
+          return (
+            <li
+              className={isCurrent ? "isCurrent" : undefined}
+              aria-current={isCurrent ? "step" : undefined}
+              key={stage.number}
+            >
+              <span>{stage.number}</span><strong>{stage.label}</strong>
+            </li>
+          );
+        })}
       </ol>
 
       <div className="presenterBrief">

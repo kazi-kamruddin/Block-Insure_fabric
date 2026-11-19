@@ -3,6 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "predev": "node scripts/prepare-ocr-assets.mjs",
+    "prebuild": "node scripts/prepare-ocr-assets.mjs",
     "dev": "next dev",
     "build": "next build",
     "postbuild": "node scripts/prepare-standalone.mjs",
@@ -12,18 +14,22 @@
     "test": "vitest run --configLoader runner",
     "test:e2e": "playwright test",
     "test:e2e:offline": "playwright test --config playwright.offline.config.ts",
-    "check:worker": "node --check scripts/load-environment.mjs && node --check scripts/start-standalone.mjs && node --check scripts/sync-events.mjs && node --check scripts/process-premium-collections.mjs",
+    "check:worker": "node --test ../../scripts/application-paths.test.mjs && node --check scripts/load-environment.mjs && node --check scripts/start-standalone.mjs && node --check scripts/sync-events.mjs && node --check scripts/process-premium-collections.mjs",
     "events:sync": "node scripts/sync-events.mjs",
     "banking:collect": "node scripts/process-premium-collections.mjs"
   },
   "dependencies": {
     "@grpc/grpc-js": "1.14.5",
     "@hyperledger/fabric-gateway": "1.12.1",
+    "@hyperledger/fabric-protos": "0.3.7",
     "@next/env": "16.4.5",
+    "@tesseract.js-data/eng": "1.0.0",
     "next": "16.4.5",
+    "pdfjs-dist": "6.5.438",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "server-only": "0.0.1",
+    "tesseract.js": "7.0.0",
     "zod": "4.6.7"
   },
   "devDependencies": {

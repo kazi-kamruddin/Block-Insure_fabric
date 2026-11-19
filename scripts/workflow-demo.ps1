@@ -2,11 +2,20 @@
 param(
     [Parameter(Position = 0)]
     [ValidateSet("Start", "Status", "Stop")]
-    [string]$Action = "Status"
+    [string]$Action = "Status",
+    [ValidateSet('Candidate','Historical')][string]$Profile='Candidate',
+    [switch]$AutomaticCollections,
+    [switch]$KeepNetwork
 )
 
 $ErrorActionPreference = "Stop"
 $projectRoot = Split-Path -Parent $PSScriptRoot
+if ($Profile -eq 'Candidate') {
+    & "$PSScriptRoot/candidate-demo.ps1" $Action -AutomaticCollections:$AutomaticCollections -KeepNetwork:$KeepNetwork
+    return
+}
+if ($AutomaticCollections) { throw '-AutomaticCollections is a candidate profile option.' }
+if ($KeepNetwork) { throw '-KeepNetwork is a candidate profile option; Historical already retains its network.' }
 $env:FABRIC_CHANNEL_NAME = "insurance-workflow-20261005"
 $env:FABRIC_EXPECTED_SCHEMA_VERSION = "15"
 $env:ORACLE_STATE_ROOT = Join-Path $projectRoot "data/oracle-workflow"
