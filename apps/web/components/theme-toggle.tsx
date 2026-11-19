@@ -1,6 +1,6 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 
 function subscribe(callback: () => void) {
   window.addEventListener("storage", callback);
@@ -21,6 +21,11 @@ function getServerSnapshot(): "dark" | "light" {
 
 export function ThemeToggle({ className }: { className?: string }) {
   const theme = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+
+  useEffect(() => {
+    const meta = document.querySelector('meta[name="theme-color"]');
+    meta?.setAttribute("content", theme === "light" ? "#e6eee6" : "#040805");
+  }, [theme]);
 
   function toggleTheme() {
     const nextTheme = theme === "dark" ? "light" : "dark";

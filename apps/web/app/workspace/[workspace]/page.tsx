@@ -1,6 +1,5 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ThemeToggle } from "@/components/theme-toggle";
+import { SiteHeader } from "@/components/site-header";
 import { WorkspaceClient } from "@/components/workspace-client";
 import { findDemoAccount, workspaceForAccount } from "@/lib/auth/accounts";
 import { currentSession } from "@/lib/auth/current-session";
@@ -31,22 +30,31 @@ export default async function RoleWorkspacePage({ params }: PageContext) {
       ? "Bangladesh Demo Commercial Bank"
       : "Block-Insure";
   const portalMark = canonicalWorkspace === "hospital" ? "HC" : canonicalWorkspace === "bank" ? "DB" : "BI";
+  const showResearch = account.role === "insurerAdmin" || account.role === "auditor";
+  const portalVariant = canonicalWorkspace === "hospital" || canonicalWorkspace === "bank" ? canonicalWorkspace : undefined;
+
   return (
-    <main className={`workspacePage workspacePage-${canonicalWorkspace}`}>
-      <header className="floatingNavWrapper">
-        <nav className="shell nav" aria-label={`${account.displayName} navigation`}>
-          <Link className="brand" href="/">
-            <span className="brandMark">{portalMark}</span>
-            <span>{portalName}</span>
-          </Link>
-          <div className="navLinks">
-            <Link className="networkPill" href="/showcase"><span className="status-dot-pulse" aria-hidden="true" /> {canonicalWorkspace} · presentation</Link>
-            <ThemeToggle />
-          </div>
-        </nav>
-      </header>
-      <WorkspaceClient initialAccount={account} initialDashboard={dashboard} deployment={`${config.channelName}/${config.chaincodeName}`}
-        medicalReviewEnabled={process.env.FABRIC_MEDICAL_REVIEW_ENABLED === "true"} />
-    </main>
+    <>
+      <SiteHeader
+        activeRoute="/workspace"
+        navLabel={`${account.displayName} navigation`}
+        brandName={portalName}
+        brandMark={portalMark}
+        pillText={`${canonicalWorkspace} · presentation`}
+        pillHref="/showcase"
+        showResearch={showResearch}
+        portalVariant={portalVariant}
+      />
+      <main id="main-content" tabIndex={-1} className={`workspacePage workspacePage-${canonicalWorkspace}`}>
+        <WorkspaceClient initialAccount={account} initialDashboard={dashboard} deployment={`${config.channelName}/${config.chaincodeName}`}
+          medicalReviewEnabled={process.env.FABRIC_MEDICAL_REVIEW_ENABLED === "true"}
+          investigationEnabled={Boolean(process.env.MEDICAL_FINDINGS_ROOT?.trim()) && account.role === "insurerAdmin" &&
+            process.env.MEDICAL_FINDINGS_INVESTIGATOR?.trim() === account.id} />
+      </main>
+      <footer className="shell footer">
+        <span>{portalName} · {account.organization}</span>
+        <span>{config.channelName}/{config.chaincodeName}</span>
+      </footer>
+    </>
   );
 }

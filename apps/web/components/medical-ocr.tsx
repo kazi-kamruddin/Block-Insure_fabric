@@ -61,22 +61,30 @@ export function MedicalOCR({ file, evidenceId, accessId = "" }: { file: Blob; ev
     } finally { setBusy(false); }
   }
 
-  return <section>
+  return <section className="medicalSubpanel" style={{ marginTop: 18 }}>
     <h3>Read invoice fields</h3>
-    <p>Compare the suggestions with the source page. These fields do not change the claim.</p>
-    <label>Page<input type="number" min="1" max="10" value={page} disabled={busy} onChange={event => {
-      setPage(event.target.value); setResult(null); setConfirmed(null); setSource("");
-    }} /></label>
-    <button type="button" className="secondary button" disabled={busy} onClick={extract}>Extract invoice fields</button>
-    {/* eslint-disable-next-line @next/next/no-img-element -- Render a local object URL without sending private image bytes to an optimizer. */}
-    {source && <img src={source} alt="Selected source invoice page" style={{ maxWidth: "100%", maxHeight: 480, objectFit: "contain" }} />}
-    {confirmed && result && <>
-      <p>OCR confidence {Math.round(result.confidence)}%</p>
-      {(Object.keys(labels) as (keyof InvoiceFields)[]).map(field => <label key={field}>{labels[field]}
-        <input value={confirmed[field]} maxLength={80} disabled={busy} onChange={event => setConfirmed({ ...confirmed, [field]: event.target.value })} />
-      </label>)}
-      <button type="button" className="secondary button" disabled={busy || !evidenceId} onClick={save}>Confirm fields and download private receipt</button>
-    </>}
+    <p className="ocrAdvisory">Browser-local advisory extraction only. Compare the suggestions with the source page; these fields do not change the claim.</p>
+    <div className="ocrGrid">
+      <div>
+        <label>Page<input type="number" min="1" max="10" value={page} disabled={busy} onChange={event => {
+          setPage(event.target.value); setResult(null); setConfirmed(null); setSource("");
+        }} /></label>
+        <div className="medicalButtonGroup">
+          <button type="button" className="secondary button" disabled={busy} aria-busy={busy} onClick={extract}>Extract invoice fields</button>
+        </div>
+        {/* eslint-disable-next-line @next/next/no-img-element -- Render a local object URL without sending private image bytes to an optimizer. */}
+        {source && <div className="ocrPreviewFrame" style={{ marginTop: 14 }}><img src={source} alt="Selected source invoice page" style={{ maxWidth: "100%", maxHeight: 480, objectFit: "contain" }} /></div>}
+      </div>
+      {confirmed && result && <div>
+        <p className="cardNote">OCR confidence <strong>{Math.round(result.confidence)}%</strong></p>
+        {(Object.keys(labels) as (keyof InvoiceFields)[]).map(field => <label key={field}>{labels[field]}
+          <input value={confirmed[field]} maxLength={80} disabled={busy} spellCheck={false} onChange={event => setConfirmed({ ...confirmed, [field]: event.target.value })} />
+        </label>)}
+        <div className="medicalButtonGroup">
+          <button type="button" className="primary button" disabled={busy || !evidenceId} onClick={save}>Confirm fields and download private receipt</button>
+        </div>
+      </div>}
+    </div>
     <p role="status">{status}</p>
   </section>;
 }

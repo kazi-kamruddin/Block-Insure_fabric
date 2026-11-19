@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { invoicePDF } from "./invoice-pdf";
 
@@ -15,6 +15,7 @@ const roles = {
 } as const;
 
 const deadlines = process.env.MEDICAL_DEADLINE_LIVE === "true";
+const finalPayment = process.env.MEDICAL_FINAL_PAYMENT === "true";
 const governed = deadlines || process.env.MEDICAL_REVIEW_LIVE === "true";
 
 function day(offset: number) {
@@ -22,6 +23,7 @@ function day(offset: number) {
 }
 
 const journey = deadlines ? "live medical deadlines, single recovery, and PDF and JPEG OCR"
+  : finalPayment ? "final medical association, concurrent claim, Oracle absence, payout recovery, and insurer findings"
   : governed ? "live medical clarification, review, appeal and OCR through one Bank payout" : "ordinary medical browser journey through one Bank payout";
 
 test(journey, async ({ page }, info) => {
@@ -30,8 +32,8 @@ test(journey, async ({ page }, info) => {
   expect(health.ok(), await health.text()).toBe(true);
   expect(await health.json()).toMatchObject({ channel: "insurance-medical-reimbursement", chaincode: "insurance-contract", schemaVersion: 15 });
 
-  const resumeClaim = deadlines ? process.env.MEDICAL_DEADLINE_RESUME_CLAIM : undefined;
-  const resumeSuffix = process.env.MEDICAL_DEADLINE_RESUME_SUFFIX;
+  const resumeClaim = deadlines ? process.env.MEDICAL_DEADLINE_RESUME_CLAIM : finalPayment ? process.env.MEDICAL_FINAL_RESUME_CLAIM : undefined;
+  const resumeSuffix = finalPayment ? process.env.MEDICAL_FINAL_RESUME_SUFFIX : process.env.MEDICAL_DEADLINE_RESUME_SUFFIX;
   if (resumeClaim && !resumeSuffix) throw new Error("Supply the interrupted fixture suffix");
   const suffix = resumeClaim && resumeSuffix ? resumeSuffix : randomUUID().slice(0, 12);
   const id = (prefix: string) => "med-" + prefix + "-" + suffix;
@@ -62,7 +64,7 @@ test(journey, async ({ page }, info) => {
     return body.result;
   }
 
-  async function form(operation: string, input: Record<string, string>, status = 200) {
+  async function fillForm(operation: string, input: Record<string, string>) {
     console.log(role + " " + operation);
     const card = page.locator("#guided-workflow");
     if (role !== "hospital") {
@@ -75,7 +77,11 @@ test(journey, async ({ page }, info) => {
       if (await field.evaluate(element => element.tagName === "SELECT")) await field.selectOption(value);
       else await field.fill(value);
     }
-    return postFromButton(card.getByRole("button", { name: /^(Save intake|Submit verified transaction|Submit bank instruction)$/ }), "/api/workflows", status);
+    return card.getByRole("button", { name: /^(Save intake|Submit verified transaction|Submit bank instruction)$/ });
+  }
+
+  async function form(operation: string, input: Record<string, string>, status = 200) {
+    return postFromButton(await fillForm(operation, input), "/api/workflows", status);
   }
 
   async function assets(type: string) {
@@ -200,7 +206,7 @@ test(journey, async ({ page }, info) => {
   }
 
   try {
-    if (governed) {
+    if (governed || finalPayment) {
       await login("insurer");
       await expect(reviewCard.getByRole("heading", { name: "Medical review and appeal" })).toBeVisible();
       if (priorClaimId) expect(await asset("claim", priorClaimId)).toMatchObject({ status: "SETTLED", amountMinor: 4000 });
@@ -231,7 +237,7 @@ test(journey, async ({ page }, info) => {
       for (const [name, ownerId, accountType, openingBalanceBdt] of [
         ["customer", "policyholder1", "CUSTOMER", "100.00"],
         ["premium", "insurer", "INSURER", "0.00"],
-        ["reserve", "insurer", "INSURER", "100.00"],
+        ["reserve", "insurer", "INSURER", finalPayment ? "0.00" : "100.00"],
       ]) await form("openBankAccount", { id: id(name), bankId: "bank-demo", ownerId, accountType,
         accountLabel: "Synthetic medical " + name, maskedAccount: "**** 1234", openingBalanceBdt, accountTokenText: id("token-" + name) });
       await login("holder");
@@ -267,14 +273,34 @@ test(journey, async ({ page }, info) => {
       expect(await forbidden.json()).toMatchObject({ message: "Hospital accounts can only save factual episode intake." });
       const episode = await form("saveMedicalEpisode", hospitalFields(0, governed ? "950.00" : "500.00"));
       episodeId = episode.id;
+      let alternate;
+      if (finalPayment) {
+        alternate = await form("saveMedicalEpisode", { ...hospitalFields(0, "25.00"),
+          episodeReference: id("alternate-episode"), patientReference: id("alternate-patient") });
+        const payload = { operation: "saveMedicalEpisode", episodeReferenceHash: "a".repeat(64), expectedRevision: 0,
+          patientReferenceHash: "b".repeat(64), service: "SURGERY", serviceDate: service, admissionDate: service,
+          dischargeDate: service, billMinor: 2500, invoiceDate: service, diagnosisCode: "", fraudLabel: true };
+        const label = await page.request.post("/api/workflows", { data: payload });
+        expect(label.status()).toBe(400);
+      }
       await login("holder");
       const discovery = page.getByRole("article").filter({ has: page.getByRole("heading", { name: "Your medical episodes", exact: true }) });
       await discovery.getByRole("button", { name: "Refresh episodes" }).click();
       await expect(discovery.getByLabel("Verified episode").locator('option[value="' + episode.id + '"]')).toHaveCount(0);
+      const idOfPolicy = id("policy");
+      const rawQuote = (episode: string) => "/api/medical/intake?" + new URLSearchParams({ policy: idOfPolicy, episode, revision: "1" });
+      if (finalPayment) {
+        const denied = await page.request.get(rawQuote(episode.id));
+        expect(denied.status(), await denied.text()).toBe(409);
+      }
       await login("insurer");
       const queue = page.getByRole("article").filter({ has: page.getByRole("heading", { name: "Episode association queue", exact: true }) });
       await queue.getByRole("button", { name: "Refresh episodes" }).click();
       await expect(queue.getByRole("button", { name: "Resolve association" }).first()).toBeVisible();
+      if (alternate) {
+        await form("verifyMedicalAssociation", { episodeId: alternate.id, revision: "1", beneficiaryId: "synthetic-other-patient",
+          decisionBasis: id("alternate-clarified-match"), associationDecision: "VERIFY" });
+      }
       await form("verifyMedicalAssociation", { episodeId: episode.id, revision: "1", beneficiaryId: "policyholder1",
         decisionBasis: id("verified-synthetic-match"), associationDecision: "VERIFY" });
       const registry = await page.request.get("/api/medical/intake");
@@ -294,8 +320,35 @@ test(journey, async ({ page }, info) => {
       await expect(discovery.getByText(/Eligible BDT 80.00 · Deductible BDT 8.00 · Insurer share BDT 57.60/)).toBeVisible();
       await expect(discovery.getByText("Payable BDT 40.00", { exact: true })).toBeVisible();
       await info.attach("reimbursement-statement", { body: await discovery.innerText(), contentType: "text/plain" });
-      const claim = await postFromButton(discovery.getByRole("button", { name: "Accept statement and submit claim" }));
-      expect(claim).toMatchObject({ id: receipt.id, version: 1, amountMinor: 4000, episodeId: episode.id, episodeRevision: 1 });
+      let claim;
+      if (finalPayment) {
+        await expect(discovery.getByLabel("Verified episode").locator('option[value="' + alternate.id + '"]')).toHaveCount(0);
+        const unauthorized = await page.request.get(rawQuote(alternate.id));
+        expect(unauthorized.status(), await unauthorized.text()).toBe(409);
+        const offer = await page.request.get(rawQuote(episode.id));
+        expect(offer.ok(), await offer.text()).toBe(true);
+        const { quote } = await offer.json();
+        expect(quote).toMatchObject({ billedMinor: 50000, eligibleMinor: 8000, deductibleMinor: 800, insurerShareMinor: 5760, payableMinor: 4000 });
+        const facts = { policyId: id("policy"), episodeId: episode.id, revision: 1 };
+        const initial = { operation: "submitMedicalClaim", id: receipt.id, ...facts, statementHash: quote.statementHash };
+        for (const malformed of [{ ...initial, amountMinor: 95000 }, { ...initial, revision: 2 }, { ...initial, statementHash: "0".repeat(64) }]) {
+          const denial = await page.request.post("/api/workflows", { data: malformed });
+          expect(denial.status(), await denial.text()).toBe("amountMinor" in malformed ? 400 : 409);
+          journal.push({ scenario: "intake-input-perturbation", status: denial.status() });
+        }
+        const preparation = await page.request.post("/api/workflows", { data: { operation: "prepareMedicalClaim", id: id("concurrent"), ...facts } });
+        expect(preparation.ok(), await preparation.text()).toBe(true);
+        const competing = await Promise.all([initial, { ...initial, id: id("concurrent") }]
+          .map(data => page.request.post("/api/workflows", { data })));
+        expect(competing.map(response => response.status()).sort()).toEqual([200, 409]);
+        claim = (await competing.find(response => response.ok())!.json()).result;
+        expect((await assets("claim") as { episodeId?: string }[]).filter(row => row.episodeId === episode.id)).toHaveLength(1);
+        journal.push({ scenario: "concurrent-medical-claims", winningClaimId: claim.id, status: competing.map(response => response.status()) });
+      } else {
+        claim = await postFromButton(discovery.getByRole("button", { name: "Accept statement and submit claim" }));
+      }
+      expect(claim).toMatchObject({ version: 1, amountMinor: 4000, episodeId: episode.id, episodeRevision: 1 });
+      if (!finalPayment) expect(claim.id).toBe(receipt.id);
       claimId = claim.id;
     });
     if (deadlines) {
@@ -512,7 +565,7 @@ test(journey, async ({ page }, info) => {
 
     await test.step("pinned matching Oracle results and exactly one committed payout", async () => {
       await login("insurer");
-      if (!governed) {
+      if (!governed && !resumeClaim) {
       const request = await form("startClaimProcessing", { claimId });
       expect(request).toMatchObject({ claimId, claimVersion: 1, modelVersion: "fabric-xgb-synthetic-v1", requiredConfirmations: 2, expectedResponses: 3 });
       await expect.poll(async () => (await asset("claim", claimId)).status, { timeout: 240_000, intervals: [2000] }).toMatch(/^(APPROVED|ORACLE_FAILED)$/);
@@ -521,6 +574,11 @@ test(journey, async ({ page }, info) => {
       expect(results.some((result, n) => results.slice(n + 1).some(other => other.resultHash === result.resultHash))).toBe(true);
       journal.push({ request, results });
       const claim = await asset("claim", claimId);
+      if (finalPayment) {
+        expect(results).toHaveLength(2);
+        expect(results.map(result => (result as { oracleId?: string }).oracleId).sort()).toEqual(["oracle1", "oracle2"]);
+        expect(claim.status).toBe("APPROVED");
+      }
       if (claim.status === "ORACLE_FAILED") {
         expect(results.some(result => result.verificationCode.startsWith("XGB_REVIEW:")), JSON.stringify(results)).toBe(true);
         await form("routeOracleFailureToReview", { requestId: request.id, reviewId: id("review"),
@@ -537,20 +595,79 @@ test(journey, async ({ page }, info) => {
         expect(results.some(result => result.verificationCode.startsWith("XGB_AUTO:")), JSON.stringify(results)).toBe(true);
       }
       }
-      await form("authorizeSettlement", { settlementId: id("settlement"), claimId, sourceAccountId: id("reserve"), destinationAccountId: id("customer") });
+      if (resumeClaim) {
+        expect(await asset("claim", claimId)).toMatchObject({ id: claimId, policyId: id("policy"), status: "SETTLEMENT_AUTHORIZED", amountMinor: 4000 });
+        expect(await asset("settlement", id("settlement"))).toMatchObject({ claimId, sourceAccountId: id("reserve"),
+          destinationAccountId: id("customer"), status: "PAYMENT_FAILED", amountMinor: 4000 });
+      } else {
+        await form("authorizeSettlement", { settlementId: id("settlement"), claimId, sourceAccountId: id("reserve"), destinationAccountId: id("customer") });
+      }
       await login("bank");
       expect((await asset("account", id("customer"))).balanceMinor).toBe(9900);
       const payout = { settlementId: id("settlement"), transferId: id("payout"), bankReferenceText: id("bank-receipt") };
-      expect(await form("confirmSettlement", payout)).toMatchObject({ status: "CONFIRMED", amountMinor: 4000 });
+      if (finalPayment) {
+        if (resumeClaim) {
+          // The interrupted case used the routine receipt for its bounce.
+          payout.bankReferenceText = id("bank-receipt-recovered");
+        } else {
+          expect(await form("confirmSettlement", { ...payout, transferId: id("underfunded"), bankReferenceText: id("bounced-receipt") }))
+            .toMatchObject({ status: "PAYMENT_FAILED", amountMinor: 4000 });
+          expect((await asset("account", id("customer"))).balanceMinor).toBe(9900);
+          await form("adjustBankAccountBalance", { transferId: id("funding"), accountId: id("reserve"),
+            direction: "CREDIT", amountBdt: "100.00", externalReferenceText: id("funding-receipt") });
+        }
+        expect((await asset("account", id("reserve"))).balanceMinor).toBe(10000);
+        const capture = page.waitForEvent("requestfailed", { predicate: request => request.url().endsWith("/api/workflows"), timeout: 150_000 });
+        let committed;
+        const endpoint = "**/api/workflows";
+        await page.route(endpoint, async route => {
+          const command = route.request().postDataJSON();
+          if (command?.operation !== "confirmSettlement" || command.transferId !== id("payout")) return route.continue();
+          const response = await route.fetch({ timeout: 120_000, maxRetries: 0 });
+          committed = { httpStatus: response.status(), ...await response.json() };
+          await route.abort("failed");
+        });
+        await (await fillForm("confirmSettlement", payout)).click();
+        await capture;
+        await page.unroute(endpoint);
+        expect(committed, JSON.stringify(committed)).toMatchObject({ httpStatus: 200, state: "COMMITTED", result: { status: "CONFIRMED", amountMinor: 4000 } });
+        await page.reload();
+        const recovered = await postFromButton(page.getByRole("button", { name: "Check saved action" }));
+        expect(recovered).toMatchObject({ status: "CONFIRMED", amountMinor: 4000, id: id("settlement") });
+        journal.push({ scenario: "valid-commit-lost-response", committed, recovered });
+      } else {
+        expect(await form("confirmSettlement", payout)).toMatchObject({ status: "CONFIRMED", amountMinor: 4000 });
+      }
       await form("confirmSettlement", { ...payout, transferId: id("duplicate") }, 409);
       expect((await asset("account", id("customer"))).balanceMinor).toBe(13900);
       expect((await asset("account", id("reserve"))).balanceMinor).toBe(6000);
       const transfers = (await assets("bank-transfer") as { settlementId: string; status: string; id: string }[]).filter(row => row.settlementId === id("settlement"));
-      expect(transfers).toHaveLength(1);
-      expect(transfers[0]).toMatchObject({ id: id("payout"), status: "SETTLED" });
+      expect(transfers.filter(row => row.status === "SETTLED")).toEqual([expect.objectContaining({ id: id("payout"), status: "SETTLED" })]);
+      expect(transfers).toHaveLength(finalPayment ? 2 : 1);
       await login("holder");
       expect(await asset("claim", claimId)).toMatchObject({ status: "SETTLED", amountMinor: 4000 });
       if (governed && priorClaimId) expect(await asset("claim", priorClaimId)).toMatchObject({ status: "SETTLED", amountMinor: 4000 });
+      if (finalPayment) {
+        const reference = id("independent-review");
+        const data = { claimId, version: 1, outcome: "DISMISSED", basisHash: createHash("sha256").update(reference).digest("hex") };
+        for (const outsider of ["holder", "hospital"] as const) {
+          await login(outsider);
+          const denial = await page.request.post("/api/medical/investigation", { data });
+          expect(denial.status(), await denial.text()).toBe(403);
+        }
+        await login("insurer");
+        await loadReview(claimId);
+        await reviewCard.getByLabel("Investigation outcome").selectOption("DISMISSED");
+        await reviewCard.getByLabel("Independent investigation reference").fill(reference);
+        const finding = await postFromButton(reviewCard.getByRole("button", { name: "Record research finding" }), "/api/medical/investigation");
+        expect(finding).toMatchObject({ outcome: "DISMISSED", version: 1 });
+        const restored = await page.request.post("/api/medical/investigation", { data });
+        expect(restored.status(), await restored.text()).toBe(200);
+        expect((await restored.json()).result).toEqual(finding);
+        const replacement = await page.request.post("/api/medical/investigation", { data: { ...data, outcome: "SUBSTANTIATED" } });
+        expect(replacement.status(), await replacement.text()).toBe(409);
+        expect(await asset("claim", claimId)).toMatchObject({ status: "SETTLED", amountMinor: 4000, version: 1 });
+      }
       await info.attach("settled-workspace", { body: await page.screenshot(), contentType: "image/png" });
       expect(errors).toEqual([]);
     });

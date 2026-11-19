@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { FabricRole } from "@/lib/fabric/config";
 import type { PublishedMedicalOffer } from "@/lib/fabric/medical";
 import type { WorkflowCommand, WorkflowOperation } from "@/lib/workflows/commands";
@@ -17,6 +17,73 @@ export type PreparedWorkflow = {
   command: Record<string, unknown>;
   revision: number;
 };
+
+const actionGroups: ReadonlyArray<{ label: string; operations: ReadonlySet<string> }> = [
+  {
+    label: "Claims & Adjudication",
+    operations: new Set([
+      "startClaimProcessing", "openClaimReview", "finalizeExpiredReview", "authorizeSettlement",
+      "assessClaimFraud", "submitClaim", "submitClaimAppeal", "registerClaimPrivacyPresentation",
+      "verifyMedicalAssociation", "configureMedicalRules", "registerMedicalOracleBenchmark",
+    ]),
+  },
+  {
+    label: "Oracle Consensus",
+    operations: new Set([
+      "publishOracleRegistrySnapshot", "requestOracleVerification", "finalizeOracleTimeout", "routeOracleFailureToReview",
+    ]),
+  },
+  {
+    label: "Policies & Coverage",
+    operations: new Set([
+      "createPolicyPackage", "configurePolicyPackagePartners", "publishPolicyPackage", "retirePolicyPackage",
+      "issuePolicy", "issuePolicyPrivacyCredential", "revokePolicyPrivacyCredential", "advancePolicyLifecycle",
+      "cancelPolicyAsInsurer", "acquirePolicy", "acquireMedicalPolicy", "renewPolicy", "cancelPolicy", "setBeneficiaries",
+    ]),
+  },
+  {
+    label: "Partners, Benefits & Evidence",
+    operations: new Set([
+      "createPartnerAgreement", "setPartnerAgreementStatus", "createBenefitPlan", "publishBenefitPlan", "retireBenefitPlan",
+      "decideBenefitRequest", "markBenefitPaymentReady", "publishEvidenceMerkleBatch", "submitBenefitRequest",
+      "grantEvidenceAccess", "revokeEvidenceAccess",
+    ]),
+  },
+  {
+    label: "Hospital Billing & Intake",
+    operations: new Set([
+      "createHospitalInvoice", "updateHospitalInvoice", "recordHospitalModelFacts",
+      "issueInvoicePrivacyCredential", "revokeInvoicePrivacyCredential", "saveMedicalEpisode",
+    ]),
+  },
+  {
+    label: "Banking, Mandates & Settlement",
+    operations: new Set([
+      "queuePremiumCollection", "requestBankMandate", "cancelBankMandate", "openBankAccount",
+      "adjustBankAccountBalance", "reviewBankMandate", "recordPremiumAdjustment", "processPremiumCollection",
+      "expireBankMandate", "confirmBenefitPayment", "confirmSettlement",
+    ]),
+  },
+];
+
+function groupOperations(operations: readonly WorkflowOperation[]) {
+  const matched = new Set<WorkflowOperation>();
+  const groups = actionGroups
+    .map((group) => {
+      const items = operations.filter((op) => {
+        if (!group.operations.has(op)) return false;
+        matched.add(op);
+        return true;
+      });
+      return { label: group.label, items };
+    })
+    .filter((group) => group.items.length > 0);
+  const unassigned = operations.filter((op) => !matched.has(op));
+  if (unassigned.length > 0) {
+    groups.push({ label: "Additional actions", items: unassigned });
+  }
+  return groups;
+}
 
 async function sha256(value: string) {
   const bytes = new TextEncoder().encode(value);
@@ -57,7 +124,14 @@ export function GuidedWorkflowForm({
       : initial;
   });
   const [formError, setFormError] = useState("");
+  const errorRef = useRef<HTMLParagraphElement | null>(null);
   const [offers, setOffers] = useState<PublishedMedicalOffer[]>([]);
+
+  useEffect(() => {
+    if (formError && errorRef.current) {
+      errorRef.current.focus();
+    }
+  }, [formError]);
   const selectedOffer = offers.find(offer => offer.id === values.packageId);
   const exampleEligible = selectedOffer ? Math.min(10_000, selectedOffer.rules.serviceSublimitMinor) : 0;
   const exampleDeductible = selectedOffer ? Math.min(Math.floor(exampleEligible * selectedOffer.rules.deductibleBps / 10_000), selectedOffer.rules.deductibleCapMinor) : 0;
@@ -105,8 +179,8 @@ export function GuidedWorkflowForm({
       <span className="kicker">{portalCopy.kicker}</span>
       <h2>{portalCopy.heading}</h2>
       {role === "hospitalOfficer" && !medical && <details><summary>Credential maintenance</summary>
-        <p>Credentials are issued automatically when an invoice is finalized. Voiding that invoice revokes its automatic credential.</p>
-        <label><input type="checkbox" checked={maintenance} onChange={(event) => { setMaintenance(event.target.checked); selectOperation("createHospitalInvoice"); }} />Show issuer maintenance actions</label>
+        <p className="cardNote">Credentials are issued automatically when an invoice is finalized. Voiding that invoice revokes its automatic credential.</p>
+        <label className="checkboxLabel"><input type="checkbox" checked={maintenance} onChange={(event) => { setMaintenance(event.target.checked); selectOperation("createHospitalInvoice"); }} />Show issuer maintenance actions</label>
       </details>}
       {operations.length > 1 && <label>Action
         <select
@@ -114,9 +188,17 @@ export function GuidedWorkflowForm({
           value={operation}
           onChange={(event) => selectOperation(event.target.value as WorkflowOperation)}
         >
-          {operations.map((candidate) => (
-            <option key={candidate} value={candidate}>{workflowFormDefinitions[candidate].label}</option>
-          ))}
+          {operations.length > 4
+            ? groupOperations(operations).map((group) => (
+              <optgroup key={group.label} label={group.label}>
+                {group.items.map((candidate) => (
+                  <option key={candidate} value={candidate}>{workflowFormDefinitions[candidate].label}</option>
+                ))}
+              </optgroup>
+            ))
+            : operations.map((candidate) => (
+              <option key={candidate} value={candidate}>{workflowFormDefinitions[candidate].label}</option>
+            ))}
         </select>
       </label>}
       <p className="cardNote workflowDescription">{definition.description}</p>
@@ -127,51 +209,61 @@ export function GuidedWorkflowForm({
         }}><option value="">Select a package</option>
           {offers.map(offer => <option key={offer.id} value={offer.id}>{offer.name}</option>)}
         </select></label>
-        {selectedOffer && <div className="wideField">
+        {selectedOffer && <div className="wideField medicalSubpanel">
           <p>BDT {(selectedOffer.premiumMinor / 100).toFixed(2)} per 30-day period, due at the start of each period. Coverage starts after payment. An overdue installment can enter grace and then lapse after 15 days. Only paid dates qualify.</p>
           <p>{selectedOffer.rules.service} is covered. Other service categories are excluded. Service sublimit BDT {(selectedOffer.rules.serviceSublimitMinor / 100).toFixed(2)}, deductible {selectedOffer.rules.deductibleBps / 100}% capped at BDT {(selectedOffer.rules.deductibleCapMinor / 100).toFixed(2)}, insurer share {selectedOffer.rules.insurerShareBps / 100}%, overall limit BDT {(selectedOffer.coverageLimitMinor / 100).toFixed(2)}.</p>
           <p>Wait {selectedOffer.rules.waitingDays} days from policy start. File within {selectedOffer.rules.filingDays} days of service, Asia/Dhaka. {selectedOffer.rules.evidenceRequired ? "Upload supporting invoice evidence." : "A complete verified episode can support routine processing."} Each monetary adjustment rounds down to the minor unit.</p>
           {Number.isFinite(termDays) && termDays > 1 && <p>{Math.ceil(termDays / 30)} installments for the dates selected below. The first is due on {values.startDate}, then every 30 days through the final coverage period.</p>}
           <p>Example: a BDT 100.00 bill yields BDT {(exampleEligible / 100).toFixed(2)} eligible, BDT {(exampleDeductible / 100).toFixed(2)} deductible and BDT {(exampleShare / 100).toFixed(2)} insurer share. With the full policy limit still available, BDT {(examplePayable / 100).toFixed(2)} is payable.</p>
-          <label><input type="checkbox" checked={values.acceptedTermsHash === selectedOffer.rules.termsHash} onChange={(event) => {
+          <label className="checkboxLabel"><input type="checkbox" checked={values.acceptedTermsHash === selectedOffer.rules.termsHash} onChange={(event) => {
             setValues(current => ({ ...current, acceptedTermsHash: event.target.checked ? selectedOffer.rules.termsHash : "" }));
           }} />I accept these published terms</label>
         </div>}
       </div>}
       <form className="guidedForm" onSubmit={submit}>
-        {definition.fields.filter(field => operation !== "acquireMedicalPolicy" || !["packageId", "acceptedTermsHash"].includes(field.name)).map((field) => (
-          <label className={field.kind === "textarea" ? "wideField" : undefined} key={field.name}>
-            {field.label}
-            {field.kind === "select" ? (
-              <select
-                name={field.name}
-                value={values[field.name] ?? ""}
-                onChange={(event) => setValues((current) => ({ ...current, [field.name]: event.target.value }))}
-              >
-                {field.options?.map((option) => <option key={option}>{option}</option>)}
-              </select>
-            ) : field.kind === "textarea" ? (
-              <textarea
-                name={field.name}
-                value={values[field.name] ?? ""}
-                placeholder={field.placeholder}
-                onChange={(event) => setValues((current) => ({ ...current, [field.name]: event.target.value }))}
-              />
-            ) : (
-              <input
-                name={field.name}
-                value={values[field.name] ?? ""}
-                type={field.kind === "date" ? "date" : field.kind === "money" ? "text" : "text"}
-                inputMode={field.kind === "money" ? "decimal" : undefined}
-                placeholder={field.placeholder}
-                onChange={(event) => setValues((current) => ({ ...current, [field.name]: event.target.value }))}
-              />
-            )}
-            {field.help && <small>{field.help}</small>}
-          </label>
-        ))}
-        {formError && <p className="formError" role="alert">{formError}</p>}
-        <button className="primary button guidedSubmit" disabled={busy} type="submit">
+        {definition.fields.filter(field => operation !== "acquireMedicalPolicy" || !["packageId", "acceptedTermsHash"].includes(field.name)).map((field) => {
+          const helpId = field.help ? `field-help-${operation}-${field.name}` : undefined;
+          return (
+            <label className={field.kind === "textarea" ? "wideField" : undefined} key={field.name}>
+              {field.label}
+              {field.kind === "select" ? (
+                <select
+                  name={field.name}
+                  value={values[field.name] ?? ""}
+                  aria-describedby={helpId}
+                  onChange={(event) => setValues((current) => ({ ...current, [field.name]: event.target.value }))}
+                >
+                  {field.options?.map((option) => <option key={option}>{option}</option>)}
+                </select>
+              ) : field.kind === "textarea" ? (
+                <textarea
+                  name={field.name}
+                  value={values[field.name] ?? ""}
+                  placeholder={field.placeholder}
+                  aria-describedby={helpId}
+                  spellCheck={false}
+                  autoComplete="off"
+                  onChange={(event) => setValues((current) => ({ ...current, [field.name]: event.target.value }))}
+                />
+              ) : (
+                <input
+                  name={field.name}
+                  value={values[field.name] ?? ""}
+                  type={field.kind === "date" ? "date" : "text"}
+                  inputMode={field.kind === "money" ? "decimal" : undefined}
+                  placeholder={field.placeholder}
+                  aria-describedby={helpId}
+                  spellCheck={false}
+                  autoComplete="off"
+                  onChange={(event) => setValues((current) => ({ ...current, [field.name]: event.target.value }))}
+                />
+              )}
+              {field.help && <small id={helpId}>{field.help}</small>}
+            </label>
+          );
+        })}
+        {formError && <p ref={errorRef} tabIndex={-1} className="formError" role="alert">{formError}</p>}
+        <button className="primary button guidedSubmit" disabled={busy} aria-busy={busy} type="submit">
           {busy ? "Submitting…" : portalCopy.submit}
         </button>
       </form>

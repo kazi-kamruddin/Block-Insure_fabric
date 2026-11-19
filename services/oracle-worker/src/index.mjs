@@ -19,6 +19,11 @@ const [{ loadOracleConfig }, { connectOracleGateway }, { loadRegistrySnapshot, v
 ]);
 
 const config = loadOracleConfig();
+const shadowFile = process.env.ORACLE_CHALLENGER_SHADOW_ARTIFACT?.trim();
+const shadow = shadowFile ? await import("./challenger-shadow.mjs").then(async (module) => ({
+  artifact: await module.loadChallengerShadow(config.fabric.channelName, shadowFile, process.env.ORACLE_CHALLENGER_SHADOW_HASH ?? ""),
+  score: module.shadowChallengerScores,
+})).catch(() => { log("warn", "Challenger shadow configuration rejected"); return null; }) : null;
 const registry = await loadRegistrySnapshot(config.registryPath);
 const healthPath = path.join(config.stateRoot, config.oracleId, "health.json");
 const previousHealth = await healthModule.loadPersistedHealth(healthPath, config.oracleId);
@@ -157,6 +162,7 @@ async function processRequest(requestId) {
   if ((!existingCommitment && Date.now() > Date.parse(request.commitDeadline)) || Date.now() > Date.parse(request.revealDeadline)) return;
   const currentClaim = await evaluate("ReadClaim", request.claimId);
   if (currentClaim.version !== request.claimVersion || currentClaim.currentOracleRequestId !== request.id) return;
+  let shadowPacket;
   const decision = await pinnedDecision({
     directory: path.join(config.stateRoot, config.oracleId, "decisions"),
     identity: decisionIdentity(config, runtime.identityFingerprint, request),
@@ -207,6 +213,11 @@ async function processRequest(requestId) {
     };
   }
   assessment = routeModel({ snapshot: requestRegistry, request, claim, assessment });
+  if (shadow && assessment.result?.prepared && request.modelHash === evaluatorHash) {
+    const records = requestRegistry.modelContext.records;
+    const source = records.find(row => row.invoiceId === claim.hospitalInvoiceId && row.hospitalId === claim.hospitalId);
+    if (source) shadowPacket = { source, records, prepared: assessment.result.prepared };
+  }
   const resultHash = protocol.buildResultDigest(request, assessment);
   const salt = protocol.buildDeterministicSalt(runtime.privateKey, request.id, config.oracleId);
   const commitmentHash = protocol.buildCommitmentDigest(request, { verified: assessment.verified, resultHash, salt });
@@ -236,6 +247,14 @@ async function processRequest(requestId) {
     request = await waitForRevealPhase(request.id);
     if (request.status === "PENDING" && Date.now() <= Date.parse(request.revealDeadline)) await submitReveal(request, assessment, resultHash, salt);
   }
+  if (shadowPacket) setImmediate(() => {
+    try {
+      const observation = shadow.score(shadow.artifact, shadowPacket);
+      if (observation) log("log", "Challenger shadow scores", { requestId, ...observation });
+    } catch {
+      log("warn", "Challenger shadow evaluation failed", { requestId });
+    }
+  });
   await updateHealth({
     status: "ONLINE",
     lastProcessedRequestId: request.id,

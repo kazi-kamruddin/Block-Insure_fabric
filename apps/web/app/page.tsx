@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { ThemeToggle } from "@/components/theme-toggle";
+import { SiteHeader } from "@/components/site-header";
+import { StatusBadge } from "@/components/status-badge";
 import { ledger } from "@/lib/fabric/ledger";
 
 export const dynamic = "force-dynamic";
@@ -29,7 +30,7 @@ export default async function Home() {
   const remainingPackages = packages.filter((item) => !featuredPackages.some((featured) => featured.id === item.id));
   const packageCard = (item: (typeof packages)[number]) => (
     <article className="capability" key={item.id}>
-      <span className="index">v{item.version}</span>
+      <StatusBadge status={item.status} label={`v${item.version} · Published`} />
       <h3>{item.name}</h3>
       <p>{item.description || "Published governed health coverage"}</p>
       <p><strong>{money(item.premiumMinor)}</strong> premium · {money(item.coverageLimitMinor)} limit</p>
@@ -38,75 +39,62 @@ export default async function Home() {
     </article>
   );
   return (
-    <main>
-      <header className="floatingNavWrapper">
-        <nav className="shell nav">
-          <a className="brand" href="#top" aria-label="Block-Insure home">
-            <span className="brandMark">BI</span>
-            <span>Block-Insure</span>
-          </a>
-          <div className="navLinks">
-            <Link href="/showcase">Presentation</Link>
-            <Link href="/workspace">Workspaces</Link>
-            <span className="networkPill"><span className="status-dot-pulse" aria-hidden="true" /> {channelName}</span>
-            <ThemeToggle />
+    <>
+      <SiteHeader activeRoute="/" brandHref="#top" pillText={channelName} />
+      <main id="main-content" tabIndex={-1}>
+        <section className="shell hero" id="top">
+          <div className="eyebrow">Hyperledger Fabric · Permissioned by design</div>
+          <h1>Insurance coordination with proof built in.</h1>
+          <p className="lede">
+            A shared ledger for insurers, policyholders, hospitals, auditors, and banks—where
+            every organization acts through an issued identity and every transition is verifiable.
+          </p>
+          <div className="actions">
+            <Link className="primary" href="/workspace">Open role workspace</Link>
+            <Link className="secondary" href="/showcase">Open presentation board</Link>
+            <a className="secondary" href="/api/fabric/health">Check ledger connection</a>
           </div>
-        </nav>
-      </header>
+        </section>
 
-      <section className="shell hero" id="top">
-        <div className="eyebrow">Hyperledger Fabric · Permissioned by design</div>
-        <h1>Insurance coordination with proof built in.</h1>
-        <p className="lede">
-          A shared ledger for insurers, policyholders, hospitals, auditors, and banks—where
-          every organization acts through an issued identity and every transition is verifiable.
-        </p>
-        <div className="actions">
-          <Link className="primary" href="/workspace">Open role workspace</Link>
-          <Link className="secondary" href="/showcase">Open presentation board</Link>
-          <a className="secondary" href="/api/fabric/health">Check ledger connection</a>
-        </div>
-      </section>
-
-      <section className="shell network" id="policies">
-        <div className="sectionHeading">
-          <div><span className="kicker">Public policy catalog</span><h2>Published coverage packages</h2></div>
-          <p>These package versions are read from the live Fabric ledger. Purchase and policy management remain inside the policyholder workspace.</p>
-        </div>
-        <div className="capabilityGrid featuredCatalog">
-          {featuredPackages.length ? featuredPackages.map(packageCard) : <article className="capability"><h3>Catalog unavailable</h3><p>Start or verify the Fabric network to load published packages.</p></article>}
-        </div>
-        {remainingPackages.length > 0 && (
-          <details className="catalogMore">
-            <summary>Browse {remainingPackages.length} more published package versions</summary>
-            <div className="capabilityGrid">{remainingPackages.map(packageCard)}</div>
-          </details>
-        )}
-      </section>
-
-      <section className="shell network" id="network">
-        <div className="sectionHeading">
-          <div>
-            <span className="kicker">One governed workflow</span>
-            <h2>Five organizations. Six operational roles.</h2>
+        <section className="shell network" id="policies">
+          <div className="sectionHeading">
+            <div><span className="kicker">Public policy catalog</span><h2>Published coverage packages</h2></div>
+            <p>These package versions are read from the live Fabric ledger. Purchase and policy management remain inside the policyholder workspace.</p>
           </div>
-          <p>Private keys stay server-side. The ledger contract validates both MSP membership and certificate role attributes.</p>
-        </div>
-        <div className="capabilityGrid">
-          {capabilities.map(([role, description], index) => (
-            <article className="capability" key={role}>
-              <span className="index">0{index + 1}</span>
-              <h3>{role}</h3>
-              <p>{description}</p>
-            </article>
-          ))}
-        </div>
-      </section>
+          <div className="capabilityGrid featuredCatalog">
+            {featuredPackages.length ? featuredPackages.map(packageCard) : <article className="capability"><h3>Catalog unavailable</h3><p>Start or verify the Fabric network to load published packages.</p></article>}
+          </div>
+          {remainingPackages.length > 0 && (
+            <details className="catalogMore">
+              <summary>Browse {remainingPackages.length} more published package versions</summary>
+              <div className="capabilityGrid">{remainingPackages.map(packageCard)}</div>
+            </details>
+          )}
+        </section>
 
+        <section className="shell network" id="network">
+          <div className="sectionHeading">
+            <div>
+              <span className="kicker">One governed workflow</span>
+              <h2>Five organizations. Six operational roles.</h2>
+            </div>
+            <p>Private keys stay server-side. The ledger contract validates both MSP membership and certificate role attributes.</p>
+          </div>
+          <div className="capabilityGrid">
+            {capabilities.map(([role, description], index) => (
+              <article className="capability" key={role}>
+                <span className="index">0{index + 1}</span>
+                <h3>{role}</h3>
+                <p>{description}</p>
+              </article>
+            ))}
+          </div>
+        </section>
+      </main>
       <footer className="shell footer">
         <span>Block-Insure Fabric</span>
         <span>Deterministic · Auditable · Organization-scoped</span>
       </footer>
-    </main>
+    </>
   );
 }

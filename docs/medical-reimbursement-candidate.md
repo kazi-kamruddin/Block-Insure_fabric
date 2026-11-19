@@ -12,6 +12,9 @@ historical evidence for sequence 1 on this channel.
 See the [review and OCR acceptance record](results/medical-review-ocr-2026-11-19.md)
 for the passed combined browser rehearsal through one new BDT 40 payout,
 the feature gate and package verification.
+The [final medical acceptance record](results/medical-final-acceptance-2026-11-19.md)
+tracks the later private-match, Bank recovery, insurer finding, shadow and
+governed browser checks tied to this same deployment.
 
 The existing November demonstration is tied to source revision `cc37af2` and
 its verified `1.6.3-xgb-alignment` package. Keep its built application, channel,
@@ -43,6 +46,17 @@ reservation, and version-pinned frozen XGBoost verification. The Bank reads only
 the existing financial claim and settlement fields. Legacy claim submission and
 appeals are unavailable on the new channel so they cannot bypass the medical
 rules. The prior channel retains its existing workflows.
+
+An optional research finding form is available to one designated insurer
+investigator on the medical channel. Set `MEDICAL_FINDINGS_INVESTIGATOR` to
+the insurer demo account ID and `MEDICAL_FINDINGS_ROOT` to a private absolute
+directory specific to the deployment. Secure and back up that directory.
+Record a finding only after completing an independent investigation against
+the current settled or rejected claim version. Supply a reference to that
+investigation. The stored record contains its hash, the finding, claim version,
+designated account and timestamp. It is stored by the web service. It leaves
+the ledger and any training datasets unchanged. The same finding can be
+confirmed again after an uncertain response.
 
 ## Isolated run
 
@@ -76,6 +90,17 @@ rehearsal. Set `MEDICAL_EVENT_PROJECTION_PATH` to the isolated medical event
 projection JSON to match OCR receipts against committed events. Short
 deadlines are supplied through the authenticated API for the test. Reviewer
 access and OCR use the ordinary browser controls.
+
+For final acceptance, first run `MEDICAL_FINAL_PAYMENT=true` with only
+Oracle workers 1 and 2 running and the challenger shadow artifact configured.
+Use an existing synthetic SURGERY benchmark via
+`MEDICAL_BENCHMARK_EXISTS=true`. The fixture performs a concurrent filing,
+an underfunded transfer, later funding and a browser-side lost response.
+Keep its saved case and journal if it is interrupted. Read back any transfer
+before creating a new Bank instruction. Then unset `MEDICAL_FINAL_PAYMENT`,
+restore the third worker and run the governed rehearsal above with
+`MEDICAL_PRIOR_CLAIM_ID` set to the settled routine case for a readback after
+the corrected appeal's payout.
 
 On the rehearsal machine the medical channel and fixtures already exist.
 If no other Fabric profile is running, the retained local helpers can resume it

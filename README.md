@@ -30,6 +30,12 @@ decryption, browser-local OCR, same-panel appeal and one Bank payout.
 The follow-up verified deadline recovery and committed PDF and JPEG OCR
 receipts. The [synthetic challenger comparison](docs/fabric-ml-challengers.md)
 records the two offline alternatives at the same review workload.
+The [final medical acceptance record](docs/results/medical-final-acceptance-2026-11-19.md)
+tracks Bank commit recovery, private patient matching, separate insurer
+investigation outcomes and live challenger shadow scoring.
+The [final medical acceptance record](docs/results/medical-final-acceptance-2026-11-19.md)
+tracks Bank commit recovery, private patient matching, separate insurer
+investigation outcomes and live challenger shadow scoring.
 
 The original implementation areas and the policy/premium/benefit expansion are
 joined by a certificate-bound 2-of-3 Oracle consensus subsystem. The source now

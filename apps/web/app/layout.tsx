@@ -16,9 +16,10 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       suppressHydrationWarning
     >
       <head>
+        <meta name="theme-color" content="#040805" />
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var t=localStorage.getItem("block-insure-theme");if(t==="light"){document.documentElement.classList.remove("dark");document.documentElement.classList.add("light");document.documentElement.setAttribute("data-theme","light");document.documentElement.style.colorScheme="light";}else{document.documentElement.classList.add("dark");document.documentElement.classList.remove("light");document.documentElement.setAttribute("data-theme","dark");document.documentElement.style.colorScheme="dark";}}catch(e){document.documentElement.classList.add("dark");document.documentElement.setAttribute("data-theme","dark");document.documentElement.style.colorScheme="dark";}})();`,
+            __html: `(function(){try{if(localStorage.getItem("block-insure-theme")!=="light")return;var d=document.documentElement;d.classList.remove("dark");d.classList.add("light");d.setAttribute("data-theme","light");d.style.colorScheme="light";}catch{}})();`,
           }}
         />
       </head>

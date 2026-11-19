@@ -79,8 +79,11 @@ sealed cohort and the unconstrained ranker tied B's macro recall there.
 The test supports comparison on the intentionally constructed billing and
 history patterns. The families were held out from fitting and calibration
 and share the same authored generator. This run contains no external fraud
-labels or independent population samples. Live challenger routing and
-worker integration remain UNTESTED. Frozen XGBoost retains routing authority.
+labels or independent population samples. The
+[final medical acceptance](results/medical-final-acceptance-2026-11-19.md)
+also verified isolated shadow scoring across two live workers for the same
+request. Frozen XGBoost retains routing authority. Challenger routing
+remains UNTESTED and promotion remains HOLD.
 
 This offline run used Node 24.16.0 and the exact Fabric evaluator identity
 `fabric-xgb-synthetic-v1`, hash
@@ -108,3 +111,14 @@ $run = ".local-reference/ml-challengers-$(Get-Date -Format yyyyMMdd-HHmmss)"
 node benchmarks/ml-challengers/evaluate.mjs --run $run
 node benchmarks/ml-challengers/evaluate.mjs --replay $run
 ```
+
+To reproduce shadow scoring on an already configured isolated medical
+worker, set `ORACLE_CHALLENGER_SHADOW_ARTIFACT` to the absolute path of that
+run's `models.json` and `ORACLE_CHALLENGER_SHADOW_HASH` to its canonical
+artifact hash. These two variables are optional. The reader verifies the
+channel, cohort protocol and frozen evaluator identity first. A failed
+artifact check is logged and frozen verification continues. Eligible packets
+produce a local log with the request ID, artifact hash, feature hash and
+two integer scores. Mandatory review and cutoffs at or before the benchmark
+date are skipped. The scores stay outside the Oracle commitment, ledger,
+review decision and settlement.

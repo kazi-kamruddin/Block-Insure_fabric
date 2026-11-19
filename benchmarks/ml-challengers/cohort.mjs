@@ -124,12 +124,16 @@ export function scoreCohort({ records, cases }, peers) {
         claimantMsp: "InsurerMSP", createdAt: record.invoiceDate + "T18:00:00.000Z",
         invoiceHash: record.invoiceHash, amountMinor: record.amountMinor, incidentDate: record.dischargeDate, treatmentType: record.treatmentType },
     });
-    const observed = { ...prepared.observation.features, relativeCharge: record.amountMinor / record.expectedMaxMinor,
-      stayDays: (Date.parse(record.dischargeDate) - Date.parse(record.admissionDate)) / dayMs,
-      ...peerHistoryFeatures(record, available, prepared.cutoff.slice(0, 10), peers) };
-    const features = Object.fromEntries(rankFeatures.map((name) => [name, observed[name]]));
+    const features = challengerFeatures(record, available, prepared, peers);
     return { id, provider, patient, label, family, features, mandatory: prepared.observation.mandatory,
       pooledPeer: peers.cuts[record.treatmentType] === undefined, frozen: assessment.riskScoreUnits,
       frozenRouted: assessment.recommendation === "REVIEW_RECOMMENDED" };
   });
+}
+
+export function challengerFeatures(record, records, prepared, peers) {
+  const observed = { ...prepared.observation.features, relativeCharge: record.amountMinor / record.expectedMaxMinor,
+    stayDays: (Date.parse(record.dischargeDate) - Date.parse(record.admissionDate)) / dayMs,
+    ...peerHistoryFeatures(record, records, prepared.cutoff.slice(0, 10), peers) };
+  return Object.fromEntries(rankFeatures.map((name) => [name, observed[name]]));
 }
