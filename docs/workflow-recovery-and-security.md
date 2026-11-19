@@ -135,17 +135,19 @@ and legacy replay have separate tests and local evidence.
 
 ## Go build and deployment
 
-The chaincode module pins Go1.26.10 and `x/net`0.62.0 with its required `x/sys`0.49.0
-and `x/text`0.43.0 dependencies. The separate image
-`block-insure/fabric-ccenv:2.5.16-go1.26.10` retains Fabric's builder and replaces
-its compiler using pinned image digests. Compilation is serial with bounded Go
-memory settings. Existing builder/runtime images and package archives remain.
+The chaincode module pins Go 1.26.11, which fixes
+[GO-2026-6859](https://pkg.go.dev/vuln/GO-2026-6859). The separate
+`block-insure/fabric-ccenv:2.5.16-go1.26.11` image retains Fabric's builder
+and installs the compiler from a digest-pinned official Go image.
+Compilation is serial with bounded Go memory settings. CI and new builds
+check that the Go directive and the builder image pin agree. Local Docker
+tests and the Docker packaging fallback use the same pinned image.
 
 From the Fabric root, build the image without starting or resetting a network:
 
 ```powershell
-docker build --memory 512m --tag block-insure/fabric-ccenv:2.5.16-go1.26.10 network/chaincode-builder
-$env:FABRIC_CHAINCODE_BUILDER = 'block-insure/fabric-ccenv:2.5.16-go1.26.10'
+docker build --memory 512m --tag block-insure/fabric-ccenv:2.5.16-go1.26.11 network/chaincode-builder
+$env:FABRIC_CHAINCODE_BUILDER = 'block-insure/fabric-ccenv:2.5.16-go1.26.11'
 ```
 
 Linux environments can use `scripts/build-chaincode-builder.sh`. Select the
@@ -155,12 +157,57 @@ compiler updates alone do not establish the compiler of deployed chaincode.
 The dated verification ties exact package IDs, runtime binary hashes and actual
 binary build information to the scan result.
 
+Use the archived Go 1.26.10 builder and its matching source and archive
+when resuming the already verified November and medical demos. The Go
+1.26.11 builder is for a new, separately approved chaincode deployment.
+
 The source and deployed binary scans use official `govulncheck`1.9.0. JSON mode
 can exit zero while reporting vulnerabilities, so CI separately checks findings
 with `scripts/check-go-vulnerabilities.mjs`. Called-symbol findings fail; other
 findings remain visible. Scanner/provider failures must not be converted to a
 clean result. A scan is a dated statement about that source/binary and database,
 not a security claim about every Fabric service or operating-system image.
+
+Quality runs the Go gate on pushes and pull requests. Its daily
+default-branch run checks for newly published advisories between PRs.
+The failed job retains the raw scan as the `chaincode-govulncheck`
+artifact. The current patch version comes from `go.mod`. For a future
+Go patch, update the Go directive and the exact official image tag and
+digest in `network/chaincode-builder/Dockerfile` together, then run the
+source checks and scan before pushing.
+
+With the pinned Go version and Node installed, run the same source gate
+locally from the Fabric root in Bash. The temporary scan path is printed
+so a failed run can be inspected.
+
+```bash
+(
+  set -euo pipefail
+  source network/scripts/chaincode-toolchain.sh
+  export GOTOOLCHAIN=local
+  test "$(go env GOVERSION)" = "go$chaincode_go_version"
+  cd chaincode/insurance-contract
+  test -z "$(gofmt -l .)"
+  go vet ./...
+  go test ./...
+  scan="$(mktemp)"
+  printf 'Scan report at %s\n' "$scan"
+  go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 -json ./... > "$scan"
+  node ../../scripts/check-go-vulnerabilities.mjs "$scan"
+)
+```
+
+On 19 November 2026 the Go 1.26.11 Linux source run passed formatting,
+module verification, vet and chaincode tests. Both the source scan and
+the scan of a new local builder-produced binary reported zero findings
+with database revision `2026-11-11T02:51:11Z`. The offline proof archive
+matched all 36 runtime files. It was never installed, and all 49 existing
+Docker volumes were retained. The optional local Go 1.26.10 comparison
+timed out under the bounded memory profile. The supplied GitHub failure
+is the pre-patch baseline. Local evidence is under
+`.local-reference/go-2026-6859-20261119/`, including both successful raw
+scans, the package audit and preservation record. GitHub's push and PR
+checks still need to run on the patch.
 
 ## Email acknowledgement
 

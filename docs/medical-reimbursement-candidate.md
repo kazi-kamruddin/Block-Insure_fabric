@@ -16,6 +16,11 @@ The [final medical acceptance record](results/medical-final-acceptance-2026-11-1
 tracks the later private-match, Bank recovery, insurer finding, shadow and
 governed browser checks tied to this same deployment.
 
+The verified medical archive contains the Go 1.26.10 module directive.
+The later Go 1.26.11 security patch changes the development source, so use
+the matching medical source at `8a79b9c` for the existing archive's
+package check. Keep the recorded medical builder and web build together.
+
 The existing November demonstration is tied to source revision `cc37af2` and
 its verified `1.6.3-xgb-alignment` package. Keep its built application, channel,
 identities, secrets and data roots together. The existing launcher checks the
