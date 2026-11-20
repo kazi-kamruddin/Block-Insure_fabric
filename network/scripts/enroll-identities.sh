@@ -7,6 +7,11 @@ samples_root="${network_root}/.fabric/fabric-samples"
 export PATH="${samples_root}/bin:${PATH}"
 
 org_root="${network_root}/organizations"
+dev_lite=false
+if [[ "${1:-}" == --dev-lite || "${1:-}" == --dev-lite-couchdb ]]; then
+  org_root="${network_root}/../data/${1#--}/organizations"
+  dev_lite=true
+fi
 
 require_tool() { command -v "$1" >/dev/null || { echo "Missing required tool: $1" >&2; exit 1; }; }
 require_tool fabric-ca-client
@@ -28,6 +33,9 @@ enroll_peer_org() {
   local domain="${org}.blockinsure.test" ca_name="ca-${org}"
   local base="${org_root}/peerOrganizations/${domain}"
   local ca_cert="${org_root}/fabric-ca/${org}/ca-cert.pem"
+  if [[ "${dev_lite:-false}" == true ]]; then
+    export FABRIC_CA_CLIENT_URL="https://localhost:${port}"
+  fi
   export FABRIC_CA_CLIENT_HOME="${base}"
   fabric-ca-client enroll -u "https://admin:adminpw@localhost:${port}" --caname "${ca_name}" --tls.certfiles "${ca_cert}"
   write_node_ous "${base}/msp" "cacerts/localhost-${port}-${ca_name}.pem"
@@ -56,36 +64,49 @@ enroll_peer_org() {
   fi
 }
 
-enroll_peer_org insurer InsurerMSP 7054 insurerAdmin
-enroll_peer_org hospital HospitalMSP 8054 hospitalOfficer
-enroll_peer_org auditor AuditorMSP 9054 auditor
-enroll_peer_org bank BankMSP 12054 bankOfficer
-enroll_peer_org oracle OracleMSP 13054 oracle
-bash "${network_root}/scripts/enroll-auditors.sh"
-bash "${network_root}/scripts/enroll-hospitals.sh"
-bash "${network_root}/scripts/enroll-oracles.sh"
+if [[ "$dev_lite" == true ]]; then
+  enroll_peer_org insurer InsurerMSP 31054 insurerAdmin
+  enroll_peer_org hospital HospitalMSP 31154 hospitalOfficer
+  enroll_peer_org auditor AuditorMSP 31254 auditor
+  enroll_peer_org bank BankMSP 31354 bankOfficer
+  enroll_peer_org oracle OracleMSP 31454 oracle
+  orderer_port=31554
+else
+  orderer_port=14054
+  enroll_peer_org insurer InsurerMSP 7054 insurerAdmin
+  enroll_peer_org hospital HospitalMSP 8054 hospitalOfficer
+  enroll_peer_org auditor AuditorMSP 9054 auditor
+  enroll_peer_org bank BankMSP 12054 bankOfficer
+  enroll_peer_org oracle OracleMSP 13054 oracle
+fi
+bash "${network_root}/scripts/enroll-auditors.sh" "$@"
+bash "${network_root}/scripts/enroll-hospitals.sh" "$@"
+bash "${network_root}/scripts/enroll-oracles.sh" "$@"
 
 enroll_orderer() {
   local domain="blockinsure.test"
   local base="${org_root}/ordererOrganizations/${domain}"
   local ca_cert="${org_root}/fabric-ca/orderer/ca-cert.pem"
+  if [[ "${dev_lite:-false}" == true ]]; then
+    export FABRIC_CA_CLIENT_URL="https://localhost:${orderer_port}"
+  fi
   export FABRIC_CA_CLIENT_HOME="${base}"
-  fabric-ca-client enroll -u https://admin:adminpw@localhost:14054 --caname ca-orderer --tls.certfiles "${ca_cert}"
-  write_node_ous "${base}/msp" "cacerts/localhost-14054-ca-orderer.pem"
+  fabric-ca-client enroll -u "https://admin:adminpw@localhost:${orderer_port}" --caname ca-orderer --tls.certfiles "${ca_cert}"
+  write_node_ous "${base}/msp" "cacerts/localhost-${orderer_port}-ca-orderer.pem"
   mkdir -p "${base}/msp/tlscacerts" "${base}/tlsca"
   cp "${ca_cert}" "${base}/msp/tlscacerts/ca.crt"
   cp "${ca_cert}" "${base}/tlsca/tlsca.${domain}-cert.pem"
   fabric-ca-client register --caname ca-orderer --id.name orderer --id.secret ordererpw --id.type orderer --tls.certfiles "${ca_cert}"
   fabric-ca-client register --caname ca-orderer --id.name ordereradmin --id.secret ordereradminpw --id.type admin --tls.certfiles "${ca_cert}"
-  fabric-ca-client enroll -u https://orderer:ordererpw@localhost:14054 --caname ca-orderer -M "${base}/orderers/orderer.${domain}/msp" --tls.certfiles "${ca_cert}"
+  fabric-ca-client enroll -u https://orderer:ordererpw@localhost:${orderer_port} --caname ca-orderer -M "${base}/orderers/orderer.${domain}/msp" --tls.certfiles "${ca_cert}"
   cp "${base}/msp/config.yaml" "${base}/orderers/orderer.${domain}/msp/config.yaml"
-  fabric-ca-client enroll -u https://orderer:ordererpw@localhost:14054 --caname ca-orderer -M "${base}/orderers/orderer.${domain}/tls" --enrollment.profile tls --csr.hosts "orderer.${domain}" --csr.hosts localhost --tls.certfiles "${ca_cert}"
+  fabric-ca-client enroll -u https://orderer:ordererpw@localhost:${orderer_port} --caname ca-orderer -M "${base}/orderers/orderer.${domain}/tls" --enrollment.profile tls --csr.hosts "orderer.${domain}" --csr.hosts localhost --tls.certfiles "${ca_cert}"
   cp "${base}/orderers/orderer.${domain}/tls/tlscacerts/"* "${base}/orderers/orderer.${domain}/tls/ca.crt"
   cp "${base}/orderers/orderer.${domain}/tls/signcerts/"* "${base}/orderers/orderer.${domain}/tls/server.crt"
   cp "${base}/orderers/orderer.${domain}/tls/keystore/"* "${base}/orderers/orderer.${domain}/tls/server.key"
-  fabric-ca-client enroll -u https://ordereradmin:ordereradminpw@localhost:14054 --caname ca-orderer -M "${base}/users/Admin@${domain}/msp" --tls.certfiles "${ca_cert}"
+  fabric-ca-client enroll -u https://ordereradmin:ordereradminpw@localhost:${orderer_port} --caname ca-orderer -M "${base}/users/Admin@${domain}/msp" --tls.certfiles "${ca_cert}"
   cp "${base}/msp/config.yaml" "${base}/users/Admin@${domain}/msp/config.yaml"
-  fabric-ca-client enroll -u https://ordereradmin:ordereradminpw@localhost:14054 --caname ca-orderer -M "${base}/users/Admin@${domain}/tls" --enrollment.profile tls --csr.hosts "admin.${domain}" --csr.hosts localhost --tls.certfiles "${ca_cert}"
+  fabric-ca-client enroll -u https://ordereradmin:ordereradminpw@localhost:${orderer_port} --caname ca-orderer -M "${base}/users/Admin@${domain}/tls" --enrollment.profile tls --csr.hosts "admin.${domain}" --csr.hosts localhost --tls.certfiles "${ca_cert}"
   cp "${base}/users/Admin@${domain}/tls/tlscacerts/"* "${base}/users/Admin@${domain}/tls/ca.crt"
   cp "${base}/users/Admin@${domain}/tls/signcerts/"* "${base}/users/Admin@${domain}/tls/client.crt"
   cp "${base}/users/Admin@${domain}/tls/keystore/"* "${base}/users/Admin@${domain}/tls/client.key"

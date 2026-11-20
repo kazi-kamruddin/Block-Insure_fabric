@@ -7,8 +7,15 @@ samples_root="${network_root}/.fabric/fabric-samples"
 export PATH="${samples_root}/bin:${PATH}"
 
 domain="auditor.blockinsure.test"
-base="${network_root}/organizations/peerOrganizations/${domain}"
-ca_cert="${network_root}/organizations/fabric-ca/auditor/ca-cert.pem"
+org_root="${network_root}/organizations"
+port=9054
+if [[ "${1:-}" == --dev-lite || "${1:-}" == --dev-lite-couchdb ]]; then
+  org_root="${network_root}/../data/${1#--}/organizations"
+  port=31254
+  export FABRIC_CA_CLIENT_URL="https://localhost:${port}"
+fi
+base="${org_root}/peerOrganizations/${domain}"
+ca_cert="${org_root}/fabric-ca/auditor/ca-cert.pem"
 export FABRIC_CA_CLIENT_HOME="${base}"
 
 command -v fabric-ca-client >/dev/null || { echo "Missing required tool: fabric-ca-client" >&2; exit 1; }
@@ -26,7 +33,7 @@ for index in 1 2 3 4; do
     --id.name "${user}" --id.secret "${user}pw" --id.type client \
     --id.attrs "role=auditor:ecert,subjectId=${user}:ecert" \
     --tls.certfiles "${ca_cert}" >/dev/null 2>&1 || true
-  fabric-ca-client enroll -u "https://${user}:${user}pw@localhost:9054" \
+  fabric-ca-client enroll -u "https://${user}:${user}pw@localhost:${port}" \
     --caname ca-auditor -M "${user_msp}" --tls.certfiles "${ca_cert}"
   cp "${base}/msp/config.yaml" "${user_msp}/config.yaml"
   echo "Enrolled ${user} with an immutable subjectId certificate attribute."

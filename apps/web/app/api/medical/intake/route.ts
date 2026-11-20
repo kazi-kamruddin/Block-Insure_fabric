@@ -3,7 +3,7 @@ import { currentSession } from "@/lib/auth/current-session";
 import { loadFabricConfig } from "@/lib/fabric/config";
 import { ledger } from "@/lib/fabric/ledger";
 import { ledgerIdSchema } from "@/lib/fabric/validation";
-import { medicalCandidateChannel } from "@/lib/workflows/commands";
+import { isMedicalChannel } from "@/lib/fabric/medical-channel";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +12,7 @@ export async function GET(request: Request) {
   if (!session || (session.role !== "policyholder" && session.role !== "insurerAdmin")) {
     return NextResponse.json({ message: "Insurer or policyholder access required" }, { status: 403 });
   }
-  if (loadFabricConfig().channelName !== medicalCandidateChannel) return NextResponse.json({ message: "Medical candidate unavailable" }, { status: 404 });
+  if (!isMedicalChannel(loadFabricConfig().channelName)) return NextResponse.json({ message: "Medical candidate unavailable" }, { status: 404 });
   const reply = (body: unknown) => NextResponse.json(body, { headers: { "Cache-Control": "private, no-store" } });
   try {
     const query = new URL(request.url).searchParams;

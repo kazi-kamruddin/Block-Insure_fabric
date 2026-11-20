@@ -12,7 +12,8 @@ import (
 const medicalCandidateChannel = "insurance-medical-reimbursement"
 
 func isMedicalCandidate(ctx contractapi.TransactionContextInterface) bool {
-	return ctx.GetStub().GetChannelID() == medicalCandidateChannel
+	channel := ctx.GetStub().GetChannelID()
+	return channel == medicalCandidateChannel || channel == medicalDevLiteChannel
 }
 
 // Only the reference commitment, revision number and digest are public.

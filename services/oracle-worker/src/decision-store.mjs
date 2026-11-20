@@ -7,15 +7,15 @@ const authenticate = (body, key) => createHmac("sha256", key).update(JSON.string
 
 // Immutable, deployment-qualified decisions: commit/reveal must never recompute
 // from changed live inputs after a restart. Corruption fails closed, not reset.
-export async function pinnedDecision({ directory, identity, key, existingCommitment, allowLegacyAdoption = false, create }) {
+export async function pinnedDecision({ directory, identity, fallbackIdentities = [], key, existingCommitment, allowLegacyAdoption = false, create }) {
   const identityHash = digest(identity);
   const filename = path.join(directory, `${identityHash}.json`);
-  async function read() {
-    const stored = JSON.parse(await fs.readFile(filename, "utf8"));
+  async function read(hash = identityHash) {
+    const stored = JSON.parse(await fs.readFile(path.join(directory, `${hash}.json`), "utf8"));
     const expected = authenticate(stored.body, key);
     const supplied = Buffer.from(String(stored.mac), "hex");
     if (expected.length !== supplied.length || !timingSafeEqual(expected, supplied) ||
-        stored.body.version !== 1 || stored.body.identityHash !== identityHash) {
+        stored.body.version !== 1 || stored.body.identityHash !== hash) {
       throw new Error("Pinned Oracle decision authentication failed");
     }
     if (existingCommitment && stored.body.decision.commitmentHash !== existingCommitment.commitmentHash) {
@@ -23,8 +23,10 @@ export async function pinnedDecision({ directory, identity, key, existingCommitm
     }
     return stored.body.decision;
   }
-  try { return await read(); }
-  catch (error) { if (error.code !== "ENOENT") throw error; }
+  for (const hash of new Set([identityHash, ...fallbackIdentities.map(digest)])) {
+    try { return await read(hash); }
+    catch (error) { if (error.code !== "ENOENT") throw error; }
+  }
   if (existingCommitment && !allowLegacyAdoption) throw new Error("Pinned Oracle decision missing for existing commitment; restore task state");
   const decision = await create();
   if (!decision || typeof decision.commitmentHash !== "string") throw new Error("Cannot persist an incomplete Oracle decision");
@@ -52,6 +54,13 @@ export function decisionIdentity(config, identityFingerprint, request) {
     request: Object.fromEntries(["id", "claimId", "queryHash", "claimVersion", "hospitalVerificationId",
       "appealId", "appealCommitmentHash", "registrySnapshotId", "registryVersion", "registryRootHash",
       "rulesVersion", "rulesHash", "modelVersion", "modelHash", "privacyPresentationId",
-      "privacyPresentationHash", "privacyProtocolVersion"].map((name) => [name, request[name] ?? ""])),
+      "privacyPresentationHash", "privacyProtocolVersion", ...(request.modelReleaseId ? ["modelReleaseId"] : [])]
+      .map((name) => [name, request[name] ?? ""])),
   };
+}
+
+export function historicalDecisionAliases(config, fingerprint, request) {
+  if (config.fabric.channelName !== "insurance-dev-lite-190" || request.modelReleaseId ||
+      request.modelVersion !== "fabric-xgb-synthetic-v1") return [];
+  return [decisionIdentity(config, fingerprint, { ...request, modelReleaseId: "frozen-medical-v1" })];
 }

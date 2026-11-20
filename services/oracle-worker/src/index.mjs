@@ -1,6 +1,8 @@
 import { createHash } from "node:crypto";
 import path from "node:path";
-import { pinnedDecision, decisionIdentity } from "./decision-store.mjs";
+import { pinnedDecision, decisionIdentity, historicalDecisionAliases } from "./decision-store.mjs";
+import { observeProviderShadow } from "./provider-risk.mjs";
+import { buildReleaseResultDigest } from "./release-protocol.mjs";
 import { routeModel, evaluatorVersion, evaluatorHash } from "./xgboost.mjs";
 import { registryAssessmentRequest } from "./medical-revision.mjs";
 import { environmentFileArgument, loadEnvironmentFile } from "./environment.mjs";
@@ -166,10 +168,18 @@ async function processRequest(requestId) {
   const decision = await pinnedDecision({
     directory: path.join(config.stateRoot, config.oracleId, "decisions"),
     identity: decisionIdentity(config, runtime.identityFingerprint, request),
+    fallbackIdentities: historicalDecisionAliases(config, runtime.identityFingerprint, request),
     key: runtime.privateKey,
     existingCommitment,
     allowLegacyAdoption: request.modelVersion === "model-v1",
     create: async () => {
+  if (request.modelReleaseId && (request.modelVersion !== evaluatorVersion || request.modelHash !== evaluatorHash)) {
+    const assessment = { verified: false, verificationCode: "XGB_EVALUATOR_UNAVAILABLE", recordHash: "0".repeat(64) };
+    const resultHash = buildReleaseResultDigest(request, assessment);
+    const salt = protocol.buildDeterministicSalt(runtime.privateKey, request.id, config.oracleId);
+    return { assessment, resultHash, salt, commitmentHash: protocol.buildCommitmentDigest(request, { ...assessment, resultHash, salt }),
+      registry: { sourceId: "unavailable-evaluator", snapshotId: request.registrySnapshotId, version: request.registryVersion, rootHash: request.registryRootHash } };
+  }
   const [claim, hospitalVerification, appeal, publicPresentation, privatePresentation] = await Promise.all([
     evaluate("ReadClaim", request.claimId),
     evaluate("ReadHospitalVerification", request.hospitalVerificationId),
@@ -218,7 +228,7 @@ async function processRequest(requestId) {
     const source = records.find(row => row.invoiceId === claim.hospitalInvoiceId && row.hospitalId === claim.hospitalId);
     if (source) shadowPacket = { source, records, prepared: assessment.result.prepared };
   }
-  const resultHash = protocol.buildResultDigest(request, assessment);
+  const resultHash = buildReleaseResultDigest(request, assessment);
   const salt = protocol.buildDeterministicSalt(runtime.privateKey, request.id, config.oracleId);
   const commitmentHash = protocol.buildCommitmentDigest(request, { verified: assessment.verified, resultHash, salt });
   return { assessment, resultHash, salt, commitmentHash, registry: {
@@ -246,6 +256,19 @@ async function processRequest(requestId) {
   if (await submitCommitment(request, commitmentHash)) {
     request = await waitForRevealPhase(request.id);
     if (request.status === "PENDING" && Date.now() <= Date.parse(request.revealDeadline)) await submitReveal(request, assessment, resultHash, salt);
+  }
+  if (config.fabric.channelName === "insurance-dev-lite-190" && process.env.ORACLE_PROVIDER_SHADOW_RELEASE &&
+      process.env.ORACLE_PROVIDER_SHADOW_ARTIFACT && process.env.ORACLE_PROVIDER_SHADOW_CATALOG) {
+    setImmediate(async () => {
+      try {
+        const release = await evaluate("ReadMedicalModelRelease", process.env.ORACLE_PROVIDER_SHADOW_RELEASE);
+        const observation = await observeProviderShadow({ release, artifactPath: process.env.ORACLE_PROVIDER_SHADOW_ARTIFACT,
+          catalogPath: process.env.ORACLE_PROVIDER_SHADOW_CATALOG, hospitalId: currentClaim.hospitalId });
+        if (observation) log("log", "Provider review shadow score", { requestId, ...observation });
+      } catch {
+        log("warn", "Provider review shadow score unavailable", { requestId });
+      }
+    });
   }
   if (shadowPacket) setImmediate(() => {
     try {

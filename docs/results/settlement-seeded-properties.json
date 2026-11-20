@@ -1,0 +1,46 @@
+{
+  "date": "2026-11-20",
+  "scope": "Synthetic, one host, unit-level, serial memoryStub traces",
+  "startingState": "One Oracle-approved medical claim",
+  "generator": {
+    "algorithm": "Go rand/v2 PCG",
+    "seed": 1900013,
+    "stream": 72,
+    "sequences": 2000,
+    "stepsPerSequence": 20
+  },
+  "observed": {
+    "stepsChecked": 40000,
+    "authorizationAttempts": 10018,
+    "confirmationAttempts": 9962,
+    "creditAttempts": 9964,
+    "debitAttempts": 10056,
+    "confirmedPayouts": 1821,
+    "failedPaymentOutcomes": 678,
+    "refusedActions": 19708,
+    "invariantFailures": 0
+  },
+  "fullGoSuite": {
+    "before": {
+      "testsPassed": 50,
+      "subtestsPassed": 18
+    },
+    "after": {
+      "testsPassed": 51,
+      "subtestsPassed": 18,
+      "testsFailed": 0
+    }
+  },
+  "invariants": [
+    "Valid certificate for the settled claim version",
+    "At most one payout per claim liability",
+    "Funds conserved after external adjustments",
+    "Certificate, claim, and settlement amounts match"
+  ],
+  "exclusions": [
+    "Corrections and appeals in generated traces",
+    "Fabric validation and concurrency",
+    "Live deployment"
+  ],
+  "rawLog": ".local-reference/maintenance-1.9/item-02/currentAfter.jsonl"
+}

@@ -27,6 +27,7 @@ type memoryStub struct {
 }
 
 func (s *memoryStub) GetChannelID() string { return s.channelID }
+func (s *memoryStub) GetTxID() string      { return "unit-test-transaction" }
 
 type memoryStateIterator struct {
 	entries []*queryresult.KV

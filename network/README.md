@@ -48,7 +48,7 @@ bash network/scripts/network.sh up
 bash network/scripts/network.sh status
 bash network/scripts/network.sh verify
 bash network/scripts/network.sh down
-bash network/scripts/network.sh reset
+bash network/scripts/network.sh reset --confirm-reset   # destructive; explicit approval only
 ```
 
 - `up` bootstraps a missing network or restarts an existing stopped network
@@ -60,8 +60,16 @@ bash network/scripts/network.sh reset
   confirms all three Oracle service enrollments.
 - `down` stops and removes containers while retaining identities, channel
   artifacts, and Docker ledger volumes.
-- `reset` is destructive: it removes this network's containers, ledger
-  volumes, generated identities, and generated channel artifacts.
+- `reset --confirm-reset` is destructive: it removes this network's containers,
+  ledger volumes, generated identities, and generated channel artifacts. A bare
+  `reset` is refused. `scripts/demo-stack.ps1 CleanBootstrap -ConfirmReset` is
+  the supervised wrapper.
+
+The `verify` defaults (`1.4.0`, schema `14`) describe the preserved main
+`insurance-channel`. They are not the current candidate. Other channels have
+their own helpers: `create-*-channel.sh` for historical experiment channels,
+`verify-candidate.sh` (read-only, run inside the candidate container by
+`scripts/candidate-demo.ps1`), and `get-ledger-state.sh` for channel heights.
 
 The launcher uses the Linux Docker CLI when its WSL socket is available and
 falls back to Docker Desktop's `docker.exe` integration when necessary.
@@ -74,6 +82,18 @@ network.
 
 Never commit local certificates, private keys, wallets, generated channel
 artifacts, or database state.
+
+## Dev-lite profiles
+
+`network.sh --dev-lite ACTION` and `network.sh --dev-lite-couchdb ACTION`
+delegate to `dev-lite.sh`. They run a separate five-peer network on
+`insurance-dev-lite-190`. Ports are in the `31xxx` range, bound to `127.0.0.1`,
+and identities and state live under `data/dev-lite*/`. The plain profile uses
+LevelDB, and `--dev-lite-couchdb` adds isolated CouchDB volumes. Actions are
+`up`, `deploy`, `verify`, `ca-start`, `ca-stop`, `stop`, and `teardown`.
+`teardown` needs `--confirm-dev-lite` or `--confirm-dev-lite-couchdb`. Only one
+orderer project may run at a time. `bash network/scripts/test-dev-lite.sh` is
+the offline regression for this dispatcher.
 
 ## Chaincode lifecycle and smoke verification
 
@@ -98,7 +118,10 @@ liability, Bank/Insurer PDC isolation and balance movement, and a chaincode-
 verified evidence Merkle proof. Bump `CHAINCODE_VERSION` whenever source changes. The script uses
 sequence 1 on a clean channel, detects an already-committed version, and chooses
 the next sequence for a new version; `CHAINCODE_SEQUENCE` remains an explicit
-override for controlled recovery.
+override for controlled recovery. Deployment also refuses to run unless every
+peer selects the digest-pinned patched builder from `chaincode-builder/`. Start
+the peers with `FABRIC_CHAINCODE_BUILDER` set to that image. Volumes are
+preserved.
 
 `bash network/scripts/seed-showcase.sh` idempotently creates one published policy
 package, its benefit plan, and the canonical Oracle registry commitment. On a

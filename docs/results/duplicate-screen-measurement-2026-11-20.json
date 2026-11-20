@@ -1,0 +1,242 @@
+{
+  "date": "2026-11-20",
+  "scope": "Synthetic, one host, unit-level. Each pair was evaluated in a fresh memoryStub.",
+  "casesPerGroup": 1000,
+  "split": "Go PCG stream 3. Independent deterministic draws for tuning and reporting.",
+  "groups": {
+    "benignRepeats": "Same service, 1–90 day gap, bill 70–130% of first, independently drawn stay length.",
+    "editedDuplicates": "Separate episode ID, same subject and service, stay shifted 0–3 days, bill changed by +/-1–10%.",
+    "sameEpisodeCorrections": "Same episode ID and subject, with perturbed facts.",
+    "differentPatients": "Different verified subjects with identical service, dates, and bills."
+  },
+  "tuningRule": "Maximize edited duplicate referrals while referring at most 2% of all synthetic benign repeats on the tuning seed. Break ties toward the lower threshold.",
+  "tuningSeed": 190031,
+  "reportSeed": 190032,
+  "tuning": [
+    {
+      "amountToleranceBps": 100,
+      "benignRepeats": {
+        "pairs": 1000,
+        "referred": 0,
+        "referralPercent": 0
+      },
+      "benignRepeatsWithinThreeDays": {
+        "pairs": 26,
+        "referred": 0,
+        "referralPercent": 0
+      },
+      "editedDuplicates": {
+        "pairs": 1000,
+        "referred": 33,
+        "referralPercent": 3.3
+      },
+      "sameEpisodeCorrections": {
+        "pairs": 1000,
+        "referred": 0,
+        "referralPercent": 0
+      },
+      "differentPatients": {
+        "pairs": 1000,
+        "referred": 0,
+        "referralPercent": 0
+      }
+    },
+    {
+      "amountToleranceBps": 250,
+      "benignRepeats": {
+        "pairs": 1000,
+        "referred": 0,
+        "referralPercent": 0
+      },
+      "benignRepeatsWithinThreeDays": {
+        "pairs": 26,
+        "referred": 0,
+        "referralPercent": 0
+      },
+      "editedDuplicates": {
+        "pairs": 1000,
+        "referred": 125,
+        "referralPercent": 12.5
+      },
+      "sameEpisodeCorrections": {
+        "pairs": 1000,
+        "referred": 0,
+        "referralPercent": 0
+      },
+      "differentPatients": {
+        "pairs": 1000,
+        "referred": 0,
+        "referralPercent": 0
+      }
+    },
+    {
+      "amountToleranceBps": 500,
+      "benignRepeats": {
+        "pairs": 1000,
+        "referred": 3,
+        "referralPercent": 0.3
+      },
+      "benignRepeatsWithinThreeDays": {
+        "pairs": 26,
+        "referred": 3,
+        "referralPercent": 11.54
+      },
+      "editedDuplicates": {
+        "pairs": 1000,
+        "referred": 287,
+        "referralPercent": 28.7
+      },
+      "sameEpisodeCorrections": {
+        "pairs": 1000,
+        "referred": 0,
+        "referralPercent": 0
+      },
+      "differentPatients": {
+        "pairs": 1000,
+        "referred": 0,
+        "referralPercent": 0
+      }
+    },
+    {
+      "amountToleranceBps": 750,
+      "benignRepeats": {
+        "pairs": 1000,
+        "referred": 4,
+        "referralPercent": 0.4
+      },
+      "benignRepeatsWithinThreeDays": {
+        "pairs": 26,
+        "referred": 4,
+        "referralPercent": 15.38
+      },
+      "editedDuplicates": {
+        "pairs": 1000,
+        "referred": 481,
+        "referralPercent": 48.1
+      },
+      "sameEpisodeCorrections": {
+        "pairs": 1000,
+        "referred": 0,
+        "referralPercent": 0
+      },
+      "differentPatients": {
+        "pairs": 1000,
+        "referred": 0,
+        "referralPercent": 0
+      }
+    },
+    {
+      "amountToleranceBps": 1000,
+      "benignRepeats": {
+        "pairs": 1000,
+        "referred": 4,
+        "referralPercent": 0.4
+      },
+      "benignRepeatsWithinThreeDays": {
+        "pairs": 26,
+        "referred": 4,
+        "referralPercent": 15.38
+      },
+      "editedDuplicates": {
+        "pairs": 1000,
+        "referred": 603,
+        "referralPercent": 60.3
+      },
+      "sameEpisodeCorrections": {
+        "pairs": 1000,
+        "referred": 0,
+        "referralPercent": 0
+      },
+      "differentPatients": {
+        "pairs": 1000,
+        "referred": 0,
+        "referralPercent": 0
+      }
+    }
+  ],
+  "current": {
+    "amountToleranceBps": 500,
+    "benignRepeats": {
+      "pairs": 1000,
+      "referred": 2,
+      "referralPercent": 0.2
+    },
+    "benignRepeatsWithinThreeDays": {
+      "pairs": 24,
+      "referred": 2,
+      "referralPercent": 8.33
+    },
+    "editedDuplicates": {
+      "pairs": 1000,
+      "referred": 258,
+      "referralPercent": 25.8
+    },
+    "sameEpisodeCorrections": {
+      "pairs": 1000,
+      "referred": 0,
+      "referralPercent": 0
+    },
+    "differentPatients": {
+      "pairs": 1000,
+      "referred": 0,
+      "referralPercent": 0
+    }
+  },
+  "candidate": {
+    "amountToleranceBps": 1000,
+    "benignRepeats": {
+      "pairs": 1000,
+      "referred": 5,
+      "referralPercent": 0.5
+    },
+    "benignRepeatsWithinThreeDays": {
+      "pairs": 24,
+      "referred": 5,
+      "referralPercent": 20.83
+    },
+    "editedDuplicates": {
+      "pairs": 1000,
+      "referred": 571,
+      "referralPercent": 57.1
+    },
+    "sameEpisodeCorrections": {
+      "pairs": 1000,
+      "referred": 0,
+      "referralPercent": 0
+    },
+    "differentPatients": {
+      "pairs": 1000,
+      "referred": 0,
+      "referralPercent": 0
+    }
+  },
+  "fullGoSuite": {
+    "before": {
+      "topLevelPassed": 51,
+      "subtestsPassed": 18
+    },
+    "after": {
+      "topLevelPassed": 52,
+      "subtestsPassed": 18,
+      "failed": 0
+    }
+  },
+  "deployedAmountToleranceBps": 500,
+  "finding": {
+    "currentEditedDuplicatesWithoutReferral": 742,
+    "candidateEditedDuplicatesWithoutReferral": 429,
+    "candidateCloseBenignReferrals": 5,
+    "candidateCloseBenignPairs": 24
+  },
+  "boundary": "This measures the private duplicate screen alone. It does not show that a missed pair would obtain payment. Group prevalence, same-day benign visits, shared patients, and crowded index buckets are outside this measurement.",
+  "duplicateKey": {
+    "collection": "oracleProofPrivateData",
+    "peerMembership": [
+      "InsurerMSP",
+      "HospitalMSP",
+      "OracleMSP"
+    ],
+    "secretVersion": "None. The bucket format has a v1 domain, and the secret has a single fixed ledger key."
+  },
+  "rawLog": ".local-reference/maintenance-1.9/item-03/currentAfter.jsonl"
+}

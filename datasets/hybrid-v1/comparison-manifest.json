@@ -1,0 +1,9 @@
+{
+  "datasetId": "healthcare-provider-fraud-kaggle",
+  "comparisonId": "hybrid-5000-v1",
+  "sourceRevision": "8d1aa5fb62cf3227517080acbe70597cd0d72e5a",
+  "upstreamManifestSha256": "3e29cb4a25425b4e7174f7055a8a672ea406d5e04d82155e8ca68ac3d45941fa",
+  "presetSha256": "61f42dfb139da49e1475d9bcf8db900f3b35137a75fac1b65dc11f58c6b3f6ff",
+  "presetCount": 5,
+  "recordCount": 5000
+}

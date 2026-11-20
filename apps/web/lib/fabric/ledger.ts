@@ -30,6 +30,7 @@ import type {
   HospitalModelFacts,
   FraudAssessment,
   Liability,
+  MedicalApprovalCertificate,
   OracleCommitment,
   OracleRegistrySnapshot,
   OracleRequest,
@@ -121,6 +122,16 @@ async function submitAsHospital<T>(
 }
 
 export const ledger = {
+  activateMedicalApprovals() {
+    return submitWithTransient("insurerAdmin", "ActivateMedicalApprovalCertificates", [], { duplicateIndexKey: randomBytes(32) });
+  },
+  proposeMedicalRegistrySnapshot(input: { id: string; hospitalId: string; version: number; rootHash: string; rulesVersion: string; rulesHash: string; recordCount: number }) {
+    return submit<OracleRegistrySnapshot>("insurerAdmin", "ProposeMedicalRegistrySnapshot", input.id, input.hospitalId,
+      input.version, input.rootHash, input.rulesVersion, input.rulesHash, input.recordCount);
+  },
+  attestMedicalRegistrySnapshot(userName: string | undefined, snapshotId: string, rootHash: string) {
+    return submitAsHospital<OracleRegistrySnapshot>(userName, "AttestMedicalRegistrySnapshot", snapshotId, rootHash);
+  },
   readMedicalReviewFacts(claimId: string) {
     return evaluate<MedicalReviewFacts>("insurerAdmin", "ReadMedicalReviewFacts", claimId);
   },
@@ -130,7 +141,8 @@ export const ledger = {
       answer: note.answer ? openMedicalReviewNote("answer", id, note.answer) : "" };
   },
   async readMedicalAppealExplanation(role: "insurerAdmin" | "policyholder", id: string) {
-    const note = await evaluate<{ text: string }>(role, "ReadMedicalAppealExplanation", id);
+    const note = await evaluate<{ text: string; purged?: boolean }>(role, "ReadMedicalAppealExplanation", id);
+    if (note.purged) return null;
     return openMedicalReviewNote("appeal", id, note.text);
   },
   listMedicalEvidenceChecks(reviewId: string) {
@@ -144,6 +156,7 @@ export const ledger = {
     const message = (name: string, text: string, ...args: Array<string | number>) => submitWithTransient(role, name, args, { medicalMessage: text }, userName);
     switch (input.action) {
       case "prepare": return write("PrepareMedicalReview", input.claimId, input.reviewId, input.prepareBy);
+      case "escalate": return write("EscalateStalledMedicalClaim", input.claimId);
       case "open": return write("OpenMedicalVoting", input.reviewId, input.deadline);
       case "recover": return write("RecoverMedicalReview", input.reviewId, input.newId, input.prepareBy);
       case "expire": return write("FinalizeExpiredReview", input.reviewId);
@@ -448,6 +461,10 @@ export const ledger = {
 
   readSettlement(id: string) {
     return evaluate<Settlement>("insurerAdmin", "ReadSettlement", id);
+  },
+
+  readMedicalApprovalCertificate(claimId: string, version: number) {
+    return evaluate<MedicalApprovalCertificate>("insurerAdmin", "ReadMedicalApprovalCertificate", claimId, String(version));
   },
 
   listSettlements() {
