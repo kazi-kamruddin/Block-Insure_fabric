@@ -1,0 +1,81 @@
+{
+  "date": "2026-11-20",
+  "scope": "Synthetic, one host, unit-level",
+  "comparativeSuiteExecuted": false,
+  "baselineCommit": "8a79b9cfdac73312f1892059b41955582fafd1da",
+  "acceptedArchiveSha256": "79132734225c138f30a3a16909981c893ba8935271568bdbee8220f1758de396",
+  "matchedRuntimeFiles": 36,
+  "currentStartingCommit": "ce747b25a02d227d2ed02a0058567b87eba5eb17",
+  "tests": {
+    "baseline": {
+      "testsPassed": 45,
+      "subtestsPassed": 10
+    },
+    "currentBefore": {
+      "testsPassed": 48,
+      "subtestsPassed": 10
+    },
+    "currentAfter": {
+      "testsPassed": 50,
+      "subtestsPassed": 18
+    }
+  },
+  "scenarios": [
+    {
+      "scenario": "Stale-version approval",
+      "baseline": "Unrun",
+      "current": "Missing current certificate rejected"
+    },
+    {
+      "scenario": "Replay onto a corrected claim",
+      "baseline": "Unrun",
+      "current": "Unrun"
+    },
+    {
+      "scenario": "Amount mismatch at authorization",
+      "baseline": "Unrun",
+      "current": "Rejected"
+    },
+    {
+      "scenario": "Amount mismatch at confirmation",
+      "baseline": "Unrun",
+      "current": "Rejected"
+    },
+    {
+      "scenario": "Double confirmation",
+      "baseline": "Unrun",
+      "current": "Second confirmation rejected"
+    },
+    {
+      "scenario": "Mutation after authorization",
+      "baseline": "Unrun",
+      "current": "Newer episode revision rejected"
+    },
+    {
+      "scenario": "Insurer-only registry publication",
+      "baseline": "Published in existing fixture",
+      "current": "Unscoped publication rejected in existing fixture"
+    },
+    {
+      "scenario": "Correction loop",
+      "baseline": "Unrun",
+      "current": "One corrected version required review. Loop unrun."
+    },
+    {
+      "scenario": "Positive Oracle result on suspected duplicate",
+      "baseline": "Unrun",
+      "current": "Panel required"
+    },
+    {
+      "scenario": "Inconsistent certificate amount",
+      "baseline": "N/A",
+      "current": "Rejected"
+    },
+    {
+      "scenario": "Early vote visibility to claimant and another MSP",
+      "baseline": "Open limitation from source review",
+      "current": "Open limitation from source review"
+    }
+  ],
+  "rawLogs": ".local-reference/maintenance-1.9/item-01/"
+}
