@@ -31,10 +31,11 @@ func (c *Contract) PrepareMedicalReview(ctx contractapi.TransactionContextInterf
 	if err != nil {
 		return nil, err
 	}
+	var request *OracleRequest
 	if usesMedicalApprovalCertificates(ctx) && claim.EpisodeID != "" && claim.CurrentOracleRequestID != "" &&
 		(claim.Status == "ORACLE_PENDING" || claim.Status == "APPROVED" ||
 			(claim.CurrentReviewID == "" && (claim.Status == "ORACLE_FAILED" || claim.Status == "MEDICAL_REVIEW_REQUIRED"))) {
-		request, err := c.ReadOracleRequest(ctx, claim.CurrentOracleRequestID)
+		request, err = c.ReadOracleRequest(ctx, claim.CurrentOracleRequestID)
 		if err != nil {
 			return nil, err
 		}
@@ -70,9 +71,13 @@ func (c *Contract) PrepareMedicalReview(ctx contractapi.TransactionContextInterf
 		return nil, fmt.Errorf("medical claim must finish current Oracle verification before preparation")
 	}
 	if claim.CurrentOracleRequestID != "" || claim.MedicalHeldReleaseID == "" {
-		request, err := c.ReadOracleRequest(ctx, claim.CurrentOracleRequestID)
-		if err != nil {
-			return nil, err
+		// A Fabric simulation reads committed state, so keep any request
+		// finalized by this transaction in memory.
+		if request == nil {
+			request, err = c.ReadOracleRequest(ctx, claim.CurrentOracleRequestID)
+			if err != nil {
+				return nil, err
+			}
 		}
 		if request.ClaimVersion != claim.Version || (request.Status != "FAILED" && request.Status != "CONSENSUS") {
 			return nil, fmt.Errorf("current verification has not finished")

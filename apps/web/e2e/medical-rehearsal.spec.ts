@@ -13,6 +13,16 @@ const roles = {
   auditor3: ["Independent Auditor Three", "auditor"],
   auditor4: ["Independent Auditor Four", "auditor"],
 } as const;
+const demoAccountIDs = {
+  insurer: "insurer-admin",
+  hospital: "hospital-officer",
+  holder: "policyholder-1",
+  bank: "bank-officer",
+  auditor1: "auditor",
+  auditor2: "auditor-2",
+  auditor3: "auditor-3",
+  auditor4: "auditor-4",
+} as const;
 
 const deadlines = process.env.MEDICAL_DEADLINE_LIVE === "true";
 const finalPayment = process.env.MEDICAL_FINAL_PAYMENT === "true";
@@ -56,17 +66,17 @@ test(journey, async ({ page }, info) => {
   page.on("pageerror", error => errors.push(error.message));
   async function login(next: keyof typeof roles) {
     if (role === next) return;
-    if (role) await page.getByRole("button", { name: "Sign out", exact: true }).click();
-    else await page.goto("/workspace");
-    const signIn = page.getByRole("button", { name: "Sign in as " + roles[next][0], exact: true });
     if (devLite) {
-      // The request starts after React mounts. The heading can appear earlier during SSR.
-      await Promise.all([
-        page.waitForRequest(request => new URL(request.url()).pathname === "/api/operations/notifications", { timeout: 45_000 }),
-        signIn.click(),
-      ]);
+      const response = await page.request.post("/api/auth/demo-login", {
+        data: { accountId: demoAccountIDs[next] },
+        maxRetries: 2,
+      });
+      expect(response.ok(), await response.text()).toBe(true);
+      await page.goto("/workspace/" + roles[next][1]);
     } else {
-      await signIn.click();
+      if (role) await page.getByRole("button", { name: "Sign out", exact: true }).click();
+      else await page.goto("/workspace");
+      await page.getByRole("button", { name: "Sign in as " + roles[next][0], exact: true }).click();
     }
     await expect(page).toHaveURL(new RegExp("/workspace/" + roles[next][1] + "$"), { timeout: 45_000 });
     await expect(page.getByRole("heading", { name: roles[next][0], exact: true })).toBeVisible();

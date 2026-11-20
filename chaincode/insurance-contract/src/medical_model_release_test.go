@@ -1,12 +1,33 @@
 package insurance
 
 import (
+	"maps"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/hyperledger/fabric-chaincode-go/v2/shim"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
+
+type committedStateStub struct {
+	*memoryStub
+	committed map[string][]byte
+}
+
+func (s *committedStateStub) GetState(key string) ([]byte, error) {
+	return slices.Clone(s.committed[key]), nil
+}
+
+type committedStateContext struct {
+	*testContext
+	ledger *committedStateStub
+}
+
+func (c *committedStateContext) GetStub() shim.ChaincodeStubInterface {
+	return c.ledger
+}
 
 func TestDevLiteLegacyCommitmentFinishesAlongsideReleaseRequest(t *testing.T) {
 	for _, unavailable := range []bool{false, true} {
@@ -116,12 +137,21 @@ func TestDevLiteHeldReleaseSettlementAndOracleOrder(t *testing.T) {
 				requireError(t, err, "model release is held")
 			}
 			setIdentity(ctx, "insurer", "InsurerMSP", "insurerAdmin", nil)
-			review, err := c.PrepareMedicalReview(ctx, f.claim.ID, "held-review", prepareBy)
+			simulation := &committedStateContext{testContext: ctx,
+				ledger: &committedStateStub{memoryStub: ctx.stub, committed: maps.Clone(ctx.stub.state)}}
+			review, err := c.PrepareMedicalReview(simulation, f.claim.ID, "held-review", prepareBy)
 			requireNoError(t, err)
 			claim, err := c.ReadClaim(ctx, f.claim.ID)
 			requireNoError(t, err)
 			if review.MedicalVersion != claim.Version || claim.MedicalHeldReleaseID != release.ID || claim.Status != "MEDICAL_REVIEW_PREPARING" {
 				t.Fatal("held release did not route the current claim into panel preparation")
+			}
+			if phase == "before commit" || phase == "between commit and reveal" {
+				final, readErr := c.ReadOracleRequest(ctx, request.ID)
+				requireNoError(t, readErr)
+				if final.Status != "FAILED" || final.FinalizationCode != "MODEL_HELD" {
+					t.Fatal("prepared panel did not finalize its pending Oracle request")
+				}
 			}
 		})
 	}

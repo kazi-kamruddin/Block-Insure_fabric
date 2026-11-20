@@ -136,3 +136,27 @@ the finalized panel dossier and was denied access to the unassigned routine
 dossier. Three focused unit tests covered expired clarification, voting,
 and evidence-grant guidance. A separate human operator rehearsal remains
 pending.
+
+### 20 November 2026 maintenance integration
+
+The isolated five-peer LevelDB deployment committed chaincode 1.9.0,
+sequence 3. These are synthetic, one-host, live observations. The
+accepted 1.8.0 deployment stayed untouched.
+
+| Check | Observed outcome | Evidence |
+| --- | --- | --- |
+| Uninterrupted corrected appeal | `medical-e6d1d017-12e0-4889-8112-9f818afb545d` had new evidence acknowledgements and three fresh approvals at version 3. Bank confirmed one BDT 40.00 payment. The standalone verifier matched the v2 digest to a direct Insurer peer read. | Local `data/dev-lite/maintenance-seq3-appeal-final/report.json` and `data/dev-lite/maintenance-seq3-appeal-receipt.json`. |
+| Claimant escalation with short deadline | `maint-escalation-ec742a664ac9` used three intentionally inactive synthetic assignments. The early request was refused. After the on-ledger reveal deadline, the claimant opened panel preparation and the Oracle request ended FAILED. | Local `data/dev-lite/maintenance-live-escalation.json`. |
+| Explicit organization-pair validation | NOT DONE. The live suite has no per-pair VALID or INVALID receipts for AuthorizeSettlement or ConfirmSettlement. The per-key policy comparison remains open. | [Run summary](results/RUN-SUMMARY.md). |
+| Pending release hold | The release became HELD while its request was pending. Sequence 3 refused panel preparation. After the sequence-4 fix, the same request ended FAILED with MODEL_HELD, and the current version entered panel preparation. | [Finding F13](results/FINDINGS.md) and local `data/dev-lite/maintenance-live-hold.json`. |
+
+The appeal used the existing gateway-held demo Bank identity. It establishes
+no separate signer custody, CouchDB acceptance, or clinical validity.
+
+The audited hold correction was deployed to all five peers as sequence 4.
+The lifecycle transaction was
+`512e71fb8768d275429869128b5855458d3a69fc730a57bc877ce0cc2c400e6a`.
+The recovered preparation committed VALID as
+`7d001e87f281f03e17e81b1647da4344b70844deeb951e0443db615b8f3e27b3`.
+A successor with the same installed evaluator artifact was promoted before
+the rehearsal release was held.
