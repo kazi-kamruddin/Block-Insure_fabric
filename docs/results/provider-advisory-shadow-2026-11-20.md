@@ -11,9 +11,10 @@ The artifact exporter produces registration metadata for an advisory
 candidate. A dev-lite worker can observe a SHADOW release when its local
 artifact hash matches and an explicit local provider-vector catalog is
 available. The observation is outside the commit/reveal payload. There
-is no verified benchmark-provider to live-hospital linkage, so no live
-registration or HIGH-tier promotion path was exercised. No challenger
-was added.
+is no verified benchmark-provider to live-hospital linkage. The logistic
+artifact was registered as CANDIDATE on the live dev-lite channel, and
+worker SHADOW scoring was verified with an authored catalog in unit tests.
+HIGH-tier promotion remains open. No challenger was added.
 
 Scope is authored synthetic worker fixtures, one host, unit-level, and
 the existing retrospective weak-label dataset. The worker suite passed
