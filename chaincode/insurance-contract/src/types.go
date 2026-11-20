@@ -275,6 +275,7 @@ type Liability struct {
 }
 
 type Claim struct {
+	MedicalHeldReleaseID      string   `json:"medicalHeldReleaseId,omitempty" metadata:",optional"`
 	MedicalDuplicateReview    bool     `json:"medicalDuplicateReview,omitempty" metadata:",optional"`
 	MedicalEscalatedAt        string   `json:"medicalEscalatedAt,omitempty" metadata:",optional"`
 	MedicalClarificationID    string   `json:"medicalClarificationId"`
@@ -412,6 +413,7 @@ type OracleRegistrySnapshot struct {
 }
 
 type OracleRequest struct {
+	ModelReleaseID          string   `json:"modelReleaseId,omitempty" metadata:",optional"`
 	AssetType               string   `json:"assetType"`
 	SchemaVersion           int      `json:"schemaVersion"`
 	ID                      string   `json:"id"`

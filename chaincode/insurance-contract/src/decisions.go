@@ -23,6 +23,15 @@ func (c *Contract) AuthorizeSettlement(ctx contractapi.TransactionContextInterfa
 	var certificateHash string
 	if claim.EpisodeID != "" {
 		if usesMedicalApprovalCertificates(ctx) {
+			request, err := c.medicalApprovalRequest(ctx, claim)
+			if err != nil {
+				return nil, err
+			}
+			if claim.MedicalHeldReleaseID == "" {
+				if err := c.requireUsableMedicalRelease(ctx, request); err != nil {
+					return nil, err
+				}
+			}
 			cert, err := c.verifyMedicalApproval(ctx, claim)
 			if err != nil {
 				return nil, err

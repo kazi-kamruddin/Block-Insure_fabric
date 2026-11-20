@@ -41,6 +41,9 @@ var oracleVerificationCodes = map[string]bool{
 // Historical requests retain their fixed-code validator. The Fabric evaluator
 // binds the full inference/context digest to the existing exact-result quorum.
 func validateOracleRoutingCode(modelVersion, code string, verified bool) error {
+	if code == "XGB_EVALUATOR_UNAVAILABLE" && !verified {
+		return nil
+	}
 	if modelVersion == "fabric-xgb-synthetic-v1" {
 		for _, prefix := range []string{"XGB_AUTO:", "XGB_REVIEW:"} {
 			if strings.HasPrefix(code, prefix) {
@@ -102,8 +105,7 @@ func oracleQueryHash(claim *Claim, verification *HospitalVerification) string {
 }
 
 func oracleResultDigest(request *OracleRequest, verified bool, verificationCode, recordHash string) string {
-	return canonicalProtocolHash(
-		oracleProtocolVersion+":result",
+	values := []string{
 		request.ID,
 		request.ClaimID,
 		request.QueryHash,
@@ -124,7 +126,11 @@ func oracleResultDigest(request *OracleRequest, verified bool, verificationCode,
 		strconv.FormatBool(verified),
 		verificationCode,
 		strings.ToLower(recordHash),
-	)
+	}
+	if request.ModelReleaseID != "" {
+		values = append(values, request.ModelReleaseID)
+	}
+	return canonicalProtocolHash(oracleProtocolVersion+":result", values...)
 }
 
 func oracleCommitmentDigest(request *OracleRequest, verified bool, resultHash, salt string) string {
@@ -341,8 +347,21 @@ func (c *Contract) RequestOracleVerification(
 		return nil, fmt.Errorf("claim %s requires a current verified hospital attestation", claimID)
 	}
 	var verification *HospitalVerification
+	var medicalReleaseID string
 	if claim.EpisodeID != "" {
-		if modelVersion != "fabric-xgb-synthetic-v1" || !strings.EqualFold(modelHash, "4954e2d2c71422d415c1d50d32687412479fee5bf61a3a9e283760726e6120b4") {
+		if usesMedicalApprovalCertificates(ctx) {
+			release, err := c.activeMedicalRoutingRelease(ctx)
+			if err != nil {
+				return nil, err
+			}
+			if release.Status != "PROMOTED" || release.IntendedTask != "ROUTING" {
+				return nil, fmt.Errorf("model release is held; prepare panel review")
+			}
+			if release.ModelVersion != modelVersion || !strings.EqualFold(release.ArtifactHash, modelHash) {
+				return nil, fmt.Errorf("request must use the promoted medical routing release")
+			}
+			medicalReleaseID = release.ID
+		} else if modelVersion != frozenMedicalModelVersion || !strings.EqualFold(modelHash, frozenMedicalModelHash) {
 			return nil, fmt.Errorf("medical claims require the pinned frozen Fabric evaluator")
 		}
 		verification, err = c.bindMedicalOracle(ctx, claim, requestID)
@@ -455,7 +474,7 @@ func (c *Contract) RequestOracleVerification(
 		QueryHash:              oracleQueryHash(claim, verification), RegistrySnapshotID: snapshot.ID,
 		RegistryVersion: snapshot.Version, RegistryRootHash: snapshot.RootHash,
 		RulesVersion: snapshot.RulesVersion, RulesHash: snapshot.RulesHash,
-		ModelVersion: strings.TrimSpace(modelVersion), ModelHash: strings.ToLower(modelHash),
+		ModelVersion: strings.TrimSpace(modelVersion), ModelHash: strings.ToLower(modelHash), ModelReleaseID: medicalReleaseID,
 		AssignedOracleIDs: assignments, RequiredConfirmations: requiredConfirmations,
 		ExpectedResponses: len(assignments), Status: "PENDING", CommitDeadline: commitDeadline,
 		RevealDeadline: revealDeadline, RequestedAt: now,
@@ -487,6 +506,9 @@ func (c *Contract) SubmitOracleCommitment(ctx contractapi.TransactionContextInte
 	}
 	request, err := c.ReadOracleRequest(ctx, requestID)
 	if err != nil {
+		return nil, err
+	}
+	if err := c.requireUsableMedicalRelease(ctx, request); err != nil {
 		return nil, err
 	}
 	if request.Status != "PENDING" {
@@ -546,6 +568,9 @@ func (c *Contract) RevealOracleResult(
 	}
 	request, err := c.ReadOracleRequest(ctx, requestID)
 	if err != nil {
+		return nil, err
+	}
+	if err := c.requireUsableMedicalRelease(ctx, request); err != nil {
 		return nil, err
 	}
 	if request.Status != "PENDING" {

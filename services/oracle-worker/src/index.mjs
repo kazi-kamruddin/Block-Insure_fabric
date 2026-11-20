@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import path from "node:path";
-import { pinnedDecision, decisionIdentity } from "./decision-store.mjs";
+import { pinnedDecision, decisionIdentity, historicalDecisionAliases } from "./decision-store.mjs";
 import { routeModel, evaluatorVersion, evaluatorHash } from "./xgboost.mjs";
 import { registryAssessmentRequest } from "./medical-revision.mjs";
 import { environmentFileArgument, loadEnvironmentFile } from "./environment.mjs";
@@ -166,10 +166,18 @@ async function processRequest(requestId) {
   const decision = await pinnedDecision({
     directory: path.join(config.stateRoot, config.oracleId, "decisions"),
     identity: decisionIdentity(config, runtime.identityFingerprint, request),
+    fallbackIdentities: historicalDecisionAliases(config, runtime.identityFingerprint, request),
     key: runtime.privateKey,
     existingCommitment,
     allowLegacyAdoption: request.modelVersion === "model-v1",
     create: async () => {
+  if (request.modelReleaseId && (request.modelVersion !== evaluatorVersion || request.modelHash !== evaluatorHash)) {
+    const assessment = { verified: false, verificationCode: "XGB_EVALUATOR_UNAVAILABLE", recordHash: "0".repeat(64) };
+    const resultHash = protocol.buildResultDigest(request, assessment);
+    const salt = protocol.buildDeterministicSalt(runtime.privateKey, request.id, config.oracleId);
+    return { assessment, resultHash, salt, commitmentHash: protocol.buildCommitmentDigest(request, { ...assessment, resultHash, salt }),
+      registry: { sourceId: "unavailable-evaluator", snapshotId: request.registrySnapshotId, version: request.registryVersion, rootHash: request.registryRootHash } };
+  }
   const [claim, hospitalVerification, appeal, publicPresentation, privatePresentation] = await Promise.all([
     evaluate("ReadClaim", request.claimId),
     evaluate("ReadHospitalVerification", request.hospitalVerificationId),

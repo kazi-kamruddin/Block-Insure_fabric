@@ -118,8 +118,16 @@ func (c *Contract) deriveMedicalApproval(ctx contractapi.TransactionContextInter
 		}
 		cert.OracleRequestID, cert.OracleResultHash, cert.OracleOutcome = request.ID, request.ResultHash, request.FinalizationCode
 		cert.RegistrySnapshotID, cert.RegistryRootHash, cert.ModelHash = request.RegistrySnapshotID, request.RegistryRootHash, request.ModelHash
+		if claim.MedicalHeldReleaseID != "" {
+			if review == nil || claim.MedicalHeldReleaseID != effectiveMedicalModelReleaseID(request) {
+				return nil, fmt.Errorf("certificate requires a panel decision for the held release")
+			}
+			cert.OracleOutcome = "MODEL_HELD:" + claim.MedicalHeldReleaseID
+		}
+	} else if review != nil && claim.MedicalHeldReleaseID != "" {
+		cert.OracleOutcome = "MODEL_HELD:" + claim.MedicalHeldReleaseID
 	} else if review == nil || claim.MedicalEscalatedAt == "" {
-		return nil, fmt.Errorf("certificate requires an Oracle result or a recorded escalation")
+		return nil, fmt.Errorf("certificate requires an Oracle result, held release, or recorded escalation")
 	}
 	values := []string{cert.ID, cert.ActivationTransactionID, cert.ClaimID, strconv.Itoa(cert.ClaimVersion),
 		strconv.Itoa(cert.EpisodeRevision), cert.EpisodeRevisionHash, strconv.Itoa(cert.AssociationVersion), cert.StatementHash,
@@ -150,13 +158,16 @@ func (c *Contract) deriveMedicalApproval(ctx contractapi.TransactionContextInter
 
 func requiresMedicalPanel(claim *Claim) bool {
 	return claim.CurrentAppealID != "" || claim.MedicalSupplementHash != "" || claim.MedicalRevisionKind == "CORRECTION" ||
-		claim.MedicalDuplicateReview || claim.MedicalEscalatedAt != ""
+		claim.MedicalDuplicateReview || claim.MedicalEscalatedAt != "" || claim.MedicalHeldReleaseID != ""
 }
 
 func (c *Contract) recordMedicalApproval(ctx contractapi.TransactionContextInterface, claim *Claim, request *OracleRequest, review *ClaimReview) error {
 	cert, err := c.deriveMedicalApproval(ctx, claim, request, review)
 	if err != nil {
 		return err
+	}
+	if claim.MedicalHeldReleaseID != "" {
+		return putState(ctx, "medicalHeldReplacementCertificate", cert.ID, cert)
 	}
 	return putState(ctx, "medicalApprovalCertificate", cert.ID, cert)
 }
@@ -169,7 +180,19 @@ func (c *Contract) medicalApprovalRequest(ctx contractapi.TransactionContextInte
 }
 
 func (c *Contract) ReadMedicalApprovalCertificate(ctx contractapi.TransactionContextInterface, claimID string, version int) (*ApprovalCertificate, error) {
-	return getState[ApprovalCertificate](ctx, "medicalApprovalCertificate", medicalRevisionKey(claimID, version))
+	id := medicalRevisionKey(claimID, version)
+	key, err := stateKey(ctx, "medicalHeldReplacementCertificate", id)
+	if err != nil {
+		return nil, err
+	}
+	raw, err := ctx.GetStub().GetState(key)
+	if err != nil {
+		return nil, err
+	}
+	if raw != nil {
+		return getState[ApprovalCertificate](ctx, "medicalHeldReplacementCertificate", id)
+	}
+	return getState[ApprovalCertificate](ctx, "medicalApprovalCertificate", id)
 }
 
 func (c *Contract) verifyMedicalApproval(ctx contractapi.TransactionContextInterface, claim *Claim) (*ApprovalCertificate, error) {

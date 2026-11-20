@@ -34,6 +34,7 @@ export function buildResultDigest(request, { verified, verificationCode, recordH
     Boolean(verified),
     verificationCode,
     String(recordHash).toLowerCase(),
+    ...(request.modelReleaseId ? [request.modelReleaseId] : []),
   );
 }
 

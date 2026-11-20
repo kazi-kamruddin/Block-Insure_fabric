@@ -31,15 +31,52 @@ func (c *Contract) PrepareMedicalReview(ctx contractapi.TransactionContextInterf
 	if err != nil {
 		return nil, err
 	}
+	if usesMedicalApprovalCertificates(ctx) && claim.EpisodeID != "" && claim.CurrentOracleRequestID != "" &&
+		(claim.Status == "ORACLE_PENDING" || claim.Status == "APPROVED" ||
+			(claim.CurrentReviewID == "" && (claim.Status == "ORACLE_FAILED" || claim.Status == "MEDICAL_REVIEW_REQUIRED"))) {
+		request, err := c.ReadOracleRequest(ctx, claim.CurrentOracleRequestID)
+		if err != nil {
+			return nil, err
+		}
+		held, err := c.heldMedicalRequest(ctx, request)
+		if err != nil {
+			return nil, err
+		}
+		if held && claim.MedicalHeldReleaseID == "" && request.ClaimVersion == claim.Version {
+			if claim.Status == "ORACLE_PENDING" {
+				now, err := timestamp(ctx)
+				if err != nil {
+					return nil, err
+				}
+				if err := c.finalizeOracleRequest(ctx, request, claim, false, "", "MODEL_HELD", now); err != nil {
+					return nil, err
+				}
+			}
+			claim.MedicalHeldReleaseID = effectiveMedicalModelReleaseID(request)
+			claim.CurrentReviewID, claim.AuditorDecisionID, claim.Status = "", "", "MEDICAL_REVIEW_REQUIRED"
+		}
+	}
+	if usesMedicalApprovalCertificates(ctx) && claim.EpisodeID != "" && claim.CurrentOracleRequestID == "" &&
+		(claim.Status == "SUBMITTED" || claim.Status == "APPEAL_SUBMITTED") {
+		release, err := c.activeMedicalRoutingRelease(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if release.Status == "HELD" {
+			claim.MedicalHeldReleaseID, claim.Status = release.ID, "MEDICAL_REVIEW_REQUIRED"
+		}
+	}
 	if claim.EpisodeID == "" || claim.CurrentReviewID != "" || (claim.Status != "ORACLE_FAILED" && claim.Status != "MEDICAL_REVIEW_REQUIRED") {
 		return nil, fmt.Errorf("medical claim must finish current Oracle verification before preparation")
 	}
-	request, err := c.ReadOracleRequest(ctx, claim.CurrentOracleRequestID)
-	if err != nil {
-		return nil, err
-	}
-	if request.ClaimVersion != claim.Version || (request.Status != "FAILED" && request.Status != "CONSENSUS") {
-		return nil, fmt.Errorf("current verification has not finished")
+	if claim.CurrentOracleRequestID != "" || claim.MedicalHeldReleaseID == "" {
+		request, err := c.ReadOracleRequest(ctx, claim.CurrentOracleRequestID)
+		if err != nil {
+			return nil, err
+		}
+		if request.ClaimVersion != claim.Version || (request.Status != "FAILED" && request.Status != "CONSENSUS") {
+			return nil, fmt.Errorf("current verification has not finished")
+		}
 	}
 	panel, err := c.medicalReviewPanel(ctx, claim)
 	if err != nil {

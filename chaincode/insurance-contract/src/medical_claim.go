@@ -368,7 +368,7 @@ func (c *Contract) AcceptMedicalCorrection(ctx contractapi.TransactionContextInt
 	claim.EvidenceIDs = []string{}
 	claim.MedicalRevisionKind, claim.MedicalSupplementHash = "CORRECTION", ""
 	claim.MedicalEscalatedAt = ""
-
+	claim.MedicalHeldReleaseID = ""
 	if err := c.screenMedicalDuplicate(ctx, claim, episode); err != nil {
 		return nil, err
 	}
