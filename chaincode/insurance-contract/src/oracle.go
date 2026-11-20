@@ -479,6 +479,12 @@ func (c *Contract) RequestOracleVerification(
 		ExpectedResponses: len(assignments), Status: "PENDING", CommitDeadline: commitDeadline,
 		RevealDeadline: revealDeadline, RequestedAt: now,
 	}
+	if medicalReleaseID != "" {
+		request.AuditPeriodID, err = c.medicalAuditPeriodForRequest(ctx, now)
+		if err != nil {
+			return nil, err
+		}
+	}
 	if err := putState(ctx, "oracleRequest", requestID, request); err != nil {
 		return nil, err
 	}
@@ -766,6 +772,9 @@ func (c *Contract) finalizeOracleRequest(ctx contractapi.TransactionContextInter
 	} else {
 		request.Status = "FAILED"
 		claim.Status = "ORACLE_FAILED"
+	}
+	if usesMedicalApprovalCertificates(ctx) && claim.Status == "APPROVED" && request.AuditPeriodID != "" {
+		claim.Status = "MEDICAL_AUDIT_PENDING"
 	}
 	if usesMedicalApprovalCertificates(ctx) && claim.EpisodeID != "" && claim.Status == "APPROVED" {
 		if err := c.recordMedicalApproval(ctx, claim, request, nil); err != nil {

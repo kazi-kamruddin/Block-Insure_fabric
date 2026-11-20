@@ -414,6 +414,7 @@ type OracleRegistrySnapshot struct {
 }
 
 type OracleRequest struct {
+	AuditPeriodID           string   `json:"auditPeriodId,omitempty" metadata:",optional"`
 	ModelReleaseID          string   `json:"modelReleaseId,omitempty" metadata:",optional"`
 	AssetType               string   `json:"assetType"`
 	SchemaVersion           int      `json:"schemaVersion"`

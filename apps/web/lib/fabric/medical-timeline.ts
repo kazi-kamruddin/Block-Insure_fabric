@@ -38,6 +38,8 @@ function nextAction({ claim, review, clarification, appeal, documents, grants, c
     }
     case "ORACLE_PENDING":
       return "Oracle workers complete verification.";
+    case "MEDICAL_AUDIT_PENDING":
+      return "Audit selection awaits the seed reveal and resolution.";
     case "ORACLE_FAILED":
     case "MEDICAL_REVIEW_REQUIRED":
       return "Insurer prepares panel review.";
