@@ -141,7 +141,8 @@ export const ledger = {
       answer: note.answer ? openMedicalReviewNote("answer", id, note.answer) : "" };
   },
   async readMedicalAppealExplanation(role: "insurerAdmin" | "policyholder", id: string) {
-    const note = await evaluate<{ text: string }>(role, "ReadMedicalAppealExplanation", id);
+    const note = await evaluate<{ text: string; purged?: boolean }>(role, "ReadMedicalAppealExplanation", id);
+    if (note.purged) return null;
     return openMedicalReviewNote("appeal", id, note.text);
   },
   listMedicalEvidenceChecks(reviewId: string) {

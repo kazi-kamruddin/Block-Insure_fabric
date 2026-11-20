@@ -179,7 +179,8 @@ func (c *Contract) QuoteMedicalAppeal(ctx contractapi.TransactionContextInterfac
 }
 
 type MedicalAppealExplanation struct {
-	Text string `json:"text"`
+	Text   string `json:"text"`
+	Purged bool   `json:"purged,omitempty" metadata:",optional"`
 }
 
 func (c *Contract) ReadMedicalAppealExplanation(ctx contractapi.TransactionContextInterface, id string) (*MedicalAppealExplanation, error) {
@@ -197,6 +198,19 @@ func (c *Contract) ReadMedicalAppealExplanation(ctx contractapi.TransactionConte
 	owner, err := callerSubject(ctx)
 	if err != nil || (role == "policyholder" && owner != appeal.ClaimantID) {
 		return nil, fmt.Errorf("appeal explanation is private")
+	}
+	if usesMedicalApprovalCertificates(ctx) {
+		key, err := stateKey(ctx, "medicalNoteDisposal", id)
+		if err != nil {
+			return nil, err
+		}
+		disposal, err := ctx.GetStub().GetState(key)
+		if err != nil {
+			return nil, err
+		}
+		if disposal != nil {
+			return &MedicalAppealExplanation{Purged: true}, nil
+		}
 	}
 	return getPrivateState[MedicalAppealExplanation](ctx, "medicalAppealExplanation", id)
 }
