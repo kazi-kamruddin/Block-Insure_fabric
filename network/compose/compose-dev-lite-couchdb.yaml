@@ -1,0 +1,74 @@
+x-couchdb: &couchdb
+  image: couchdb:3.3.3
+  environment:
+    COUCHDB_USER: devlite
+    COUCHDB_PASSWORD: devlite-demo-only
+  healthcheck:
+    test: ["CMD", "curl", "-fsS", "http://127.0.0.1:5984/_up"]
+    interval: 4s
+    timeout: 3s
+    retries: 15
+
+x-state-db: &state-db
+  CORE_LEDGER_STATE_STATEDATABASE: CouchDB
+  CORE_LEDGER_STATE_COUCHDBCONFIG_USERNAME: devlite
+  CORE_LEDGER_STATE_COUCHDBCONFIG_PASSWORD: devlite-demo-only
+
+volumes:
+  couchdb-insurer:
+  couchdb-hospital:
+  couchdb-auditor:
+  couchdb-bank:
+  couchdb-oracle:
+
+services:
+  couchdb-insurer:
+    <<: *couchdb
+    volumes: [couchdb-insurer:/opt/couchdb/data]
+  peer-insurer:
+    depends_on:
+      couchdb-insurer:
+        condition: service_healthy
+    environment:
+      <<: *state-db
+      CORE_LEDGER_STATE_COUCHDBCONFIG_COUCHDBADDRESS: couchdb-insurer:5984
+  couchdb-hospital:
+    <<: *couchdb
+    volumes: [couchdb-hospital:/opt/couchdb/data]
+  peer-hospital:
+    depends_on:
+      couchdb-hospital:
+        condition: service_healthy
+    environment:
+      <<: *state-db
+      CORE_LEDGER_STATE_COUCHDBCONFIG_COUCHDBADDRESS: couchdb-hospital:5984
+  couchdb-auditor:
+    <<: *couchdb
+    volumes: [couchdb-auditor:/opt/couchdb/data]
+  peer-auditor:
+    depends_on:
+      couchdb-auditor:
+        condition: service_healthy
+    environment:
+      <<: *state-db
+      CORE_LEDGER_STATE_COUCHDBCONFIG_COUCHDBADDRESS: couchdb-auditor:5984
+  couchdb-bank:
+    <<: *couchdb
+    volumes: [couchdb-bank:/opt/couchdb/data]
+  peer-bank:
+    depends_on:
+      couchdb-bank:
+        condition: service_healthy
+    environment:
+      <<: *state-db
+      CORE_LEDGER_STATE_COUCHDBCONFIG_COUCHDBADDRESS: couchdb-bank:5984
+  couchdb-oracle:
+    <<: *couchdb
+    volumes: [couchdb-oracle:/opt/couchdb/data]
+  peer-oracle:
+    depends_on:
+      couchdb-oracle:
+        condition: service_healthy
+    environment:
+      <<: *state-db
+      CORE_LEDGER_STATE_COUCHDBCONFIG_COUCHDBADDRESS: couchdb-oracle:5984

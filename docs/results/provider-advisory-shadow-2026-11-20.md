@@ -19,3 +19,19 @@ HIGH-tier promotion remains open. No challenger was added.
 Scope is authored synthetic worker fixtures, one host, unit-level, and
 the existing retrospective weak-label dataset. The worker suite passed
 31 tests. The Go suite remained at 57 tests and 24 subtests.
+
+### Live CouchDB dev-lite follow-up
+
+The same hash-matched artifact entered SHADOW on the isolated CouchDB
+channel. For one authored hospital vector set to the artifact's feature
+means, the expected score was 34,983 units. Both active Oracle workers
+logged that score for the same request. Both authoritative reveals were
+XGB_AUTO under the pinned `frozen-medical-v1` release and the request
+finalized in exact consensus. The advisory output stayed in worker logs.
+
+The SHADOW transaction was
+`c7c6d9035e43d5c318d138abe2a295b802b6f3b0fb028238881c2632d0764632`.
+Local records are `data/dev-lite-couchdb/maintenance-shadow-setup.json`
+and `data/dev-lite-couchdb/maintenance-shadow-live.json`. This is a
+synthetic one-host live pipeline check with no observed patient or provider
+outcomes and no HIGH-tier promotion.

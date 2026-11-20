@@ -9,8 +9,8 @@ export PATH="${samples_root}/bin:${PATH}"
 domain="oracle.blockinsure.test"
 org_root="${network_root}/organizations"
 port=13054
-if [[ "${1:-}" == --dev-lite ]]; then
-  org_root="${network_root}/../data/dev-lite/organizations"
+if [[ "${1:-}" == --dev-lite || "${1:-}" == --dev-lite-couchdb ]]; then
+  org_root="${network_root}/../data/${1#--}/organizations"
   port=31454
   export FABRIC_CA_CLIENT_URL="https://localhost:${port}"
 fi

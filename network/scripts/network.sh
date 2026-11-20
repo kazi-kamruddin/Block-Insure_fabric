@@ -2,12 +2,15 @@
 set -euo pipefail
 
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
-if [[ "${1:-}" == --dev-lite ]]; then
-  shift
-  exec bash "${script_dir}/dev-lite.sh" "$@"
-fi
+case "${1:-}" in
+  --dev-lite|--dev-lite-couchdb)
+    profile="$1"
+    shift
+    exec bash "${script_dir}/dev-lite.sh" "$profile" "$@"
+    ;;
+esac
 if (( $# != 1 )); then
-  echo "Usage: $0 [--dev-lite] ACTION (profile flag goes first)" >&2
+  echo "Usage: $0 [--dev-lite|--dev-lite-couchdb] ACTION (profile flag goes first)" >&2
   exit 2
 fi
 network_root="$(cd -- "${script_dir}/.." && pwd -P)"

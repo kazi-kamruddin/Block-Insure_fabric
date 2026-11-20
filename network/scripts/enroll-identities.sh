@@ -8,8 +8,8 @@ export PATH="${samples_root}/bin:${PATH}"
 
 org_root="${network_root}/organizations"
 dev_lite=false
-if [[ "${1:-}" == --dev-lite ]]; then
-  org_root="${network_root}/../data/dev-lite/organizations"
+if [[ "${1:-}" == --dev-lite || "${1:-}" == --dev-lite-couchdb ]]; then
+  org_root="${network_root}/../data/${1#--}/organizations"
   dev_lite=true
 fi
 
@@ -64,7 +64,7 @@ enroll_peer_org() {
   fi
 }
 
-if [[ "${1:-}" == --dev-lite ]]; then
+if [[ "$dev_lite" == true ]]; then
   enroll_peer_org insurer InsurerMSP 31054 insurerAdmin
   enroll_peer_org hospital HospitalMSP 31154 hospitalOfficer
   enroll_peer_org auditor AuditorMSP 31254 auditor

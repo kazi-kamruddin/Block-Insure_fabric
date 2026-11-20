@@ -12,14 +12,15 @@ docker() {
   case "$1 $2" in
     'volume ls') printf '%s\n' block-insure-dev-lite_orderer block-insure_orderer ;;
     'volume inspect') echo "${mock_owner:-block-insure-dev-lite/orderer}" ;;
+    'ps --filter') printf '%s' "${mock_orderer:-}" ;;
   esac
 }
 osnadmin() {
-  [[ " $* " == *" localhost:31053 "* && " $* " == *"/data/dev-lite/organizations/"* ]] || return 2
+  [[ " $* " == *" localhost:31053 "* && " $* " == *"/data/$DEV_LITE_DATA_DIR/organizations/"* ]] || return 2
   echo '{"name":"insurance-dev-lite-190"}'
 }
 peer() {
-  [[ "$*" == 'channel getinfo -c insurance-dev-lite-190' && "$CORE_PEER_MSPCONFIGPATH" == *'/data/dev-lite/organizations/'* ]] || return 2
+  [[ "$*" == 'channel getinfo -c insurance-dev-lite-190' && "$CORE_PEER_MSPCONFIGPATH" == *"/data/$DEV_LITE_DATA_DIR/organizations/"* ]] || return 2
   echo "$CORE_PEER_ADDRESS" >>"$test_log"
 }
 powershell.exe() { echo "powershell $*" >>"$test_log"; }
@@ -39,6 +40,15 @@ if mock_owner=other/orderer run teardown --confirm-dev-lite; then exit 1; fi
 if grep -Eq '^docker (compose|volume rm)' "$test_log"; then exit 1; fi
 run teardown --confirm-dev-lite
 grep -Fxq 'docker volume rm block-insure-dev-lite_orderer' "$test_log"
+: > "$test_log"
+bash "$here/network.sh" --dev-lite-couchdb verify
+mock_orderer=block-insure-dev-lite bash "$here/network.sh" --dev-lite-couchdb up && exit 1
+bash "$here/network.sh" --dev-lite-couchdb teardown --confirm-dev-lite && exit 1
+bash "$here/network.sh" --dev-lite-couchdb ca-start
+bash "$here/network.sh" --dev-lite-couchdb stop
+grep -Fq 'docker compose --project-name block-insure-dev-lite-couchdb' "$test_log"
+grep -Fq 'compose-dev-lite-couchdb.yaml' "$test_log"
+if grep -Eq '^docker volume rm|^powershell' "$test_log"; then exit 1; fi
 # Source-level contract: only evaluate the known exact-equality guard.
 # Fail closed if its implementation changes; never infer success from a missing match.
 python_bin=python3

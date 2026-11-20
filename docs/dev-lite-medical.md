@@ -30,6 +30,28 @@ controller running, use `./scripts/test-dev-lite-medical.ps1` on the
 activated channel. Add `-Activate` for the first rehearsal on a freshly
 deployed, empty channel. The switch performs the one-time activation.
 
+### Isolated CouchDB acceptance profile
+
+`network.sh --dev-lite-couchdb` uses the independent Compose project and
+network `block-insure-dev-lite-couchdb`, data root `data/dev-lite-couchdb`,
+and eleven project-owned volumes. Five CouchDB 3.3.3 services are reachable
+only on that Docker network. Each peer waits for its own database health
+check. The two development projects share the loopback ports and the
+chaincode's dev-lite channel name, but each creates its own genesis block,
+credentials, ledger and database files.
+
+Stop the development app controller and LevelDB project before selecting
+the CouchDB profile. Use the same `up` and `deploy` commands above with
+`--dev-lite-couchdb` and an explicit audited package. Then run
+`./scripts/dev-lite-app.ps1 -CouchDB -TwoOracles` and
+`./scripts/test-dev-lite-medical.ps1 -CouchDB -Activate` for the first
+rehearsal. The browser output, keys and app state stay in the CouchDB data
+root. The `stop` action retains volumes, including the existing LevelDB
+ledger. Leave the accepted deployment outside this procedure.
+After removing the CouchDB test volumes, archive the CouchDB profile data
+root before a fresh replay so the old browser receipts, event cursors and
+application journal stay linked to their original run.
+
 1. As Insurer, activate approval certificates once. The transaction writes
    the activation point and stores the duplicate-screening key in private data.
    Every medical approval on this fresh channel requires a certificate.
@@ -147,7 +169,7 @@ accepted 1.8.0 deployment stayed untouched.
 | --- | --- | --- |
 | Uninterrupted corrected appeal | `medical-e6d1d017-12e0-4889-8112-9f818afb545d` had new evidence acknowledgements and three fresh approvals at version 3. Bank confirmed one BDT 40.00 payment. The standalone verifier matched the v2 digest to a direct Insurer peer read. | Local `data/dev-lite/maintenance-seq3-appeal-final/report.json` and `data/dev-lite/maintenance-seq3-appeal-receipt.json`. |
 | Claimant escalation with short deadline | `maint-escalation-ec742a664ac9` used three intentionally inactive synthetic assignments. The early request was refused. After the on-ledger reveal deadline, the claimant opened panel preparation and the Oracle request ended FAILED. | Local `data/dev-lite/maintenance-live-escalation.json`. |
-| Explicit organization-pair validation | NOT DONE. The live suite has no per-pair VALID or INVALID receipts for AuthorizeSettlement or ConfirmSettlement. The per-key policy comparison remains open. | [Run summary](results/RUN-SUMMARY.md). |
+| Explicit organization-pair validation | On sequence 4 only Bank + Insurer endorsed and committed both operations. The other 18 checks stopped during endorsement. | [Pair matrix and transaction IDs](results/dev-lite-endorsement-pairs-2026-11-20.md). |
 | Pending release hold | The release became HELD while its request was pending. Sequence 3 refused panel preparation. After the sequence-4 fix, the same request ended FAILED with MODEL_HELD, and the current version entered panel preparation. | [Finding F13](results/FINDINGS.md) and local `data/dev-lite/maintenance-live-hold.json`. |
 
 The appeal used the existing gateway-held demo Bank identity. It establishes
@@ -160,3 +182,29 @@ The recovered preparation committed VALID as
 `7d001e87f281f03e17e81b1647da4344b70844deeb951e0443db615b8f3e27b3`.
 A successor with the same installed evaluator artifact was promoted before
 the rehearsal release was held.
+
+### 20 November 2026 CouchDB acceptance
+
+The separate CouchDB project ran the audited 1.9.0 package at sequence 1
+with two Oracle workers. This was a synthetic, one-host rehearsal. Each
+journey confirmed one BDT 40.00 payout. The standalone verifier checked
+internal consistency of all three exported dossiers.
+
+| Journey | Claim | Approval | Settlement |
+| --- | --- | --- | --- |
+| Routine recovery | `medical-3e944683-41a1-48d0-bc86-b396ca3b6da2` | ORACLE_AUTO, version 1. Recovered a committed payout after losing its response. | `med-settlement-67821fcf-fc9` |
+| Corrected appeal | `medical-5b17c158-1652-4203-b3dd-4f6aa9d2c2b3` | PANEL, version 3. Fresh evidence checks and three fresh approvals. | `med-settlement-b5a250b9-4dd` |
+| Suspected duplicate | `medical-9bb13fab-b6eb-477d-b441-7f7ca1b9b848` | PANEL, version 1. A positive Oracle result retained mandatory review. | `med-settlement-e841c0bf-8df` |
+
+The three Playwright reports are under
+`data/dev-lite-couchdb/medical-rehearsal/20261120-163552-6249/`. The local
+`data/dev-lite-couchdb/maintenance-journeys.json` links the final
+certificates and transfer IDs. These cases establish workflow acceptance
+on the tested database backend. Deployment scale and real-world clinical
+performance remain outside the evidence.
+
+Teardown removed exactly the 11 volumes owned by
+`block-insure-dev-lite-couchdb`. The accepted 1.8.0 containers and channel
+were untouched. Docker reported the same names and sizes for all six
+accepted volumes before and after. The six LevelDB development volumes
+were retained.

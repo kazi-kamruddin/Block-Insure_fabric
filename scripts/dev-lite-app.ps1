@@ -1,8 +1,9 @@
 [CmdletBinding()]
-param([switch]$TwoOracles)
+param([switch]$TwoOracles, [switch]$CouchDB)
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
-$state = Join-Path $root 'data/dev-lite'
+$profile = if ($CouchDB) { 'dev-lite-couchdb' } else { 'dev-lite' }
+$state = Join-Path $root "data/$profile"
 $web = Join-Path $root 'apps/web'
 $workers = Join-Path $root 'services/oracle-worker'
 $port = 3219
@@ -11,7 +12,7 @@ if (@(Get-NetTCPConnection -LocalPort (@($port) + $oraclePorts) -State Listen -E
     throw 'A dev-lite app or worker port already has an owner.'
 }
 if (-not (Test-Path -LiteralPath (Join-Path $state 'enrollment-complete'))) {
-    throw 'Enroll and deploy through network.sh --dev-lite before starting the app.'
+    throw "Enroll and deploy through network.sh --$profile before starting the app."
 }
 $secretPath = Join-Path $state 'app-secrets.json'
 if (-not (Test-Path -LiteralPath $secretPath)) {
