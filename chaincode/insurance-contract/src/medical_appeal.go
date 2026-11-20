@@ -23,6 +23,7 @@ func (c *Contract) advanceMedicalVersion(ctx contractapi.TransactionContextInter
 	}
 	claim.Version++
 	claim.MedicalEscalatedAt = ""
+
 	claim.MedicalRevisionKind = kind
 	quote.StatementHash = medicalSuccessorHash(quote.StatementHash, kind, claim.Version, noteHash)
 	claim.DescriptionHash = quote.StatementHash
@@ -30,7 +31,7 @@ func (c *Contract) advanceMedicalVersion(ctx contractapi.TransactionContextInter
 	claim.CurrentReviewID, claim.CurrentOracleRequestID, claim.HospitalVerificationID = "", "", ""
 	claim.OracleOutcome, claim.OracleResultHash, claim.AuditorDecisionID = "", "", ""
 	claim.MedicalSettlementID, claim.PrivacyPresentationID = "", ""
-	return putPrivateState(ctx, "medicalStatement", medicalRevisionKey(claim.ID, claim.Version), quote)
+	return storeMedicalStatement(ctx, claim, quote)
 }
 
 func (c *Contract) SubmitMedicalAppeal(ctx contractapi.TransactionContextInterface, id, claimID, decisionID, evidenceHash string, revision int, acceptedStatementHash string) (*ClaimAppeal, error) {
@@ -119,12 +120,13 @@ func (c *Contract) SubmitMedicalAppeal(ctx contractapi.TransactionContextInterfa
 		claim.HospitalInvoiceID = medicalRevisionKey(episode.ID, revision)
 		claim.Version++
 		claim.MedicalEscalatedAt = ""
+
 		if err := c.screenMedicalDuplicate(ctx, claim, episode); err != nil {
 			return nil, err
 		}
 		quote.StatementHash = medicalSuccessorHash(quote.StatementHash, "APPEAL", claim.Version, noteHash)
 		claim.DescriptionHash = quote.StatementHash
-		if err := putPrivateState(ctx, "medicalStatement", medicalRevisionKey(claim.ID, claim.Version), quote); err != nil {
+		if err := storeMedicalStatement(ctx, claim, quote); err != nil {
 			return nil, err
 		}
 		claim.MedicalRevisionKind = "APPEAL"

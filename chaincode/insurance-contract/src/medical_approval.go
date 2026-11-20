@@ -1,6 +1,7 @@
 package insurance
 
 import (
+	"encoding/json"
 	"fmt"
 	"strconv"
 
@@ -75,6 +76,10 @@ type ApprovalCertificate struct {
 	EscalatedAt             string `json:"escalatedAt"`
 	DuplicateReview         bool   `json:"duplicateReview"`
 	ApprovedAt              string `json:"approvedAt"`
+	PackageID               string `json:"packageId,omitempty" metadata:",optional"`
+	RulesVersion            int    `json:"rulesVersion,omitempty" metadata:",optional"`
+	TermsHash               string `json:"termsHash,omitempty" metadata:",optional"`
+	BreakdownHash           string `json:"breakdownHash,omitempty" metadata:",optional"`
 	Hash                    string `json:"hash"`
 }
 
@@ -116,11 +121,30 @@ func (c *Contract) deriveMedicalApproval(ctx contractapi.TransactionContextInter
 	} else if review == nil || claim.MedicalEscalatedAt == "" {
 		return nil, fmt.Errorf("certificate requires an Oracle result or a recorded escalation")
 	}
-	cert.Hash = canonicalProtocolHash("fabric-medical-approval-v1", cert.ID, cert.ActivationTransactionID, cert.ClaimID, strconv.Itoa(cert.ClaimVersion),
+	values := []string{cert.ID, cert.ActivationTransactionID, cert.ClaimID, strconv.Itoa(cert.ClaimVersion),
 		strconv.Itoa(cert.EpisodeRevision), cert.EpisodeRevisionHash, strconv.Itoa(cert.AssociationVersion), cert.StatementHash,
 		strconv.FormatInt(cert.AmountMinor, 10), cert.Currency, cert.Path, cert.OracleRequestID, cert.OracleResultHash, cert.OracleOutcome,
 		cert.RegistrySnapshotID, cert.RegistryRootHash, cert.ModelHash, cert.ReviewID, cert.DecisionID, cert.EscalatedAt,
-		strconv.FormatBool(cert.DuplicateReview), cert.ApprovedAt)
+		strconv.FormatBool(cert.DuplicateReview), cert.ApprovedAt}
+	key, err := stateKey(ctx, "medicalTermsCommitment", cert.ID)
+	if err != nil {
+		return nil, err
+	}
+	raw, err := ctx.GetStub().GetState(key)
+	if err != nil {
+		return nil, err
+	}
+	domain := "fabric-medical-approval-v1"
+	if raw != nil {
+		var terms MedicalTermsCommitment
+		if err := json.Unmarshal(raw, &terms); err != nil {
+			return nil, fmt.Errorf("invalid medical terms commitment: %w", err)
+		}
+		cert.PackageID, cert.RulesVersion, cert.TermsHash, cert.BreakdownHash = terms.PackageID, terms.RulesVersion, terms.TermsHash, terms.BreakdownHash
+		domain = "fabric-medical-approval-v2"
+		values = append(values, cert.PackageID, strconv.Itoa(cert.RulesVersion), cert.TermsHash, cert.BreakdownHash)
+	}
+	cert.Hash = canonicalProtocolHash(domain, values...)
 	return cert, nil
 }
 
