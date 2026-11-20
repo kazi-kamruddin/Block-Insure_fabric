@@ -31,16 +31,66 @@ func (c *Contract) PrepareMedicalReview(ctx contractapi.TransactionContextInterf
 	if err != nil {
 		return nil, err
 	}
+	var request *OracleRequest
+	if usesMedicalApprovalCertificates(ctx) && claim.EpisodeID != "" && claim.CurrentOracleRequestID != "" &&
+		(claim.Status == "ORACLE_PENDING" || claim.Status == "APPROVED" ||
+			(claim.CurrentReviewID == "" && (claim.Status == "ORACLE_FAILED" || claim.Status == "MEDICAL_REVIEW_REQUIRED"))) {
+		request, err = c.ReadOracleRequest(ctx, claim.CurrentOracleRequestID)
+		if err != nil {
+			return nil, err
+		}
+		held, err := c.heldMedicalRequest(ctx, request)
+		if err != nil {
+			return nil, err
+		}
+		if held && claim.MedicalHeldReleaseID == "" && request.ClaimVersion == claim.Version {
+			if claim.Status == "ORACLE_PENDING" {
+				now, err := timestamp(ctx)
+				if err != nil {
+					return nil, err
+				}
+				if err := c.finalizeOracleRequest(ctx, request, claim, false, "", "MODEL_HELD", now); err != nil {
+					return nil, err
+				}
+			}
+			claim.MedicalHeldReleaseID = effectiveMedicalModelReleaseID(request)
+			claim.CurrentReviewID, claim.AuditorDecisionID, claim.Status = "", "", "MEDICAL_REVIEW_REQUIRED"
+		}
+	}
+	if usesMedicalApprovalCertificates(ctx) && claim.EpisodeID != "" && claim.CurrentOracleRequestID == "" &&
+		(claim.Status == "SUBMITTED" || claim.Status == "APPEAL_SUBMITTED") {
+		release, err := c.activeMedicalRoutingRelease(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if release.Status == "HELD" {
+			claim.MedicalHeldReleaseID, claim.Status = release.ID, "MEDICAL_REVIEW_REQUIRED"
+		}
+	}
 	if claim.EpisodeID == "" || claim.CurrentReviewID != "" || (claim.Status != "ORACLE_FAILED" && claim.Status != "MEDICAL_REVIEW_REQUIRED") {
 		return nil, fmt.Errorf("medical claim must finish current Oracle verification before preparation")
 	}
-	request, err := c.ReadOracleRequest(ctx, claim.CurrentOracleRequestID)
+	if claim.CurrentOracleRequestID != "" || claim.MedicalHeldReleaseID == "" {
+		// A Fabric simulation reads committed state, so keep any request
+		// finalized by this transaction in memory.
+		if request == nil {
+			request, err = c.ReadOracleRequest(ctx, claim.CurrentOracleRequestID)
+			if err != nil {
+				return nil, err
+			}
+		}
+		if request.ClaimVersion != claim.Version || (request.Status != "FAILED" && request.Status != "CONSENSUS") {
+			return nil, fmt.Errorf("current verification has not finished")
+		}
+	}
+	panel, err := c.medicalReviewPanel(ctx, claim)
 	if err != nil {
 		return nil, err
 	}
-	if request.ClaimVersion != claim.Version || (request.Status != "FAILED" && request.Status != "CONSENSUS") {
-		return nil, fmt.Errorf("current verification has not finished")
-	}
+	return c.createMedicalPreparation(ctx, claim, reviewID, prepareBy, panel)
+}
+
+func (c *Contract) medicalReviewPanel(ctx contractapi.TransactionContextInterface, claim *Claim) ([]string, error) {
 	panel := medicalPanel
 	if claim.CurrentAppealID != "" {
 		appeal, err := c.ReadClaimAppeal(ctx, claim.CurrentAppealID)
@@ -53,7 +103,7 @@ func (c *Contract) PrepareMedicalReview(ctx contractapi.TransactionContextInterf
 		}
 		panel = prior.AssignedAuditorIDs
 	}
-	return c.createMedicalPreparation(ctx, claim, reviewID, prepareBy, panel)
+	return panel, nil
 }
 
 func (c *Contract) createMedicalPreparation(ctx contractapi.TransactionContextInterface, claim *Claim, reviewID, prepareBy string, panel []string) (*ClaimReview, error) {
@@ -107,12 +157,21 @@ func (c *Contract) currentMedicalReview(ctx contractapi.TransactionContextInterf
 }
 
 func (c *Contract) OpenMedicalVoting(ctx contractapi.TransactionContextInterface, reviewID, deadline string) (*ClaimReview, error) {
-	if _, err := requireIdentity(ctx, "InsurerMSP", "insurerAdmin"); err != nil {
-		return nil, err
-	}
 	review, claim, err := c.currentMedicalReview(ctx, reviewID)
 	if err != nil {
 		return nil, err
+	}
+	if _, err := requireIdentity(ctx, "InsurerMSP", "insurerAdmin"); err != nil {
+		if !usesMedicalApprovalCertificates(ctx) || claim.MedicalEscalatedAt == "" {
+			return nil, err
+		}
+		if _, auditorErr := requireIdentity(ctx, "AuditorMSP", "auditor"); auditorErr != nil {
+			return nil, auditorErr
+		}
+		subject, subjectErr := callerSubject(ctx)
+		if subjectErr != nil || !containsAssignment(review.AssignedAuditorIDs, subject) {
+			return nil, fmt.Errorf("assigned auditor required to open escalated review")
+		}
 	}
 	if review.Status != "PREPARING" {
 		return nil, fmt.Errorf("review is not in access preparation")

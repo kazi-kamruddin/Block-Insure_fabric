@@ -24,6 +24,9 @@ export async function withFabricContract<T>(
   profileUserName?: string,
 ): Promise<T> {
   const config = loadFabricConfig();
+  if (role === "bankOfficer" && config.externalBankCustody) {
+    throw new Error("Dev-lite Bank credentials are managed by the external operator.");
+  }
   const profile = role === "auditor" && profileUserName
     ? resolveAuditorProfile(profileUserName, config)
     : role === "hospitalOfficer" && profileUserName

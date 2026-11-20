@@ -43,6 +43,10 @@ One deliberately narrow collection, `bankInsurerPrivateData`, shares Bank accoun
 token hashes and simulated balances only between BankMSP and InsurerMSP peers.
 Public account state retains masked display and ownership metadata. Hospital,
 Auditor, and Oracle peers receive only the public hashes and transfer outcomes.
+A second collection, `oracleProofPrivateData`, holds salted Oracle credential
+fields and selective-disclosure presentations. Its members are HospitalMSP,
+InsurerMSP and OracleMSP, and writes need 2 of those 3 peers to endorse. Shared
+world state holds only roots and proof metadata.
 
 ## Development ordering model
 
@@ -57,7 +61,8 @@ The channel application policy uses `MAJORITY Endorsement`. The insurance
 chaincode overrides this with an explicit two-of-five organization policy so
 ordinary workflow transactions remain practical while retaining cross-organization
 validation. Writes to `bankInsurerPrivateData` use the stricter collection-level
-`AND('BankMSP.peer','InsurerMSP.peer')` policy. The definition lifecycle uses
+`AND('BankMSP.peer','InsurerMSP.peer')` policy, and writes to
+`oracleProofPrivateData` use `OutOf(2, Hospital, Insurer, Oracle peers)`. The definition lifecycle uses
 `MAJORITY LifecycleEndorsement`, while the deployment script deliberately obtains
 definition approvals from all five organizations before commit.
 

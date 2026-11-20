@@ -72,7 +72,7 @@ func (c *Contract) ListMedicalOracleSources(ctx contractapi.TransactionContextIn
 		if err != nil || !association.Verified {
 			// An unlinked episode cannot be safely assigned to patient history.
 			// Flag incomplete history; never expose its private details.
-			sources = append(sources, MedicalOracleSource{Invoice: HospitalInvoice{ID: medicalRevisionKey(head.ID, head.Revision)}})
+			sources = append(sources, MedicalOracleSource{Invoice: HospitalInvoice{ID: medicalRevisionKey(head.ID, head.Revision), HospitalID: head.HospitalID}})
 			continue
 		}
 		invoice := HospitalInvoice{ID: medicalRevisionKey(head.ID, head.Revision), HospitalID: head.HospitalID,

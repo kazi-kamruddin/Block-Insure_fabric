@@ -20,7 +20,24 @@ func (c *Contract) AuthorizeSettlement(ctx contractapi.TransactionContextInterfa
 	if claim.Status != "APPROVED" {
 		return nil, fmt.Errorf("claim %s must be APPROVED to authorize settlement", claimID)
 	}
+	var certificateHash string
 	if claim.EpisodeID != "" {
+		if usesMedicalApprovalCertificates(ctx) {
+			request, err := c.medicalApprovalRequest(ctx, claim)
+			if err != nil {
+				return nil, err
+			}
+			if claim.MedicalHeldReleaseID == "" {
+				if err := c.requireUsableMedicalRelease(ctx, request); err != nil {
+					return nil, err
+				}
+			}
+			cert, err := c.verifyMedicalApproval(ctx, claim)
+			if err != nil {
+				return nil, err
+			}
+			certificateHash = cert.Hash
+		}
 		if _, err := currentMedicalHead(ctx, claim); err != nil {
 			return nil, err
 		}
@@ -43,7 +60,8 @@ func (c *Contract) AuthorizeSettlement(ctx contractapi.TransactionContextInterfa
 	settlement := &Settlement{
 		AssetType: "settlement", SchemaVersion: SchemaVersion, ID: settlementID,
 		ClaimID: claimID, SourceAccountID: sourceAccountID, DestinationAccountID: destinationAccountID,
-		AmountMinor: claim.AmountMinor, Currency: "BDT", Status: "AUTHORIZED", AuthorizedAt: now, UpdatedAt: now,
+		ApprovalCertificateHash: certificateHash,
+		AmountMinor:             claim.AmountMinor, Currency: "BDT", Status: "AUTHORIZED", AuthorizedAt: now, UpdatedAt: now,
 	}
 	if err := putState(ctx, "settlement", settlementID, settlement); err != nil {
 		return nil, err
@@ -53,7 +71,7 @@ func (c *Contract) AuthorizeSettlement(ctx contractapi.TransactionContextInterfa
 		SourceType: "CLAIM", SourceID: claimID, PolicyID: claim.PolicyID,
 		AmountMinor: claim.AmountMinor, Status: "PAYMENT_READY", CreatedAt: now, UpdatedAt: now,
 	}
-	if err := putState(ctx, "liability", liability.ID, liability); err != nil {
+	if err := c.createClaimLiability(ctx, claim, liability); err != nil {
 		return nil, err
 	}
 	claim.Status = "SETTLEMENT_AUTHORIZED"
@@ -119,6 +137,15 @@ func (c *Contract) ConfirmSettlement(ctx contractapi.TransactionContextInterface
 	if claim.EpisodeID != "" {
 		if claim.MedicalSettlementID != settlement.ID || claim.Status != "SETTLEMENT_AUTHORIZED" || claim.AmountMinor != settlement.AmountMinor {
 			return nil, fmt.Errorf("settlement belongs to a superseded medical claim version")
+		}
+		if usesMedicalApprovalCertificates(ctx) {
+			cert, err := c.verifyMedicalApproval(ctx, claim)
+			if err != nil {
+				return nil, err
+			}
+			if cert.Hash != settlement.ApprovalCertificateHash || cert.Currency != settlement.Currency {
+				return nil, fmt.Errorf("settlement has no matching medical approval certificate")
+			}
 		}
 		if _, err := currentMedicalHead(ctx, claim); err != nil {
 			return nil, err

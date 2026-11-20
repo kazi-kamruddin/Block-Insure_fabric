@@ -7,6 +7,11 @@ $unrelated = 'dev-peer0.other.example-insurance-contract_1.4.0-hash'
 function Assert-True($value, $message) { if (-not $value) { throw $message } }
 $unwanted = @(Get-UnselectedFabricRuntime -Names @($legacy, $selected, $unrelated) -Organizations @('insurer') -Version '1.6.0-xgb-alignment')
 Assert-True ($unwanted.Count -eq 1 -and $unwanted[0] -eq $legacy) 'Selected or unrelated runtime was targeted.'
+$liteOld = 'devlite-peer0.insurer.dev-lite.blockinsure.test-insurance-contract_1.8.0-hash'
+$liteNew = 'devlite-peer0.insurer.dev-lite.blockinsure.test-insurance-contract_1.9.0-hash'
+$mixed = @($legacy, $selected, $unrelated, $liteOld, $liteNew)
+$liteTargets = @(Get-UnselectedFabricRuntime -Names $mixed -Organizations @('insurer.dev-lite') -NetworkID devlite -Version '1.9.0')
+Assert-True ($liteTargets.Count -eq 1 -and $liteTargets[0] -eq $liteOld) 'Dev-lite drain crossed its network, peer or version boundary.'
 $clock = @{ now = 0; stopped = @(); emitted = @{} }
 Wait-FabricRuntimeStable -Required @($peer) -CoreOnly -MinimumSeconds 40 -QuietSeconds 15 -TimeoutSeconds 100 `
     -Now { $clock.now } -Pause { $clock.now++ } -Sample {

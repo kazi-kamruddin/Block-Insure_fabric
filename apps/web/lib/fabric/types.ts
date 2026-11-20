@@ -265,6 +265,7 @@ export type ClaimStatus =
   | "ORACLE_FAILED"
   | "MEDICAL_REVIEW_REQUIRED"
   | "MEDICAL_REVIEW_PREPARING"
+  | "MEDICAL_AUDIT_PENDING"
   | "NO_PAYABLE_AMOUNT"
   | "UNDER_REVIEW"
   | "APPEAL_SUBMITTED"
@@ -274,6 +275,11 @@ export type ClaimStatus =
   | "SETTLED";
 
 export type Claim = {
+  medicalDuplicateReview?: boolean;
+  medicalEvidenceRequired?: boolean;
+  medicalRevisionKind?: "CORRECTION" | "APPEAL" | "CLARIFICATION" | "";
+  medicalSettlementId?: string;
+  medicalEscalatedAt?: string;
   medicalClarificationId?: string;
   medicalRecoveryUsed?: boolean;
   medicalSupplementHash?: string;
@@ -348,6 +354,9 @@ export type SelectiveDisclosurePresentation = {
 };
 
 export type OracleRegistrySnapshot = {
+  hospitalId?: string;
+  status?: "PROPOSED" | "ACTIVE";
+  attestedAt?: string;
   assetType: "oracleRegistrySnapshot";
   schemaVersion: number;
   id: string;
@@ -388,7 +397,7 @@ export type OracleRequest = {
   status: "PENDING" | "CONSENSUS" | "FAILED";
   verifiedResult: boolean;
   resultHash: string;
-  finalizationCode: "" | "EXACT_CONSENSUS" | "NEGATIVE_RESULT" | "CONFLICT" | "TIMEOUT";
+  finalizationCode: "" | "EXACT_CONSENSUS" | "NEGATIVE_RESULT" | "CONFLICT" | "TIMEOUT" | "ESCALATED_TIMEOUT";
   commitDeadline: LedgerTimestamp;
   revealDeadline: LedgerTimestamp;
   requestedAt: LedgerTimestamp;
@@ -607,6 +616,7 @@ export type FraudAssessment = {
 };
 
 export type Settlement = {
+  approvalCertificateHash?: string;
   assetType: "settlement";
   schemaVersion: number;
   id: string;
@@ -622,6 +632,18 @@ export type Settlement = {
   authorizedAt: LedgerTimestamp;
   confirmedAt: LedgerTimestamp;
   updatedAt: LedgerTimestamp;
+};
+
+export type MedicalApprovalCertificate = {
+  claimId: string;
+  claimVersion: number;
+  amountMinor: number;
+  currency: "BDT";
+  path: "ORACLE_AUTO" | "PANEL";
+  registrySnapshotId: string;
+  modelHash: string;
+  hash: string;
+  approvedAt: LedgerTimestamp;
 };
 
 export type ClaimHistoryRecord = {

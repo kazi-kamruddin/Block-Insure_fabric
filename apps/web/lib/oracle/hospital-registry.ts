@@ -7,7 +7,7 @@ import { ledger } from "@/lib/fabric/ledger";
 import type { HospitalInvoice } from "@/lib/fabric/types";
 import { persistJsonFile } from "@/lib/events/state-file";
 import { loadFabricConfig } from "@/lib/fabric/config";
-import { medicalCandidateChannel } from "@/lib/workflows/commands";
+import { isMedicalChannel, medicalDevLiteChannel } from "@/lib/fabric/medical-channel";
 
 const protocolVersion = "block-insure-oracle-v1";
 const rulesVersion = "hospital-invoice-rules-v2";
@@ -104,20 +104,23 @@ function recordsFromInvoices(invoices: HospitalInvoice[]) {
     .sort((left, right) => left.lookupHash.localeCompare(right.lookupHash));
 }
 
-async function publishHospitalRegistrySnapshot() {
-  const medical = loadFabricConfig().channelName === medicalCandidateChannel;
+async function publishHospitalRegistrySnapshot(hospitalScope?: string) {
+  const channel = loadFabricConfig().channelName;
+  const medical = isMedicalChannel(channel);
+  if ((channel === medicalDevLiteChannel) !== Boolean(hospitalScope)) throw new Error("Dev-lite registry proposals require one hospital scope");
   if (medical && process.env.FABRIC_XGBOOST_ENABLED !== "true") throw new Error("Medical snapshots require the frozen evaluator and private Oracle access");
-  const [legacyInvoices, medicalSources, published] = await Promise.all([
+  const [legacyInvoices, allMedicalSources, published] = await Promise.all([
     medical ? Promise.resolve([]) : ledger.listHospitalInvoices(),
     medical ? ledger.listMedicalOracleSources() : Promise.resolve([]),
     ledger.listOracleRegistrySnapshots(),
   ]);
+  const medicalSources = hospitalScope ? allMedicalSources.filter(source => source.invoice.hospitalId === hospitalScope) : allMedicalSources;
   const invoices = medical ? medicalSources.map(source => source.invoice).filter(invoice => invoice.status === "FINALIZED") : legacyInvoices;
   const records = recordsFromInvoices(invoices);
   if (records.length === 0) return null;
-  const latest = published.filter((item) => /^registry-hospital-v[1-9][0-9]*$/.test(item.id))
+  const latest = published.filter((item) => /^registry-hospital-v[1-9][0-9]*$/.test(item.id) && item.hospitalId === hospitalScope)
     .reduce<(typeof published)[number] | undefined>((previous, item) => !previous || item.version > previous.version ? item : previous, undefined);
-  const version = (latest?.version ?? 0) + 1;
+  const version = (hospitalScope ? Math.max(0, ...published.map(snapshot => snapshot.version)) : latest?.version ?? 0) + 1;
   const snapshotId = `registry-hospital-v${version}`;
   const rulesHash = createHash("sha256").update("Hospital invoice v2: finalized source, invoice ID, hospital and patient binding; positive claim up to invoice total within admission/discharge dates; narrative is not a treatment identifier.").digest("hex");
   let modelContext: HospitalRegistrySnapshotFile["modelContext"];
@@ -169,18 +172,32 @@ async function publishHospitalRegistrySnapshot() {
     rulesVersion, rulesHash, rootHash, records, ...(modelContext ? { modelContext } : {}),
   };
   await persistJsonFile(snapshotPath(snapshotId), snapshot);
-  await ledger.publishOracleRegistrySnapshot({ id: snapshotId, version, rootHash, rulesVersion, rulesHash, recordCount: records.length });
+  const proposal = { id: snapshotId, version, rootHash, rulesVersion, rulesHash, recordCount: records.length };
+  if (hospitalScope) await ledger.proposeMedicalRegistrySnapshot({ ...proposal, hospitalId: hospitalScope });
+  else await ledger.publishOracleRegistrySnapshot(proposal);
   return snapshot;
 }
 
 let publicationQueue = Promise.resolve();
 
-export function refreshHospitalRegistrySnapshot() {
+export function refreshHospitalRegistrySnapshot(hospitalScope?: string) {
   // Concurrent Hospital edits and insurer requests share a version allocator.
   // Always read the ledger after the preceding publication has committed.
-  const operation = publicationQueue.then(publishHospitalRegistrySnapshot);
+  const operation = publicationQueue.then(() => publishHospitalRegistrySnapshot(hospitalScope));
   publicationQueue = operation.then(() => undefined, () => undefined);
   return operation;
+}
+
+export async function currentAttestedMedicalSnapshot(hospitalId: string, invoiceId: string) {
+  const snapshots = await ledger.listOracleRegistrySnapshots();
+  const active = snapshots.filter(snapshot => snapshot.status === "ACTIVE" && snapshot.hospitalId === hospitalId)
+    .sort((a, b) => b.version - a.version)[0];
+  if (!active) throw new Error("Ask the assigned Hospital to attest a registry proposal before starting verification");
+  const snapshot = await readHospitalRegistrySnapshot(active.id);
+  if (snapshot.rootHash !== active.rootHash || !snapshot.records.some(record => record.invoiceId === invoiceId)) {
+    throw new Error("The current episode revision needs a new Hospital-attested registry proposal");
+  }
+  return snapshot;
 }
 
 export async function readHospitalRegistrySnapshot(id: string) {

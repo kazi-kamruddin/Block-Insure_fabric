@@ -10,15 +10,23 @@ import (
 )
 
 type MedicalQuote struct {
-	BilledMinor         int64  `json:"billedMinor"`
-	EligibleMinor       int64  `json:"eligibleMinor"`
-	DeductibleMinor     int64  `json:"deductibleMinor"`
-	InsurerShareMinor   int64  `json:"insurerShareMinor"`
-	RemainingCoverMinor int64  `json:"remainingCoverMinor"`
-	PayableMinor        int64  `json:"payableMinor"`
-	FilingDeadline      string `json:"filingDeadline"`
-	EvidenceRequired    bool   `json:"evidenceRequired"`
-	StatementHash       string `json:"statementHash"`
+	BilledMinor         int64                   `json:"billedMinor"`
+	EligibleMinor       int64                   `json:"eligibleMinor"`
+	DeductibleMinor     int64                   `json:"deductibleMinor"`
+	InsurerShareMinor   int64                   `json:"insurerShareMinor"`
+	RemainingCoverMinor int64                   `json:"remainingCoverMinor"`
+	PayableMinor        int64                   `json:"payableMinor"`
+	FilingDeadline      string                  `json:"filingDeadline"`
+	EvidenceRequired    bool                    `json:"evidenceRequired"`
+	StatementHash       string                  `json:"statementHash"`
+	Terms               *MedicalTermsCommitment `json:"termsCommitment,omitempty" metadata:",optional"`
+}
+
+type MedicalTermsCommitment struct {
+	PackageID     string `json:"packageId"`
+	RulesVersion  int    `json:"rulesVersion"`
+	TermsHash     string `json:"termsHash"`
+	BreakdownHash string `json:"breakdownHash"`
 }
 
 type MedicalPreparation struct {
@@ -141,6 +149,14 @@ func (c *Contract) medicalFacts(ctx contractapi.TransactionContextInterface, pol
 		FilingDeadline: deadline, EvidenceRequired: rules.EvidenceRequired}
 	quote.StatementHash = canonicalProtocolHash("fabric-medical-statement-v1", policy.ID, policy.TermsHash, head.RevisionHash,
 		strconv.Itoa(revision), strconv.FormatInt(quote.PayableMinor, 10), strconv.FormatInt(remaining, 10))
+	if usesMedicalApprovalCertificates(ctx) {
+		quote.Terms = &MedicalTermsCommitment{PackageID: policy.PackageID, RulesVersion: rules.Version, TermsHash: rules.TermsHash,
+			BreakdownHash: canonicalProtocolHash("fabric-medical-breakdown-v1", quote.StatementHash,
+				strconv.FormatInt(quote.BilledMinor, 10), strconv.FormatInt(rules.ServiceSublimitMinor, 10), strconv.FormatInt(quote.EligibleMinor, 10),
+				strconv.FormatInt(rules.DeductibleCapMinor, 10), strconv.FormatInt(quote.DeductibleMinor, 10),
+				strconv.FormatInt(rules.InsurerShareBps, 10), strconv.FormatInt(quote.InsurerShareMinor, 10),
+				strconv.FormatInt(policy.CoverageLimitMinor, 10), strconv.FormatInt(quote.RemainingCoverMinor, 10), strconv.FormatInt(quote.PayableMinor, 10))}
+	}
 	return policy, episode, quote, coverage, nil
 }
 
@@ -223,6 +239,9 @@ func (c *Contract) SubmitMedicalClaim(ctx contractapi.TransactionContextInterfac
 		return nil, err
 	}
 	claim.MedicalAssociationKey, claim.MedicalAssociationVersion = medicalAssociationKey(episode), association.Version
+	if err := c.screenMedicalDuplicate(ctx, claim, episode); err != nil {
+		return nil, err
+	}
 	if err := putState(ctx, "medicalPayableEpisode", episodeID, struct {
 		ClaimID string `json:"claimId"`
 	}{id}); err != nil {
@@ -239,10 +258,20 @@ func (c *Contract) saveMedicalVersion(ctx contractapi.TransactionContextInterfac
 	if err := overwriteAsset(ctx, "medicalCoverage", claim.PolicyID, coverage); err != nil {
 		return nil, err
 	}
-	if err := putPrivateState(ctx, "medicalStatement", medicalRevisionKey(claim.ID, claim.Version), quote); err != nil {
+	if err := storeMedicalStatement(ctx, claim, quote); err != nil {
 		return nil, err
 	}
 	return claim, emit(ctx, "ClaimSubmitted", claim)
+}
+
+func storeMedicalStatement(ctx contractapi.TransactionContextInterface, claim *Claim, quote *MedicalQuote) error {
+	key := medicalRevisionKey(claim.ID, claim.Version)
+	if usesMedicalApprovalCertificates(ctx) && quote.Terms != nil {
+		if err := putState(ctx, "medicalTermsCommitment", key, quote.Terms); err != nil {
+			return err
+		}
+	}
+	return putPrivateState(ctx, "medicalStatement", key, quote)
 }
 
 func (c *Contract) ReadMedicalStatement(ctx contractapi.TransactionContextInterface, id string, version int) (*MedicalQuote, error) {
@@ -305,6 +334,11 @@ func (c *Contract) AcceptMedicalCorrection(ctx contractapi.TransactionContextInt
 		return nil, fmt.Errorf("review the corrected statement before reconfirming")
 	}
 	previous := claim.AmountMinor
+	if usesMedicalApprovalCertificates(ctx) && claim.MedicalSettlementID != "" {
+		if err := c.supersedeUnpaidMedicalSettlement(ctx, claim); err != nil {
+			return nil, err
+		}
+	}
 	link, err := verifiedMedicalAssociation(ctx, episode, claim.ClaimantID)
 	if err != nil {
 		return nil, err
@@ -333,6 +367,11 @@ func (c *Contract) AcceptMedicalCorrection(ctx contractapi.TransactionContextInt
 	claim.CurrentAppealID, claim.PrivacyPresentationID, claim.MedicalSettlementID = "", "", ""
 	claim.EvidenceIDs = []string{}
 	claim.MedicalRevisionKind, claim.MedicalSupplementHash = "CORRECTION", ""
+	claim.MedicalEscalatedAt = ""
+	claim.MedicalHeldReleaseID = ""
+	if err := c.screenMedicalDuplicate(ctx, claim, episode); err != nil {
+		return nil, err
+	}
 	claim.Version++
 	claim.UpdatedAt, err = timestamp(ctx)
 	if err != nil {

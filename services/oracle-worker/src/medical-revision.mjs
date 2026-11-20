@@ -2,7 +2,7 @@
 // medical attestation can use the original non-appeal registry checks. The
 // actual version still binds the event, evaluator, reveal and commitment.
 export function registryAssessmentRequest(channel, request, claim, verification) {
-  if (channel !== "insurance-medical-reimbursement" || request.claimVersion <= 1 || !claim.episodeId ||
+  if (!["insurance-medical-reimbursement", "insurance-dev-lite-190"].includes(channel) || request.claimVersion <= 1 || !claim.episodeId ||
       request.appealId || request.appealCommitmentHash || claim.currentAppealId || verification.appealId ||
       !["CORRECTION", "CLARIFICATION"].includes(verification.medicalRevisionKind) ||
       verification.medicalRevisionKind !== claim.medicalRevisionKind ||

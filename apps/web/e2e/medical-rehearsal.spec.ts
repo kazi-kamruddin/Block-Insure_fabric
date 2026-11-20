@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { createHash, randomUUID } from "node:crypto";
-import { readFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { invoicePDF } from "./invoice-pdf";
 
 const roles = {
@@ -13,16 +13,30 @@ const roles = {
   auditor3: ["Independent Auditor Three", "auditor"],
   auditor4: ["Independent Auditor Four", "auditor"],
 } as const;
+const demoAccountIDs = {
+  insurer: "insurer-admin",
+  hospital: "hospital-officer",
+  holder: "policyholder-1",
+  bank: "bank-officer",
+  auditor1: "auditor",
+  auditor2: "auditor-2",
+  auditor3: "auditor-3",
+  auditor4: "auditor-4",
+} as const;
 
 const deadlines = process.env.MEDICAL_DEADLINE_LIVE === "true";
 const finalPayment = process.env.MEDICAL_FINAL_PAYMENT === "true";
 const governed = deadlines || process.env.MEDICAL_REVIEW_LIVE === "true";
+const devLite = process.env.FABRIC_CHANNEL_NAME === "insurance-dev-lite-190";
+const duplicateOnly = devLite && process.env.DEV_LITE_DUPLICATE_REVIEW === "true";
 
-function day(offset: number) {
-  return new Date(Date.now() + 6 * 3_600_000 + offset * 86_400_000).toISOString().slice(0, 10);
+function day(offset: number, base?: string) {
+  const now = base ? Date.parse(base) : Date.now() + 6 * 3_600_000;
+  return new Date(now + offset * 86_400_000).toISOString().slice(0, 10);
 }
 
-const journey = deadlines ? "live medical deadlines, single recovery, and PDF and JPEG OCR"
+const journey = duplicateOnly ? "live duplicate referral despite positive Oracle verification, then one Bank payout"
+  : deadlines ? "live medical deadlines, single recovery, and PDF and JPEG OCR"
   : finalPayment ? "final medical association, concurrent claim, Oracle absence, payout recovery, and insurer findings"
   : governed ? "live medical clarification, review, appeal and OCR through one Bank payout" : "ordinary medical browser journey through one Bank payout";
 
@@ -30,24 +44,40 @@ test(journey, async ({ page }, info) => {
   test.setTimeout(900_000);
   const health = await page.request.get("/api/fabric/health");
   expect(health.ok(), await health.text()).toBe(true);
-  expect(await health.json()).toMatchObject({ channel: "insurance-medical-reimbursement", chaincode: "insurance-contract", schemaVersion: 15 });
+  expect(await health.json()).toMatchObject({ channel: process.env.FABRIC_CHANNEL_NAME ?? "insurance-medical-reimbursement", chaincode: "insurance-contract", schemaVersion: 15 });
 
-  const resumeClaim = deadlines ? process.env.MEDICAL_DEADLINE_RESUME_CLAIM : finalPayment ? process.env.MEDICAL_FINAL_RESUME_CLAIM : undefined;
-  const resumeSuffix = finalPayment ? process.env.MEDICAL_FINAL_RESUME_SUFFIX : process.env.MEDICAL_DEADLINE_RESUME_SUFFIX;
+  const resumeClarification = devLite && governed && !deadlines && process.env.DEV_LITE_RESUME_CLARIFICATION;
+  const resumeApprovedAppeal = devLite && governed && !deadlines && process.env.DEV_LITE_RESUME_APPROVED_APPEAL;
+  const resumeClaim = resumeClarification || resumeApprovedAppeal || (deadlines ? process.env.MEDICAL_DEADLINE_RESUME_CLAIM : finalPayment ? process.env.MEDICAL_FINAL_RESUME_CLAIM : undefined);
+  const intakeCheckpoint: { suffix: string; service: string; episodeId: string; alternateId: string } | undefined =
+    devLite && finalPayment && !resumeClaim && process.env.DEV_LITE_RESUME_ROUTINE_INTAKE
+      ? JSON.parse(process.env.DEV_LITE_RESUME_ROUTINE_INTAKE) : undefined;
+  const resumeSuffix = (resumeClarification || resumeApprovedAppeal) ? process.env.DEV_LITE_RESUME_SUFFIX
+    : finalPayment ? process.env.MEDICAL_FINAL_RESUME_SUFFIX : process.env.MEDICAL_DEADLINE_RESUME_SUFFIX;
   if (resumeClaim && !resumeSuffix) throw new Error("Supply the interrupted fixture suffix");
-  const suffix = resumeClaim && resumeSuffix ? resumeSuffix : randomUUID().slice(0, 12);
+  const suffix = resumeClaim && resumeSuffix ? resumeSuffix : intakeCheckpoint?.suffix ?? randomUUID().slice(0, 12);
   const id = (prefix: string) => "med-" + prefix + "-" + suffix;
-  const start = day(-1), service = day(0), firstEnd = day(28), end = day(59);
+  let start = day(-1), service = day(0), firstEnd = day(28), end = day(59);
   const journal: unknown[] = [];
   const errors: string[] = [];
   const priorClaimId = process.env.MEDICAL_PRIOR_CLAIM_ID;
+  if (duplicateOnly && !priorClaimId) throw new Error("Supply the routine settlement's claim ID");
   let role: keyof typeof roles | undefined;
   page.on("pageerror", error => errors.push(error.message));
   async function login(next: keyof typeof roles) {
     if (role === next) return;
-    if (role) await page.getByRole("button", { name: "Sign out", exact: true }).click();
-    else await page.goto("/workspace");
-    await page.getByRole("button", { name: "Sign in as " + roles[next][0], exact: true }).click();
+    if (devLite) {
+      const response = await page.request.post("/api/auth/demo-login", {
+        data: { accountId: demoAccountIDs[next] },
+        maxRetries: 2,
+      });
+      expect(response.ok(), await response.text()).toBe(true);
+      await page.goto("/workspace/" + roles[next][1]);
+    } else {
+      if (role) await page.getByRole("button", { name: "Sign out", exact: true }).click();
+      else await page.goto("/workspace");
+      await page.getByRole("button", { name: "Sign in as " + roles[next][0], exact: true }).click();
+    }
     await expect(page).toHaveURL(new RegExp("/workspace/" + roles[next][1] + "$"), { timeout: 45_000 });
     await expect(page.getByRole("heading", { name: roles[next][0], exact: true })).toBeVisible();
     role = next;
@@ -97,10 +127,18 @@ test(journey, async ({ page }, info) => {
   }
 
   const reviewCard = page.locator("#medical-review");
+  const timeline = page.getByRole("region", { name: "Medical claim timeline" });
   async function loadReview(claimId: string) {
-    await reviewCard.getByLabel("Medical claim ID").fill(claimId);
+    const input = reviewCard.getByLabel("Medical claim ID");
+    const loadButton = reviewCard.getByRole("button", { name: "Load medical case" });
+    // The server-rendered input may exist before React attaches after a role
+    // switch. Only retry the local fill, never a ledger operation.
+    await expect(async () => {
+      await input.fill(claimId);
+      await expect(loadButton).toBeEnabled({ timeout: 1_200 });
+    }).toPass({ timeout: 45_000 });
     const pending = page.waitForResponse(response => new URL(response.url()).pathname === "/api/medical/review" && response.request().method() === "GET");
-    await reviewCard.getByRole("button", { name: "Load medical case" }).click();
+    await loadButton.click();
     const response = await pending;
     expect(response.ok(), await response.text()).toBe(true);
     const detail = await response.json();
@@ -115,7 +153,38 @@ test(journey, async ({ page }, info) => {
     return outcome;
   }
 
+  async function loadBankTimeline(settlementId: string) {
+    const card = page.getByRole("article", { name: "Medical settlement timeline" });
+    const button = card.getByRole("button", { name: "Load medical settlement" });
+    await expect(async () => {
+      await card.getByLabel("Medical settlement ID").fill(settlementId);
+      await expect(button).toBeEnabled({ timeout: 1_200 });
+    }).toPass({ timeout: 45_000 });
+    const pending = page.waitForResponse(response => new URL(response.url()).pathname === "/api/medical/settlement");
+    await button.click();
+    const response = await pending;
+    expect(response.ok(), await response.text()).toBe(true);
+    return response.json();
+  }
+
+  async function attestRegistry() {
+    if (!devLite) return;
+    await login("insurer");
+    const registry = page.locator("#medical-registry");
+    await registry.getByLabel("Hospital ID").fill("hospital-demo");
+    const proposed = await postFromButton(registry.getByRole("button", { name: "Propose registry snapshot" }), "/api/medical/registry");
+    await login("hospital");
+    await registry.getByRole("button", { name: "Refresh registry proposals" }).click();
+    const entry = registry.getByRole("listitem").filter({ hasText: proposed.id + " ·" });
+    await expect(entry).toBeVisible({ timeout: 60_000 });
+    if (!(await entry.innerText()).includes("ACTIVE")) {
+      await postFromButton(entry.getByRole("button", { name: "Attest this snapshot" }), "/api/medical/registry");
+    }
+    await login("insurer");
+  }
+
   async function freshVerification(claimId: string, version: number, appealId?: string) {
+    await attestRegistry();
     const request = await form("startClaimProcessing", { claimId });
     expect(request).toMatchObject({ claimId, claimVersion: version, modelVersion: "fabric-xgb-synthetic-v1", requiredConfirmations: 2, expectedResponses: 3 });
     if (appealId) expect(request).toMatchObject({ appealId });
@@ -206,14 +275,33 @@ test(journey, async ({ page }, info) => {
   }
 
   try {
-    if (governed || finalPayment) {
+    if (devLite && process.env.DEV_LITE_ACTIVATE === "true") {
+      await login("insurer");
+      await postFromButton(page.getByRole("button", { name: "Activate approval certificates" }), "/api/medical/registry");
+    }
+    if (governed || finalPayment || duplicateOnly) {
       await login("insurer");
       await expect(reviewCard.getByRole("heading", { name: "Medical review and appeal" })).toBeVisible();
-      if (priorClaimId) expect(await asset("claim", priorClaimId)).toMatchObject({ status: "SETTLED", amountMinor: 4000 });
+      if (priorClaimId) {
+        const prior = await asset("claim", priorClaimId);
+        expect(prior).toMatchObject({ status: "SETTLED", amountMinor: 4000 });
+        if (devLite) service = prior.incidentDate;
+      }
+      if (devLite && finalPayment && !resumeClaim && !intakeCheckpoint) {
+        const usedDates = new Set((await assets("claim") as { episodeId?: string; claimantId: string; incidentDate: string }[])
+          .filter(claim => claim.episodeId && claim.claimantId === "policyholder1").map(claim => claim.incidentDate));
+        const unused = Array.from({ length: 21 }, (_, offset) => day(-offset)).find(date => !usedDates.has(date));
+        if (!unused) throw new Error("No unused service date in the dev-lite fixture window");
+        service = unused;
+      }
     }
+    if (intakeCheckpoint) service = intakeCheckpoint.service;
+    start = day(-1, service);
+    firstEnd = day(28, service);
+    end = day(59, service);
     let claimId = resumeClaim ?? "";
     let episodeId = "";
-    if (!resumeClaim) await test.step("register partners and publish the medical policy", async () => {
+    if (!resumeClaim && !intakeCheckpoint) await test.step("register partners and publish the medical policy", async () => {
       await login("insurer");
       const existing = await assets("partner-agreement") as { partnerId: string; status: string }[];
       for (const [partnerType, partnerId, name] of [
@@ -232,7 +320,7 @@ test(journey, async ({ page }, info) => {
       await form("publishPolicyPackage", { id: id("package") });
     });
 
-    if (!resumeClaim) await test.step("accept policy terms and pay the first installment with OTP", async () => {
+    if (!resumeClaim && !intakeCheckpoint) await test.step("accept policy terms and pay the first installment with OTP", async () => {
       await login("bank");
       for (const [name, ownerId, accountType, openingBalanceBdt] of [
         ["customer", "policyholder1", "CUSTOMER", "100.00"],
@@ -264,25 +352,37 @@ test(journey, async ({ page }, info) => {
     });
 
     if (!resumeClaim) await test.step("intake stays hidden until verified and the quote is pinned to the submitted claim", async () => {
-      await login("hospital");
-      await expect(page.locator("#guided-workflow").getByLabel("Workflow action")).toHaveCount(0);
-      const forbidden = await page.request.post("/api/workflows", { data: { operation: "recordHospitalModelFacts",
-        invoiceId: id("hospital-model"), treatmentType: "SURGERY", diagnosisCode: "", invoiceDate: service,
-        expectedMinMinor: 1, expectedMaxMinor: 2, licenseStatus: "ACTIVE" } });
-      expect(forbidden.status()).toBe(403);
-      expect(await forbidden.json()).toMatchObject({ message: "Hospital accounts can only save factual episode intake." });
-      const episode = await form("saveMedicalEpisode", hospitalFields(0, governed ? "950.00" : "500.00"));
-      episodeId = episode.id;
       let alternate;
-      if (finalPayment) {
-        alternate = await form("saveMedicalEpisode", { ...hospitalFields(0, "25.00"),
-          episodeReference: id("alternate-episode"), patientReference: id("alternate-patient") });
-        const payload = { operation: "saveMedicalEpisode", episodeReferenceHash: "a".repeat(64), expectedRevision: 0,
-          patientReferenceHash: "b".repeat(64), service: "SURGERY", serviceDate: service, admissionDate: service,
-          dischargeDate: service, billMinor: 2500, invoiceDate: service, diagnosisCode: "", fraudLabel: true };
-        const label = await page.request.post("/api/workflows", { data: payload });
-        expect(label.status()).toBe(400);
+      if (intakeCheckpoint) {
+        await login("insurer");
+        expect(await asset("policy", id("policy"))).toMatchObject({ status: "ACTIVE", paidThroughDate: firstEnd });
+        const response = await page.request.get("/api/medical/intake");
+        expect(response.ok(), await response.text()).toBe(true);
+        const { episodes } = await response.json();
+        expect(episodes).toContainEqual(expect.objectContaining({ id: intakeCheckpoint.episodeId, revision: 1, serviceDate: service, billMinor: 50_000 }));
+        expect(episodes).toContainEqual(expect.objectContaining({ id: intakeCheckpoint.alternateId, revision: 1, serviceDate: service, billMinor: 2_500 }));
+        episodeId = intakeCheckpoint.episodeId;
+        alternate = { id: intakeCheckpoint.alternateId };
+      } else {
+        await login("hospital");
+        await expect(page.locator("#guided-workflow").getByLabel("Workflow action")).toHaveCount(0);
+        const forbidden = await page.request.post("/api/workflows", { data: { operation: "recordHospitalModelFacts",
+          invoiceId: id("hospital-model"), treatmentType: "SURGERY", diagnosisCode: "", invoiceDate: service,
+          expectedMinMinor: 1, expectedMaxMinor: 2, licenseStatus: "ACTIVE" } });
+        expect(forbidden.status()).toBe(403);
+        expect(await forbidden.json()).toMatchObject({ message: "Hospital accounts can only save factual episode intake." });
+        episodeId = (await form("saveMedicalEpisode", hospitalFields(0, governed ? "950.00" : "500.00"))).id;
+        if (finalPayment) {
+          alternate = await form("saveMedicalEpisode", { ...hospitalFields(0, "25.00"),
+            episodeReference: id("alternate-episode"), patientReference: id("alternate-patient") });
+          const payload = { operation: "saveMedicalEpisode", episodeReferenceHash: "a".repeat(64), expectedRevision: 0,
+            patientReferenceHash: "b".repeat(64), service: "SURGERY", serviceDate: service, admissionDate: service,
+            dischargeDate: service, billMinor: 2500, invoiceDate: service, diagnosisCode: "", fraudLabel: true };
+          const label = await page.request.post("/api/workflows", { data: payload });
+          expect(label.status()).toBe(400);
+        }
       }
+      const episode = { id: episodeId };
       await login("holder");
       const discovery = page.getByRole("article").filter({ has: page.getByRole("heading", { name: "Your medical episodes", exact: true }) });
       await discovery.getByRole("button", { name: "Refresh episodes" }).click();
@@ -295,8 +395,12 @@ test(journey, async ({ page }, info) => {
       }
       await login("insurer");
       const queue = page.getByRole("article").filter({ has: page.getByRole("heading", { name: "Episode association queue", exact: true }) });
-      await queue.getByRole("button", { name: "Refresh episodes" }).click();
-      await expect(queue.getByRole("button", { name: "Resolve association" }).first()).toBeVisible();
+      const [intake] = await Promise.all([
+        page.waitForResponse(response => new URL(response.url()).pathname === "/api/medical/intake"),
+        queue.getByRole("button", { name: "Refresh episodes" }).click(),
+      ]);
+      expect(intake.ok(), await intake.text()).toBe(true);
+      await expect(queue.getByRole("button", { name: "Resolve association" }).first()).toBeVisible({ timeout: 15_000 });
       if (alternate) {
         await form("verifyMedicalAssociation", { episodeId: alternate.id, revision: "1", beneficiaryId: "synthetic-other-patient",
           decisionBasis: id("alternate-clarified-match"), associationDecision: "VERIFY" });
@@ -350,6 +454,7 @@ test(journey, async ({ page }, info) => {
       expect(claim).toMatchObject({ version: 1, amountMinor: 4000, episodeId: episode.id, episodeRevision: 1 });
       if (!finalPayment) expect(claim.id).toBe(receipt.id);
       claimId = claim.id;
+      if (duplicateOnly) expect(claim).toMatchObject({ medicalDuplicateReview: true, version: 1, appealCount: 0 });
     });
     if (deadlines) {
       await test.step("expire preparation, recover once, commit OCR for both formats, and expire voting", async () => {
@@ -452,20 +557,39 @@ test(journey, async ({ page }, info) => {
       return;
     }
 
-    if (governed) await test.step("clarification, four-auditor decryption, OCR and corrected appeal", async () => {
+    if (resumeApprovedAppeal) await test.step("verify retained corrected appeal approval", async () => {
       await login("insurer");
-      const initialResults = await freshVerification(claimId, 1);
-      expect(initialResults.some(result => result.verificationCode.startsWith("XGB_REVIEW:"))).toBe(true);
-      await loadReview(claimId);
-      const initial = await reviewAction("Prepare four-auditor review");
+      const retained = await loadReview(claimId);
+      expect(retained.claim).toMatchObject({ policyId: id("policy"), version: 3, status: "APPROVED", medicalDuplicateReview: true });
+      expect(retained.appeal).toMatchObject({ status: "OVERTURNED" });
+      expect(retained.review).toMatchObject({ medicalVersion: 3, status: "APPROVED" });
+      expect(retained.decisions.filter((decision: { outcome: string }) => decision.outcome === "APPROVE")).toHaveLength(3);
+    });
+
+    if (governed && !resumeApprovedAppeal) await test.step("clarification, four-auditor decryption, OCR and corrected appeal", async () => {
+      await login("insurer");
+      let initial;
+      if (resumeClarification) {
+        const retained = await loadReview(claimId);
+        expect(retained.claim).toMatchObject({ version: 1, status: "MEDICAL_REVIEW_PREPARING", policyId: id("policy") });
+        expect(retained.clarification).toMatchObject({ status: "PENDING" });
+        episodeId = retained.claim.episodeId;
+        initial = retained.review;
+      } else {
+        const initialResults = await freshVerification(claimId, 1);
+        expect(initialResults.some(result => result.verificationCode.startsWith("XGB_REVIEW:"))).toBe(true);
+        await loadReview(claimId);
+        initial = await reviewAction("Prepare four-auditor review");
+        await reviewCard.getByLabel("Clarification question and requested evidence").fill("Please provide the itemized synthetic invoice.");
+        await reviewAction("Send clarification");
+      }
       expect(initial).toMatchObject({ assignedAuditorIds: panel, approvalThreshold: 3, rejectionThreshold: 2 });
-      await reviewCard.getByLabel("Clarification question and requested evidence").fill("Please provide the itemized synthetic invoice.");
-      await reviewAction("Send clarification");
       await expect(reviewCard.getByRole("button", { name: "Open voting for 24 hours" })).toBeDisabled();
 
       await login("holder");
       await loadReview(claimId);
       await expect(reviewCard.getByText(/Please provide the itemized synthetic invoice/)).toBeVisible();
+      if (devLite) await expect(timeline.getByText(/Policyholder answers the clarification request/)).toBeVisible();
       const image = await page.evaluate(date => {
         const canvas = document.createElement("canvas");
         canvas.width = 1000;
@@ -531,6 +655,9 @@ test(journey, async ({ page }, info) => {
       await expect(reviewCard.getByText(/Corrected payable amount BDT 40.00/)).toBeVisible();
       const appeal = await reviewAction("File medical appeal");
       expect(appeal).toMatchObject({ claimVersion: 3, disputedDecisionId: disputed, medicalPriorReviewId: returned.id });
+      if (devLite && priorClaimId) {
+        expect(await asset("claim", claimId)).toMatchObject({ medicalDuplicateReview: true });
+      }
       const appealDocument = id("appeal-document");
       await uploadDocument(claimId, appealDocument, "APPEAL_DOCUMENT", newFile, 3);
 
@@ -547,6 +674,7 @@ test(journey, async ({ page }, info) => {
       expect(stale.status(), await stale.text()).toBe(403);
       await login("holder");
       const detail = await loadReview(claimId);
+      if (devLite) await expect(timeline.getByText(/Policyholder grants evidence access/)).toBeVisible();
       const currentIds = detail.documents.map((doc: { id: string }) => doc.id);
       expect(currentIds).toContain(appealDocument);
       expect(await reviewAction("Grant listed evidence to these four reviewers")).toHaveLength(4 * currentIds.length);
@@ -563,9 +691,33 @@ test(journey, async ({ page }, info) => {
       expect(await asset("claim", claimId)).toMatchObject({ version: 3, status: "APPROVED", amountMinor: 4000 });
     });
 
-    await test.step("pinned matching Oracle results and exactly one committed payout", async () => {
+    if (duplicateOnly) await test.step("refer a similar episode with a positive Oracle result", async () => {
       await login("insurer");
-      if (!governed && !resumeClaim) {
+      const results = await freshVerification(claimId, 1);
+      expect(results.some(result => result.verificationCode.startsWith("XGB_AUTO:")), JSON.stringify(results)).toBe(true);
+      const referred = await loadReview(claimId);
+      expect(referred.claim).toMatchObject({ status: "MEDICAL_REVIEW_REQUIRED", medicalDuplicateReview: true, version: 1 });
+      await expect(timeline.getByText(/similar episode or a crowded matching window/)).toBeVisible();
+      await expect(timeline.getByText(/Insurer prepares panel review/)).toBeVisible();
+      await expect(timeline.getByText("Pinned Oracle inputs")).toBeVisible();
+      await info.attach("duplicate-referral-timeline", { body: await timeline.screenshot(), contentType: "image/png" });
+      await reviewAction("Prepare four-auditor review");
+      await reviewAction("Open voting for 24 hours");
+      for (const auditor of panel.slice(0, 3)) {
+        await login(auditor);
+        await loadReview(claimId);
+        await expect(timeline.getByText(/Assigned auditors review and vote/)).toBeVisible();
+        await reviewCard.getByLabel("Reason reference").fill("The similar synthetic episode is a separate eligible visit.");
+        await reviewAction("Record reasoned vote");
+      }
+      await login("insurer");
+      expect(await asset("claim", claimId)).toMatchObject({ version: 1, status: "APPROVED", appealCount: 0 });
+    });
+
+    await test.step("pinned matching Oracle results and exactly one committed payout", async () => {
+      if (!governed && !duplicateOnly) await attestRegistry();
+      await login("insurer");
+      if (!governed && !duplicateOnly && !resumeClaim) {
       const request = await form("startClaimProcessing", { claimId });
       expect(request).toMatchObject({ claimId, claimVersion: 1, modelVersion: "fabric-xgb-synthetic-v1", requiredConfirmations: 2, expectedResponses: 3 });
       await expect.poll(async () => (await asset("claim", claimId)).status, { timeout: 240_000, intervals: [2000] }).toMatch(/^(APPROVED|ORACLE_FAILED)$/);
@@ -595,14 +747,27 @@ test(journey, async ({ page }, info) => {
         expect(results.some(result => result.verificationCode.startsWith("XGB_AUTO:")), JSON.stringify(results)).toBe(true);
       }
       }
-      if (resumeClaim) {
+      if (finalPayment && resumeClaim) {
         expect(await asset("claim", claimId)).toMatchObject({ id: claimId, policyId: id("policy"), status: "SETTLEMENT_AUTHORIZED", amountMinor: 4000 });
         expect(await asset("settlement", id("settlement"))).toMatchObject({ claimId, sourceAccountId: id("reserve"),
           destinationAccountId: id("customer"), status: "PAYMENT_FAILED", amountMinor: 4000 });
       } else {
+        if (devLite) {
+          const approved = await loadReview(claimId);
+          expect(approved.timeline.approval).toMatchObject({ path: governed || duplicateOnly ? "PANEL" : "ORACLE_AUTO" });
+          await expect(timeline.getByText(/Insurer authorizes settlement/)).toBeVisible();
+        }
         await form("authorizeSettlement", { settlementId: id("settlement"), claimId, sourceAccountId: id("reserve"), destinationAccountId: id("customer") });
       }
       await login("bank");
+      if (devLite) {
+        const bank = await loadBankTimeline(id("settlement"));
+        expect(bank).toMatchObject({ claimId, approval: { path: governed || duplicateOnly ? "PANEL" : "ORACLE_AUTO" },
+          payout: { status: finalPayment && resumeClaim ? "PAYMENT_FAILED" : "AUTHORIZED", amountMinor: 4000 } });
+        expect(Object.keys(bank).sort()).toEqual(["approval", "claimId", "claimVersion", "payout"]);
+        expect((await page.request.get("/api/medical/review?" + new URLSearchParams({ claim: claimId }))).status()).toBe(403);
+        await expect(page.getByRole("region", { name: "Medical settlement result" }).getByText(bank.approval.hash)).toBeVisible();
+      }
       expect((await asset("account", id("customer"))).balanceMinor).toBe(9900);
       const payout = { settlementId: id("settlement"), transferId: id("payout"), bankReferenceText: id("bank-receipt") };
       if (finalPayment) {
@@ -646,6 +811,23 @@ test(journey, async ({ page }, info) => {
       expect(transfers).toHaveLength(finalPayment ? 2 : 1);
       await login("holder");
       expect(await asset("claim", claimId)).toMatchObject({ status: "SETTLED", amountMinor: 4000 });
+      if (devLite) {
+        const settled = await asset("settlement", id("settlement"));
+        expect(settled.approvalCertificateHash).toMatch(/^[a-f0-9]{64}$/);
+        const final = await loadReview(claimId);
+        expect(final.timeline).toMatchObject({ approval: { hash: settled.approvalCertificateHash },
+          payout: { id: id("settlement"), status: "CONFIRMED", transferId: id("payout"), amountMinor: 4000 } });
+        await expect(timeline.getByText(/Payout complete/)).toBeVisible();
+        await expect(timeline.getByText(id("payout"), { exact: true })).toBeVisible();
+        expect((await page.request.get("/api/medical/settlement?" + new URLSearchParams({ settlement: id("settlement") }))).status()).toBe(403);
+        await login("insurer");
+        const audit = await page.request.get("/api/audit/claims/" + claimId);
+        expect(audit.ok(), await audit.text()).toBe(true);
+        expect(await audit.json()).toMatchObject({ approvalCertificate: { hash: settled.approvalCertificateHash, claimVersion: final.claim.version },
+          settlement: { id: id("settlement"), status: "CONFIRMED" } });
+        await login("holder");
+        await loadReview(claimId);
+      }
       if (governed && priorClaimId) expect(await asset("claim", priorClaimId)).toMatchObject({ status: "SETTLED", amountMinor: 4000 });
       if (finalPayment) {
         const reference = id("independent-review");
@@ -670,6 +852,11 @@ test(journey, async ({ page }, info) => {
       }
       await info.attach("settled-workspace", { body: await page.screenshot(), contentType: "image/png" });
       expect(errors).toEqual([]);
+      if (devLite && finalPayment) {
+        const receipt = info.outputPath("routine-result.json");
+        await writeFile(receipt, JSON.stringify({ claimId, settlementId: id("settlement") }));
+        await info.attach("dev-lite-routine-result", { path: receipt, contentType: "application/json" });
+      }
     });
   } finally {
     await info.attach("fabric-rehearsal-journal", { body: JSON.stringify({ suffix, start, service, end, journal, errors }, null, 2), contentType: "application/json" });

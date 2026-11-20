@@ -10,9 +10,11 @@ import {
 } from "@/lib/auth/accounts";
 import type { RoleDashboard } from "@/lib/dashboard/build-dashboard";
 import { GuidedWorkflowForm, type PreparedWorkflow } from "@/components/guided-workflow-form";
-import { medicalCandidateChannel } from "@/lib/workflows/commands";
+import { isMedicalChannel, medicalDevLiteChannel } from "@/lib/fabric/medical-channel";
+import { MedicalRegistryControls } from "./medical-registry-controls";
 import { MedicalIntake } from "@/components/medical-intake";
 import { MedicalReview } from "@/components/medical-review";
+import { MedicalSettlementTimeline } from "@/components/medical-timeline";
 import { MedicalOCR } from "@/components/medical-ocr";
 import { PresentationGuide } from "@/components/presentation-guide";
 import { StatusBadge } from "@/components/status-badge";
@@ -178,7 +180,7 @@ export function WorkspaceClient({
   const [retrievalPassphrase, setRetrievalPassphrase] = useState("");
   const [retrieving, setRetrieving] = useState(false);
   const [decryptedEvidence, setDecryptedEvidence] = useState<{ url: string; name: string; blob: Blob; id: string; accessId: string; reviewId: string; digest: string } | null>(null);
-  const medicalReview = medicalReviewEnabled && deployment.startsWith(`${medicalCandidateChannel}/`);
+  const medicalReview = medicalReviewEnabled && isMedicalChannel(deployment.split("/")[0]);
   const [auditClaimId, setAuditClaimId] = useState("");
   const [proofEvidenceId, setProofEvidenceId] = useState("");
   const [proofBatchId, setProofBatchId] = useState("");
@@ -883,12 +885,15 @@ export function WorkspaceClient({
       </div>
 
       <div className="workGrid" id="transaction-console">
+        {deployment.startsWith(`${medicalDevLiteChannel}/`) && account.role === "bankOfficer" && <MedicalSettlementTimeline />}
         {medicalReview && (account.role === "policyholder" || account.role === "insurerAdmin" || account.role === "auditor") &&
           <MedicalReview role={account.role} investigationEnabled={investigationEnabled} onEvidence={(id, grant) => {
             setRetrievalEvidenceId(id); setRetrievalGrantId(grant); setDecryptedEvidence(null);
             document.getElementById("retrieve-evidence")?.scrollIntoView({ behavior: "smooth" });
           }} />}
-        {deployment.startsWith(`${medicalCandidateChannel}/`) && (account.role === "insurerAdmin" || account.role === "policyholder") &&
+        {deployment.startsWith(`${medicalDevLiteChannel}/`) && (account.role === "insurerAdmin" || account.role === "hospitalOfficer") &&
+          <MedicalRegistryControls role={account.role} />}
+        {isMedicalChannel(deployment.split("/")[0]) && (account.role === "insurerAdmin" || account.role === "policyholder") &&
           <MedicalIntake insurer={account.role === "insurerAdmin"} onAssociation={prepared => {
             setPreparedWorkflow(prepared);
             document.getElementById("guided-workflow")?.scrollIntoView({ behavior: "smooth" });
@@ -911,7 +916,7 @@ export function WorkspaceClient({
           </div>
         </article>}
         <GuidedWorkflowForm
-          medical={deployment.startsWith(`${medicalCandidateChannel}/`)}
+          medical={isMedicalChannel(deployment.split("/")[0])}
           key={`${account.role}-${preparedWorkflow?.revision ?? 0}`}
           role={account.role}
           busy={busy}
@@ -1095,7 +1100,7 @@ export function WorkspaceClient({
           <article className="workCard evidenceCard">
             <span className="kicker">Portable audit artifact</span>
             <h2>Export claim dossier</h2>
-            <p className="cardNote">Download the ledger-backed claim timeline, Oracle request/commitments/reveals and registry/model provenance, evidence access, reviews, every auditor vote, appeals, fraud advisories, and settlement as one JSON record.</p>
+            <p className="cardNote">Download claim history, Oracle provenance, evidence access, review and appeal records, and settlement as one JSON record.</p>
             <div className="auditExport">
               <label>Claim ID<input spellCheck={false} autoComplete="off" value={auditClaimId} onChange={(event) => setAuditClaimId(event.target.value)} placeholder="claim-1" /></label>
               <a

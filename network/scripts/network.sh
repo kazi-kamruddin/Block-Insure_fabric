@@ -2,6 +2,24 @@
 set -euo pipefail
 
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+case "${1:-}" in
+  --dev-lite|--dev-lite-couchdb)
+    profile="$1"
+    shift
+    exec bash "${script_dir}/dev-lite.sh" "$profile" "$@"
+    ;;
+esac
+usage="Usage: $0 [--dev-lite|--dev-lite-couchdb] {up|down|status|verify|reset --confirm-reset} (profile flag goes first)"
+case "$*" in
+  up|down|status|verify) ;;
+  reset)
+    echo "reset deletes this network's ledger volumes, enrolled identities and channel artifacts." >&2
+    echo "Re-run as 'network.sh reset --confirm-reset' only after explicit approval." >&2
+    exit 2
+    ;;
+  "reset --confirm-reset") ;;
+  *) echo "${usage}" >&2; exit 2 ;;
+esac
 network_root="$(cd -- "${script_dir}/.." && pwd -P)"
 samples_root="${network_root}/.fabric/fabric-samples"
 channel_name="insurance-channel"
@@ -124,7 +142,7 @@ up() {
      [ -d "${organizations}/peerOrganizations/bank.blockinsure.test" ]; then
     if [ ! -d "${organizations}/peerOrganizations/oracle.blockinsure.test" ]; then
       echo "Existing channel artifacts predate OracleMSP. A clean Oracle topology bootstrap is required; ordinary startup will not reset the ledger." >&2
-      echo "After explicit approval, run: bash network/scripts/network.sh reset && bash network/scripts/network.sh up" >&2
+      echo "After explicit approval, run: bash network/scripts/network.sh reset --confirm-reset && bash network/scripts/network.sh up" >&2
       exit 1
     fi
     compose up -d ca-insurer
@@ -133,7 +151,9 @@ up() {
     compose up -d ca-bank
     compose up -d ca-oracle
     compose up -d ca-orderer
+    # The enrollment helpers below contact the Auditor, Hospital and Oracle CAs.
     wait_for_running ca.auditor.blockinsure.test
+    wait_for_running ca.hospital.blockinsure.test
     wait_for_running ca.oracle.blockinsure.test
     bash "${network_root}/scripts/enroll-auditors.sh"
     bash "${network_root}/scripts/enroll-hospitals.sh"
@@ -326,5 +346,5 @@ case "${1:-}" in
   reset) reset ;;
   status) status ;;
   verify) verify ;;
-  *) echo "Usage: $0 {up|down|reset|status|verify}" >&2; exit 1 ;;
+  *) echo "${usage}" >&2; exit 1 ;;
 esac

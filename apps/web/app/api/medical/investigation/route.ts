@@ -8,7 +8,7 @@ import { researchFindings } from "@/lib/fabric/research-finding";
 import { recordResearchFinding } from "@/lib/fabric/research-finding-store";
 import { ledgerIdSchema } from "@/lib/fabric/validation";
 import { checkMutationOrigin } from "@/lib/security/request-origin";
-import { medicalCandidateChannel } from "@/lib/workflows/commands";
+import { isMedicalChannel } from "@/lib/fabric/medical-channel";
 
 export const runtime = "nodejs";
 const input = z.strictObject({
@@ -25,7 +25,7 @@ export async function POST(request: Request) {
   const config = loadFabricConfig();
   const root = process.env.MEDICAL_FINDINGS_ROOT?.trim();
   const investigator = process.env.MEDICAL_FINDINGS_INVESTIGATOR?.trim();
-  if (config.channelName !== medicalCandidateChannel || !root || !path.isAbsolute(root) || !investigator) {
+  if (!isMedicalChannel(config.channelName) || !root || !path.isAbsolute(root) || !investigator) {
     return reply({ message: "Medical investigation recording is unavailable" }, 404);
   }
   const session = await currentSession().catch(() => null);

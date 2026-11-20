@@ -7,13 +7,14 @@ import { loadFabricConfig } from "@/lib/fabric/config";
 import { ledger } from "@/lib/fabric/ledger";
 import { ledgerIdSchema } from "@/lib/fabric/validation";
 import { medicalReviewCommand, type MedicalReviewCommand } from "@/lib/fabric/medical-review";
-import { medicalCandidateChannel } from "@/lib/workflows/commands";
+import { isMedicalChannel, medicalDevLiteChannel } from "@/lib/fabric/medical-channel";
+import { buildMedicalTimeline, hasFinalMedicalApproval } from "@/lib/fabric/medical-timeline";
 import { checkMutationOrigin } from "@/lib/security/request-origin";
 
 export const dynamic = "force-dynamic";
 const reply = (body: unknown, status = 200) => NextResponse.json(body, { status, headers: { "Cache-Control": "private, no-store" } });
 function enabled() {
-  return process.env.FABRIC_MEDICAL_REVIEW_ENABLED === "true" && loadFabricConfig().channelName === medicalCandidateChannel;
+  return process.env.FABRIC_MEDICAL_REVIEW_ENABLED === "true" && isMedicalChannel(loadFabricConfig().channelName);
 }
 type ReviewRole = "insurerAdmin" | "policyholder" | "auditor";
 function reviewRole(role: Session["role"]): role is ReviewRole {
@@ -39,7 +40,8 @@ export async function GET(request: Request) {
       if (session.role !== "policyholder" || !/^[1-9][0-9]{0,8}$/.test(revision)) return reply({ message: "Invalid appeal revision" }, 400);
       return reply({ quote: await ledger.quoteMedicalAppeal(claim.id, revision) });
     }
-    const [appeal, clarification, documents, grants, checks, decisions, facts] = await Promise.all([
+    const devLite = loadFabricConfig().channelName === medicalDevLiteChannel;
+    const [appeal, clarification, documents, grants, checks, decisions, facts, oracle, certificate, settlement] = await Promise.all([
       claim.currentAppealId ? ledger.readClaimAppeal(claim.currentAppealId) : null,
       claim.medicalClarificationId ? ledger.readMedicalClarification(session.role === "policyholder" ? session.role : "insurerAdmin", claim.medicalClarificationId) : null,
       Promise.all(claim.evidenceIds.map(id => ledger.readEvidenceReference(id))),
@@ -47,8 +49,17 @@ export async function GET(request: Request) {
       review ? ledger.listMedicalEvidenceChecks(review.id) : [],
       review && (session.role !== "auditor" || review.status !== "OPEN") ? ledger.listAuditorDecisions() : [],
       ledger.readMedicalReviewFacts(claim.id),
+      devLite && claim.currentOracleRequestId ? ledger.readOracleRequest(claim.currentOracleRequestId) : null,
+      devLite && hasFinalMedicalApproval(claim) ? ledger.readMedicalApprovalCertificate(claim.id, claim.version) : null,
+      devLite && claim.medicalSettlementId ? ledger.readSettlement(claim.medicalSettlementId) : null,
     ]);
-    return reply({ claim, review, appeal, clarification, documents, facts,
+    const timeline = devLite ? buildMedicalTimeline({ claim,
+      review: review?.medicalVersion === claim.version ? review : null,
+      clarification, appeal, documents, grants, checks, readAt: Date.now(),
+      oracle: oracle?.claimVersion === claim.version ? oracle : null,
+      certificate, settlement: settlement?.approvalCertificateHash === certificate?.hash ? settlement : null,
+    }) : undefined;
+    return reply({ claim, review, appeal, clarification, documents, facts, devLite, timeline,
       appealExplanation: appeal ? await ledger.readMedicalAppealExplanation(session.role === "policyholder" ? session.role : "insurerAdmin", appeal.id) : null,
       grants: grants.filter(grant => grant.medicalReviewId === review?.id && (session.role !== "auditor" || grant.granteeSubject === session.subjectId)),
       checks: checks.filter(check => session.role !== "auditor" || check.auditorId === session.subjectId),
@@ -60,12 +71,13 @@ export async function GET(request: Request) {
 
 const permissions = {
   prepare: "insurerAdmin", open: "insurerAdmin", recover: "insurerAdmin", expire: "insurerAdmin", ask: "insurerAdmin",
-  share: "policyholder", appeal: "policyholder", confirm: "auditor", vote: "auditor",
+  share: "policyholder", appeal: "policyholder", escalate: "policyholder", confirm: "auditor", vote: "auditor",
 } as const;
 
 function allowed(action: MedicalReviewCommand, role: ReviewRole) {
   if (action.action === "respond") return role === (action.response === "EXPIRED" ? "insurerAdmin" : "policyholder");
   if (action.action === "recordOCR") return role === "policyholder" || role === "auditor";
+  if (action.action === "open" && role === "auditor") return true; // Chaincode checks escalation and assignment.
   return permissions[action.action] === role;
 }
 
@@ -76,6 +88,8 @@ export async function POST(request: Request) {
   const session = await currentSession().catch(() => null);
   const input = medicalReviewCommand.safeParse(await request.json().catch(() => null));
   if (!input.success) return reply({ message: "Check the medical workflow fields" }, 400);
+  if ((input.data.action === "escalate" || (input.data.action === "open" && session?.role === "auditor")) &&
+      loadFabricConfig().channelName !== medicalDevLiteChannel) return reply({ message: "Action unavailable on this channel" }, 404);
   if (!session || !reviewRole(session.role) || !allowed(input.data, session.role)) return reply({ message: "This role cannot perform that action" }, 403);
   try {
     return reply({ result: await ledger.medicalReviewAction(session.role, input.data, findDemoAccount(session.accountId)?.fabricUserName) });

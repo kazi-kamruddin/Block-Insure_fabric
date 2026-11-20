@@ -1,8 +1,8 @@
 function Get-UnselectedFabricRuntime {
-    param([string[]]$Names, [string[]]$Organizations, [string]$Version, [switch]$CoreOnly)
+    param([string[]]$Names, [string[]]$Organizations, [string]$Version, [switch]$CoreOnly, [string]$NetworkID = 'dev')
     foreach ($name in $Names) {
         foreach ($organization in $Organizations) {
-            $prefix = "dev-peer0.$organization.blockinsure.test-insurance-contract_"
+            $prefix = "$NetworkID-peer0.$organization.blockinsure.test-insurance-contract_"
             if ($name.StartsWith($prefix, [StringComparison]::Ordinal)) {
                 if ($CoreOnly -or -not $name.StartsWith("${prefix}${Version}-", [StringComparison]::Ordinal)) { $name }
                 break
@@ -16,7 +16,7 @@ function Wait-FabricRuntimeStable {
         [Parameter(Mandatory)][scriptblock]$Sample, [Parameter(Mandatory)][scriptblock]$StopRuntime,
         [Parameter(Mandatory)][string[]]$Required,
         [string[]]$Organizations = @('insurer', 'hospital', 'auditor', 'bank', 'oracle'),
-        [string]$Version, [switch]$CoreOnly,
+        [string]$Version, [switch]$CoreOnly, [string]$NetworkID = 'dev',
         [int]$MinimumSeconds = 40, [int]$QuietSeconds = 15, [int]$TimeoutSeconds = 150,
         [long]$MinimumAvailableBytes = 134217728,
         [scriptblock]$Now = { [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds() / 1000.0 },
@@ -27,7 +27,7 @@ function Wait-FabricRuntimeStable {
     while ($true) {
         $sampled = & $Sample
         $seconds = & $Now
-        $unwanted = @(Get-UnselectedFabricRuntime -Names $sampled.Names -Organizations $Organizations -Version $Version -CoreOnly:$CoreOnly)
+        $unwanted = @(Get-UnselectedFabricRuntime -Names $sampled.Names -Organizations $Organizations -Version $Version -CoreOnly:$CoreOnly -NetworkID $NetworkID)
         & $Observe ([ordered]@{ elapsedSeconds = [math]::Round($seconds - $start, 1); availableBytes = $sampled.AvailableBytes; unwanted = $unwanted; names = @($sampled.Names) })
         if ($unwanted.Count) {
             & $StopRuntime $unwanted

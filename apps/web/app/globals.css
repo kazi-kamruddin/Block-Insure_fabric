@@ -2450,6 +2450,15 @@ code {
   border-radius: 12px;
 }
 
+.medicalTimeline {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.medicalTimelineId {
+  overflow-wrap: anywhere;
+}
+
 .medicalSubpanel h3 {
   margin: 0 0 8px;
   font-size: 16px;

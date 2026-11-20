@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { StatusBadge } from "@/components/status-badge";
+import { MedicalTimeline } from "@/components/medical-timeline";
 import { sha256Hex } from "@/lib/evidence/browser-crypto";
 import { medicalReasonLabels, type MedicalReviewCommand, type MedicalReviewView } from "@/lib/fabric/medical-review";
 import type { MedicalQuote } from "@/lib/fabric/medical";
@@ -83,7 +84,7 @@ export function MedicalReview({ role, onEvidence, investigationEnabled = false }
     <span className="kicker">Governed adjudication</span>
     <h2>Medical review and appeal</h2>
     <p className="authorityDistinction">
-      <strong>Decision boundary:</strong> Automated Oracle checks and offline benchmarks inform processing only. Final governed outcomes come solely from three approval votes or two rejection votes across the four assigned AuditorMSP certificates.
+      A panel decision requires three approvals or two rejections from the four assigned auditors. Offline model scores never authorize payment.
     </p>
     <div className="auditExport">
       <label>Medical claim ID<input value={claimId} disabled={busy} spellCheck={false} autoComplete="off" onChange={event => {
@@ -98,6 +99,14 @@ export function MedicalReview({ role, onEvidence, investigationEnabled = false }
         <StatusBadge status={view.claim.status} />
       </div>
       <p>Recorded service {view.facts.service} on {view.facts.serviceDate} · episode revision {view.claim.episodeRevision}</p>
+      {view.timeline && <MedicalTimeline timeline={view.timeline} />}
+      {view.devLite && role === "policyholder" && !review && !view.claim.medicalEscalatedAt &&
+        ["SUBMITTED", "APPEAL_SUBMITTED", "ORACLE_PENDING"].includes(view.claim.status) &&
+        <button type="button" className="secondary button" disabled={busy} onClick={() => work(() => send({ action: "escalate", claimId: view.claim.id }))}>
+          Escalate after processing deadline
+        </button>}
+      {role === "auditor" && preparing && review && view.claim.medicalEscalatedAt &&
+        <button type="button" className="primary button" disabled={busy} onClick={() => work(() => send({ action: "open", reviewId: review.id, deadline: later(24) }))}>Open escalated voting</button>}
       <p>Billed BDT {(view.facts.quote.billedMinor / 100).toFixed(2)} · Eligible BDT {(view.facts.quote.eligibleMinor / 100).toFixed(2)} · Payable BDT {(view.facts.quote.payableMinor / 100).toFixed(2)}</p>
       {view.appeal && <p>Appeal {view.appeal.status} · Disputed decision {view.appeal.disputedDecisionId}</p>}
       {view.appealExplanation && <p>Appeal explanation: {view.appealExplanation}</p>}

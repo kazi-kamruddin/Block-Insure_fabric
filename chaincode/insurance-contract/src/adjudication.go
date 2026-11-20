@@ -463,6 +463,15 @@ func (c *Contract) recordAuditorDecision(ctx contractapi.TransactionContextInter
 		}
 		review.ClosedAt = now
 		claim.AuditorDecisionID = decisionID
+		if approved && review.MedicalVersion != 0 && usesMedicalApprovalCertificates(ctx) {
+			request, err := c.medicalApprovalRequest(ctx, claim)
+			if err != nil {
+				return nil, err
+			}
+			if err := c.recordMedicalApproval(ctx, claim, request, review); err != nil {
+				return nil, err
+			}
+		}
 		if review.AppealID != "" {
 			appeal, readErr := c.ReadClaimAppeal(ctx, review.AppealID)
 			if readErr != nil {

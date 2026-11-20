@@ -22,6 +22,8 @@ func (c *Contract) advanceMedicalVersion(ctx contractapi.TransactionContextInter
 		return err
 	}
 	claim.Version++
+	claim.MedicalEscalatedAt = ""
+	claim.MedicalHeldReleaseID = ""
 	claim.MedicalRevisionKind = kind
 	quote.StatementHash = medicalSuccessorHash(quote.StatementHash, kind, claim.Version, noteHash)
 	claim.DescriptionHash = quote.StatementHash
@@ -29,7 +31,7 @@ func (c *Contract) advanceMedicalVersion(ctx contractapi.TransactionContextInter
 	claim.CurrentReviewID, claim.CurrentOracleRequestID, claim.HospitalVerificationID = "", "", ""
 	claim.OracleOutcome, claim.OracleResultHash, claim.AuditorDecisionID = "", "", ""
 	claim.MedicalSettlementID, claim.PrivacyPresentationID = "", ""
-	return putPrivateState(ctx, "medicalStatement", medicalRevisionKey(claim.ID, claim.Version), quote)
+	return storeMedicalStatement(ctx, claim, quote)
 }
 
 func (c *Contract) SubmitMedicalAppeal(ctx contractapi.TransactionContextInterface, id, claimID, decisionID, evidenceHash string, revision int, acceptedStatementHash string) (*ClaimAppeal, error) {
@@ -117,9 +119,14 @@ func (c *Contract) SubmitMedicalAppeal(ctx contractapi.TransactionContextInterfa
 		claim.AmountMinor, claim.IncidentDate, claim.EpisodeRevision = quote.PayableMinor, episode.ServiceDate, revision
 		claim.HospitalInvoiceID = medicalRevisionKey(episode.ID, revision)
 		claim.Version++
+		claim.MedicalEscalatedAt = ""
+		claim.MedicalHeldReleaseID = ""
+		if err := c.screenMedicalDuplicate(ctx, claim, episode); err != nil {
+			return nil, err
+		}
 		quote.StatementHash = medicalSuccessorHash(quote.StatementHash, "APPEAL", claim.Version, noteHash)
 		claim.DescriptionHash = quote.StatementHash
-		if err := putPrivateState(ctx, "medicalStatement", medicalRevisionKey(claim.ID, claim.Version), quote); err != nil {
+		if err := storeMedicalStatement(ctx, claim, quote); err != nil {
 			return nil, err
 		}
 		claim.MedicalRevisionKind = "APPEAL"
@@ -172,7 +179,8 @@ func (c *Contract) QuoteMedicalAppeal(ctx contractapi.TransactionContextInterfac
 }
 
 type MedicalAppealExplanation struct {
-	Text string `json:"text"`
+	Text   string `json:"text"`
+	Purged bool   `json:"purged,omitempty" metadata:",optional"`
 }
 
 func (c *Contract) ReadMedicalAppealExplanation(ctx contractapi.TransactionContextInterface, id string) (*MedicalAppealExplanation, error) {
@@ -190,6 +198,19 @@ func (c *Contract) ReadMedicalAppealExplanation(ctx contractapi.TransactionConte
 	owner, err := callerSubject(ctx)
 	if err != nil || (role == "policyholder" && owner != appeal.ClaimantID) {
 		return nil, fmt.Errorf("appeal explanation is private")
+	}
+	if usesMedicalApprovalCertificates(ctx) {
+		key, err := stateKey(ctx, "medicalNoteDisposal", id)
+		if err != nil {
+			return nil, err
+		}
+		disposal, err := ctx.GetStub().GetState(key)
+		if err != nil {
+			return nil, err
+		}
+		if disposal != nil {
+			return &MedicalAppealExplanation{Purged: true}, nil
+		}
 	}
 	return getPrivateState[MedicalAppealExplanation](ctx, "medicalAppealExplanation", id)
 }
