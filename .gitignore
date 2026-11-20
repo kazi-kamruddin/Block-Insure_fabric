@@ -98,6 +98,27 @@ AGENTS.md
 AGENT.md
 agent.md
 GEMINI.md
+# Assistant memory, instructions, settings and prompt/handoff notes
+CLAUDE.md
+CLAUDE.local.md
+MEMORY.md
+.claude/
+.codex/
+.gemini/
+.cursor/
+.cursorrules
+.windsurf/
+.windsurfrules
+.clinerules
+.aider*
+.mcp.json
+.github/copilot-instructions.md
+/memory/
+/prompts/
+/ai-handoffs/
+/ai-notes/
+*.prompt.md
+*.handoff.md
 /data/dev-lite/
 /data/dev-lite-couchdb/
 /data/dev-lite/

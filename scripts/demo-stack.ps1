@@ -250,7 +250,7 @@ switch ($Action) {
         if (-not $ConfirmReset) { throw "CleanBootstrap destroys only this project's local Fabric ledger/identities and ignored demo runtime data. Re-run with -ConfirmReset after deliberate approval." }
         if ((Read-ManagedProcesses | Where-Object { Test-ManagedProcess $_ }).Count -gt 0) { throw "Stop the managed demo processes before clean bootstrap." }
         Invoke-Preflight
-        Invoke-NetworkScript "network.sh reset"
+        Invoke-NetworkScript "network.sh reset --confirm-reset"
         Clear-CleanShowcaseState
         Invoke-NetworkScript "network.sh up"
         Invoke-NetworkScript "deploy-chaincode.sh"
