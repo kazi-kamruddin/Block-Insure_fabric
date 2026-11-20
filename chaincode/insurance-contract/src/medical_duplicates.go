@@ -19,6 +19,8 @@ type medicalDuplicateEntry struct {
 	BillMinor     int64
 }
 
+const medicalDuplicateAmountBps int64 = 500
+
 func (c *Contract) screenMedicalDuplicate(ctx contractapi.TransactionContextInterface, claim *Claim, episode *MedicalEpisode) error {
 	if !usesMedicalApprovalCertificates(ctx) {
 		return nil
@@ -41,6 +43,10 @@ func (c *Contract) screenMedicalDuplicate(ctx contractapi.TransactionContextInte
 // Read exact private keys so simultaneous filings for the same beneficiary
 // participate in MVCC even when there is no prior bucket. Never reject on similarity.
 func indexMedicalDuplicate(ctx contractapi.TransactionContextInterface, key []byte, patient string, episode *MedicalEpisode) (bool, error) {
+	return indexMedicalDuplicateWithAmountTolerance(ctx, key, patient, episode, medicalDuplicateAmountBps)
+}
+
+func indexMedicalDuplicateWithAmountTolerance(ctx contractapi.TransactionContextInterface, key []byte, patient string, episode *MedicalEpisode, amountBps int64) (bool, error) {
 	date, err := validateDate("duplicate screening service date", episode.ServiceDate)
 	if err != nil {
 		return false, err
@@ -69,7 +75,7 @@ func indexMedicalDuplicate(ctx contractapi.TransactionContextInterface, key []by
 			}
 			difference := max(other.BillMinor, episode.BillMinor) - min(other.BillMinor, episode.BillMinor)
 			overlap := other.AdmissionDate <= episode.DischargeDate && episode.AdmissionDate <= other.DischargeDate
-			if (overlap && difference <= max(other.BillMinor, episode.BillMinor)/20) || (offset == 0 && difference == 0) {
+			if (overlap && difference <= medicalShare(max(other.BillMinor, episode.BillMinor), amountBps)) || (offset == 0 && difference == 0) {
 				matched = true
 			}
 		}
