@@ -25,8 +25,24 @@ The sanitized `before.json` and `after.json` record the distinct
 credential fingerprints and query outcomes. The fetched
 `updated-config.block` records the committed MSP update.
 
-This establishes live endorser rejection of one revoked enrollment and
-successful reads with both replacement credentials on this deployment.
-Bank application cutover and old Bank retirement remain operator actions.
-No production key migration, transaction signed by the replaced auditor,
-or cross-host custody was demonstrated.
+The later synthetic signer rehearsal also used those replacement
+credentials for valid writes. The replacement auditor's approval vote
+committed as
+`aa356741e2044ad8279ef5cfc3a3d3ca43ff82f5d6e7bc6fdbf8388673ba80d2`.
+The separate CLI used the replacement Bank certificate to confirm BDT
+40.00 in transaction
+`5b8ed1b940870a20160e62ef68c94d192fed94ec9b467586c7d3256b9411638b`.
+The normal gateway confirmation path refused the same synthetic
+settlement while configured for external signing. An operator with a
+separate OS identity still needs to repeat that approval to establish
+independent custody.
+
+The disposable CouchDB migration ledger additionally exercised Bank
+predecessor retirement. Both Bank certificates initially read the
+same private account. The replacement confirmed a BDT 40.00 payout in
+transaction `5c8e562307a8aed33e5b5f6a06f7a9fffe414e6d2b3d3fd4cb52c51654b72d38`.
+After the BankMSP CRL committed in config block 81, the predecessor was
+refused and the replacement still read the account. The working LevelDB
+Bank enrollment stayed in place. Machine-readable records and the
+fetched block are under
+`data/dev-lite-couchdb/migration-rehearsal/bank-rotation/`.
