@@ -18,7 +18,7 @@ FIELDS = (
     "escalatedAt", "duplicateReview", "approvedAt",
 )
 TERMS = ("packageId", "rulesVersion", "termsHash", "breakdownHash")
-INT_FIELDS = {"claimVersion", "episodeRevision", "associationVersion", "amountMinor", "rulesVersion"}
+INT_FIELDS = {"claimVersion", "episodeRevision", "associationVersion", "amountMinor", "rulesVersion", "duplicateRuleVersion"}
 
 
 def require(condition, reason):
@@ -60,7 +60,12 @@ def verify(dossier, expected_hash=None):
             require(re.fullmatch(r"[0-9a-f]{64}", certificate[field]), f"Invalid certificate {field}")
     observed = certificate.get("hash")
     require(isinstance(observed, str) and re.fullmatch(r"[0-9a-f]{64}", observed), "Invalid certificate hash")
-    derived = canonical_digest(f"fabric-medical-approval-v{version}", canonical)
+    domain = f"fabric-medical-approval-v{version}"
+    if "duplicateRuleVersion" in certificate:
+        domain += ":duplicate-rule"
+        canonical.append(encoded_field(certificate, "duplicateRuleVersion"))
+        require(certificate["duplicateRuleVersion"] in (1, 2), "Unknown duplicate rule version")
+    derived = canonical_digest(domain, canonical)
     require(hmac.compare_digest(derived, observed), "Certificate hash mismatch")
     if expected_hash is not None:
         require(hmac.compare_digest(derived, expected_hash), "Certificate does not match the supplied ledger hash")

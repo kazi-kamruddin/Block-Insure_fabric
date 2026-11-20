@@ -275,44 +275,45 @@ type Liability struct {
 }
 
 type Claim struct {
-	MedicalHeldReleaseID      string   `json:"medicalHeldReleaseId,omitempty" metadata:",optional"`
-	MedicalDuplicateReview    bool     `json:"medicalDuplicateReview,omitempty" metadata:",optional"`
-	MedicalEscalatedAt        string   `json:"medicalEscalatedAt,omitempty" metadata:",optional"`
-	MedicalClarificationID    string   `json:"medicalClarificationId"`
-	MedicalRecoveryUsed       bool     `json:"medicalRecoveryUsed"`
-	MedicalRevisionKind       string   `json:"medicalRevisionKind"`
-	MedicalSupplementHash     string   `json:"medicalSupplementHash"`
-	EpisodeID                 string   `json:"episodeId"`
-	EpisodeRevision           int      `json:"episodeRevision"`
-	MedicalEvidenceRequired   bool     `json:"medicalEvidenceRequired"`
-	MedicalSettlementID       string   `json:"medicalSettlementId"`
-	MedicalAssociationKey     string   `json:"medicalAssociationKey"`
-	MedicalAssociationVersion int      `json:"medicalAssociationVersion"`
-	AssetType                 string   `json:"assetType"`
-	SchemaVersion             int      `json:"schemaVersion"`
-	ID                        string   `json:"id"`
-	PolicyID                  string   `json:"policyId"`
-	ClaimantID                string   `json:"claimantId"`
-	HospitalID                string   `json:"hospitalId"`
-	HospitalInvoiceID         string   `json:"hospitalInvoiceId"`
-	AmountMinor               int64    `json:"amountMinor"`
-	IncidentDate              string   `json:"incidentDate"`
-	DescriptionHash           string   `json:"descriptionHash"`
-	EvidenceIDs               []string `json:"evidenceIds"`
-	HospitalVerificationID    string   `json:"hospitalVerificationId"`
-	AuditorDecisionID         string   `json:"auditorDecisionId"`
-	CurrentReviewID           string   `json:"currentReviewId"`
-	CurrentAppealID           string   `json:"currentAppealId"`
-	CurrentOracleRequestID    string   `json:"currentOracleRequestId"`
-	PrivacyPresentationID     string   `json:"privacyPresentationId"`
-	OracleOutcome             string   `json:"oracleOutcome"`
-	OracleResultHash          string   `json:"oracleResultHash"`
-	Version                   int      `json:"version"`
-	ReviewRound               int      `json:"reviewRound"`
-	AppealCount               int      `json:"appealCount"`
-	Status                    string   `json:"status"`
-	CreatedAt                 string   `json:"createdAt"`
-	UpdatedAt                 string   `json:"updatedAt"`
+	MedicalDuplicateRuleVersion int      `json:"medicalDuplicateRuleVersion,omitempty" metadata:",optional"`
+	MedicalHeldReleaseID        string   `json:"medicalHeldReleaseId,omitempty" metadata:",optional"`
+	MedicalDuplicateReview      bool     `json:"medicalDuplicateReview,omitempty" metadata:",optional"`
+	MedicalEscalatedAt          string   `json:"medicalEscalatedAt,omitempty" metadata:",optional"`
+	MedicalClarificationID      string   `json:"medicalClarificationId"`
+	MedicalRecoveryUsed         bool     `json:"medicalRecoveryUsed"`
+	MedicalRevisionKind         string   `json:"medicalRevisionKind"`
+	MedicalSupplementHash       string   `json:"medicalSupplementHash"`
+	EpisodeID                   string   `json:"episodeId"`
+	EpisodeRevision             int      `json:"episodeRevision"`
+	MedicalEvidenceRequired     bool     `json:"medicalEvidenceRequired"`
+	MedicalSettlementID         string   `json:"medicalSettlementId"`
+	MedicalAssociationKey       string   `json:"medicalAssociationKey"`
+	MedicalAssociationVersion   int      `json:"medicalAssociationVersion"`
+	AssetType                   string   `json:"assetType"`
+	SchemaVersion               int      `json:"schemaVersion"`
+	ID                          string   `json:"id"`
+	PolicyID                    string   `json:"policyId"`
+	ClaimantID                  string   `json:"claimantId"`
+	HospitalID                  string   `json:"hospitalId"`
+	HospitalInvoiceID           string   `json:"hospitalInvoiceId"`
+	AmountMinor                 int64    `json:"amountMinor"`
+	IncidentDate                string   `json:"incidentDate"`
+	DescriptionHash             string   `json:"descriptionHash"`
+	EvidenceIDs                 []string `json:"evidenceIds"`
+	HospitalVerificationID      string   `json:"hospitalVerificationId"`
+	AuditorDecisionID           string   `json:"auditorDecisionId"`
+	CurrentReviewID             string   `json:"currentReviewId"`
+	CurrentAppealID             string   `json:"currentAppealId"`
+	CurrentOracleRequestID      string   `json:"currentOracleRequestId"`
+	PrivacyPresentationID       string   `json:"privacyPresentationId"`
+	OracleOutcome               string   `json:"oracleOutcome"`
+	OracleResultHash            string   `json:"oracleResultHash"`
+	Version                     int      `json:"version"`
+	ReviewRound                 int      `json:"reviewRound"`
+	AppealCount                 int      `json:"appealCount"`
+	Status                      string   `json:"status"`
+	CreatedAt                   string   `json:"createdAt"`
+	UpdatedAt                   string   `json:"updatedAt"`
 }
 
 // PrivacyCredential is the public, Fabric-signed anchor for a credential whose

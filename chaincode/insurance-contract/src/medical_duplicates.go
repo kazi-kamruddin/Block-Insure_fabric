@@ -21,6 +21,19 @@ type medicalDuplicateEntry struct {
 
 const medicalDuplicateAmountBps int64 = 500
 
+func (c *Contract) SetDevLiteDuplicateRule(ctx contractapi.TransactionContextInterface, version int) error {
+	if !usesMedicalApprovalCertificates(ctx) {
+		return fmt.Errorf("duplicate rule selection requires dev-lite")
+	}
+	if _, err := requireIdentity(ctx, "InsurerMSP", "insurerAdmin"); err != nil {
+		return err
+	}
+	if version != 1 && version != 2 {
+		return fmt.Errorf("unknown duplicate rule version")
+	}
+	return overwriteAsset(ctx, "medicalDuplicateRule", "active", version)
+}
+
 func (c *Contract) screenMedicalDuplicate(ctx contractapi.TransactionContextInterface, claim *Claim, episode *MedicalEpisode) error {
 	if !usesMedicalApprovalCertificates(ctx) {
 		return nil
@@ -32,12 +45,82 @@ func (c *Contract) screenMedicalDuplicate(ctx contractapi.TransactionContextInte
 	if len(key) != 32 {
 		return fmt.Errorf("activate medical approvals before indexing claims")
 	}
-	matched, err := indexMedicalDuplicate(ctx, key, claim.ClaimantID, episode)
+	ruleKey, err := stateKey(ctx, "medicalDuplicateRule", "active")
 	if err != nil {
 		return err
 	}
+	version := 2
+	raw, err := ctx.GetStub().GetState(ruleKey)
+	if err != nil {
+		return err
+	}
+	if raw != nil {
+		if err := json.Unmarshal(raw, &version); err != nil {
+			return err
+		}
+	}
+	v1, err := indexMedicalDuplicate(ctx, key, claim.ClaimantID, episode)
+	if err != nil {
+		return err
+	}
+	v2, err := c.indexMedicalOverlap(ctx, key, claim.ClaimantID, episode)
+	if err != nil {
+		return err
+	}
+	matched := v2
+	if version == 1 {
+		matched = v1
+	}
+	if !claim.MedicalDuplicateReview {
+		claim.MedicalDuplicateRuleVersion = version
+	} else if claim.MedicalDuplicateRuleVersion == 0 {
+		claim.MedicalDuplicateRuleVersion = 1
+	}
 	claim.MedicalDuplicateReview = claim.MedicalDuplicateReview || matched
 	return nil
+}
+
+func (c *Contract) indexMedicalOverlap(ctx contractapi.TransactionContextInterface, key []byte, patient string, episode *MedicalEpisode) (bool, error) {
+	mac := hmac.New(sha256.New, key)
+	mac.Write([]byte(canonicalProtocolHash("fabric-medical-duplicate-v2", patient, episode.HospitalID, episode.Service)))
+	bucket := "medical-duplicate-v2-" + hex.EncodeToString(mac.Sum(nil))
+	raw, err := ctx.GetStub().GetPrivateData(oracleProofCollection, bucket)
+	if err != nil {
+		return false, err
+	}
+	entries := make(map[string]medicalDuplicateEntry)
+	if raw != nil {
+		if err := json.Unmarshal(raw, &entries); err != nil {
+			return false, err
+		}
+	} else {
+		// Populate the new bucket from earlier filed versions on first use.
+		claims, err := c.ListClaims(ctx)
+		if err != nil {
+			return false, err
+		}
+		for _, claim := range claims {
+			if claim.ClaimantID != patient || claim.HospitalID != episode.HospitalID || claim.EpisodeID == "" {
+				continue
+			}
+			prior, err := readMedicalEpisode(ctx, claim.EpisodeID, claim.EpisodeRevision)
+			if err != nil {
+				return false, err
+			}
+			if prior.Service == episode.Service {
+				entries[prior.ID] = medicalDuplicateEntry{EpisodeID: prior.ID, AdmissionDate: prior.AdmissionDate, DischargeDate: prior.DischargeDate}
+			}
+		}
+	}
+	matched := false
+	for id, other := range entries {
+		if id != episode.ID && other.AdmissionDate <= episode.DischargeDate && episode.AdmissionDate <= other.DischargeDate {
+			matched = true
+			break
+		}
+	}
+	entries[episode.ID] = medicalDuplicateEntry{EpisodeID: episode.ID, AdmissionDate: episode.AdmissionDate, DischargeDate: episode.DischargeDate}
+	return matched, writeMedicalPrivate(ctx, bucket, entries)
 }
 
 // Read exact private keys so simultaneous filings for the same beneficiary

@@ -75,6 +75,7 @@ type ApprovalCertificate struct {
 	DecisionID              string `json:"decisionId"`
 	EscalatedAt             string `json:"escalatedAt"`
 	DuplicateReview         bool   `json:"duplicateReview"`
+	DuplicateRuleVersion    int    `json:"duplicateRuleVersion,omitempty" metadata:",optional"`
 	ApprovedAt              string `json:"approvedAt"`
 	PackageID               string `json:"packageId,omitempty" metadata:",optional"`
 	RulesVersion            int    `json:"rulesVersion,omitempty" metadata:",optional"`
@@ -96,7 +97,7 @@ func (c *Contract) deriveMedicalApproval(ctx contractapi.TransactionContextInter
 		ID: medicalRevisionKey(claim.ID, claim.Version), ActivationTransactionID: activation.TransactionID,
 		ClaimID: claim.ID, ClaimVersion: claim.Version, EpisodeRevision: claim.EpisodeRevision, EpisodeRevisionHash: head.RevisionHash,
 		AssociationVersion: claim.MedicalAssociationVersion, StatementHash: claim.DescriptionHash, AmountMinor: claim.AmountMinor, Currency: "BDT",
-		DuplicateReview: claim.MedicalDuplicateReview, EscalatedAt: claim.MedicalEscalatedAt,
+		DuplicateReview: claim.MedicalDuplicateReview, DuplicateRuleVersion: claim.MedicalDuplicateRuleVersion, EscalatedAt: claim.MedicalEscalatedAt,
 	}
 	if review != nil {
 		if review.ID != claim.CurrentReviewID || review.ClaimID != claim.ID || review.MedicalVersion != claim.Version ||
@@ -151,6 +152,10 @@ func (c *Contract) deriveMedicalApproval(ctx contractapi.TransactionContextInter
 		cert.PackageID, cert.RulesVersion, cert.TermsHash, cert.BreakdownHash = terms.PackageID, terms.RulesVersion, terms.TermsHash, terms.BreakdownHash
 		domain = "fabric-medical-approval-v2"
 		values = append(values, cert.PackageID, strconv.Itoa(cert.RulesVersion), cert.TermsHash, cert.BreakdownHash)
+	}
+	if cert.DuplicateRuleVersion != 0 {
+		domain += ":duplicate-rule"
+		values = append(values, strconv.Itoa(cert.DuplicateRuleVersion))
 	}
 	cert.Hash = canonicalProtocolHash(domain, values...)
 	return cert, nil

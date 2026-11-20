@@ -1,0 +1,107 @@
+{
+  "date": "2026-11-20",
+  "scope": "Synthetic, one host, unit-level memoryStub for the current rule; paired test-only predicate for the overlap-first variant.",
+  "seed": 190032,
+  "missCauses": {
+    "dateOutsideWindow": 0,
+    "noStayOverlapOnly": 191,
+    "amountOutsideToleranceOnly": 347,
+    "multiple": 204,
+    "total": 742
+  },
+  "multipleReasons": "All 204 combined no overlap and amount outside tolerance. Edited dates are drawn from 0–3 days, so outside-window cases cannot occur.",
+  "amountBuckets": {
+    "1-3%": [
+      162,
+      290
+    ],
+    "4-5%": [
+      96,
+      205
+    ],
+    "6-10%": [
+      0,
+      505
+    ]
+  },
+  "dateShiftBuckets": {
+    "0": [
+      94,
+      230
+    ],
+    "1": [
+      87,
+      265
+    ],
+    "2": [
+      49,
+      250
+    ],
+    "3": [
+      28,
+      255
+    ]
+  },
+  "policies": {
+    "editedDuplicates": {
+      "current": [
+        258,
+        1000
+      ],
+      "overlapFirst": [
+        605,
+        1000
+      ]
+    },
+    "benignRepeats": {
+      "current": [
+        2,
+        1000
+      ],
+      "overlapFirst": [
+        13,
+        1000
+      ]
+    },
+    "benignRepeatsWithinThreeDays": {
+      "current": [
+        2,
+        24
+      ],
+      "overlapFirst": [
+        13,
+        24
+      ]
+    },
+    "nonoverlappingReadmissions": {
+      "current": [
+        0,
+        1000
+      ],
+      "overlapFirst": [
+        0,
+        1000
+      ]
+    }
+  },
+  "arrayFormat": "[referred, pairs]",
+  "authoredAssumptions": [
+    "All pairs have the same hospital and service and use one synthetic subject. The variant also requires distinct episode IDs and inclusive stay overlap and ignores billing amount.",
+    "Edited duplicates shift the whole stay and service date forward uniformly by 0–3 days; authored amount change is uniformly 1–10% with equally likely direction, truncated to minor units.",
+    "Original benign repeats have uniform 1–90-day service gaps and bills 70–130% of the first bill. The three-day subset is small.",
+    "Readmission gaps are measured from discharge to the next admission. The generator draws 80% from 1–14 days and 20% from 15–90 days, uses the same bill and stay distributions as benign repeats, and enforces no stay overlap. Zero under the variant follows from the generator and the predicate.",
+    "Stay duration, amounts, hospital and service concentration, and prevalence are synthetic. No real-world referral or fraud rate is estimated."
+  ],
+  "fullGoSuite": {
+    "before": {
+      "topLevelPassed": 52,
+      "subtestsPassed": 18
+    },
+    "after": {
+      "topLevelPassed": 52,
+      "subtestsPassed": 18,
+      "failed": 0
+    }
+  },
+  "rawLog": ".local-reference/maintenance-1.9/item-03-followup/currentAfter.jsonl"
+}
