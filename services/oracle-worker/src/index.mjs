@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import path from "node:path";
 import { pinnedDecision, decisionIdentity, historicalDecisionAliases } from "./decision-store.mjs";
 import { observeProviderShadow } from "./provider-risk.mjs";
+import { buildReleaseResultDigest } from "./release-protocol.mjs";
 import { routeModel, evaluatorVersion, evaluatorHash } from "./xgboost.mjs";
 import { registryAssessmentRequest } from "./medical-revision.mjs";
 import { environmentFileArgument, loadEnvironmentFile } from "./environment.mjs";
@@ -174,7 +175,7 @@ async function processRequest(requestId) {
     create: async () => {
   if (request.modelReleaseId && (request.modelVersion !== evaluatorVersion || request.modelHash !== evaluatorHash)) {
     const assessment = { verified: false, verificationCode: "XGB_EVALUATOR_UNAVAILABLE", recordHash: "0".repeat(64) };
-    const resultHash = protocol.buildResultDigest(request, assessment);
+    const resultHash = buildReleaseResultDigest(request, assessment);
     const salt = protocol.buildDeterministicSalt(runtime.privateKey, request.id, config.oracleId);
     return { assessment, resultHash, salt, commitmentHash: protocol.buildCommitmentDigest(request, { ...assessment, resultHash, salt }),
       registry: { sourceId: "unavailable-evaluator", snapshotId: request.registrySnapshotId, version: request.registryVersion, rootHash: request.registryRootHash } };
@@ -227,7 +228,7 @@ async function processRequest(requestId) {
     const source = records.find(row => row.invoiceId === claim.hospitalInvoiceId && row.hospitalId === claim.hospitalId);
     if (source) shadowPacket = { source, records, prepared: assessment.result.prepared };
   }
-  const resultHash = protocol.buildResultDigest(request, assessment);
+  const resultHash = buildReleaseResultDigest(request, assessment);
   const salt = protocol.buildDeterministicSalt(runtime.privateKey, request.id, config.oracleId);
   const commitmentHash = protocol.buildCommitmentDigest(request, { verified: assessment.verified, resultHash, salt });
   return { assessment, resultHash, salt, commitmentHash, registry: {
