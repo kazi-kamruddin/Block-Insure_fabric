@@ -14,6 +14,7 @@ import { isMedicalChannel, medicalDevLiteChannel } from "@/lib/fabric/medical-ch
 import { MedicalRegistryControls } from "./medical-registry-controls";
 import { MedicalIntake } from "@/components/medical-intake";
 import { MedicalReview } from "@/components/medical-review";
+import { MedicalSettlementTimeline } from "@/components/medical-timeline";
 import { MedicalOCR } from "@/components/medical-ocr";
 import { PresentationGuide } from "@/components/presentation-guide";
 import { StatusBadge } from "@/components/status-badge";
@@ -884,6 +885,7 @@ export function WorkspaceClient({
       </div>
 
       <div className="workGrid" id="transaction-console">
+        {deployment.startsWith(`${medicalDevLiteChannel}/`) && account.role === "bankOfficer" && <MedicalSettlementTimeline />}
         {medicalReview && (account.role === "policyholder" || account.role === "insurerAdmin" || account.role === "auditor") &&
           <MedicalReview role={account.role} investigationEnabled={investigationEnabled} onEvidence={(id, grant) => {
             setRetrievalEvidenceId(id); setRetrievalGrantId(grant); setDecryptedEvidence(null);
@@ -1098,7 +1100,7 @@ export function WorkspaceClient({
           <article className="workCard evidenceCard">
             <span className="kicker">Portable audit artifact</span>
             <h2>Export claim dossier</h2>
-            <p className="cardNote">Download the ledger-backed claim timeline, Oracle request/commitments/reveals and registry/model provenance, evidence access, reviews, every auditor vote, appeals, fraud advisories, and settlement as one JSON record.</p>
+            <p className="cardNote">Download claim history, Oracle provenance, evidence access, review and appeal records, and settlement as one JSON record.</p>
             <div className="auditExport">
               <label>Claim ID<input spellCheck={false} autoComplete="off" value={auditClaimId} onChange={(event) => setAuditClaimId(event.target.value)} placeholder="claim-1" /></label>
               <a

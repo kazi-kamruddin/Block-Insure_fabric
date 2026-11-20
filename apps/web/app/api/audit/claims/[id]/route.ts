@@ -18,7 +18,8 @@ export async function GET(_request: Request, context: RouteContext) {
   if (!id.success) return NextResponse.json({ message: "Invalid claim ID" }, { status: 400 });
 
   try {
-    const dossier = await loadClaimAuditDossier(id.data);
+    const dossier = await loadClaimAuditDossier(id.data, session.role === "auditor" ? session.subjectId ?? "" : undefined);
+    if (!dossier) return NextResponse.json({ message: "Claim audit dossier was not found" }, { status: 404 });
     return NextResponse.json(dossier, {
       headers: {
         "cache-control": "private, no-store",

@@ -275,6 +275,9 @@ export type ClaimStatus =
 
 export type Claim = {
   medicalDuplicateReview?: boolean;
+  medicalEvidenceRequired?: boolean;
+  medicalRevisionKind?: "CORRECTION" | "APPEAL" | "CLARIFICATION" | "";
+  medicalSettlementId?: string;
   medicalEscalatedAt?: string;
   medicalClarificationId?: string;
   medicalRecoveryUsed?: boolean;
@@ -393,7 +396,7 @@ export type OracleRequest = {
   status: "PENDING" | "CONSENSUS" | "FAILED";
   verifiedResult: boolean;
   resultHash: string;
-  finalizationCode: "" | "EXACT_CONSENSUS" | "NEGATIVE_RESULT" | "CONFLICT" | "TIMEOUT";
+  finalizationCode: "" | "EXACT_CONSENSUS" | "NEGATIVE_RESULT" | "CONFLICT" | "TIMEOUT" | "ESCALATED_TIMEOUT";
   commitDeadline: LedgerTimestamp;
   revealDeadline: LedgerTimestamp;
   requestedAt: LedgerTimestamp;
@@ -628,6 +631,18 @@ export type Settlement = {
   authorizedAt: LedgerTimestamp;
   confirmedAt: LedgerTimestamp;
   updatedAt: LedgerTimestamp;
+};
+
+export type MedicalApprovalCertificate = {
+  claimId: string;
+  claimVersion: number;
+  amountMinor: number;
+  currency: "BDT";
+  path: "ORACLE_AUTO" | "PANEL";
+  registrySnapshotId: string;
+  modelHash: string;
+  hash: string;
+  approvedAt: LedgerTimestamp;
 };
 
 export type ClaimHistoryRecord = {

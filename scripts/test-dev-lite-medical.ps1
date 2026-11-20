@@ -13,6 +13,7 @@ $env:DEV_LITE_ACTIVATE = if ($Activate) { 'true' } else { 'false' }
 $env:MEDICAL_FINAL_PAYMENT = 'true'
 $env:MEDICAL_REVIEW_LIVE = 'false'
 $env:MEDICAL_DEADLINE_LIVE = 'false'
+$env:DEV_LITE_DUPLICATE_REVIEW = 'false'
 $env:MEDICAL_BENCHMARK_EXISTS = if ($Activate) { 'false' } else { 'true' }
 $env:PLAYWRIGHT_OUTPUT_DIR = Join-Path $output 'routine'
 $browser = Join-Path $web 'node_modules/@playwright/test/cli.js'
@@ -30,4 +31,10 @@ $env:MEDICAL_BENCHMARK_EXISTS = 'true'
 $env:PLAYWRIGHT_OUTPUT_DIR = Join-Path $output 'appeal'
 & node $browser test --config $config
 if ($LASTEXITCODE) { throw "Appeal rehearsal failed. Evidence: $env:PLAYWRIGHT_OUTPUT_DIR" }
+
+$env:MEDICAL_REVIEW_LIVE = 'false'
+$env:DEV_LITE_DUPLICATE_REVIEW = 'true'
+$env:PLAYWRIGHT_OUTPUT_DIR = Join-Path $output 'duplicate'
+& node $browser test --config $config
+if ($LASTEXITCODE) { throw "Duplicate rehearsal failed. Evidence: $env:PLAYWRIGHT_OUTPUT_DIR" }
 Write-Output "Dev-lite medical rehearsals passed. Evidence: $output"

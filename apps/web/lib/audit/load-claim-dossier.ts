@@ -1,6 +1,9 @@
 import "server-only";
 
 import { ledger } from "@/lib/fabric/ledger";
+import { loadFabricConfig } from "@/lib/fabric/config";
+import { medicalDevLiteChannel } from "@/lib/fabric/medical-channel";
+import { hasFinalMedicalApproval } from "@/lib/fabric/medical-timeline";
 import { buildEvidenceMerkleTree, evidenceLeafHash } from "@/lib/evidence/merkle";
 import type {
   AuditorDecision,
@@ -15,12 +18,16 @@ import type {
   MerkleProofStep,
   FraudAssessment,
   HospitalVerification,
+  MedicalApprovalCertificate,
   OracleCommitment,
   OracleRegistrySnapshot,
   OracleRequest,
   OracleResult,
   Settlement,
 } from "@/lib/fabric/types";
+
+const isFinalReview = (review: ClaimReview) =>
+  ["APPROVED", "REJECTED", "TIMED_OUT", "ACCESS_FAILED", "SUPERSEDED"].includes(review.status);
 
 export type ClaimAuditDossier = {
   schemaVersion: 6;
@@ -42,11 +49,19 @@ export type ClaimAuditDossier = {
   appeals: ClaimAppeal[];
   fraudAssessments: FraudAssessment[];
   settlement: Settlement | null;
+  approvalCertificate?: MedicalApprovalCertificate | null;
 };
 
-export async function loadClaimAuditDossier(claimId: string): Promise<ClaimAuditDossier> {
+export async function loadClaimAuditDossier(claimId: string, auditorSubject?: string): Promise<ClaimAuditDossier | null> {
   const claim = await ledger.readClaim(claimId);
-  const [history, allEvidence, allEvidenceBatches, allAccess, allGrants, allVerifications, allDecisions, allReviews, allAppeals, allFraudAssessments, allSettlements, allOracleRequests, allOracleCommitments, allOracleResults, allOracleSnapshots] = await Promise.all([
+  const devLiteMedical = !!claim.episodeId && loadFabricConfig().channelName === medicalDevLiteChannel;
+  const auditorMedicalExport = devLiteMedical && auditorSubject !== undefined;
+  if (auditorMedicalExport) {
+    const review = claim.currentReviewId ? await ledger.readClaimReview(claim.currentReviewId) : null;
+    if (!review || !isFinalReview(review) || review.medicalVersion !== claim.version ||
+        !review.assignedAuditorIds.includes(auditorSubject)) return null;
+  }
+  const [history, allEvidence, allEvidenceBatches, allAccess, allGrants, allVerifications, allDecisions, allReviews, allAppeals, allFraudAssessments, allSettlements, allOracleRequests, allOracleCommitments, allOracleResults, allOracleSnapshots, approvalCertificate] = await Promise.all([
     ledger.claimHistory(claimId),
     ledger.listEvidenceReferences(),
     ledger.listEvidenceMerkleBatches(),
@@ -62,6 +77,7 @@ export async function loadClaimAuditDossier(claimId: string): Promise<ClaimAudit
     ledger.listOracleCommitments(),
     ledger.listOracleResults(),
     ledger.listOracleRegistrySnapshots(),
+    devLiteMedical && hasFinalMedicalApproval(claim) ? ledger.readMedicalApprovalCertificate(claim.id, claim.version) : null,
   ]);
 
   const claimEvidence = allEvidence.filter((item) => item.claimId === claimId);
@@ -79,6 +95,9 @@ export async function loadClaimAuditDossier(claimId: string): Promise<ClaimAudit
     };
   });
 
+  const reviewRounds = allReviews.filter(review => review.claimId === claimId &&
+    (!auditorMedicalExport || isFinalReview(review)));
+  const exportRoundIds = new Set(reviewRounds.map(review => review.id));
   return {
     schemaVersion: 6,
     exportedAt: new Date().toISOString(),
@@ -94,10 +113,13 @@ export async function loadClaimAuditDossier(claimId: string): Promise<ClaimAudit
     oracleCommitments: allOracleCommitments.filter((item) => item.claimId === claimId),
     oracleResults: allOracleResults.filter((item) => item.claimId === claimId),
     oracleRegistrySnapshots: allOracleSnapshots.filter((snapshot) => allOracleRequests.some((request) => request.claimId === claimId && request.registrySnapshotId === snapshot.id)),
-    auditorDecisions: allDecisions.filter((item) => item.claimId === claimId),
-    reviewRounds: allReviews.filter((item) => item.claimId === claimId),
+    auditorDecisions: allDecisions.filter(item => item.claimId === claimId &&
+      (!auditorMedicalExport || exportRoundIds.has(item.reviewId))),
+    reviewRounds,
     appeals: allAppeals.filter((item) => item.claimId === claimId),
     fraudAssessments: allFraudAssessments.filter((item) => item.claimId === claimId),
-    settlement: allSettlements.find((item) => item.claimId === claimId) ?? null,
+    settlement: allSettlements.find(item => item.claimId === claimId &&
+      (!devLiteMedical || item.id === claim.medicalSettlementId)) ?? null,
+    ...(devLiteMedical ? { approvalCertificate } : {}),
   };
 }

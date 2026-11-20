@@ -37,6 +37,9 @@ records the two offline alternatives at the same review workload.
 The [final medical acceptance record](docs/results/medical-final-acceptance-2026-11-19.md)
 tracks Bank commit recovery, private patient matching, separate insurer
 investigation outcomes and live challenger shadow scoring.
+The [dev-lite medical runbook](docs/dev-lite-medical.md#operator-rehearsal)
+covers the current claim and Bank timelines and the three synthetic rehearsals
+on the isolated 1.9.0 channel.
 
 The original implementation areas and the policy/premium/benefit expansion are
 joined by a certificate-bound 2-of-3 Oracle consensus subsystem. The source now

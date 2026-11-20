@@ -30,6 +30,7 @@ import type {
   HospitalModelFacts,
   FraudAssessment,
   Liability,
+  MedicalApprovalCertificate,
   OracleCommitment,
   OracleRegistrySnapshot,
   OracleRequest,
@@ -459,6 +460,10 @@ export const ledger = {
 
   readSettlement(id: string) {
     return evaluate<Settlement>("insurerAdmin", "ReadSettlement", id);
+  },
+
+  readMedicalApprovalCertificate(claimId: string, version: number) {
+    return evaluate<MedicalApprovalCertificate>("insurerAdmin", "ReadMedicalApprovalCertificate", claimId, String(version));
   },
 
   listSettlements() {

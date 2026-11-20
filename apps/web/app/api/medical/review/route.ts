@@ -8,6 +8,7 @@ import { ledger } from "@/lib/fabric/ledger";
 import { ledgerIdSchema } from "@/lib/fabric/validation";
 import { medicalReviewCommand, type MedicalReviewCommand } from "@/lib/fabric/medical-review";
 import { isMedicalChannel, medicalDevLiteChannel } from "@/lib/fabric/medical-channel";
+import { buildMedicalTimeline, hasFinalMedicalApproval } from "@/lib/fabric/medical-timeline";
 import { checkMutationOrigin } from "@/lib/security/request-origin";
 
 export const dynamic = "force-dynamic";
@@ -39,7 +40,8 @@ export async function GET(request: Request) {
       if (session.role !== "policyholder" || !/^[1-9][0-9]{0,8}$/.test(revision)) return reply({ message: "Invalid appeal revision" }, 400);
       return reply({ quote: await ledger.quoteMedicalAppeal(claim.id, revision) });
     }
-    const [appeal, clarification, documents, grants, checks, decisions, facts] = await Promise.all([
+    const devLite = loadFabricConfig().channelName === medicalDevLiteChannel;
+    const [appeal, clarification, documents, grants, checks, decisions, facts, oracle, certificate, settlement] = await Promise.all([
       claim.currentAppealId ? ledger.readClaimAppeal(claim.currentAppealId) : null,
       claim.medicalClarificationId ? ledger.readMedicalClarification(session.role === "policyholder" ? session.role : "insurerAdmin", claim.medicalClarificationId) : null,
       Promise.all(claim.evidenceIds.map(id => ledger.readEvidenceReference(id))),
@@ -47,8 +49,17 @@ export async function GET(request: Request) {
       review ? ledger.listMedicalEvidenceChecks(review.id) : [],
       review && (session.role !== "auditor" || review.status !== "OPEN") ? ledger.listAuditorDecisions() : [],
       ledger.readMedicalReviewFacts(claim.id),
+      devLite && claim.currentOracleRequestId ? ledger.readOracleRequest(claim.currentOracleRequestId) : null,
+      devLite && hasFinalMedicalApproval(claim) ? ledger.readMedicalApprovalCertificate(claim.id, claim.version) : null,
+      devLite && claim.medicalSettlementId ? ledger.readSettlement(claim.medicalSettlementId) : null,
     ]);
-    return reply({ claim, review, appeal, clarification, documents, facts, devLite: loadFabricConfig().channelName === medicalDevLiteChannel,
+    const timeline = devLite ? buildMedicalTimeline({ claim,
+      review: review?.medicalVersion === claim.version ? review : null,
+      clarification, appeal, documents, grants, checks, readAt: Date.now(),
+      oracle: oracle?.claimVersion === claim.version ? oracle : null,
+      certificate, settlement: settlement?.approvalCertificateHash === certificate?.hash ? settlement : null,
+    }) : undefined;
+    return reply({ claim, review, appeal, clarification, documents, facts, devLite, timeline,
       appealExplanation: appeal ? await ledger.readMedicalAppealExplanation(session.role === "policyholder" ? session.role : "insurerAdmin", appeal.id) : null,
       grants: grants.filter(grant => grant.medicalReviewId === review?.id && (session.role !== "auditor" || grant.granteeSubject === session.subjectId)),
       checks: checks.filter(check => session.role !== "auditor" || check.auditorId === session.subjectId),

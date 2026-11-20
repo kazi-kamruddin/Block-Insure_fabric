@@ -2,6 +2,7 @@ import { z } from "zod";
 import { ledgerIdSchema as id } from "./validation";
 import type { AuditorDecision, Claim, ClaimAppeal, ClaimReview, EvidenceAccessGrant, EvidenceReference } from "./types";
 import type { MedicalQuote } from "./medical";
+import type { MedicalTimeline } from "./medical-timeline";
 
 const date = z.string().datetime({ offset: true });
 const hash = z.string().regex(/^[a-f0-9]{64}$/);
@@ -39,6 +40,7 @@ export type MedicalEvidenceCheck = { reviewId: string; evidenceId: string; grant
 export type MedicalReviewFacts = { service: string; serviceDate: string; termsHash: string; quote: MedicalQuote };
 export type MedicalReviewView = {
   devLite?: boolean;
+  timeline?: MedicalTimeline;
   claim: Claim; review: ClaimReview | null; appeal: ClaimAppeal | null; clarification: MedicalClarification | null;
   appealExplanation: string | null;
   facts: MedicalReviewFacts;
