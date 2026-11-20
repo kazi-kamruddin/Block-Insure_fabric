@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import path from "node:path";
 import { pinnedDecision, decisionIdentity, historicalDecisionAliases } from "./decision-store.mjs";
+import { observeProviderShadow } from "./provider-risk.mjs";
 import { routeModel, evaluatorVersion, evaluatorHash } from "./xgboost.mjs";
 import { registryAssessmentRequest } from "./medical-revision.mjs";
 import { environmentFileArgument, loadEnvironmentFile } from "./environment.mjs";
@@ -254,6 +255,19 @@ async function processRequest(requestId) {
   if (await submitCommitment(request, commitmentHash)) {
     request = await waitForRevealPhase(request.id);
     if (request.status === "PENDING" && Date.now() <= Date.parse(request.revealDeadline)) await submitReveal(request, assessment, resultHash, salt);
+  }
+  if (config.fabric.channelName === "insurance-dev-lite-190" && process.env.ORACLE_PROVIDER_SHADOW_RELEASE &&
+      process.env.ORACLE_PROVIDER_SHADOW_ARTIFACT && process.env.ORACLE_PROVIDER_SHADOW_CATALOG) {
+    setImmediate(async () => {
+      try {
+        const release = await evaluate("ReadMedicalModelRelease", process.env.ORACLE_PROVIDER_SHADOW_RELEASE);
+        const observation = await observeProviderShadow({ release, artifactPath: process.env.ORACLE_PROVIDER_SHADOW_ARTIFACT,
+          catalogPath: process.env.ORACLE_PROVIDER_SHADOW_CATALOG, hospitalId: currentClaim.hospitalId });
+        if (observation) log("log", "Provider review shadow score", { requestId, ...observation });
+      } catch {
+        log("warn", "Provider review shadow score unavailable", { requestId });
+      }
+    });
   }
   if (shadowPacket) setImmediate(() => {
     try {
