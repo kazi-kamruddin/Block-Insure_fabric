@@ -10,4 +10,6 @@ services/oracle-worker/src/xgboost.mjs -text
 services/oracle-worker/src/registry.mjs -text
 services/oracle-worker/src/protocol.mjs -text
 services/oracle-worker/src/privacy.mjs -text
+datasets/hybrid-v1/upstream-manifest.json -text
+datasets/hybrid-v1/comparison-presets.json -text
 

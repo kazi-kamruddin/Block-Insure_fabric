@@ -7,8 +7,15 @@ samples_root="${network_root}/.fabric/fabric-samples"
 export PATH="${samples_root}/bin:${PATH}"
 
 domain="hospital.blockinsure.test"
-base="${network_root}/organizations/peerOrganizations/${domain}"
-ca_cert="${network_root}/organizations/fabric-ca/hospital/ca-cert.pem"
+org_root="${network_root}/organizations"
+port=8054
+if [[ "${1:-}" == --dev-lite ]]; then
+  org_root="${network_root}/../data/dev-lite/organizations"
+  port=31154
+  export FABRIC_CA_CLIENT_URL="https://localhost:${port}"
+fi
+base="${org_root}/peerOrganizations/${domain}"
+ca_cert="${org_root}/fabric-ca/hospital/ca-cert.pem"
 export FABRIC_CA_CLIENT_HOME="${base}"
 
 command -v fabric-ca-client >/dev/null || { echo "Missing required tool: fabric-ca-client" >&2; exit 1; }
@@ -33,7 +40,7 @@ for index in 1 2 3 4 5; do
     --id.name "${user}" --id.secret "${user}pw" --id.type client \
     --id.attrs "role=hospitalOfficer:ecert,subjectId=${subject}:ecert" \
     --tls.certfiles "${ca_cert}" >/dev/null 2>&1 || true
-  fabric-ca-client enroll -u "https://${user}:${user}pw@localhost:8054" \
+  fabric-ca-client enroll -u "https://${user}:${user}pw@localhost:${port}" \
     --caname ca-hospital -M "${user_msp}" --tls.certfiles "${ca_cert}"
   cp "${base}/msp/config.yaml" "${user_msp}/config.yaml"
   echo "Enrolled ${user} with certificate subjectId ${subject}."

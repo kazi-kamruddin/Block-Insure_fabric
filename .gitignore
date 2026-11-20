@@ -74,6 +74,10 @@ logs/
 Thumbs.db
 
 # Private local context
+/datasets/hybrid-v1/raw/
+/datasets/hybrid-v1/processed/
+/datasets/hybrid-v1/runtime/
+/data/research/
 /data/workflow-operations*/
 /.project-context/
 /.local-reference/
@@ -94,3 +98,5 @@ AGENTS.md
 AGENT.md
 agent.md
 GEMINI.md
+/data/dev-lite/
+/data/dev-lite/

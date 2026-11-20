@@ -6,7 +6,8 @@ import { findDemoAccount } from "@/lib/auth/accounts";
 import type { Session } from "@/lib/auth/session-token";
 import { assessClaimFraud } from "@/lib/fraud/assess-claim";
 import type { WorkflowCommand } from "./commands";
-import { refreshHospitalRegistrySnapshot } from "@/lib/oracle/hospital-registry";
+import { currentAttestedMedicalSnapshot, refreshHospitalRegistrySnapshot } from "@/lib/oracle/hospital-registry";
+import { medicalDevLiteChannel } from "@/lib/fabric/medical-channel";
 import { buildEvidenceMerkleTree } from "@/lib/evidence/merkle";
 import evaluator from "@/lib/oracle/evaluator.json";
 
@@ -132,7 +133,9 @@ export async function executeWorkflowCommand(command: WorkflowCommand, session: 
       if (claim.episodeId && process.env.FABRIC_XGBOOST_ENABLED !== "true") throw new Error("The isolated medical channel requires the frozen Fabric evaluator");
       if (claim.status === "ORACLE_PENDING" && claim.currentOracleRequestId) return ledger.readOracleRequest(claim.currentOracleRequestId);
       if (!["SUBMITTED", "APPEAL_SUBMITTED", "HOSPITAL_VERIFIED"].includes(claim.status)) throw new Error("This claim is not awaiting processing.");
-      const snapshot = await refreshHospitalRegistrySnapshot();
+      const snapshot = process.env.FABRIC_CHANNEL_NAME === medicalDevLiteChannel
+        ? await currentAttestedMedicalSnapshot(claim.hospitalId, claim.hospitalInvoiceId ?? "")
+        : await refreshHospitalRegistrySnapshot();
       if (!snapshot) throw new Error("No Hospital invoice records are available.");
       return ledger.requestOracleVerification({
         requestId: `oracle-${randomUUID()}`, claimId: claim.id, snapshotId: snapshot.snapshotId,
@@ -145,7 +148,9 @@ export async function executeWorkflowCommand(command: WorkflowCommand, session: 
     }
     case "requestOracleVerification": {
       const claim = await ledger.readClaim(command.claimId);
-      const snapshot = claim.hospitalInvoiceId ? await refreshHospitalRegistrySnapshot() : null;
+      const snapshot = process.env.FABRIC_CHANNEL_NAME === medicalDevLiteChannel
+        ? await currentAttestedMedicalSnapshot(claim.hospitalId, claim.hospitalInvoiceId ?? "")
+        : claim.hospitalInvoiceId ? await refreshHospitalRegistrySnapshot() : null;
       return ledger.requestOracleVerification({ ...command, snapshotId: snapshot?.snapshotId ?? command.snapshotId });
     }
     case "finalizeOracleTimeout":

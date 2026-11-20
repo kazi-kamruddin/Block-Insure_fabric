@@ -2,6 +2,14 @@
 set -euo pipefail
 
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+if [[ "${1:-}" == --dev-lite ]]; then
+  shift
+  exec bash "${script_dir}/dev-lite.sh" "$@"
+fi
+if (( $# != 1 )); then
+  echo "Usage: $0 [--dev-lite] ACTION (profile flag goes first)" >&2
+  exit 2
+fi
 network_root="$(cd -- "${script_dir}/.." && pwd -P)"
 samples_root="${network_root}/.fabric/fabric-samples"
 channel_name="insurance-channel"

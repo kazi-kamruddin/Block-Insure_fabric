@@ -10,7 +10,8 @@ import {
 } from "@/lib/auth/accounts";
 import type { RoleDashboard } from "@/lib/dashboard/build-dashboard";
 import { GuidedWorkflowForm, type PreparedWorkflow } from "@/components/guided-workflow-form";
-import { medicalCandidateChannel } from "@/lib/workflows/commands";
+import { isMedicalChannel, medicalDevLiteChannel } from "@/lib/fabric/medical-channel";
+import { MedicalRegistryControls } from "./medical-registry-controls";
 import { MedicalIntake } from "@/components/medical-intake";
 import { MedicalReview } from "@/components/medical-review";
 import { MedicalOCR } from "@/components/medical-ocr";
@@ -178,7 +179,7 @@ export function WorkspaceClient({
   const [retrievalPassphrase, setRetrievalPassphrase] = useState("");
   const [retrieving, setRetrieving] = useState(false);
   const [decryptedEvidence, setDecryptedEvidence] = useState<{ url: string; name: string; blob: Blob; id: string; accessId: string; reviewId: string; digest: string } | null>(null);
-  const medicalReview = medicalReviewEnabled && deployment.startsWith(`${medicalCandidateChannel}/`);
+  const medicalReview = medicalReviewEnabled && isMedicalChannel(deployment.split("/")[0]);
   const [auditClaimId, setAuditClaimId] = useState("");
   const [proofEvidenceId, setProofEvidenceId] = useState("");
   const [proofBatchId, setProofBatchId] = useState("");
@@ -888,7 +889,9 @@ export function WorkspaceClient({
             setRetrievalEvidenceId(id); setRetrievalGrantId(grant); setDecryptedEvidence(null);
             document.getElementById("retrieve-evidence")?.scrollIntoView({ behavior: "smooth" });
           }} />}
-        {deployment.startsWith(`${medicalCandidateChannel}/`) && (account.role === "insurerAdmin" || account.role === "policyholder") &&
+        {deployment.startsWith(`${medicalDevLiteChannel}/`) && (account.role === "insurerAdmin" || account.role === "hospitalOfficer") &&
+          <MedicalRegistryControls role={account.role} />}
+        {isMedicalChannel(deployment.split("/")[0]) && (account.role === "insurerAdmin" || account.role === "policyholder") &&
           <MedicalIntake insurer={account.role === "insurerAdmin"} onAssociation={prepared => {
             setPreparedWorkflow(prepared);
             document.getElementById("guided-workflow")?.scrollIntoView({ behavior: "smooth" });
@@ -911,7 +914,7 @@ export function WorkspaceClient({
           </div>
         </article>}
         <GuidedWorkflowForm
-          medical={deployment.startsWith(`${medicalCandidateChannel}/`)}
+          medical={isMedicalChannel(deployment.split("/")[0])}
           key={`${account.role}-${preparedWorkflow?.revision ?? 0}`}
           role={account.role}
           busy={busy}

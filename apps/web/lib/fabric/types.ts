@@ -274,6 +274,8 @@ export type ClaimStatus =
   | "SETTLED";
 
 export type Claim = {
+  medicalDuplicateReview?: boolean;
+  medicalEscalatedAt?: string;
   medicalClarificationId?: string;
   medicalRecoveryUsed?: boolean;
   medicalSupplementHash?: string;
@@ -348,6 +350,9 @@ export type SelectiveDisclosurePresentation = {
 };
 
 export type OracleRegistrySnapshot = {
+  hospitalId?: string;
+  status?: "PROPOSED" | "ACTIVE";
+  attestedAt?: string;
   assetType: "oracleRegistrySnapshot";
   schemaVersion: number;
   id: string;
@@ -607,6 +612,7 @@ export type FraudAssessment = {
 };
 
 export type Settlement = {
+  approvalCertificateHash?: string;
   assetType: "settlement";
   schemaVersion: number;
   id: string;

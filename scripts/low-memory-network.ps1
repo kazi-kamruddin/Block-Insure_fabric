@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Position = 0)]
-    [ValidateSet("Start", "Status")]
+    [ValidateSet("Start", "Status", "Drain")]
     [string]$Action = "Status",
     [ValidatePattern('^[A-Za-z0-9][A-Za-z0-9.-]{0,79}$')]
     [string]$ChaincodeVersion = "1.4.1-hardening",
@@ -9,7 +9,8 @@ param(
     [ValidateRange(30,120)][int]$StabilizationSeconds = 40,
     [ValidateRange(10,60)][int]$QuietSeconds = 15,
     [ValidateRange(128,2048)][int]$MinimumGuestAvailableMiB = 128,
-    [string]$EvidencePath
+    [string]$EvidencePath,
+    [ValidateSet("Default", "DevLite")][string]$Profile = "Default"
 )
 
 $ErrorActionPreference = "Stop"
@@ -93,6 +94,32 @@ function Assert-Runtime {
     Write-Host "CAs are stopped; existing enrolled identities are required."
 }
 
+if ($Profile -eq "DevLite") {
+    if ($Action -ne "Drain") { throw 'Start dev-lite through network.sh --dev-lite up.' }
+    # Require both the dedicated Docker network and the dev-lite peer ID.
+    function Get-LiteNames {
+        $names = Invoke-FabricDocker -Arguments @('ps','--filter','network=block-insure-dev-lite','--format','{{.Names}}')
+        if ($names) { $names -split '\r?\n' }
+    }
+    $domains = @($organizations | ForEach-Object { "$_.dev-lite" })
+    if ($CoreOnly) {
+        # Peers are already stopped; they cannot launch additional runtimes.
+        $unselected = @(Get-UnselectedFabricRuntime -Names @(Get-LiteNames) -Organizations $domains -Version $ChaincodeVersion -CoreOnly -NetworkID devlite)
+        Stop-UnselectedRuntimes $unselected
+    } else {
+        $orderer = Invoke-FabricDocker -Arguments @('ps','--filter','label=com.docker.compose.project=block-insure-dev-lite','--filter','label=com.docker.compose.service=orderer','--format','{{.Names}}')
+        if (-not $orderer -or $orderer -match '\s') { throw 'Expected one running dev-lite orderer.' }
+        Wait-FabricRuntimeStable -Required @($orderer) -Organizations $domains -Version $ChaincodeVersion -NetworkID devlite `
+            -MinimumSeconds $StabilizationSeconds -QuietSeconds $QuietSeconds -MinimumAvailableBytes ($MinimumGuestAvailableMiB * 1MB) `
+            -StopRuntime { param($names) Stop-UnselectedRuntimes $names } -Sample {
+                $memory = Invoke-FabricDocker -Arguments @('exec',$orderer,'cat','/proc/meminfo')
+                if ($memory -notmatch '(?m)^MemAvailable:\s+(\d+)\s+kB') { throw 'Cannot measure dev-lite guest memory.' }
+                [pscustomobject]@{ Names = @(Get-LiteNames); AvailableBytes = [long]$Matches[1] * 1024 }
+            }
+    }
+    return
+}
+if ($Action -eq "Drain") { throw 'Drain requires -Profile DevLite.' }
 if ($Action -eq "Start") {
     $identityRoot = Join-Path $projectRoot "network/organizations"
     if (-not (Test-Path -LiteralPath (Join-Path $identityRoot "ordererOrganizations/blockinsure.test")) -or

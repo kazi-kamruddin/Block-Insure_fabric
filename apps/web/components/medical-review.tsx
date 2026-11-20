@@ -98,6 +98,15 @@ export function MedicalReview({ role, onEvidence, investigationEnabled = false }
         <StatusBadge status={view.claim.status} />
       </div>
       <p>Recorded service {view.facts.service} on {view.facts.serviceDate} · episode revision {view.claim.episodeRevision}</p>
+      {view.claim.medicalDuplicateReview && <p>Panel review required. A separate episode has similar service dates and billing facts.</p>}
+      {view.claim.medicalEscalatedAt && <p>Escalated to the appointed auditors.</p>}
+      {view.devLite && role === "policyholder" && !review && !view.claim.medicalEscalatedAt &&
+        ["SUBMITTED", "APPEAL_SUBMITTED", "ORACLE_PENDING"].includes(view.claim.status) &&
+        <button type="button" className="secondary button" disabled={busy} onClick={() => work(() => send({ action: "escalate", claimId: view.claim.id }))}>
+          Escalate after processing deadline
+        </button>}
+      {role === "auditor" && preparing && review && view.claim.medicalEscalatedAt &&
+        <button type="button" className="primary button" disabled={busy} onClick={() => work(() => send({ action: "open", reviewId: review.id, deadline: later(24) }))}>Open escalated voting</button>}
       <p>Billed BDT {(view.facts.quote.billedMinor / 100).toFixed(2)} · Eligible BDT {(view.facts.quote.eligibleMinor / 100).toFixed(2)} · Payable BDT {(view.facts.quote.payableMinor / 100).toFixed(2)}</p>
       {view.appeal && <p>Appeal {view.appeal.status} · Disputed decision {view.appeal.disputedDecisionId}</p>}
       {view.appealExplanation && <p>Appeal explanation: {view.appealExplanation}</p>}

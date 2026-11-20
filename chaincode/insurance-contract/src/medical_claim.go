@@ -223,6 +223,9 @@ func (c *Contract) SubmitMedicalClaim(ctx contractapi.TransactionContextInterfac
 		return nil, err
 	}
 	claim.MedicalAssociationKey, claim.MedicalAssociationVersion = medicalAssociationKey(episode), association.Version
+	if err := c.screenMedicalDuplicate(ctx, claim, episode); err != nil {
+		return nil, err
+	}
 	if err := putState(ctx, "medicalPayableEpisode", episodeID, struct {
 		ClaimID string `json:"claimId"`
 	}{id}); err != nil {
@@ -305,6 +308,11 @@ func (c *Contract) AcceptMedicalCorrection(ctx contractapi.TransactionContextInt
 		return nil, fmt.Errorf("review the corrected statement before reconfirming")
 	}
 	previous := claim.AmountMinor
+	if usesMedicalApprovalCertificates(ctx) && claim.MedicalSettlementID != "" {
+		if err := c.supersedeUnpaidMedicalSettlement(ctx, claim); err != nil {
+			return nil, err
+		}
+	}
 	link, err := verifiedMedicalAssociation(ctx, episode, claim.ClaimantID)
 	if err != nil {
 		return nil, err
@@ -333,6 +341,10 @@ func (c *Contract) AcceptMedicalCorrection(ctx contractapi.TransactionContextInt
 	claim.CurrentAppealID, claim.PrivacyPresentationID, claim.MedicalSettlementID = "", "", ""
 	claim.EvidenceIDs = []string{}
 	claim.MedicalRevisionKind, claim.MedicalSupplementHash = "CORRECTION", ""
+	claim.MedicalEscalatedAt = ""
+	if err := c.screenMedicalDuplicate(ctx, claim, episode); err != nil {
+		return nil, err
+	}
 	claim.Version++
 	claim.UpdatedAt, err = timestamp(ctx)
 	if err != nil {

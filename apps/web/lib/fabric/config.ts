@@ -111,7 +111,7 @@ export function resolveRoleProfile(role: FabricRole, config: FabricConfig) {
   return {
     role,
     mspId: definition.mspId,
-    peerEndpoint: `localhost:${definition.peerPort}`,
+    peerEndpoint: `localhost:${rolePeerPort(role, config)}`,
     peerHostAlias: peerName,
     tlsCertificatePath: path.join(organizationRoot, "peers", peerName, "tls", "ca.crt"),
     userMspPath: path.join(
@@ -124,6 +124,11 @@ export function resolveRoleProfile(role: FabricRole, config: FabricConfig) {
 }
 
 const auditorIdentityNames = new Set(["auditor1", "auditor2", "auditor3", "auditor4"]);
+const devLitePeerPorts = { insurerAdmin: 31051, policyholder: 31051, hospitalOfficer: 31151, auditor: 31251, bankOfficer: 31351 };
+
+function rolePeerPort(role: FabricRole, config: FabricConfig) {
+  return config.channelName === medicalDevLiteChannel ? devLitePeerPorts[role] : roleDefinitions[role].peerPort;
+}
 const hospitalIdentityNames = new Set(["hospital1", "hospital2", "hospital3", "hospital4", "hospital5"]);
 
 function resolveNamedRoleProfile(role: "auditor" | "hospitalOfficer", userName: string, allowedNames: Set<string>, config: FabricConfig) {
@@ -134,7 +139,7 @@ function resolveNamedRoleProfile(role: "auditor" | "hospitalOfficer", userName: 
   return {
     role,
     mspId: definition.mspId,
-    peerEndpoint: `localhost:${definition.peerPort}`,
+    peerEndpoint: `localhost:${rolePeerPort(role, config)}`,
     peerHostAlias: peerName,
     tlsCertificatePath: path.join(organizationRoot, "peers", peerName, "tls", "ca.crt"),
     userMspPath: path.join(organizationRoot, "users", `${userName}@${definition.organizationDomain}`, "msp"),
@@ -148,3 +153,4 @@ export function resolveAuditorProfile(userName: string, config: FabricConfig) {
 export function resolveHospitalProfile(userName: string, config: FabricConfig) {
   return resolveNamedRoleProfile("hospitalOfficer", userName, hospitalIdentityNames, config);
 }
+import { medicalDevLiteChannel } from "./medical-channel";

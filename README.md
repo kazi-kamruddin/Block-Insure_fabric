@@ -77,6 +77,14 @@ not require the Solidity implementation or an imported copy. Shared methodology
 is represented by Fabric-owned frozen assets and source-hashed test fixtures.
 Other implementations serve only as read-only development references.
 
+The [Fabric research dataset guide](datasets/hybrid-v1/README.md) explains
+how to verify the local Medicare benchmark archive and prepare the isolated
+5,000-record comparison workload.
+
+The [Fabric research dataset guide](datasets/hybrid-v1/README.md) explains
+how to verify the local Medicare benchmark archive and prepare the isolated
+5,000-record comparison workload.
+
 - `network/` — local Fabric topology, channel configuration, and lifecycle scripts.
 - `chaincode/insurance-contract/` — insurance domain chaincode and its tests.
 - `apps/web/` — Next.js web application.

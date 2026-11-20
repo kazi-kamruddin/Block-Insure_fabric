@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { createHash, randomUUID } from "node:crypto";
-import { readFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { invoicePDF } from "./invoice-pdf";
 
 const roles = {
@@ -17,6 +17,7 @@ const roles = {
 const deadlines = process.env.MEDICAL_DEADLINE_LIVE === "true";
 const finalPayment = process.env.MEDICAL_FINAL_PAYMENT === "true";
 const governed = deadlines || process.env.MEDICAL_REVIEW_LIVE === "true";
+const devLite = process.env.FABRIC_CHANNEL_NAME === "insurance-dev-lite-190";
 
 function day(offset: number) {
   return new Date(Date.now() + 6 * 3_600_000 + offset * 86_400_000).toISOString().slice(0, 10);
@@ -30,10 +31,13 @@ test(journey, async ({ page }, info) => {
   test.setTimeout(900_000);
   const health = await page.request.get("/api/fabric/health");
   expect(health.ok(), await health.text()).toBe(true);
-  expect(await health.json()).toMatchObject({ channel: "insurance-medical-reimbursement", chaincode: "insurance-contract", schemaVersion: 15 });
+  expect(await health.json()).toMatchObject({ channel: process.env.FABRIC_CHANNEL_NAME ?? "insurance-medical-reimbursement", chaincode: "insurance-contract", schemaVersion: 15 });
 
-  const resumeClaim = deadlines ? process.env.MEDICAL_DEADLINE_RESUME_CLAIM : finalPayment ? process.env.MEDICAL_FINAL_RESUME_CLAIM : undefined;
-  const resumeSuffix = finalPayment ? process.env.MEDICAL_FINAL_RESUME_SUFFIX : process.env.MEDICAL_DEADLINE_RESUME_SUFFIX;
+  const resumeClarification = devLite && governed && !deadlines && process.env.DEV_LITE_RESUME_CLARIFICATION;
+  const resumeApprovedAppeal = devLite && governed && !deadlines && process.env.DEV_LITE_RESUME_APPROVED_APPEAL;
+  const resumeClaim = resumeClarification || resumeApprovedAppeal || (deadlines ? process.env.MEDICAL_DEADLINE_RESUME_CLAIM : finalPayment ? process.env.MEDICAL_FINAL_RESUME_CLAIM : undefined);
+  const resumeSuffix = (resumeClarification || resumeApprovedAppeal) ? process.env.DEV_LITE_RESUME_SUFFIX
+    : finalPayment ? process.env.MEDICAL_FINAL_RESUME_SUFFIX : process.env.MEDICAL_DEADLINE_RESUME_SUFFIX;
   if (resumeClaim && !resumeSuffix) throw new Error("Supply the interrupted fixture suffix");
   const suffix = resumeClaim && resumeSuffix ? resumeSuffix : randomUUID().slice(0, 12);
   const id = (prefix: string) => "med-" + prefix + "-" + suffix;
@@ -98,9 +102,16 @@ test(journey, async ({ page }, info) => {
 
   const reviewCard = page.locator("#medical-review");
   async function loadReview(claimId: string) {
-    await reviewCard.getByLabel("Medical claim ID").fill(claimId);
+    const input = reviewCard.getByLabel("Medical claim ID");
+    const loadButton = reviewCard.getByRole("button", { name: "Load medical case" });
+    // The server-rendered input may exist before React attaches after a role
+    // switch. Only retry the local fill, never a ledger operation.
+    await expect(async () => {
+      await input.fill(claimId);
+      await expect(loadButton).toBeEnabled({ timeout: 1_200 });
+    }).toPass({ timeout: 45_000 });
     const pending = page.waitForResponse(response => new URL(response.url()).pathname === "/api/medical/review" && response.request().method() === "GET");
-    await reviewCard.getByRole("button", { name: "Load medical case" }).click();
+    await loadButton.click();
     const response = await pending;
     expect(response.ok(), await response.text()).toBe(true);
     const detail = await response.json();
@@ -115,7 +126,24 @@ test(journey, async ({ page }, info) => {
     return outcome;
   }
 
+  async function attestRegistry() {
+    if (!devLite) return;
+    await login("insurer");
+    const registry = page.locator("#medical-registry");
+    await registry.getByLabel("Hospital ID").fill("hospital-demo");
+    const proposed = await postFromButton(registry.getByRole("button", { name: "Propose registry snapshot" }), "/api/medical/registry");
+    await login("hospital");
+    await registry.getByRole("button", { name: "Refresh registry proposals" }).click();
+    const entry = registry.getByRole("listitem").filter({ hasText: proposed.id + " ·" });
+    await expect(entry).toBeVisible({ timeout: 60_000 });
+    if (!(await entry.innerText()).includes("ACTIVE")) {
+      await postFromButton(entry.getByRole("button", { name: "Attest this snapshot" }), "/api/medical/registry");
+    }
+    await login("insurer");
+  }
+
   async function freshVerification(claimId: string, version: number, appealId?: string) {
+    await attestRegistry();
     const request = await form("startClaimProcessing", { claimId });
     expect(request).toMatchObject({ claimId, claimVersion: version, modelVersion: "fabric-xgb-synthetic-v1", requiredConfirmations: 2, expectedResponses: 3 });
     if (appealId) expect(request).toMatchObject({ appealId });
@@ -206,6 +234,10 @@ test(journey, async ({ page }, info) => {
   }
 
   try {
+    if (devLite && process.env.DEV_LITE_ACTIVATE === "true") {
+      await login("insurer");
+      await postFromButton(page.getByRole("button", { name: "Activate approval certificates" }), "/api/medical/registry");
+    }
     if (governed || finalPayment) {
       await login("insurer");
       await expect(reviewCard.getByRole("heading", { name: "Medical review and appeal" })).toBeVisible();
@@ -452,15 +484,33 @@ test(journey, async ({ page }, info) => {
       return;
     }
 
-    if (governed) await test.step("clarification, four-auditor decryption, OCR and corrected appeal", async () => {
+    if (resumeApprovedAppeal) await test.step("verify retained corrected appeal approval", async () => {
       await login("insurer");
-      const initialResults = await freshVerification(claimId, 1);
-      expect(initialResults.some(result => result.verificationCode.startsWith("XGB_REVIEW:"))).toBe(true);
-      await loadReview(claimId);
-      const initial = await reviewAction("Prepare four-auditor review");
+      const retained = await loadReview(claimId);
+      expect(retained.claim).toMatchObject({ policyId: id("policy"), version: 3, status: "APPROVED", medicalDuplicateReview: true });
+      expect(retained.appeal).toMatchObject({ status: "OVERTURNED" });
+      expect(retained.review).toMatchObject({ medicalVersion: 3, status: "APPROVED" });
+      expect(retained.decisions.filter((decision: { outcome: string }) => decision.outcome === "APPROVE")).toHaveLength(3);
+    });
+
+    if (governed && !resumeApprovedAppeal) await test.step("clarification, four-auditor decryption, OCR and corrected appeal", async () => {
+      await login("insurer");
+      let initial;
+      if (resumeClarification) {
+        const retained = await loadReview(claimId);
+        expect(retained.claim).toMatchObject({ version: 1, status: "MEDICAL_REVIEW_PREPARING", policyId: id("policy") });
+        expect(retained.clarification).toMatchObject({ status: "PENDING" });
+        episodeId = retained.claim.episodeId;
+        initial = retained.review;
+      } else {
+        const initialResults = await freshVerification(claimId, 1);
+        expect(initialResults.some(result => result.verificationCode.startsWith("XGB_REVIEW:"))).toBe(true);
+        await loadReview(claimId);
+        initial = await reviewAction("Prepare four-auditor review");
+        await reviewCard.getByLabel("Clarification question and requested evidence").fill("Please provide the itemized synthetic invoice.");
+        await reviewAction("Send clarification");
+      }
       expect(initial).toMatchObject({ assignedAuditorIds: panel, approvalThreshold: 3, rejectionThreshold: 2 });
-      await reviewCard.getByLabel("Clarification question and requested evidence").fill("Please provide the itemized synthetic invoice.");
-      await reviewAction("Send clarification");
       await expect(reviewCard.getByRole("button", { name: "Open voting for 24 hours" })).toBeDisabled();
 
       await login("holder");
@@ -531,6 +581,9 @@ test(journey, async ({ page }, info) => {
       await expect(reviewCard.getByText(/Corrected payable amount BDT 40.00/)).toBeVisible();
       const appeal = await reviewAction("File medical appeal");
       expect(appeal).toMatchObject({ claimVersion: 3, disputedDecisionId: disputed, medicalPriorReviewId: returned.id });
+      if (devLite && priorClaimId) {
+        expect(await asset("claim", claimId)).toMatchObject({ medicalDuplicateReview: true });
+      }
       const appealDocument = id("appeal-document");
       await uploadDocument(claimId, appealDocument, "APPEAL_DOCUMENT", newFile, 3);
 
@@ -564,6 +617,7 @@ test(journey, async ({ page }, info) => {
     });
 
     await test.step("pinned matching Oracle results and exactly one committed payout", async () => {
+      if (!governed) await attestRegistry();
       await login("insurer");
       if (!governed && !resumeClaim) {
       const request = await form("startClaimProcessing", { claimId });
@@ -595,7 +649,7 @@ test(journey, async ({ page }, info) => {
         expect(results.some(result => result.verificationCode.startsWith("XGB_AUTO:")), JSON.stringify(results)).toBe(true);
       }
       }
-      if (resumeClaim) {
+      if (finalPayment && resumeClaim) {
         expect(await asset("claim", claimId)).toMatchObject({ id: claimId, policyId: id("policy"), status: "SETTLEMENT_AUTHORIZED", amountMinor: 4000 });
         expect(await asset("settlement", id("settlement"))).toMatchObject({ claimId, sourceAccountId: id("reserve"),
           destinationAccountId: id("customer"), status: "PAYMENT_FAILED", amountMinor: 4000 });
@@ -646,6 +700,10 @@ test(journey, async ({ page }, info) => {
       expect(transfers).toHaveLength(finalPayment ? 2 : 1);
       await login("holder");
       expect(await asset("claim", claimId)).toMatchObject({ status: "SETTLED", amountMinor: 4000 });
+      if (devLite) {
+        const settled = await asset("settlement", id("settlement"));
+        expect(settled.approvalCertificateHash).toMatch(/^[a-f0-9]{64}$/);
+      }
       if (governed && priorClaimId) expect(await asset("claim", priorClaimId)).toMatchObject({ status: "SETTLED", amountMinor: 4000 });
       if (finalPayment) {
         const reference = id("independent-review");
@@ -670,6 +728,11 @@ test(journey, async ({ page }, info) => {
       }
       await info.attach("settled-workspace", { body: await page.screenshot(), contentType: "image/png" });
       expect(errors).toEqual([]);
+      if (devLite && finalPayment) {
+        const receipt = info.outputPath("routine-result.json");
+        await writeFile(receipt, JSON.stringify({ claimId, settlementId: id("settlement") }));
+        await info.attach("dev-lite-routine-result", { path: receipt, contentType: "application/json" });
+      }
     });
   } finally {
     await info.attach("fabric-rehearsal-journal", { body: JSON.stringify({ suffix, start, service, end, journal, errors }, null, 2), contentType: "application/json" });

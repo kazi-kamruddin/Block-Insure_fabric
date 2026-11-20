@@ -67,7 +67,18 @@ fixtures. The three baseline files have different source IDs and the same
 canonical root. Fault profiles alter one registry or one configured model so
 that divergent results are observable and repeatable.
 
-For the larger experiment, run this from `services/oracle-worker`:
+For the matched 5,000-record experiment, verify and build from Fabric's
+[local research dataset](../datasets/hybrid-v1/README.md). From the
+repository root, run:
+
+```powershell
+npm --prefix services/oracle-worker run verify:hybrid-archive
+npm --prefix services/oracle-worker run build:hybrid-comparison
+```
+
+The comparison run writes to a fresh subdirectory in ignored
+`data/research/`. For a different workload, run the generic builder
+from `services/oracle-worker`:
 
 ```powershell
 npm run build:hybrid-registries -- --input="C:/datasets/hybrid-primary.jsonl"
@@ -87,7 +98,7 @@ fault tolerance—not independent factual corroboration. Independent real source
 can later implement the same snapshot interface without changing the consensus
 contract.
 
-To run a worker against a generated replica, set `ORACLE_REGISTRY_PATH` before
+For an isolated research worker, set `ORACLE_REGISTRY_PATH` before
 starting its normal identity profile. For example, from `services/oracle-worker`:
 
 ```powershell

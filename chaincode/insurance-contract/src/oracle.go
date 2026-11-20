@@ -273,6 +273,13 @@ func (c *Contract) PublishOracleRegistrySnapshot(
 	rootHash, rulesVersion, rulesHash string,
 	recordCount int,
 ) (*OracleRegistrySnapshot, error) {
+	if usesMedicalApprovalCertificates(ctx) {
+		return nil, fmt.Errorf("medical registry proposal requires a hospital scope")
+	}
+	return c.publishOracleRegistrySnapshot(ctx, id, "", version, rootHash, rulesVersion, rulesHash, recordCount)
+}
+
+func (c *Contract) publishOracleRegistrySnapshot(ctx contractapi.TransactionContextInterface, id, hospitalID string, version int, rootHash, rulesVersion, rulesHash string, recordCount int) (*OracleRegistrySnapshot, error) {
 	publishedBy, err := requireIdentity(ctx, "InsurerMSP", "insurerAdmin")
 	if err != nil {
 		return nil, err
@@ -300,6 +307,9 @@ func (c *Contract) PublishOracleRegistrySnapshot(
 		AssetType: "oracleRegistrySnapshot", SchemaVersion: SchemaVersion, ID: id,
 		Version: version, RootHash: strings.ToLower(rootHash), RulesVersion: strings.TrimSpace(rulesVersion),
 		RulesHash: strings.ToLower(rulesHash), RecordCount: recordCount, PublishedBy: publishedBy, CreatedAt: now,
+	}
+	if hospitalID != "" {
+		snapshot.HospitalID, snapshot.Status = hospitalID, "PROPOSED"
 	}
 	if err := putState(ctx, "oracleRegistrySnapshot", id, snapshot); err != nil {
 		return nil, err
@@ -378,6 +388,11 @@ func (c *Contract) RequestOracleVerification(
 	snapshot, err := c.ReadOracleRegistrySnapshot(ctx, snapshotID)
 	if err != nil {
 		return nil, err
+	}
+	if usesMedicalApprovalCertificates(ctx) {
+		if err := requireActiveMedicalSnapshot(ctx, claim, snapshot); err != nil {
+			return nil, err
+		}
 	}
 	if invoiceFlow && snapshot.RulesVersion != "hospital-invoice-rules-v2" {
 		return nil, fmt.Errorf("invoice claims require a current Hospital registry using hospital-invoice-rules-v2")
@@ -707,7 +722,8 @@ func (c *Contract) finalizeOracleRequest(ctx contractapi.TransactionContextInter
 	if verified {
 		request.Status = "CONSENSUS"
 		claim.Status = "APPROVED"
-		if claim.EpisodeID != "" && (claim.CurrentAppealID != "" || claim.MedicalSupplementHash != "") {
+		if claim.EpisodeID != "" && (claim.CurrentAppealID != "" || claim.MedicalSupplementHash != "" ||
+			(usesMedicalApprovalCertificates(ctx) && requiresMedicalPanel(claim))) {
 			claim.Status = "MEDICAL_REVIEW_REQUIRED"
 		} else if claim.CurrentAppealID != "" {
 			appeal, err := c.ReadClaimAppeal(ctx, claim.CurrentAppealID)
@@ -725,6 +741,11 @@ func (c *Contract) finalizeOracleRequest(ctx contractapi.TransactionContextInter
 	} else {
 		request.Status = "FAILED"
 		claim.Status = "ORACLE_FAILED"
+	}
+	if usesMedicalApprovalCertificates(ctx) && claim.EpisodeID != "" && claim.Status == "APPROVED" {
+		if err := c.recordMedicalApproval(ctx, claim, request, nil); err != nil {
+			return err
+		}
 	}
 	if err := overwriteAsset(ctx, "oracleRequest", request.ID, request); err != nil {
 		return err

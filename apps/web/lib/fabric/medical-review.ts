@@ -8,6 +8,7 @@ const hash = z.string().regex(/^[a-f0-9]{64}$/);
 const optionalHash = z.union([hash, z.literal("")]);
 const message = z.string().trim().min(1).max(2000);
 export const medicalReviewCommand = z.discriminatedUnion("action", [
+  z.strictObject({ action: z.literal("escalate"), claimId: id }),
   z.strictObject({ action: z.literal("prepare"), claimId: id, reviewId: id, prepareBy: date }),
   z.strictObject({ action: z.literal("open"), reviewId: id, deadline: date }),
   z.strictObject({ action: z.literal("recover"), reviewId: id, newId: id, prepareBy: date }),
@@ -37,6 +38,7 @@ export type MedicalClarification = {
 export type MedicalEvidenceCheck = { reviewId: string; evidenceId: string; grantId: string; auditorId: string; checkedAt: string };
 export type MedicalReviewFacts = { service: string; serviceDate: string; termsHash: string; quote: MedicalQuote };
 export type MedicalReviewView = {
+  devLite?: boolean;
   claim: Claim; review: ClaimReview | null; appeal: ClaimAppeal | null; clarification: MedicalClarification | null;
   appealExplanation: string | null;
   facts: MedicalReviewFacts;

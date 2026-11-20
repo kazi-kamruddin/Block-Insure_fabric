@@ -41,6 +41,14 @@ func (c *Contract) PrepareMedicalReview(ctx contractapi.TransactionContextInterf
 	if request.ClaimVersion != claim.Version || (request.Status != "FAILED" && request.Status != "CONSENSUS") {
 		return nil, fmt.Errorf("current verification has not finished")
 	}
+	panel, err := c.medicalReviewPanel(ctx, claim)
+	if err != nil {
+		return nil, err
+	}
+	return c.createMedicalPreparation(ctx, claim, reviewID, prepareBy, panel)
+}
+
+func (c *Contract) medicalReviewPanel(ctx contractapi.TransactionContextInterface, claim *Claim) ([]string, error) {
 	panel := medicalPanel
 	if claim.CurrentAppealID != "" {
 		appeal, err := c.ReadClaimAppeal(ctx, claim.CurrentAppealID)
@@ -53,7 +61,7 @@ func (c *Contract) PrepareMedicalReview(ctx contractapi.TransactionContextInterf
 		}
 		panel = prior.AssignedAuditorIDs
 	}
-	return c.createMedicalPreparation(ctx, claim, reviewID, prepareBy, panel)
+	return panel, nil
 }
 
 func (c *Contract) createMedicalPreparation(ctx contractapi.TransactionContextInterface, claim *Claim, reviewID, prepareBy string, panel []string) (*ClaimReview, error) {
@@ -107,12 +115,21 @@ func (c *Contract) currentMedicalReview(ctx contractapi.TransactionContextInterf
 }
 
 func (c *Contract) OpenMedicalVoting(ctx contractapi.TransactionContextInterface, reviewID, deadline string) (*ClaimReview, error) {
-	if _, err := requireIdentity(ctx, "InsurerMSP", "insurerAdmin"); err != nil {
-		return nil, err
-	}
 	review, claim, err := c.currentMedicalReview(ctx, reviewID)
 	if err != nil {
 		return nil, err
+	}
+	if _, err := requireIdentity(ctx, "InsurerMSP", "insurerAdmin"); err != nil {
+		if !usesMedicalApprovalCertificates(ctx) || claim.MedicalEscalatedAt == "" {
+			return nil, err
+		}
+		if _, auditorErr := requireIdentity(ctx, "AuditorMSP", "auditor"); auditorErr != nil {
+			return nil, auditorErr
+		}
+		subject, subjectErr := callerSubject(ctx)
+		if subjectErr != nil || !containsAssignment(review.AssignedAuditorIDs, subject) {
+			return nil, fmt.Errorf("assigned auditor required to open escalated review")
+		}
 	}
 	if review.Status != "PREPARING" {
 		return nil, fmt.Errorf("review is not in access preparation")

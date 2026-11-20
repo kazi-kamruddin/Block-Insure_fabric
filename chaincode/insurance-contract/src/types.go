@@ -275,6 +275,8 @@ type Liability struct {
 }
 
 type Claim struct {
+	MedicalDuplicateReview    bool     `json:"medicalDuplicateReview,omitempty" metadata:",optional"`
+	MedicalEscalatedAt        string   `json:"medicalEscalatedAt,omitempty" metadata:",optional"`
 	MedicalClarificationID    string   `json:"medicalClarificationId"`
 	MedicalRecoveryUsed       bool     `json:"medicalRecoveryUsed"`
 	MedicalRevisionKind       string   `json:"medicalRevisionKind"`
@@ -393,6 +395,10 @@ type SelectiveDisclosurePresentation struct {
 }
 
 type OracleRegistrySnapshot struct {
+	HospitalID    string `json:"hospitalId,omitempty" metadata:",optional"`
+	Status        string `json:"status,omitempty" metadata:",optional"`
+	AttestedBy    string `json:"attestedBy,omitempty" metadata:",optional"`
+	AttestedAt    string `json:"attestedAt,omitempty" metadata:",optional"`
 	AssetType     string `json:"assetType"`
 	SchemaVersion int    `json:"schemaVersion"`
 	ID            string `json:"id"`
@@ -665,21 +671,22 @@ type FraudAssessment struct {
 }
 
 type Settlement struct {
-	AssetType            string `json:"assetType"`
-	SchemaVersion        int    `json:"schemaVersion"`
-	ID                   string `json:"id"`
-	ClaimID              string `json:"claimId"`
-	SourceAccountID      string `json:"sourceAccountId"`
-	DestinationAccountID string `json:"destinationAccountId"`
-	TransferID           string `json:"transferId"`
-	AmountMinor          int64  `json:"amountMinor"`
-	Currency             string `json:"currency"`
-	Status               string `json:"status"`
-	FailureCode          string `json:"failureCode"`
-	BankReferenceHash    string `json:"bankReferenceHash"`
-	AuthorizedAt         string `json:"authorizedAt"`
-	ConfirmedAt          string `json:"confirmedAt"`
-	UpdatedAt            string `json:"updatedAt"`
+	ApprovalCertificateHash string `json:"approvalCertificateHash,omitempty" metadata:",optional"`
+	AssetType               string `json:"assetType"`
+	SchemaVersion           int    `json:"schemaVersion"`
+	ID                      string `json:"id"`
+	ClaimID                 string `json:"claimId"`
+	SourceAccountID         string `json:"sourceAccountId"`
+	DestinationAccountID    string `json:"destinationAccountId"`
+	TransferID              string `json:"transferId"`
+	AmountMinor             int64  `json:"amountMinor"`
+	Currency                string `json:"currency"`
+	Status                  string `json:"status"`
+	FailureCode             string `json:"failureCode"`
+	BankReferenceHash       string `json:"bankReferenceHash"`
+	AuthorizedAt            string `json:"authorizedAt"`
+	ConfirmedAt             string `json:"confirmedAt"`
+	UpdatedAt               string `json:"updatedAt"`
 }
 
 type HistoryRecord struct {
