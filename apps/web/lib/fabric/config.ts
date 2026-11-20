@@ -13,6 +13,7 @@ export const fabricRoles = [
 export type FabricRole = (typeof fabricRoles)[number];
 
 const environmentSchema = z.object({
+  FABRIC_DEV_LITE_BANK_CUSTODY: z.enum(["gateway", "external"]).default("gateway"),
   FABRIC_NETWORK_ROOT: z.string().trim().min(1).optional(),
   FABRIC_CHANNEL_NAME: z.string().trim().min(1).default("insurance-channel"),
   FABRIC_CHAINCODE_NAME: z.string().trim().min(1).default("insurance-contract"),
@@ -87,6 +88,8 @@ export function loadFabricConfig(environment: NodeJS.ProcessEnv = process.env) {
     networkRoot,
     channelName: values.FABRIC_CHANNEL_NAME,
     chaincodeName: values.FABRIC_CHAINCODE_NAME,
+    externalBankCustody: values.FABRIC_CHANNEL_NAME === medicalDevLiteChannel &&
+      values.FABRIC_DEV_LITE_BANK_CUSTODY === "external",
     deadlines: {
       evaluate: values.FABRIC_EVALUATE_DEADLINE_SECONDS,
       endorse: values.FABRIC_ENDORSE_DEADLINE_SECONDS,
