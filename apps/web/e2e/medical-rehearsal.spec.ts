@@ -532,9 +532,10 @@ test(journey, async ({ page }, info) => {
         await loadReview(claimId);
         expect(await reviewAction("Grant listed evidence to these four reviewers")).toHaveLength(8);
         const remote: string[] = [];
+        const applicationOrigin = new URL(page.url()).origin;
         page.context().on("request", request => {
           const url = new URL(request.url());
-          if (url.protocol.startsWith("http") && url.origin !== "http://127.0.0.1:3210") remote.push(url.hostname);
+          if (url.protocol.startsWith("http") && url.origin !== applicationOrigin) remote.push(url.hostname);
         });
         await confirmReviewDocuments(claimId, [pdf, jpeg], { [pdf]: "MED-250", [jpeg]: "MED-251" }, 1);
         expect(remote).toEqual([]);

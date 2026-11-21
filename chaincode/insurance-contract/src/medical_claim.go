@@ -295,8 +295,14 @@ func (c *Contract) medicalCorrectionFacts(ctx contractapi.TransactionContextInte
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
-	if claim.EpisodeID == "" || claim.Status == "SETTLED" || revision < claim.EpisodeRevision {
+	if claim.EpisodeID == "" || claim.Status == "SETTLED" || claim.MedicalReserveReleasedAt != "" || revision < claim.EpisodeRevision {
 		return nil, nil, nil, nil, fmt.Errorf("only an unpaid claim with a current episode revision can be corrected")
+	}
+	// Only the certificate channel can supersede an unpaid settlement and its
+	// liability. Elsewhere a correction would orphan both and leave the claim
+	// unable to settle, so refuse it before any state changes.
+	if claim.MedicalSettlementID != "" && !usesMedicalApprovalCertificates(ctx) {
+		return nil, nil, nil, nil, fmt.Errorf("a settlement is already authorized for this claim; complete or reconcile it before correcting")
 	}
 	_, episode, quote, coverage, err := c.medicalFacts(ctx, claim.PolicyID, claim.EpisodeID, revision, claim.AmountMinor, claim.CreatedAt)
 	if err == nil && revision == claim.EpisodeRevision {

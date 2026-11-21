@@ -280,6 +280,7 @@ export type Claim = {
   medicalRevisionKind?: "CORRECTION" | "APPEAL" | "CLARIFICATION" | "";
   medicalSettlementId?: string;
   medicalEscalatedAt?: string;
+  medicalReservationReleasedAt?: string;
   medicalClarificationId?: string;
   medicalRecoveryUsed?: boolean;
   medicalSupplementHash?: string;

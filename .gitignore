@@ -3,6 +3,8 @@ node_modules/
 .next/
 dist/
 coverage/
+__pycache__/
+*.py[cod]
 /data/evidence/
 /data/events/
 /data/oracle/
@@ -19,10 +21,6 @@ coverage/
 /data/evidence-workflow/
 /data/events-workflow/
 /data/oracle-workflow/
-/data/oracle-alignment-20261108/
-/data/events-alignment-20261108/
-/data/evidence-alignment-20261108/
-/data/otp-alignment-20261108/
 /data/oracle-alignment-20261108/
 /data/events-alignment-20261108/
 /data/evidence-alignment-20261108/
@@ -121,4 +119,3 @@ MEMORY.md
 *.handoff.md
 /data/dev-lite/
 /data/dev-lite-couchdb/
-/data/dev-lite/

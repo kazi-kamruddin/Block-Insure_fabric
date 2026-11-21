@@ -4,7 +4,7 @@ import { useState } from "react";
 import { StatusBadge } from "@/components/status-badge";
 import { MedicalTimeline } from "@/components/medical-timeline";
 import { sha256Hex } from "@/lib/evidence/browser-crypto";
-import { medicalReasonLabels, type MedicalReviewCommand, type MedicalReviewView } from "@/lib/fabric/medical-review";
+import { medicalReasonLabels, medicalReleaseAvailableAt, type MedicalReviewCommand, type MedicalReviewView } from "@/lib/fabric/medical-review";
 import type { MedicalQuote } from "@/lib/fabric/medical";
 import { researchFindings } from "@/lib/fabric/research-finding";
 
@@ -78,6 +78,23 @@ export function MedicalReview({ role, onEvidence, investigationEnabled = false }
     const body = await response.json();
     if (!response.ok) throw new Error(body.message);
     setQuote(body.quote);
+  }
+
+  function reservationPanel() {
+    if (!view || !review) return null;
+    const reserved = `BDT ${(view.claim.amountMinor / 100).toFixed(2)}`;
+    if (view.claim.medicalReservationReleasedAt) {
+      return <div className="medicalSubpanel"><p>{reserved} of reserved cover was returned to the policy on {new Date(view.claim.medicalReservationReleasedAt).toLocaleString()}. This rejection is final.</p></div>;
+    }
+    const availableAt = medicalReleaseAvailableAt(view.claim, review);
+    const waiting = availableAt !== null && availableAt.getTime() > (view.readAt ?? 0);
+    return <div className="medicalSubpanel">
+      <p>{reserved} of policy cover stays reserved while an appeal or procedural recovery can still change this rejection.
+        {waiting ? ` It can be returned after ${availableAt.toLocaleString()}.` : " No further appeal or recovery is available, so it can be returned now."}</p>
+      {!waiting && <div className="medicalButtonGroup">
+        <button type="button" className="secondary button" disabled={busy} onClick={() => work(() => send({ action: "release", claimId: view.claim.id }))}>Return reserved cover to the policy</button>
+      </div>}
+    </div>;
   }
 
   return <article className="workCard workCardWide" id="medical-review">
@@ -218,6 +235,7 @@ export function MedicalReview({ role, onEvidence, investigationEnabled = false }
         {view.appeal?.evidenceHash && view.claim.status === "APPEAL_SUBMITTED" && <p className="evidenceWarning">Upload the committed file below as APPEAL_DOCUMENT before re-verification.</p>}
         {view.claim.medicalSupplementHash && view.claim.status === "APPEAL_SUBMITTED" && <p className="evidenceWarning">Also upload the committed CLARIFICATION_DOCUMENT for the new response.</p>}
       </>}
+      {view.devLite && role !== "auditor" && review && view.claim.status === "REJECTED" && reservationPanel()}
       {role === "auditor" && review?.status === "OPEN" && <div className="medicalSubpanel">
         <label>Decision reason<select value={reason} onChange={event => setReason(event.target.value as ReasonCode)}>
           {(Object.keys(medicalReasonLabels) as ReasonCode[]).map(code => <option key={code} value={code}>{medicalReasonLabels[code]}</option>)}

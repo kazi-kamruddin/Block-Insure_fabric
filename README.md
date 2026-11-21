@@ -16,7 +16,7 @@ An opt-in frozen XGBoost alignment candidate is under verification; see
 [its input contract and verification boundaries](docs/frozen-xgboost-alignment.md).
 It is not activated on preserved channels. Existing research results do not
 validate the new evaluator or establish real-patient classification accuracy.
-The current isolated candidate is1.6.3-xgb-alignment/sequence4. Its
+The current isolated candidate is 1.6.3-xgb-alignment/sequence 4. Its
 [recovery/security guide](docs/workflow-recovery-and-security.md) and
 [dated verification record](docs/results/recovery-security-2026-11-10.md)
 track durable critical actions, the patched Go builder and provider failure
@@ -39,7 +39,8 @@ tracks Bank commit recovery, private patient matching, separate insurer
 investigation outcomes and live challenger shadow scoring.
 The [dev-lite medical runbook](docs/dev-lite-medical.md#operator-rehearsal)
 covers the current claim and Bank timelines and the three synthetic rehearsals
-on the isolated 1.9.0 channel.
+on the isolated 1.9.0 channel. The [1.9.0 maintenance run summary](docs/results/RUN-SUMMARY.md)
+lists each 1.9.0 item with its scope, evidence and stated limitations.
 
 The original implementation areas and the policy/premium/benefit expansion are
 joined by a certificate-bound 2-of-3 Oracle consensus subsystem. The source now
@@ -62,7 +63,7 @@ The preserved October workflow demonstration uses a separate
 Select it explicitly with `scripts/workflow-demo.ps1 Start -Profile Historical`.
 The wrapper now defaults to the verified November candidate. Use the
 [presentation runbook](docs/local-demonstration.md) for the current isolated
-candidate and keep its application/package/schema aligned. The earlier3 October hardening gate is
+candidate and keep its application/package/schema aligned. The earlier 3 October hardening gate is
 recorded in [the dated live record](docs/results/hardening-live-20261003.md).
 The default local environment file still selects the older main channel; select
 the isolated candidate environment explicitly for current alignment verification.

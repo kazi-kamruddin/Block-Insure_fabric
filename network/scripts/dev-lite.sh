@@ -39,6 +39,14 @@ if ! command -v docker >/dev/null || ! docker info >/dev/null 2>&1; then
   done
 fi
 compose() { "$docker_cli" compose --project-name "$project" "${compose_files[@]}" "$@"; }
+compose_start() {
+  if [[ "$profile" == --dev-lite ]]; then
+    # Retain existing containers and their mounts even when rendered settings differ.
+    compose up -d --no-recreate "$@"
+  else
+    compose up -d "$@"
+  fi
+}
 retry() {
   local i
   for i in {1..30}; do
@@ -84,7 +92,7 @@ ca_ready() {
 bootstrap() {
   mkdir -p "$state"/{config,channel-artifacts}
   if [[ ! -f "$state/enrollment-complete" ]]; then
-    compose up -d "${cas[@]}"
+    compose_start "${cas[@]}"
     trap 'compose stop "${cas[@]}"' EXIT
     for i in "${!cas[@]}"; do retry ca_ready "${cas[i]#ca-}" "$((31054+i*100))"; done
     bash "$here/enroll-identities.sh" "$profile"
@@ -161,11 +169,11 @@ up() {
     command -v "$tool" >/dev/null || die "Missing prerequisite: $tool"
   done
   bootstrap
-  compose up -d orderer
+  compose_start orderer
   retry orderer_admin list
   if ! orderer_joined; then orderer_admin join --channelID "$channel" --config-block "$block"; fi
   for i in "${!orgs[@]}"; do
-    compose up -d "peer-${orgs[i]}"
+    compose_start "peer-${orgs[i]}"
     peer_context "$i"
     retry peer channel list
     if ! peer channel getinfo -c "$channel" >/dev/null 2>&1; then peer channel join -b "$block"; fi
@@ -177,7 +185,7 @@ case "${1:-}" in
   up) up ;;
   deploy) deploy ;;
   verify) verify ;;
-  ca-start) compose up -d "${cas[@]}" ;;
+  ca-start) compose_start "${cas[@]}" ;;
   ca-stop) compose stop "${cas[@]}" ;;
   stop) compose stop; drain -CoreOnly ;;
   teardown)

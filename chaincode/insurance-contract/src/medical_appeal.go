@@ -59,6 +59,9 @@ func (c *Contract) SubmitMedicalAppeal(ctx contractapi.TransactionContextInterfa
 	if review.Status != "REJECTED" {
 		return nil, fmt.Errorf("procedural failures use recovery, not an appeal")
 	}
+	if err := requireOpenMedicalRejection(ctx, review, claim); err != nil {
+		return nil, err
+	}
 	decision, err := getState[AuditorDecision](ctx, "auditorDecision", decisionID)
 	if err != nil {
 		return nil, err
@@ -173,6 +176,13 @@ func (c *Contract) QuoteMedicalAppeal(ctx contractapi.TransactionContextInterfac
 	}
 	if claim.Status != "REJECTED" || revision <= claim.EpisodeRevision {
 		return nil, fmt.Errorf("a newer revision for a rejected claim is required")
+	}
+	review, _, err := c.currentMedicalReview(ctx, claim.CurrentReviewID)
+	if err != nil {
+		return nil, err
+	}
+	if err := requireOpenMedicalRejection(ctx, review, claim); err != nil {
+		return nil, err
 	}
 	_, _, quote, _, err := c.medicalFacts(ctx, claim.PolicyID, claim.EpisodeID, revision, claim.AmountMinor, claim.CreatedAt)
 	return quote, err

@@ -48,6 +48,16 @@ describe("Fabric event projection", () => {
     expect(once.countsByName.ClaimSubmitted).toBe(1);
   });
 
+  it("notifies the claimant and insurer when a rejected claim's cover is released", () => {
+    const projection = applyFabricEvent(emptyEventProjection(), {
+      id: "10:tx-release:MedicalReservationReleased", blockNumber: "10", transactionId: "tx-release", eventName: "MedicalReservationReleased",
+      payload: { id: "claim-rejected", claimantId: "owner", medicalReservationReleasedAt: "2026-10-06T12:00:00Z" },
+    }, "2026-10-06T12:00:01Z");
+    expect(notificationsFor(projection, "policyholder", "owner")).toHaveLength(1);
+    expect(notificationsFor(projection, "policyholder", "another-holder")).toHaveLength(0);
+    expect(notificationsFor(projection, "insurerAdmin")).toEqual([expect.objectContaining({ assetId: "claim-rejected" })]);
+  });
+
   it("routes review notifications only to assigned certificate subjects", () => {
     const projection = applyFabricEvent(emptyEventProjection(), {
       id: "8:tx-2:ClaimReviewOpened", blockNumber: "8", transactionId: "tx-2", eventName: "ClaimReviewOpened",

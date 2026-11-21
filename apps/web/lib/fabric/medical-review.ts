@@ -10,6 +10,7 @@ const optionalHash = z.union([hash, z.literal("")]);
 const message = z.string().trim().min(1).max(2000);
 export const medicalReviewCommand = z.discriminatedUnion("action", [
   z.strictObject({ action: z.literal("escalate"), claimId: id }),
+  z.strictObject({ action: z.literal("release"), claimId: id }),
   z.strictObject({ action: z.literal("prepare"), claimId: id, reviewId: id, prepareBy: date }),
   z.strictObject({ action: z.literal("open"), reviewId: id, deadline: date }),
   z.strictObject({ action: z.literal("recover"), reviewId: id, newId: id, prepareBy: date }),
@@ -26,6 +27,19 @@ export const medicalReviewCommand = z.discriminatedUnion("action", [
     sourceHash: hash, suggestionsHash: hash, confirmedHash: hash, lowConfidence: z.boolean(), accessId: z.union([id, z.literal("")]) }),
 ]);
 export type MedicalReviewCommand = z.infer<typeof medicalReviewCommand>;
+
+/** Mirrors the chaincode `medicalAppealWindow` on the certificate channel. */
+export const medicalAppealWindowDays = 30;
+
+/**
+ * When a rejected claim's coverage reservation may be released: now (null)
+ * once no appeal or recovery remains, otherwise when the window closes. The
+ * chaincode decides with transaction time; this is display guidance only.
+ */
+export function medicalReleaseAvailableAt(claim: Pick<Claim, "appealCount" | "medicalRecoveryUsed">, review: Pick<ClaimReview, "status" | "closedAt">): Date | null {
+  const remaining = review.status === "REJECTED" ? claim.appealCount < 1 : !claim.medicalRecoveryUsed;
+  return remaining ? new Date(Date.parse(review.closedAt) + medicalAppealWindowDays * 86_400_000) : null;
+}
 export const medicalReasonLabels = {
   TERMS_AND_EVIDENCE_SUPPORT: "The issued terms and evidence support reimbursement",
   EVIDENCE_DOES_NOT_SUPPORT_SERVICE: "The evidence does not establish the covered service",
@@ -40,6 +54,8 @@ export type MedicalEvidenceCheck = { reviewId: string; evidenceId: string; grant
 export type MedicalReviewFacts = { service: string; serviceDate: string; termsHash: string; quote: MedicalQuote };
 export type MedicalReviewView = {
   devLite?: boolean;
+  /** Server clock when the view was read, in epoch milliseconds. */
+  readAt?: number;
   timeline?: MedicalTimeline;
   claim: Claim; review: ClaimReview | null; appeal: ClaimAppeal | null; clarification: MedicalClarification | null;
   appealExplanation: string | null;

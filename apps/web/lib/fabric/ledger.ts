@@ -157,6 +157,7 @@ export const ledger = {
     switch (input.action) {
       case "prepare": return write("PrepareMedicalReview", input.claimId, input.reviewId, input.prepareBy);
       case "escalate": return write("EscalateStalledMedicalClaim", input.claimId);
+      case "release": return write("ReleaseMedicalReservation", input.claimId);
       case "open": return write("OpenMedicalVoting", input.reviewId, input.deadline);
       case "recover": return write("RecoverMedicalReview", input.reviewId, input.newId, input.prepareBy);
       case "expire": return write("FinalizeExpiredReview", input.reviewId);

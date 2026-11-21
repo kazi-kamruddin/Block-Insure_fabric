@@ -53,7 +53,7 @@ critical actions now use saved intent and a durable commit-status journal. The
 request, custody, layout-compatibility and activation boundaries. Select the
 patched builder image before isolated startup; no preserved channel is upgraded.
 
-The earlier isolated1.6.2/sequence3 package superseded earlier1.6.0/1 and intermediate
+The earlier isolated 1.6.2/sequence 3 package superseded earlier 1.6.0/1 and intermediate
 1.6.1/2; keep their archives and history. Only bank_transfers.go runtime changed:
 exact already-collected installment reconciliation and a distinct non-financial
 event. Model/evaluator, schema, quorum, endorsement and PDC membership remain

@@ -131,3 +131,7 @@ jobs:
         run: node formal/insurance-workflow/check-model.mjs
       - name: Test research statistics and security cases
         run: node --test benchmarks/comparative/statistics.test.mjs benchmarks/security-evaluation/cases.test.mjs scripts/check-go-vulnerabilities.test.mjs scripts/start-background-node.test.mjs
+      - name: Test Bank operator signer approval
+        run: node --test tools/bank-signer/confirmation.test.mjs
+      - name: Test independent dossier verifier
+        run: python3 -B -m unittest discover -s tools/verify-dossier -p 'test_*.py'

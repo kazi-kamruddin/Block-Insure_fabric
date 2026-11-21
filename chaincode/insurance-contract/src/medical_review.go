@@ -246,6 +246,9 @@ func (c *Contract) RecoverMedicalReview(ctx contractapi.TransactionContextInterf
 	if claim.Status != "REJECTED" || (prior.Status != "TIMED_OUT" && prior.Status != "ACCESS_FAILED") || claim.MedicalRecoveryUsed {
 		return nil, fmt.Errorf("no procedural recovery is available")
 	}
+	if err := requireOpenMedicalRejection(ctx, prior, claim); err != nil {
+		return nil, err
+	}
 	claim.MedicalRecoveryUsed = true
 	return c.createMedicalPreparation(ctx, claim, newID, prepareBy, prior.AssignedAuditorIDs)
 }

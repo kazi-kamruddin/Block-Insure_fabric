@@ -279,6 +279,7 @@ type Claim struct {
 	MedicalHeldReleaseID        string   `json:"medicalHeldReleaseId,omitempty" metadata:",optional"`
 	MedicalDuplicateReview      bool     `json:"medicalDuplicateReview,omitempty" metadata:",optional"`
 	MedicalEscalatedAt          string   `json:"medicalEscalatedAt,omitempty" metadata:",optional"`
+	MedicalReserveReleasedAt    string   `json:"medicalReservationReleasedAt,omitempty" metadata:",optional"`
 	MedicalClarificationID      string   `json:"medicalClarificationId"`
 	MedicalRecoveryUsed         bool     `json:"medicalRecoveryUsed"`
 	MedicalRevisionKind         string   `json:"medicalRevisionKind"`

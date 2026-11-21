@@ -10,6 +10,7 @@ import { medicalReviewCommand, type MedicalReviewCommand } from "@/lib/fabric/me
 import { isMedicalChannel, medicalDevLiteChannel } from "@/lib/fabric/medical-channel";
 import { buildMedicalTimeline, hasFinalMedicalApproval } from "@/lib/fabric/medical-timeline";
 import { checkMutationOrigin } from "@/lib/security/request-origin";
+import { visibleDecisions } from "@/lib/fabric/vote-visibility";
 
 export const dynamic = "force-dynamic";
 const reply = (body: unknown, status = 200) => NextResponse.json(body, { status, headers: { "Cache-Control": "private, no-store" } });
@@ -47,23 +48,24 @@ export async function GET(request: Request) {
       Promise.all(claim.evidenceIds.map(id => ledger.readEvidenceReference(id))),
       review ? ledger.listEvidenceAccessGrants() : [],
       review ? ledger.listMedicalEvidenceChecks(review.id) : [],
-      review && (session.role !== "auditor" || review.status !== "OPEN") ? ledger.listAuditorDecisions() : [],
+      review ? ledger.listAuditorDecisions() : [],
       ledger.readMedicalReviewFacts(claim.id),
       devLite && claim.currentOracleRequestId ? ledger.readOracleRequest(claim.currentOracleRequestId) : null,
       devLite && hasFinalMedicalApproval(claim) ? ledger.readMedicalApprovalCertificate(claim.id, claim.version) : null,
       devLite && claim.medicalSettlementId ? ledger.readSettlement(claim.medicalSettlementId) : null,
     ]);
+    const readAt = Date.now();
     const timeline = devLite ? buildMedicalTimeline({ claim,
       review: review?.medicalVersion === claim.version ? review : null,
-      clarification, appeal, documents, grants, checks, readAt: Date.now(),
+      clarification, appeal, documents, grants, checks, readAt,
       oracle: oracle?.claimVersion === claim.version ? oracle : null,
       certificate, settlement: settlement?.approvalCertificateHash === certificate?.hash ? settlement : null,
     }) : undefined;
-    return reply({ claim, review, appeal, clarification, documents, facts, devLite, timeline,
+    return reply({ claim, review, appeal, clarification, documents, facts, devLite, readAt, timeline,
       appealExplanation: appeal ? await ledger.readMedicalAppealExplanation(session.role === "policyholder" ? session.role : "insurerAdmin", appeal.id) : null,
       grants: grants.filter(grant => grant.medicalReviewId === review?.id && (session.role !== "auditor" || grant.granteeSubject === session.subjectId)),
       checks: checks.filter(check => session.role !== "auditor" || check.auditorId === session.subjectId),
-      decisions: decisions.filter(decision => decision.reviewId === review?.id) });
+      decisions: review ? visibleDecisions(decisions.filter(decision => decision.reviewId === review.id), [review], session) : [] });
   } catch {
     return reply({ message: "Medical case or current quote is unavailable" }, 409);
   }
@@ -77,6 +79,7 @@ const permissions = {
 function allowed(action: MedicalReviewCommand, role: ReviewRole) {
   if (action.action === "respond") return role === (action.response === "EXPIRED" ? "insurerAdmin" : "policyholder");
   if (action.action === "recordOCR") return role === "policyholder" || role === "auditor";
+  if (action.action === "release") return role === "policyholder" || role === "insurerAdmin"; // Chaincode checks ownership and finality.
   if (action.action === "open" && role === "auditor") return true; // Chaincode checks escalation and assignment.
   return permissions[action.action] === role;
 }
@@ -88,7 +91,7 @@ export async function POST(request: Request) {
   const session = await currentSession().catch(() => null);
   const input = medicalReviewCommand.safeParse(await request.json().catch(() => null));
   if (!input.success) return reply({ message: "Check the medical workflow fields" }, 400);
-  if ((input.data.action === "escalate" || (input.data.action === "open" && session?.role === "auditor")) &&
+  if ((input.data.action === "escalate" || input.data.action === "release" || (input.data.action === "open" && session?.role === "auditor")) &&
       loadFabricConfig().channelName !== medicalDevLiteChannel) return reply({ message: "Action unavailable on this channel" }, 404);
   if (!session || !reviewRole(session.role) || !allowed(input.data, session.role)) return reply({ message: "This role cannot perform that action" }, 403);
   try {

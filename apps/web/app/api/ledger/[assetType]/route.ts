@@ -3,6 +3,7 @@ import { z } from "zod";
 import { currentSession } from "@/lib/auth/current-session";
 import { findDemoAccount } from "@/lib/auth/accounts";
 import { ledger } from "@/lib/fabric/ledger";
+import { visibleDecisions } from "@/lib/fabric/vote-visibility";
 
 const assetTypeSchema = z.enum(["partner-agreement", "hospital-invoice", "package", "policy", "claim", "evidence", "evidence-batch", "evidence-grant", "verification", "decision", "review", "appeal", "fraud-assessment", "settlement", "access", "account", "bank-transfer", "mandate", "premium-payment", "premium-adjustment", "collection", "benefit-plan", "beneficiaries", "benefit-request", "liability", "oracle-snapshot", "oracle-request", "oracle-commitment", "oracle-result", "privacy-credential", "privacy-presentation"]);
 type RouteContext = { params: Promise<{ assetType: string }> };
@@ -159,9 +160,9 @@ export async function GET(_request: Request, context: RouteContext) {
         break;
       }
       case "decision": {
-        const decisions = await ledger.listAuditorDecisions();
+        const [decisions, reviews] = await Promise.all([ledger.listAuditorDecisions(), ledger.listClaimReviews()]);
         const claimIds = await visibleClaimIds();
-        result = claimIds ? decisions.filter((item) => claimIds.has(item.claimId)) : decisions;
+        result = visibleDecisions(claimIds ? decisions.filter((item) => claimIds.has(item.claimId)) : decisions, reviews, session);
         break;
       }
       case "review": {

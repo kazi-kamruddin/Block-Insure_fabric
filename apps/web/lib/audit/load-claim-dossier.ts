@@ -4,6 +4,7 @@ import { ledger } from "@/lib/fabric/ledger";
 import { loadFabricConfig } from "@/lib/fabric/config";
 import { medicalDevLiteChannel } from "@/lib/fabric/medical-channel";
 import { hasFinalMedicalApproval } from "@/lib/fabric/medical-timeline";
+import { visibleDecisions } from "@/lib/fabric/vote-visibility";
 import { buildEvidenceMerkleTree, evidenceLeafHash } from "@/lib/evidence/merkle";
 import type {
   AuditorDecision,
@@ -113,8 +114,9 @@ export async function loadClaimAuditDossier(claimId: string, auditorSubject?: st
     oracleCommitments: allOracleCommitments.filter((item) => item.claimId === claimId),
     oracleResults: allOracleResults.filter((item) => item.claimId === claimId),
     oracleRegistrySnapshots: allOracleSnapshots.filter((snapshot) => allOracleRequests.some((request) => request.claimId === claimId && request.registrySnapshotId === snapshot.id)),
-    auditorDecisions: allDecisions.filter(item => item.claimId === claimId &&
-      (!auditorMedicalExport || exportRoundIds.has(item.reviewId))),
+    auditorDecisions: visibleDecisions(allDecisions.filter(item => item.claimId === claimId &&
+      (!auditorMedicalExport || exportRoundIds.has(item.reviewId))), allReviews,
+      auditorSubject === undefined ? { role: "insurerAdmin" } : { role: "auditor", subjectId: auditorSubject }),
     reviewRounds,
     appeals: allAppeals.filter((item) => item.claimId === claimId),
     fraudAssessments: allFraudAssessments.filter((item) => item.claimId === claimId),

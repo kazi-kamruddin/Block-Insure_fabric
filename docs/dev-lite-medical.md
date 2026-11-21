@@ -5,6 +5,17 @@ deployment has a separate channel, package, identities and storage.
 
 In Ubuntu/WSL, with Docker Desktop running, start the isolated profile:
 
+LevelDB `up` and `ca-start` reuse existing service containers and their volumes.
+Compose settings such as the builder image apply when a missing container is
+created. Existing containers start with their stored settings.
+
+On 21 November, a LevelDB start and stop with deliberately different rendered
+peer settings preserved all 12 existing Compose container IDs and six named
+volume mounts. All five peers read back the retained 1.9.0 sequence-5 ledger.
+Fabric replaced its five peer-managed chaincode runtime containers during the
+cycle. The accepted 1.8.0 and CouchDB profiles stayed stopped. The local evidence is
+`data/dev-lite/startup-preservation-20261121/summary.json`.
+
 ```bash
 DEV_LITE_CHAINCODE_BUILDER=block-insure/fabric-ccenv:2.5.16-go1.26.11 \
   bash network/scripts/network.sh --dev-lite up
@@ -208,3 +219,14 @@ Teardown removed exactly the 11 volumes owned by
 were untouched. Docker reported the same names and sizes for all six
 accepted volumes before and after. The six LevelDB development volumes
 were retained.
+
+### Rejected-claim coverage release (source, 21 November 2026)
+
+Source after `d554f09` adds `ReleaseMedicalReservation` on this channel. A rejected medical claim keeps its reserved cover while an appeal or procedural recovery can still change it. That window is 30 days from the rejecting round's close. The claimant or insurer can return the cover at once when both paths are already used, or after the window closes. Late appeals and recoveries are refused. The Medical review panel shows the reserved amount and a **Return reserved cover to the policy** action.
+
+On 21 November the LevelDB dev-lite channel advanced from sequence 4 to 5. Go build and vet passed. The rebuilt `insurance-contract_1.9.0-reservation-seq5.tar.gz` matched all 44 audited source files. Its SHA-256 is `03245043975c1facb582542e964f012952e8775d226726de869877fea5c0cc01`. Lifecycle transaction `f3d0944f88351a4b31a17ade8da2e210561a1414730597b71341c2a66e408908` was VALID on all five peers, and each read back version 1.9.0 with all five MSP approvals. The routine, corrected appeal, suspected duplicate and separate deadline browser rehearsals passed.
+
+- **F01 Gateway visibility.** In an OPEN round with one vote, the holder and second auditor saw no decisions, the voting auditor saw their own vote, and the insurer could see it. The second auditor's direct decision lookup returned 403. After TIMED_OUT, all four viewers saw the vote and the direct lookup returned 200. Public ledger decisions remain outside this Gateway protection.
+- **F19 coverage release.** The claimant released the timed-out claim after its one recovery was used. Insurer peer readback confirmed `UsedMinor` went from 4,000 to 0. Release transaction `2c1571d852e0aae7b0de79b6bd3d5e8b4a7cb250229ec30bac3bdd29a2f3ab42` committed in block 645. Holder and insurer notifications carried the same transaction. A second release, appeal quote and procedural recovery each returned 409.
+
+These are synthetic, one-host LevelDB dev-lite results. The inventory had no pre-upgrade rejected medical claims, and the 30-day expiry and non-certificate F18 behavior were outside the live checks. Compose recreated the six dev-lite core containers during startup. Teardown stopped the app and dev-lite network and retained all six named ledger volumes. The accepted 1.8.0 and CouchDB profiles were untouched. See `data/dev-lite/live-check-20261121/summary.json` and `data/dev-lite/maintenance-seq5-deploy.log` for the run evidence and recovered setup errors.

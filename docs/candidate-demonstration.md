@@ -10,7 +10,7 @@ From the Fabric repository root in PowerShell:
 
 Open http://127.0.0.1:3200/workspace. The default Candidate profile resumes the
 existing insurance-workflow-alignment-20261108 channel, schema15,
-insurance-contract1.6.3-xgb-alignment/sequence4. Its package SHA256 is
+insurance-contract 1.6.3-xgb-alignment/sequence 4. Its package SHA256 is
 bc2a30f5b434c73649f765a31232892941ced4f617c7f5518cf399af8457c44a.
 No channel creation, package deployment, seeding, enrollment or reset occurs.
 Solidity is neither used nor modified. The October profile remains available

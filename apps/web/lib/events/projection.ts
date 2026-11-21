@@ -83,6 +83,10 @@ function notificationTargets(event: IndexedFabricEvent) {
       { role: "insurerAdmin", subject: "", title: "Claim appeal submitted", asset: text(p, "claimId") },
       { role: "policyholder", subject: text(p, "claimantId"), title: "Appeal submitted for corrected-invoice verification", asset: text(p, "claimId") },
     ];
+    case "MedicalReservationReleased": return [
+      { role: "insurerAdmin", subject: "", title: "Rejected claim cover returned to the policy", asset: text(p, "id") },
+      { role: "policyholder", subject: text(p, "claimantId"), title: "Reserved cover returned after final rejection", asset: text(p, "id") },
+    ];
     case "SettlementAuthorized": return [{ role: "bankOfficer", subject: "", title: "Settlement ready for confirmation", asset: text(p, "id") }];
     case "PremiumCollectionQueued": return [{ role: "bankOfficer", subject: "", title: "Premium collection queued", asset: text(p, "id") }];
     case "BankTransferProcessed": return [

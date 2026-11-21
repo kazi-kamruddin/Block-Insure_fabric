@@ -4,6 +4,7 @@ import { ledgerIdSchema } from "@/lib/fabric/validation";
 import { currentSession } from "@/lib/auth/current-session";
 import { findDemoAccount } from "@/lib/auth/accounts";
 import { ledger } from "@/lib/fabric/ledger";
+import { canSeeDecision } from "@/lib/fabric/vote-visibility";
 
 const routeSchema = z.object({
   assetType: z.enum(["partner-agreement", "hospital-invoice", "package", "policy", "claim", "evidence", "evidence-batch", "evidence-grant", "verification", "decision", "review", "appeal", "fraud-assessment", "settlement", "claim-history", "account", "bank-transfer", "mandate", "premium-payment", "premium-adjustment", "collection", "benefit-plan", "beneficiaries", "benefit-request", "liability", "oracle-snapshot", "oracle-request", "oracle-commitment", "oracle-result", "oracle-history", "privacy-credential", "privacy-presentation"]),
@@ -194,6 +195,9 @@ export async function GET(_request: Request, context: RouteContext) {
           if (claim.claimantId !== session.subjectId) {
             return NextResponse.json({ message: "Asset is not owned by this account" }, { status: 403 });
           }
+        }
+        if (!canSeeDecision(decision, await ledger.readClaimReview(decision.reviewId).catch(() => undefined), session)) {
+          return NextResponse.json({ message: "Votes are sealed until the review round closes" }, { status: 403 });
         }
         break;
       }
