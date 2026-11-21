@@ -30,7 +30,14 @@ export function CustomerPortal({ memberId }: { memberId: string }) {
       result => { if (mounted) setPolicies(result.result.filter(item => item.policyholderId === memberId)); },
       () => { if (mounted) setPolicyError("Your policies could not be loaded."); },
     );
-    return () => { mounted = false; };
+    const changed = () => {
+      void customerApi<{ result: Policy[] }>("/api/ledger/policy").then(
+        result => { if (mounted) setPolicies(result.result.filter(item => item.policyholderId === memberId)); },
+        () => undefined,
+      );
+    };
+    window.addEventListener("block-insure:coverage-changed", changed);
+    return () => { mounted = false; window.removeEventListener("block-insure:coverage-changed", changed); };
   }, [memberId]);
 
   async function runProfileAction(action: () => Promise<void>) {

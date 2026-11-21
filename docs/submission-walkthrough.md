@@ -76,6 +76,13 @@ One** button for that session.
    **Reactivate customer** with the same member ID. A second application
    with a national ID that an active customer already holds cannot be
    approved, and a policyholder must be 18 or older.
+6. To take this customer through to a Bank payout, follow steps 7–15 of the
+   [supervisor running order](supervisor-running-order.md). The Hospital
+   intake now pre-fills the service and billing dates; keep them, because a
+   stay without a billing date blocks automatic Oracle routing for that
+   Hospital (F49). **Authorize settlement** has **Find payout accounts**,
+   which fills the Insurer reserve and the customer's linked account. Keep
+   the customer in a private browser window while you switch staff roles.
 
 ## Part 2 — Follow a claim through each role
 

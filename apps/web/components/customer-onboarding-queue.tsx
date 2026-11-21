@@ -44,7 +44,7 @@ export function CustomerOnboardingQueue() {
     })}>Refresh customers</button>
     {customers?.length === 0 && <p>No customer profiles are waiting or on record.</p>}
     {customers && <div className="queueList">
-      {customers.map(customer => <article className="queueItem customerQueueEntry" key={customer.memberId} aria-label={customer.memberId}>
+      {[...customers].sort((left, right) => Number(right.status === "PENDING_KYC") - Number(left.status === "PENDING_KYC")).map(customer => <article className="queueItem customerQueueEntry" key={customer.memberId} aria-label={customer.memberId}>
         <div className="queueTitle"><strong>{customer.fullName || customer.memberId}</strong><StatusBadge status={customer.status} /></div>
         <dl className="customerCardDetails">
           <dt>Member ID</dt><dd>{customer.memberId}</dd>

@@ -38,8 +38,8 @@ export const workflowFormDefinitions: Record<WorkflowOperation, WorkflowFormDefi
     { name: "patientReference", label: "Insurance member ID (from the patient's card)", help: "The member ID is hashed in this browser before submission." },
     { name: "service", label: "Service performed", kind: "select", options: ["SURGERY", "CONSULTATION", "DIAGNOSTIC", "INPATIENT", "OTHER"] },
     { name: "admissionDate", label: "Admission date", kind: "date" }, { name: "dischargeDate", label: "Discharge date", kind: "date" },
-    { name: "serviceDate", label: "Documented service date (if known)", kind: "date" }, { name: "billBdt", label: "Billed BDT", kind: "money" },
-    { name: "invoiceDate", label: "Billing date (if documented)", kind: "date" }, { name: "diagnosisCode", label: "Diagnosis code (if recorded)" },
+    { name: "serviceDate", label: "Documented service date", kind: "date", help: "Claims are filed against this date. Leave it empty only if it is genuinely unknown." }, { name: "billBdt", label: "Billed BDT", kind: "money" },
+    { name: "invoiceDate", label: "Billing date", kind: "date", help: "Oracle verification needs the billing date. Without it this Hospital's history is incomplete and automatic verification is refused." }, { name: "diagnosisCode", label: "Diagnosis code (if recorded)" },
   ] },
   configureMedicalRules: { label: "Configure reimbursement terms", description: "Set the rules for a draft package before publishing it. Days follow Asia/Dhaka; calculations round down to the minor unit.", fields: [
     { name: "packageId", label: "Draft package ID" },
@@ -505,9 +505,10 @@ export const workflowFormDefinitions: Record<WorkflowOperation, WorkflowFormDefi
 };
 
 // Calendar dates follow Asia/Dhaka (UTC+06:00), the ledger's business day.
-function dateOffset(years: number) {
+function dateOffset(years: number, days = 0) {
   const value = new Date(Date.now() + 6 * 3_600_000);
   value.setUTCFullYear(value.getUTCFullYear() + years);
+  value.setUTCDate(value.getUTCDate() + days);
   return value.toISOString().slice(0, 10);
 }
 
@@ -525,9 +526,10 @@ export function createWorkflowFormValues(
 ): WorkflowFormValues {
   const today = dateOffset(0);
   const defaults: Record<WorkflowOperation, WorkflowFormValues> = {
-    saveMedicalEpisode: { episodeReference: "", expectedRevision: "0", patientReference: "", service: "SURGERY", admissionDate: today, dischargeDate: today, serviceDate: "", invoiceDate: "", diagnosisCode: "", billBdt: "" },
+    saveMedicalEpisode: { episodeReference: "", expectedRevision: "0", patientReference: "", service: "SURGERY", admissionDate: today, dischargeDate: today, serviceDate: today, invoiceDate: today, diagnosisCode: "", billBdt: "" },
     configureMedicalRules: { packageId: "", service: "SURGERY", sublimit: "", deductibleBps: "1000", deductibleCap: "", shareBps: "8000", waitingDays: "30", filingDays: "30", evidenceRequired: "No" },
-    acquireMedicalPolicy: { id: generatedId("policy", idFactory), packageId: "", startDate: today, endDate: dateOffset(1), acceptedTermsHash: "" },
+    // A one-year medical term ends the day before the anniversary (Asia/Dhaka).
+    acquireMedicalPolicy: { id: generatedId("policy", idFactory), packageId: "", startDate: today, endDate: dateOffset(1, -1), acceptedTermsHash: "" },
     verifyMedicalAssociation: { episodeId: "", revision: "", beneficiaryId: "", decisionBasis: "", associationDecision: "VERIFY" },
     registerMedicalOracleBenchmark: { hospitalId: "", service: "SURGERY", minimum: "", maximum: "", licenseStatus: "ACTIVE", sourceReference: "" },
     prepareMedicalClaim: {},
@@ -685,6 +687,8 @@ export async function buildWorkflowCommand(
         filingDays: Number(required(values, "filingDays", "Filing days")), evidenceRequired: values.evidenceRequired === "Yes" };
       break;
     case "acquireMedicalPolicy":
+      if (!values.packageId?.trim()) throw new Error("Choose a medical package first.");
+      if (!values.acceptedTermsHash?.trim()) throw new Error("Read the terms and tick \"I accept these published terms\" before buying.");
       command = { operation, id: values.id, packageId: values.packageId, startDate: values.startDate, endDate: values.endDate, acceptedTermsHash: values.acceptedTermsHash };
       break;
     case "verifyMedicalAssociation":

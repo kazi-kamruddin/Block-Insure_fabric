@@ -359,6 +359,36 @@ old; and the shared source cap is sixty codes per hour.
 | Live onboarding | The first re-run stopped at its first sign-up code with HTTP 429: earlier runs that evening had used all twenty shared-source sends (F42). After the cap change the full journey passed in 5.0 minutes (`data/dev-lite/onboarding-20261121/20261121T1623357127Z`), including the new checks: a KYC-verified name change refused (409), reactivation (200), and sign-in again with the same member ID (200), alongside the existing suspension, cross-customer and sixth-code refusals. |
 | Not re-run | The medical rehearsals could not run again on 21 November, because all three routine service categories already had a claim that day; the changes do not touch the claim path, and the hospital form keeps legacy references unchanged (unit test). |
 
+### Demonstration readiness (21 November 2026, late night)
+
+The live order for the supervisor meeting is the
+[supervisor running order](supervisor-running-order.md). A browser-only
+rehearsal of that order found ten gaps (F43–F52 in
+[FINDINGS](results/FINDINGS.md#demonstration-readiness--21-november-2026-late-night)).
+The most important was F49: an intake without a billing date stops automatic
+Oracle routing for all of that Hospital's claims until it is corrected. After
+the fixes, a new synthetic customer completed the whole order in the browser,
+from sign-up to a Bank-confirmed BDT 64,000 payout (claim SETTLED, balance
+BDT 87,750.00). See the [rehearsal record](supervisor-running-order.md#rehearsal-record).
+
+Two additive synthetic ledger records were made for the demonstration through
+ordinary Insurer and Bank transactions:
+
+- Package `demo-hospital-care-plus-v1` ("Block-Insure Hospital Care Plus"),
+  PUBLISHED. BDT 1,250 per installment, BDT 300,000 cover, partners
+  `hospital-demo` and `bank-demo`. Its INPATIENT rules are a BDT 150,000
+  sublimit, a 10% deductible capped at BDT 5,000, an 80% Insurer share, no
+  waiting period, 30 days to file and no mandatory evidence. The published
+  packages list shows it first.
+- Insurer account `insurer-claims-reserve` ("Block-Insure claims reserve",
+  `**** 7001`) at `bank-demo`, opened with BDT 50,00,000 so that repeated
+  demonstration payouts do not bounce.
+
+The 40 earlier rehearsal packages remain PUBLISHED. Retiring them is a ledger
+change that cannot be undone and needs the owner's decision. A retired package
+blocks only new purchases and renewals; existing policies keep their premiums
+and claims.
+
 ### Onboarding implementation files
 
 | Directory | Files and responsibilities |

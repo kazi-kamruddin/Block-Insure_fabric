@@ -4,10 +4,18 @@ import { useState } from "react";
 import type { OracleRegistrySnapshot } from "@/lib/fabric/types";
 
 export function MedicalRegistryControls({ role }: { role: "insurerAdmin" | "hospitalOfficer" }) {
-  const [hospitalId, setHospitalId] = useState("");
+  // The dev-lite demo has one medical partner hospital (Dhaka Central Medical Hospital).
+  const [hospitalId, setHospitalId] = useState("hospital-demo");
   const [snapshots, setSnapshots] = useState<OracleRegistrySnapshot[]>([]);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [showHistory, setShowHistory] = useState(false);
+  // Proposals awaiting attestation first, then the newest snapshot; older ones on request.
+  const version = (id: string) => Number(/(\d+)$/.exec(id)?.[1] ?? 0);
+  const ordered = [...snapshots].sort((left, right) => Number(right.status === "PROPOSED") - Number(left.status === "PROPOSED")
+    || version(right.id) - version(left.id) || right.id.localeCompare(left.id));
+  const pending = ordered.filter(snapshot => snapshot.status === "PROPOSED").length;
+  const visible = showHistory ? ordered : ordered.slice(0, pending + 1);
   async function run(body?: Record<string, string>) {
     setBusy(true);
     setMessage("");
@@ -39,7 +47,9 @@ export function MedicalRegistryControls({ role }: { role: "insurerAdmin" | "hosp
     </>}
     <button type="button" className="secondary button" disabled={busy} onClick={() => void run()}>Refresh registry proposals</button>
     <p role="status">{message}</p>
-    <ul>{snapshots.map(snapshot => <li key={snapshot.id}>
+    {ordered.length > visible.length || showHistory ? <button type="button" className="secondary button" onClick={() => setShowHistory(value => !value)}>
+      {showHistory ? "Hide older snapshots" : `Show ${ordered.length - visible.length} older snapshots`}</button> : null}
+    <ul>{visible.map(snapshot => <li key={snapshot.id}>
       <strong>{snapshot.id} · {snapshot.hospitalId} · {snapshot.status}</strong>
       <p>Rules {snapshot.rulesVersion} · {snapshot.recordCount} records</p>
       <p><code>{snapshot.rootHash}</code></p>

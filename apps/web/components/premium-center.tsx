@@ -48,7 +48,11 @@ export function PremiumCenter({ onPreparePayment }: { onPreparePayment: (payment
     let active = true;
     fetchCenter().then((next) => { if (active) show(next); })
       .catch((error: unknown) => { if (active) setMessage(error instanceof Error ? error.message : "Premium details are unavailable"); });
-    return () => { active = false; };
+    const changed = () => {
+      fetchCenter().then((next) => { if (active) { show(next); setMessage("Policies and balances updated from the ledger."); } }).catch(() => undefined);
+    };
+    window.addEventListener("block-insure:coverage-changed", changed);
+    return () => { active = false; window.removeEventListener("block-insure:coverage-changed", changed); };
   }, []);
 
   async function act(label: string, task: () => Promise<unknown>) {

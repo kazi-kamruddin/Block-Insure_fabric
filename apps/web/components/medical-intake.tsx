@@ -26,6 +26,7 @@ export function MedicalIntake({ insurer, customerMatching = false, onAssociation
 }) {
   const [intake, setIntake] = useState<Intake | null>(null);
   const [matches, setMatches] = useState<Partial<Record<string, CustomerMatch | null>>>({});
+  const [showVerified, setShowVerified] = useState(false);
   const [episodeId, setEpisodeId] = useState("");
   const [policyId, setPolicyId] = useState("");
   const [draft, setDraft] = useState<{ quote: MedicalQuote; receipt: MedicalPreparation | null; deadlineSoon: boolean }>();
@@ -76,6 +77,8 @@ export function MedicalIntake({ insurer, customerMatching = false, onAssociation
     onAssociation({ revision: selectionTime, command: {
       operation: "verifyMedicalAssociation", episodeId: row.id, revision: row.revision,
       beneficiaryId: row.beneficiaryId || match?.memberId,
+      // Only the digest of this note reaches the ledger; the operator may edit it.
+      ...(match ? { decisionBasis: `Member ID ${match.memberId} on the Hospital intake matches the approved customer record` } : {}),
     } });
   }
 
@@ -92,6 +95,12 @@ export function MedicalIntake({ insurer, customerMatching = false, onAssociation
     resetDraft();
   }
 
+  // Pending episodes are the Insurer's work; verified ones stay available on request.
+  const episodes = intake?.episodes ?? [];
+  const pendingCount = episodes.filter(row => row.associationStatus !== "VERIFIED").length;
+  const settledCount = episodes.length - pendingCount;
+  const queue = episodes.filter(row => showVerified || row.associationStatus !== "VERIFIED");
+
   return <article className="workCard guidedCard">
     <span className="kicker">Hospital episode coordination</span>
     <h2>{insurer ? "Episode association queue" : "Your medical episodes"}</h2>
@@ -100,10 +109,11 @@ export function MedicalIntake({ insurer, customerMatching = false, onAssociation
         setIntake(await json<Intake>("/api/medical/intake")); setMatches({}); resetDraft();
       })}>Refresh episodes</button>
     </div>
-    {intake && insurer && <div className="queueList" style={{ marginTop: 14 }}>{intake.episodes.map(row => <div className="queueItem" key={row.id}>
+    {intake && insurer && <p className="cardNote">{pendingCount} episode{pendingCount === 1 ? "" : "s"} awaiting association{settledCount ? ` · ${settledCount} already verified` : ""}.{settledCount > 0 && <> <button type="button" className="secondary button" onClick={() => setShowVerified(value => !value)}>{showVerified ? "Hide verified" : "Show verified"}</button></>}</p>}
+    {intake && insurer && <div className="queueList" style={{ marginTop: 14 }}>{queue.map(row => <div className="queueItem" key={row.id}>
       <div>
         <div className="queueTitle">
-          <strong>{row.hospitalId} · {row.service} · {row.serviceDate || "Service date to confirm"}</strong>
+          <strong>{row.hospitalId} · {row.service} · {row.serviceDate || "Service date not recorded"}</strong>
           <StatusBadge status={row.associationStatus} />
         </div>
         <small className="monoWrap">Patient reference fingerprint: {row.patientReferenceHash}</small>
@@ -119,7 +129,7 @@ export function MedicalIntake({ insurer, customerMatching = false, onAssociation
       </select></label>
       <label>Verified episode<select disabled={busy} value={episodeId} onChange={event => { setEpisodeId(event.target.value); resetDraft(); }}>
         <option value="">Choose an episode</option>
-        {intake.episodes.map(row => <option key={row.id} value={row.id}>{row.hospitalId} · {row.service} · {row.serviceDate || "date unresolved"}</option>)}
+        {intake.episodes.map(row => <option key={row.id} value={row.id}>{row.hospitalId} · {row.service} · {row.serviceDate || "service date not recorded"}</option>)}
       </select></label>
       {!intake.episodes.length && <p className="wideField emptyState">No verified episodes are available yet. The insurer can check an outstanding association.</p>}
       {episode && <div className="wideField medicalSubpanel">
@@ -127,7 +137,7 @@ export function MedicalIntake({ insurer, customerMatching = false, onAssociation
           <span>Revision {episode.revision} · {episode.service} · {money(episode.billMinor)} · {episode.admissionDate} to {episode.dischargeDate}</span>
           {existing && <StatusBadge status={existing.status} label={`Claim ${existing.id} · v${existing.version} · ${existing.status}`} />}
         </div>
-        {!episode.serviceDate && <p className="evidenceWarning">Ask the insurer to confirm the documented service date before filing.</p>}
+        {!episode.serviceDate && <p className="evidenceWarning">The Hospital has not recorded a service date for this stay. Ask the Hospital to save a corrected intake with the documented service date before filing.</p>}
         {(!existing || correction) && <div className="medicalButtonGroup">
           <button type="button" className="secondary button" disabled={busy || (!existing && !policyId) || !episode.serviceDate} onClick={() => run(prepare)}>{correction ? "Review corrected reimbursement" : "Prepare claim and calculate reimbursement"}</button>
         </div>}

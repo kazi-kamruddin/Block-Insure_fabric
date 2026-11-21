@@ -407,6 +407,8 @@ export function WorkspaceClient({
       if (action) { localStorage.removeItem(storageKey); notifySavedAction(); }
       setOutput(JSON.stringify(body.result, null, 2));
       await refreshDashboard();
+      // Policies, accounts and the insurance card are held by separate panels.
+      window.dispatchEvent(new Event("block-insure:coverage-changed"));
     } catch (error) {
       setOutput(error instanceof Error ? error.message : "Command failed");
     } finally {
@@ -503,6 +505,8 @@ export function WorkspaceClient({
       if (["SETTLED", "BOUNCED"].includes(body.result?.status)) localStorage.removeItem(pendingKey);
       setManualPayment((current) => ({ ...current, challengeId: "", otp: "", demoCode: "", externalReference: "" }));
       await refreshDashboard();
+      // The premium panel and insurance card hold their own copies of the policy.
+      window.dispatchEvent(new Event("block-insure:coverage-changed"));
     } catch (error) {
       setOutput(error instanceof Error ? error.message : "Premium payment failed");
     } finally {
