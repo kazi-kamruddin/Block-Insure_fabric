@@ -8,6 +8,11 @@ import { readJson, serialized, writeJson } from "@/lib/customers/state-file";
 const hour = 3_600_000;
 const resend = 60_000;
 const ttl = 600_000;
+// Per-email limits (cooldown, 5 per hour) stop guessing and inbox flooding.
+// The source cap protects the email quota. On the single-host profile every
+// visitor shares the loopback source, so it is sized for a whole demo day's
+// rehearsals rather than one person.
+const sourceHourlyCap = 60;
 const challenge = z.object({ digest: z.string(), expiresAt: z.number(), attempts: z.number() });
 const stateSchema = z.object({
   challenges: z.record(z.string(), challenge),
@@ -52,7 +57,7 @@ export class EmailCodeStore {
       const retryAt = Math.max(
         (emails.at(-1) ?? -resend) + resend,
         emails.length >= 5 ? emails[0] + hour : 0,
-        ips.length >= 20 ? ips[0] + hour : 0,
+        ips.length >= sourceHourlyCap ? ips[0] + hour : 0,
       );
       if (retryAt > now) return { retryAfter: Math.ceil((retryAt - now) / 1000) } as const;
 

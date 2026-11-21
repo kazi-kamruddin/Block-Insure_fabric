@@ -40,7 +40,7 @@ export function codes() {
   return new EmailCodeStore(secret.length >= 32 ? secret : sessionSecret());
 }
 
-type CustomerTemplate = "signup-code" | "signup-existing" | "login-code" | "kyc-approved" | "kyc-rejected";
+type CustomerTemplate = "signup-code" | "signup-existing" | "login-code" | "email-change-code" | "kyc-approved" | "kyc-rejected";
 
 export function queueCustomerEmail(recipient: string, template: CustomerTemplate, variables: Record<string, string> = {}) {
   if (!process.env.EMAIL_GATEWAY_URL?.trim()) return;
@@ -67,7 +67,7 @@ export async function sendCustomerCode(email: string, purpose: EmailCodePurpose)
     else queueCustomerEmail(email, "signup-code", variables);
   } else if (purpose === "login") {
     if (existing?.status === "ACTIVE" || existing?.status === "EMAIL_VERIFIED") queueCustomerEmail(email, "login-code", variables);
-  } else if (!existing) queueCustomerEmail(email, "signup-code", variables);
+  } else if (!existing) queueCustomerEmail(email, "email-change-code", variables);
 
   return customerResponse({ message: "If this address can be used, a code will be sent.", ...(localCustomerCodes() ? { displayCode: result.code } : {}) });
 }

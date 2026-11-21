@@ -5,7 +5,7 @@ import { StatusBadge } from "./status-badge";
 import { customerApi, type CustomerView } from "./customer-api";
 
 const queueUrl = "/api/insurer/customers";
-type Decision = "approve" | "reject" | "suspend";
+type Decision = "approve" | "reject" | "suspend" | "reactivate";
 
 export function CustomerOnboardingQueue() {
   const [customers, setCustomers] = useState<CustomerView[]>();
@@ -32,7 +32,7 @@ export function CustomerOnboardingQueue() {
     void run(async () => {
       const result = await customerApi<{ customer: CustomerView }>(queueUrl, { action, memberId, reason: reason || undefined });
       setCustomers(current => current?.map(item => item.memberId === memberId ? result.customer : item));
-      setMessage(action === "approve" ? "Customer approved." : action === "reject" ? "Profile rejected." : "Customer suspended.");
+      setMessage({ approve: "Customer approved.", reject: "Profile rejected.", suspend: "Customer suspended.", reactivate: "Customer reactivated." }[action]);
     });
   }
 
@@ -55,7 +55,8 @@ export function CustomerOnboardingQueue() {
           {customer.nidLast3 && <><dt>National ID ends in</dt><dd>{customer.nidLast3}</dd></>}
           <dt>Data-sharing consent</dt><dd>{customer.consent?.dataSharing ? "Given" : "Not recorded"}</dd>
         </dl>
-        {(customer.status === "PENDING_KYC" || customer.status === "ACTIVE") && <form className="guidedForm" onSubmit={event => event.preventDefault()}>
+        {customer.duplicateNationalIdOf && <p className="formError" role="note">The same national ID is held by member {customer.duplicateNationalIdOf}. Approval is refused while that account is active or suspended.</p>}
+        {(customer.status === "PENDING_KYC" || customer.status === "ACTIVE" || customer.status === "SUSPENDED") && <form className="guidedForm" onSubmit={event => event.preventDefault()}>
           <label className="wideField">Decision note (optional)<input name="reason" maxLength={300} /></label>
           <div className="wideField medicalButtonGroup">
             {customer.status === "PENDING_KYC" && <>
@@ -63,6 +64,7 @@ export function CustomerOnboardingQueue() {
               <button type="button" className="secondary button" disabled={busy} onClick={event => decide(event.currentTarget.form, customer.memberId, "reject")}>Reject customer</button>
             </>}
             {customer.status === "ACTIVE" && <button type="button" className="secondary button" disabled={busy} onClick={event => decide(event.currentTarget.form, customer.memberId, "suspend")}>Suspend customer</button>}
+            {customer.status === "SUSPENDED" && <button type="button" className="primary button" disabled={busy} onClick={event => decide(event.currentTarget.form, customer.memberId, "reactivate")}>Reactivate customer</button>}
           </div>
         </form>}
       </article>)}

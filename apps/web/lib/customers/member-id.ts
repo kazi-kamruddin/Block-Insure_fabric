@@ -1,7 +1,8 @@
 import { randomBytes } from "node:crypto";
+import { memberIdPattern } from "./member-reference";
 
+export { memberIdPattern };
 const alphabet = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
-export const memberIdPattern = /^BI-[0-9A-HJKMNP-TV-Z]{8}$/;
 
 export function newMemberId(existing: ReadonlySet<string>) {
   for (let attempt = 0; attempt < 16; attempt++) {

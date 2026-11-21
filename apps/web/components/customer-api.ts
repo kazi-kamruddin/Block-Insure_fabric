@@ -8,6 +8,7 @@ export type CustomerView = {
   consent?: { dataSharing: boolean; at: string };
   status: "EMAIL_VERIFIED" | "PENDING_KYC" | "ACTIVE" | "REJECTED" | "SUSPENDED";
   nidLast3?: string;
+  duplicateNationalIdOf?: string;
 };
 
 export type CodeResponse = { message?: string; displayCode?: string };

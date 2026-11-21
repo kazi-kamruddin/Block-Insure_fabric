@@ -1,11 +1,12 @@
 import { z } from "zod";
 import { codes, customerGuard, customerResponse, establishSignup, finishSignup, profileFields, requestCode, sendCustomerCode, signupIdentity, verifyCode } from "@/lib/auth/customer-auth";
+import { adultDateOfBirth } from "@/lib/customers/age";
 import { newMemberId } from "@/lib/customers/member-id";
 import { nationalIdFields } from "@/lib/customers/pii";
 import { CustomerStore, customerView, type CustomerRecord } from "@/lib/customers/store";
 
 const inputSchema = z.discriminatedUnion("action", [requestCode, verifyCode, profileFields.extend({
-  action: z.literal("profile"), dateOfBirth: z.iso.date().refine(value => value < new Date().toISOString().slice(0, 10)),
+  action: z.literal("profile"), dateOfBirth: z.iso.date().refine(value => adultDateOfBirth(value), "A policyholder must be between 18 and 100 years old"),
   nid: z.string().trim().regex(/^(?:\d{10}|\d{13}|\d{17})$/),
 })]);
 

@@ -82,7 +82,7 @@ test("direct delivery is opt-in and mappings override the supplied address", asy
 
 test("onboarding templates send codes and member IDs to the recipient", () => {
   const vars = { code: "1".repeat(6), expiresAt: "2026-11-21T10:00:00Z", memberId: "BI-7K3Q9XMP" };
-  for (const name of ["signup-code", "login-code"]) {
+  for (const name of ["signup-code", "login-code", "email-change-code"]) {
     assert.ok(templates[name](vars).text.includes(vars.code));
     assert.ok(templates[name](vars).text.includes(vars.expiresAt));
     assert.ok(!templates[name](vars).subject.includes(vars.code));

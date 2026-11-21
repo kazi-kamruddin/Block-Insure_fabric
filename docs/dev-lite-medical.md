@@ -288,15 +288,17 @@ future dates were not re-run against this package.
 ## Customer onboarding (21 November 2026 onward)
 
 On `insurance-dev-lite-190`, start the existing sequence-7 lab and run
-`.scriptsdev-lite-app.ps1 -TwoOracles -Onboarding` from PowerShell. The
+`.\scripts\dev-lite-app.ps1 -TwoOracles -Onboarding` from PowerShell. The
 controller starts the existing stopped Insurer CA by container ID and stops
 it when the controller exits. It adds the wallet and profile HMAC keys to the
 existing app secret store when those entries are absent. The default rehearsal
 uses browser-visible codes on loopback. It does not need the email connector.
 
 An email code expires in ten minutes and allows five attempts. Resends wait
-60 seconds, with five sends per address and twenty per IP per hour. The
-loopback-only listener shares a single IP bucket. Completed sign-in rotates
+60 seconds, with five sends per address and sixty per source per hour. The
+loopback-only listener shares a single source bucket, so the source cap is
+sized for a whole demo day of rehearsals (it was twenty until the review
+below). Completed sign-in rotates
 the signed session, and suspension blocks further Gateway signatures. An
 email-verified customer who interrupted sign-up can use **Customer sign-in** to
 recover the profile form before KYC. Only active customers get a ledger session.
@@ -316,7 +318,7 @@ the association on-chain. Email, phone, date of birth, consent and the KYC
 decision stay off-chain. The national ID is retained as a keyed digest and a
 three-digit suffix.
 
-Run `.scripts	est-dev-lite-onboarding.ps1` against the running app.
+Run `.\scripts\test-dev-lite-onboarding.ps1` against the running app.
 It checks all five peer definitions before running Playwright, disables
 traces, video and screenshots, and writes a sanitized journey and peer
 readback under `data/dev-lite/onboarding-20261121/`. Requests from failed
@@ -339,6 +341,23 @@ in-process file-store lock, an off-chain KYC record, a single host and
 synthetic people. Suspension is an application control. The run does not
 verify CRL revocation, real email delivery, identity verification against a
 national registry or automated certificate renewal.
+
+### Review fixes (21 November 2026, night)
+
+A source review of the onboarding commit `940e842` found five business-rule
+gaps and one operational limit, fixed before the demonstration (F37–F42 in
+[FINDINGS](results/FINDINGS.md#onboarding-review--21-november-2026-night)):
+member IDs typed at the Hospital are normalised before hashing; the
+KYC-verified name is locked for the customer; the Insurer can reactivate a
+suspended customer; a national ID already held by an active or suspended
+customer blocks a second approval; a policyholder must be 18 to 100 years
+old; and the shared source cap is sixty codes per hour.
+
+| Check | Result and evidence |
+| --- | --- |
+| Offline | Web lint, typecheck and Vitest 176/176 (seven new tests), connector 6/6 and the Oracle worker check passed. With the network and app stopped, the 19 November `.next` was moved aside; `next build` passed with the same four pre-existing tracing warnings (F36) and the offline e2e suite passed 11/11; the original `.next` was then restored. |
+| Live onboarding | The first re-run stopped at its first sign-up code with HTTP 429: earlier runs that evening had used all twenty shared-source sends (F42). After the cap change the full journey passed in 5.0 minutes (`data/dev-lite/onboarding-20261121/20261121T1623357127Z`), including the new checks: a KYC-verified name change refused (409), reactivation (200), and sign-in again with the same member ID (200), alongside the existing suspension, cross-customer and sixth-code refusals. |
+| Not re-run | The medical rehearsals could not run again on 21 November, because all three routine service categories already had a claim that day; the changes do not touch the claim path, and the hospital form keeps legacy references unchanged (unit test). |
 
 ### Onboarding implementation files
 

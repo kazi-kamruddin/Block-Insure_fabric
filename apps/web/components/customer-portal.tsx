@@ -98,7 +98,8 @@ export function CustomerPortal({ memberId }: { memberId: string }) {
       {customer && <>
         <p className="customerEmail">Current email address <strong>{customer.email}</strong></p>
         <form className="guidedForm" onSubmit={saveProfile}>
-          <label>Full name<input name="fullName" autoComplete="name" maxLength={120} defaultValue={customer.fullName} required /></label>
+          <label>Full name (verified)<input name="fullName" autoComplete="name" maxLength={120} defaultValue={customer.fullName} readOnly aria-describedby="verified-name-help" required />
+            <small id="verified-name-help">Checked by the Insurer when your account was approved. Ask the Insurer to correct it.</small></label>
           <label>Phone<input name="phone" type="tel" autoComplete="tel" maxLength={32} defaultValue={customer.phone} required /></label>
           <label className="wideField">Address (optional)<input name="address" autoComplete="street-address" maxLength={300} defaultValue={customer.address} /></label>
           <label className="wideField customerConsent"><input name="consent" type="checkbox" defaultChecked={customer.consent?.dataSharing} />I consent to sharing my information with the insurer for coverage and claims</label>

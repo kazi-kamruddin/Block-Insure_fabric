@@ -48,7 +48,9 @@ export async function POST(request: Request) {
         if (customers.some(item => item.email === action.email)) return "email-conflict";
         customer.email = action.email;
       } else {
-        customer.fullName = action.fullName;
+        // The Insurer verified this name at KYC and matches hospital stays
+        // against it, so only the Insurer can correct it.
+        if (action.fullName !== customer.fullName) return "name-locked";
         customer.phone = action.phone;
         customer.address = action.address || undefined;
         customer.consent ??= { dataSharing: true, at: new Date().toISOString() };
@@ -57,6 +59,7 @@ export async function POST(request: Request) {
     });
     if (outcome === "inactive") return unavailable();
     if (outcome === "email-conflict") return rejectedCode();
+    if (outcome === "name-locked") return customerResponse({ message: "Your name was verified when your account was approved. Ask the Insurer to correct it." }, 409);
     return customerResponse({ customer: outcome });
   } catch {
     return customerResponse({ message: "Customer profile is unavailable" }, 503);

@@ -107,7 +107,8 @@ export function CustomerAccess({ mode }: { mode: keyof typeof title }) {
       {phase === "profile" && <form className="guidedForm" onSubmit={submitProfile}>
         <label>Full name<input ref={nextControl} name="fullName" autoComplete="name" maxLength={120} required /></label>
         <label>Phone<input name="phone" type="tel" autoComplete="tel" maxLength={25} required /></label>
-        <label>Date of birth<input name="dateOfBirth" type="date" autoComplete="bday" required /></label>
+        <label>Date of birth<input name="dateOfBirth" type="date" autoComplete="bday" required aria-describedby="birth-help" />
+          <small id="birth-help">The policyholder must be 18 or older.</small></label>
         <div>
           <label>National ID<input name="nid" type="text" inputMode="numeric" autoComplete="off" pattern="[0-9]{10}|[0-9]{13}|[0-9]{17}" maxLength={17} aria-describedby="nid-help" required /></label>
           <small id="nid-help">Enter a 10-, 13-, or 17-digit number.</small>

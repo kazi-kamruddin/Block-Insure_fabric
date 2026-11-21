@@ -7,6 +7,22 @@ import {
 } from "./forms";
 
 describe("guided workflow forms", () => {
+  it("hashes the issued member ID however the hospital clerk types it", async () => {
+    const hashText = vi.fn(async (value: string) => (value === "BI-7K3Q9XM0" ? "e" : "f").repeat(64));
+    const episode = await buildWorkflowCommand("saveMedicalEpisode", {
+      episodeReference: "EP-1", expectedRevision: "0", patientReference: " bi 7k3q9xmo ", service: "INPATIENT",
+      admissionDate: "2026-11-21", dischargeDate: "2026-11-21", serviceDate: "", billBdt: "85,000.00", invoiceDate: "", diagnosisCode: "",
+    }, hashText);
+    expect(episode).toMatchObject({ patientReferenceHash: "e".repeat(64) });
+    expect(hashText).toHaveBeenCalledWith("BI-7K3Q9XM0");
+    hashText.mockClear();
+    await buildWorkflowCommand("createHospitalInvoice", {
+      id: "invoice-1", patientReferenceText: "policyholder1", invoiceReferenceText: "INV-1", treatmentText: "stay",
+      amountBdt: "85000", admissionDate: "2026-11-21", dischargeDate: "2026-11-21", status: "FINALIZED",
+    }, hashText);
+    expect(hashText).toHaveBeenCalledWith("policyholder1");
+  });
+
   it("converts exact BDT values to integer minor units", () => {
     expect(bdtToMinor("2500")).toBe(250_000);
     expect(bdtToMinor("10.05")).toBe(1_005);

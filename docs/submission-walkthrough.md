@@ -69,6 +69,13 @@ One** button for that session.
    from the card when recording a stay. The Insurer opens **Episode association
    queue**, selects **Resolve association**, reviews the suggested match, and
    confirms the covered patient through the existing association action.
+5. The Hospital can type the member ID in any case or with spaces; it is
+   normalised to the issued ID before hashing. The customer's name is locked
+   once the Insurer approves it. In **Customer onboarding** the Insurer can
+   suspend a customer (sign-in and transactions stop at once) and later
+   **Reactivate customer** with the same member ID. A second application
+   with a national ID that an active customer already holds cannot be
+   approved, and a policyholder must be 18 or older.
 
 ## Part 2 — Follow a claim through each role
 

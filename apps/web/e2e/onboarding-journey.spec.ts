@@ -192,6 +192,10 @@ test("onboard real CA identities and settle a synthetic medical claim on LevelDB
         const failure = await rateProbe;
         if (failure) throw failure;
       }
+      // The KYC-verified name is the Insurer's to correct, not the customer's.
+      await call(first, "Refuse changing the KYC-verified name", "/api/customer/profile", {
+        action: "update", fullName: "Someone Else Entirely", phone: "+880 1000 000 001", dataSharing: true,
+      }, 409);
       const { customer } = await call<{ customer: Member }>(insurer, "Suspend the approved customer", "/api/insurer/customers", {
         action: "suspend", memberId, reason: "Synthetic suspension",
       });
@@ -203,6 +207,17 @@ test("onboard real CA identities and settle a synthetic medical claim on LevelDB
       await call(fresh, "Refuse a suspended customer's new sign-in", "/api/auth/login", { action: "verify", email: address("first"), code }, 401);
       const unchanged = await asset<{ status: string }>(insurer, "policy", policyId);
       expect(unchanged.status).toBe("ACTIVE");
+      // A suspension is reversible: the same certificate and member ID return.
+      const { customer: restored } = await call<{ customer: Member }>(insurer, "Reactivate the suspended customer", "/api/insurer/customers", {
+        action: "reactivate", memberId, reason: "Synthetic reactivation",
+      });
+      expect(restored.status).toBe("ACTIVE");
+      await wait(cooldown);
+      const returning = await client();
+      const again = await codeRequest(returning, "login", address("first"));
+      await call(returning, "Sign in again after reactivation", "/api/auth/login", { action: "verify", email: address("first"), code: again });
+      const reactivated = await call<{ customer: Member }>(returning, "Read the reactivated profile", "/api/customer/profile");
+      expect(reactivated.customer.memberId).toBe(memberId);
     });
   }
 

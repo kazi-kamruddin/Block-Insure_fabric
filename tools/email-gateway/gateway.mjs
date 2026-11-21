@@ -41,6 +41,7 @@ export const templates = {
   }),
   "signup-code": (v) => accountCode("sign-up", v),
   "login-code": (v) => accountCode("sign-in", v),
+  "email-change-code": (v) => accountCode("email verification", v),
   "signup-existing": () => ({
     subject: "Your Block-Insure account",
     text: "You already have an account with this email address. Sign in with a one-time code instead.",

@@ -1,4 +1,5 @@
 import type { FabricRole } from "@/lib/fabric/config";
+import { normalizeMemberReference } from "@/lib/customers/member-reference";
 import {
   workflowCommandSchema,
   type WorkflowCommand,
@@ -306,7 +307,7 @@ export const workflowFormDefinitions: Record<WorkflowOperation, WorkflowFormDefi
     description: "Update a draft, finalize it, or void an immutable finalized invoice.",
     fields: [
       { name: "id", label: "Invoice ID" },
-      { name: "patientReferenceText", label: "Patient reference" },
+      { name: "patientReferenceText", label: "Insurance member ID (from the patient's card)", help: "The member ID is hashed in this browser before submission." },
       { name: "invoiceReferenceText", label: "Invoice reference" },
       { name: "treatmentText", label: "Treatment reference", kind: "textarea" },
       { name: "amountBdt", label: "Invoice total (BDT)", kind: "money" },
@@ -665,12 +666,15 @@ export async function buildWorkflowCommand(
   hashText: HashText,
 ): Promise<WorkflowCommand> {
   const digest = async (name: string, label: string) => hashText(required(values, name, label));
+  // A typed member ID must reduce to the exact issued ID, or the Insurer's
+  // customer match silently fails. Other (legacy) references pass unchanged.
+  const memberDigest = async (name: string, label: string) => hashText(normalizeMemberReference(required(values, name, label)));
   let command: unknown;
 
   switch (operation) {
     case "saveMedicalEpisode":
       command = { operation, episodeReferenceHash: await digest("episodeReference", "Hospital episode reference"),
-        expectedRevision: Number(required(values, "expectedRevision", "Revision")), patientReferenceHash: await digest("patientReference", "Insurance member ID"),
+        expectedRevision: Number(required(values, "expectedRevision", "Revision")), patientReferenceHash: await memberDigest("patientReference", "Insurance member ID"),
         service: values.service, admissionDate: values.admissionDate, dischargeDate: values.dischargeDate, serviceDate: values.serviceDate ?? "",
         billMinor: bdtToMinor(required(values, "billBdt", "Bill")), invoiceDate: values.invoiceDate ?? "", diagnosisCode: values.diagnosisCode ?? "" };
       break;
@@ -840,7 +844,7 @@ export async function buildWorkflowCommand(
     case "updateHospitalInvoice":
       command = {
         operation, id: required(values, "id", "Invoice ID"),
-        patientReferenceHash: await digest("patientReferenceText", "Patient reference"),
+        patientReferenceHash: await memberDigest("patientReferenceText", "Patient reference"),
         invoiceReferenceHash: await digest("invoiceReferenceText", "Invoice reference"),
         treatmentHash: await digest("treatmentText", "Treatment reference"),
         amountMinor: bdtToMinor(required(values, "amountBdt", "Invoice total")),

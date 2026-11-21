@@ -3,11 +3,11 @@ import { z } from "zod";
 import { currentSession } from "@/lib/auth/current-session";
 import { customerGuard, customerResponse, queueCustomerEmail } from "@/lib/auth/customer-auth";
 import { memberIdPattern } from "@/lib/customers/member-id";
-import { decideCustomer } from "@/lib/customers/onboarding";
+import { decideCustomer, nationalIdHolder } from "@/lib/customers/onboarding";
 import { CustomerStore, customerView } from "@/lib/customers/store";
 import { FabricCaRequestError } from "@/lib/fabric/ca-client";
 
-const actionSchema = z.object({ action: z.enum(["approve", "reject", "suspend"]), memberId: z.string().regex(memberIdPattern), reason: z.string().trim().max(500).default("") });
+const actionSchema = z.object({ action: z.enum(["approve", "reject", "suspend", "reactivate"]), memberId: z.string().regex(memberIdPattern), reason: z.string().trim().max(500).default("") });
 
 async function insurer() {
   const session = await currentSession().catch(() => null);
@@ -26,7 +26,9 @@ export async function GET(request: Request) {
       const match = customers.find(item => item.status === "ACTIVE" && createHash("sha256").update(item.memberId).digest("hex") === hash.toLowerCase());
       return customerResponse({ match: match ? { memberId: match.memberId, fullName: match.fullName, dateOfBirth: match.dateOfBirth } : null });
     }
-    return customerResponse({ customers: customers.filter(item => item.status !== "EMAIL_VERIFIED").map(customerView) });
+    return customerResponse({ customers: customers.filter(item => item.status !== "EMAIL_VERIFIED").map(item => ({
+      ...customerView(item), duplicateNationalIdOf: nationalIdHolder(customers, item)?.memberId,
+    })) });
   } catch {
     return customerResponse({ message: "Customer approvals are temporarily unavailable" }, 503);
   }
@@ -44,6 +46,7 @@ export async function POST(request: Request) {
     const result = await decideCustomer(memberId, action, session.accountId, reason);
     if (result.outcome === "missing") return customerResponse({ message: "Customer does not exist" }, 404);
     if (result.outcome === "conflict") return customerResponse({ message: "The requested decision is unavailable at this stage" }, 409);
+    if (result.outcome === "duplicate-nid") return customerResponse({ message: "Another active customer already holds this national ID" }, 409);
     const { customer, changed } = result;
     if (changed && action === "approve") queueCustomerEmail(customer.email, "kyc-approved", { memberId });
     if (changed && action === "reject") queueCustomerEmail(customer.email, "kyc-rejected");

@@ -5,7 +5,15 @@ import { CustomerStore, type CustomerRecord } from "./store";
 import { serialized } from "./state-file";
 import { customerWallet, openCustomerValue, saveCustomerWallet, sealCustomerValue } from "./wallet";
 
-type Decision = "approve" | "reject" | "suspend";
+type Decision = "approve" | "reject" | "suspend" | "reactivate";
+
+// One person, one customer: a national ID already held by a live account
+// (active or suspended) must not be approved again under a new member ID.
+export function nationalIdHolder(customers: readonly CustomerRecord[], customer: CustomerRecord) {
+  if (!customer.nidHmac) return undefined;
+  return customers.find(item => item.memberId !== customer.memberId && item.nidHmac === customer.nidHmac
+    && (item.status === "ACTIVE" || item.status === "SUSPENDED"));
+}
 
 export async function decideCustomer(memberId: string, decision: Decision, by: string, reason: string) {
   const store = new CustomerStore();
@@ -22,6 +30,17 @@ export async function decideCustomer(memberId: string, decision: Decision, by: s
   return serialized(`${store.file}:issuance:${memberId}`, async () => {
     const record = await store.find(memberId);
     if (!record) return { outcome: "missing" } as const;
+    if (decision === "reactivate") {
+      // Only a customer who was approved (and so holds a certificate) returns.
+      if (record.status !== "SUSPENDED" || !(await customerWallet(memberId))?.certificate) return { outcome: "conflict" } as const;
+      if (nationalIdHolder(await store.list(), record)) return { outcome: "duplicate-nid" } as const;
+      const customer = await update(item => {
+        item.status = "ACTIVE";
+        item.kycDecision = decisionRecord();
+        delete item.sessionId;
+      });
+      return { outcome: "ok", customer: customer!, changed: true } as const;
+    }
     if (decision !== "approve") {
       const expected = decision === "reject" ? "PENDING_KYC" : "ACTIVE";
       if (record.status !== expected || record.issuance) return { outcome: "conflict" } as const;
@@ -34,6 +53,7 @@ export async function decideCustomer(memberId: string, decision: Decision, by: s
     }
     if (record.status === "ACTIVE") return { outcome: "ok", customer: record, changed: false } as const;
     if (record.status !== "PENDING_KYC") return { outcome: "conflict" } as const;
+    if (nationalIdHolder(await store.list(), record)) return { outcome: "duplicate-nid" } as const;
     const secretContext = `${memberId}:enrollment`;
     const keyContext = `${memberId}:key`;
     let issuance = record.issuance;

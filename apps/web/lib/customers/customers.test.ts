@@ -182,9 +182,9 @@ describe("passwordless code limits", () => {
     expect(Boolean((await codes.issue(email, ip, "login", zero + 3_600_000)).code)).toBe(true);
   });
 
-  it("caps requests from a single IP across distinct addresses", async () => {
+  it("caps requests from a single source at 60 an hour across distinct addresses", async () => {
     const codes = store();
-    for (let count = 0; count < 20; count++) {
+    for (let count = 0; count < 60; count++) {
       await issue(codes, `member-${count}@block-insure.test`, zero);
     }
     expect(await codes.issue(email, ip, "login", zero)).toEqual({ retryAfter: 3600 });
