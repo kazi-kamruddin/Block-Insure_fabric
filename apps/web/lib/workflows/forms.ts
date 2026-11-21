@@ -24,11 +24,11 @@ export type WorkflowFormValues = Record<string, string>;
 export type HashText = (value: string) => Promise<string>;
 
 export const operationsByRole = {
-  insurerAdmin: ["startClaimProcessing", "createPartnerAgreement", "setPartnerAgreementStatus", "createPolicyPackage", "configurePolicyPackagePartners", "publishPolicyPackage", "retirePolicyPackage", "createBenefitPlan", "publishBenefitPlan", "retireBenefitPlan", "issuePolicy", "issuePolicyPrivacyCredential", "revokePolicyPrivacyCredential", "advancePolicyLifecycle", "cancelPolicyAsInsurer", "queuePremiumCollection", "decideBenefitRequest", "markBenefitPaymentReady", "publishEvidenceMerkleBatch", "assessClaimFraud", "publishOracleRegistrySnapshot", "requestOracleVerification", "finalizeOracleTimeout", "routeOracleFailureToReview", "openClaimReview", "finalizeExpiredReview", "authorizeSettlement"],
-  policyholder: ["acquirePolicy", "requestBankMandate", "cancelBankMandate", "setBeneficiaries", "submitBenefitRequest", "renewPolicy", "cancelPolicy", "submitClaim", "registerClaimPrivacyPresentation", "submitClaimAppeal", "grantEvidenceAccess", "revokeEvidenceAccess"],
+  insurerAdmin: ["startClaimProcessing", "createPartnerAgreement", "setPartnerAgreementStatus", "createPolicyPackage", "configurePolicyPackagePartners", "publishPolicyPackage", "retirePolicyPackage", "createBenefitPlan", "publishBenefitPlan", "retireBenefitPlan", "issuePolicy", "issuePolicyPrivacyCredential", "revokePolicyPrivacyCredential", "advancePolicyLifecycle", "cancelPolicyAsInsurer", "queuePremiumCollection", "schedulePremiumCollections", "retryPremiumCollection", "decideBenefitRequest", "markBenefitPaymentReady", "publishEvidenceMerkleBatch", "assessClaimFraud", "publishOracleRegistrySnapshot", "requestOracleVerification", "finalizeOracleTimeout", "routeOracleFailureToReview", "openClaimReview", "finalizeExpiredReview", "authorizeSettlement"],
+  policyholder: ["acquirePolicy", "requestBankAccountLink", "cancelBankAccountLink", "requestBankMandate", "cancelBankMandate", "setBeneficiaries", "submitBenefitRequest", "renewPolicy", "cancelPolicy", "submitClaim", "registerClaimPrivacyPresentation", "submitClaimAppeal", "grantEvidenceAccess", "revokeEvidenceAccess"],
   hospitalOfficer: ["createHospitalInvoice", "updateHospitalInvoice", "recordHospitalModelFacts"],
   auditor: ["recordAuditorDecision"],
-  bankOfficer: ["openBankAccount", "adjustBankAccountBalance", "reviewBankMandate", "recordPremiumAdjustment", "processPremiumCollection", "expireBankMandate", "confirmBenefitPayment", "confirmSettlement"],
+  bankOfficer: ["openBankAccount", "reviewBankAccountLink", "adjustBankAccountBalance", "reviewBankMandate", "recordPremiumAdjustment", "processPremiumCollection", "expireBankMandate", "confirmBenefitPayment", "confirmSettlement"],
 } as const satisfies Record<FabricRole, readonly WorkflowOperation[]>;
 
 export const workflowFormDefinitions: Record<WorkflowOperation, WorkflowFormDefinition> = {
@@ -196,6 +196,31 @@ export const workflowFormDefinitions: Record<WorkflowOperation, WorkflowFormDefi
     label: "Adjust account balance",
     description: "Record an auditable simulated credit or debit for demonstration funding.",
     fields: [{ name: "transferId", label: "Transfer ID" }, { name: "accountId", label: "Account reference ID" }, { name: "direction", label: "Direction", kind: "select", options: ["CREDIT", "DEBIT"] }, { name: "amountBdt", label: "Amount (BDT)", kind: "money" }, { name: "externalReferenceText", label: "External adjustment reference" }],
+  },
+  requestBankAccountLink: {
+    label: "Request a bank account link",
+    description: "Ask a contracted Bank to link one of your accounts. Enter only the masked number; the Bank verifies the account and supplies its private details.",
+    fields: [{ name: "id", label: "Link request ID" }, { name: "bankId", label: "Contracted Bank ID" }, { name: "accountLabel", label: "Account nickname" }, { name: "maskedAccount", label: "Masked account number", placeholder: "**** 1234" }],
+  },
+  reviewBankAccountLink: {
+    label: "Review a bank account link",
+    description: "Approve after verifying the customer's account in the Bank's own records, or reject. Approval opens the verified account with a private token and balance.",
+    fields: [{ name: "id", label: "Link request ID" }, { name: "outcome", label: "Outcome", kind: "select", options: ["APPROVE", "REJECT"] }, { name: "accountReferenceId", label: "New account reference ID (approval only)" }, { name: "accountTokenText", label: "Bank-vault token (approval only)" }, { name: "openingBalanceBdt", label: "Verified balance (BDT, approval only)", kind: "money" }, { name: "decisionText", label: "Decision reference" }],
+  },
+  cancelBankAccountLink: {
+    label: "Cancel a bank account link request",
+    description: "Withdraw a link request the Bank has not reviewed yet.",
+    fields: [{ name: "id", label: "Link request ID" }],
+  },
+  schedulePremiumCollections: {
+    label: "Schedule due EFT collections",
+    description: "Create a collection for every active mandate due on or before today's ledger date. Running it again creates nothing new.",
+    fields: [{ name: "asOfDate", label: "Business date (today or earlier)", kind: "date" }],
+  },
+  retryPremiumCollection: {
+    label: "Retry a bounced EFT collection",
+    description: "Present a bounced installment to the Bank again, for example after the customer funds the account. At most three attempts.",
+    fields: [{ name: "collectionId", label: "Collection ID" }],
   },
   requestBankMandate: {
     label: "Request debit mandate",
@@ -519,6 +544,11 @@ export function createWorkflowFormValues(
     renewPolicy: { newId: generatedId("policy-renewal", idFactory), existingId: "", newEndDate: dateOffset(2) },
     openBankAccount: { id: generatedId("account-ref", idFactory), bankId: "bank-demo", ownerId: "policyholder1", accountType: "CUSTOMER", accountLabel: "Primary savings", maskedAccount: "**** **** 4821", openingBalanceBdt: "", accountTokenText: "" },
     adjustBankAccountBalance: { transferId: generatedId("bank-adjustment", idFactory), accountId: "", direction: "CREDIT", amountBdt: "", externalReferenceText: "" },
+    requestBankAccountLink: { id: generatedId("bank-link", idFactory), bankId: "bank-demo", accountLabel: "", maskedAccount: "" },
+    reviewBankAccountLink: { id: "", outcome: "APPROVE", accountReferenceId: generatedId("account", idFactory), accountTokenText: "", openingBalanceBdt: "0", decisionText: "" },
+    cancelBankAccountLink: { id: "" },
+    schedulePremiumCollections: { asOfDate: today },
+    retryPremiumCollection: { collectionId: "" },
     requestBankMandate: { id: generatedId("mandate", idFactory), policyId: "", accountReferenceId: "", expiryDate: dateOffset(1) },
     reviewBankMandate: { id: "", outcome: "APPROVE", decisionText: "" },
     cancelBankMandate: { id: "" },
@@ -723,6 +753,27 @@ export async function buildWorkflowCommand(
       break;
     case "adjustBankAccountBalance":
       command = { operation, transferId: required(values, "transferId", "Transfer ID"), accountId: required(values, "accountId", "Account reference ID"), direction: required(values, "direction", "Direction"), amountMinor: bdtToMinor(required(values, "amountBdt", "Amount")), externalReferenceHash: await digest("externalReferenceText", "External adjustment reference") };
+      break;
+    case "requestBankAccountLink":
+      command = { operation, id: required(values, "id", "Link request ID"), bankId: required(values, "bankId", "Contracted Bank ID"), accountLabel: required(values, "accountLabel", "Account nickname"), maskedAccount: required(values, "maskedAccount", "Masked account number") };
+      break;
+    case "reviewBankAccountLink": {
+      const approve = values.outcome === "APPROVE";
+      command = { operation, id: required(values, "id", "Link request ID"), outcome: required(values, "outcome", "Outcome"),
+        accountReferenceId: approve ? required(values, "accountReferenceId", "New account reference ID") : "",
+        accountTokenHash: approve ? await digest("accountTokenText", "Bank-vault token") : "",
+        openingBalanceMinor: approve ? nonNegativeBdtToMinor(values.openingBalanceBdt || "0") : 0,
+        decisionHash: await digest("decisionText", "Decision reference") };
+      break;
+    }
+    case "cancelBankAccountLink":
+      command = { operation, id: required(values, "id", "Link request ID") };
+      break;
+    case "schedulePremiumCollections":
+      command = { operation, asOfDate: required(values, "asOfDate", "Business date") };
+      break;
+    case "retryPremiumCollection":
+      command = { operation, collectionId: required(values, "collectionId", "Collection ID") };
       break;
     case "requestBankMandate":
       command = { operation, id: required(values, "id", "Mandate ID"), policyId: required(values, "policyId", "Policy ID"), accountReferenceId: required(values, "accountReferenceId", "Account reference ID"), expiryDate: required(values, "expiryDate", "Mandate expiry") };

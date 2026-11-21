@@ -238,3 +238,49 @@ This run used the committed source at `32ff6e8` with the same sequence-5 package
 The Insurer exported the routine claim `medical-dd367ca9-cca7-4ac1-9753-f947b14bc084`. The new read-only `network/scripts/read-dev-lite-certificate.sh` read its certificate hash `5b94b770…84d5` directly from the Insurer peer. The standalone verifier accepted the dossier against that hash and rejected an altered hash.
 
 `MEDICAL_STOP_BEFORE_BANK=true` stops a rehearsal journey after Insurer authorization. Settlement `med-settlement-cbb65431-1ec` was staged this way and awaits Bank confirmation. With `FABRIC_DEV_LITE_BANK_CUSTODY=external`, the Gateway refused the Bank confirmation with 409 and issued the unsigned request saved at `data/dev-lite/closeout-20261121/bank-signing-request.json`. The separate-OS-account signature is an owner step in the [submission walkthrough](submission-walkthrough.md). The app and network were stopped afterwards with the six volumes retained.
+
+## Premium flows and bank links on sequence 6 (21 November 2026)
+
+Sequence 6 completes the customer–Bank premium path on the LevelDB dev-lite
+channel. The medical rules are unchanged from sequence 5.
+
+- **Chaincode.** A policyholder can ask a contracted Bank to link an account
+  (`RequestBankAccountLink`). The Bank approves it with the private token and
+  balance in transient data (`ReviewBankAccountLink`), which opens the
+  verified CUSTOMER account for the requester. The policyholder can cancel a
+  pending request. The Insurer can retry a bounced EFT collection up to three
+  attempts (`RetryPremiumCollection`). Policy lifecycle, collection
+  scheduling and queueing, mandate expiry and collection processing now
+  refuse dates later than the transaction's Asia/Dhaka business date (F20,
+  F21).
+- **Web app.** The policyholder has **My bank and premiums**: link requests,
+  linked accounts, and per-policy **Pay first premium now** / **Pay next
+  installment by OTP**, which fills the OTP card, plus **Set up automatic EFT
+  payment**. The Bank has **Bank work queue** (verify links, approve
+  mandates, collect premiums, record deposits). The Insurer has **Premium
+  collections and policy status** (schedule due collections, retry bounces,
+  check grace and lapse). Endorsement errors now show the chaincode's reason
+  (F23).
+- **Operations.** `dev-lite-app.ps1 -Collections` starts the automatic
+  collection worker. `-Email` starts the local Brevo connector
+  (`tools/email-gateway/`). `dev-lite-preflight.ps1` is a read-only pre-demo
+  check, and `stage-dev-lite-demo.ps1` prepares demo cases the evening before.
+
+Identity and evidence:
+
+| Item | Value |
+| --- | --- |
+| Package | `insurance-contract_1.9.0-premium-seq6.tar.gz`, SHA-256 `27a6b4e4ef031feae14de9d7c222a1a973891f93ec6b7e556d9c6c5e1acaf225`, label `insurance-contract_1.9.0`. All 45 packaged source files matched the working tree (`data/dev-lite/premium-20261121/package-audit.json`). Built with Go 1.26.11 in the pinned builder; `go build` and `go vet` passed. |
+| Lifecycle | Sequence 6 committed VALID in transaction `898ea0eab044695e835839e89bcb8c3b3b8652474c0dfe34d684dea28719f436`. All five peers read back version 1.9.0, sequence 6, with all five approvals. |
+| Backup | Before the upgrade, the six stopped volumes were archived read-only to `data/dev-lite/backups/pre-seq6-20261121-104844/` with SHA-256 sums. |
+| Preservation | After the upgrade the routine claim `medical-dd367ca9-…` still read SETTLED from the Insurer peer with certificate hash `5b94b770…84d5`. |
+| Offline | Go `gofmt`, `vet` and the full test suite passed in the pinned container, including four new tests. Web lint, typecheck and 145/145 unit tests passed. The worker check, TLA+ model and the email connector's 3/3 tests passed. |
+| Live premium journey | `scripts/test-dev-lite-premium.ps1` passed in 1.9 minutes (`data/dev-lite/premium-journey/20261121-111226-5005`). Three link requests (two verified, one rejected), two first premiums by OTP, two mandates approved, an early schedule and a future lapse refused with 409, an automatic run that completed one collection and bounced the other with INSUFFICIENT_FUNDS, a deposit, an Insurer retry, a completed second attempt, and a mandate cancellation. |
+| Medical regression | `scripts/test-dev-lite-medical.ps1` passed the routine (3.8 min), corrected appeal (10.1 min) and duplicate (3.6 min) journeys on sequence 6 (`data/dev-lite/medical-rehearsal/20261121-111444-9375`). |
+
+Limits: synthetic data on one host. The demo Bank has no core system, so a
+random vault token stands in for the account number on approval. The
+collection worker and the scripted journey must not run at the same time,
+because the worker may collect an installment before the scripted Bank click.
+Retroactive coverage (F22) is open. The older general workflow specs that use
+future dates were not re-run against this package.

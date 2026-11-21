@@ -5,12 +5,12 @@ import { findDemoAccount } from "@/lib/auth/accounts";
 import { ledger } from "@/lib/fabric/ledger";
 import { visibleDecisions } from "@/lib/fabric/vote-visibility";
 
-const assetTypeSchema = z.enum(["partner-agreement", "hospital-invoice", "package", "policy", "claim", "evidence", "evidence-batch", "evidence-grant", "verification", "decision", "review", "appeal", "fraud-assessment", "settlement", "access", "account", "bank-transfer", "mandate", "premium-payment", "premium-adjustment", "collection", "benefit-plan", "beneficiaries", "benefit-request", "liability", "oracle-snapshot", "oracle-request", "oracle-commitment", "oracle-result", "privacy-credential", "privacy-presentation"]);
+const assetTypeSchema = z.enum(["partner-agreement", "hospital-invoice", "package", "policy", "claim", "evidence", "evidence-batch", "evidence-grant", "verification", "decision", "review", "appeal", "fraud-assessment", "settlement", "access", "account", "bank-link", "bank-transfer", "mandate", "premium-payment", "premium-adjustment", "collection", "benefit-plan", "beneficiaries", "benefit-request", "liability", "oracle-snapshot", "oracle-request", "oracle-commitment", "oracle-result", "privacy-credential", "privacy-presentation"]);
 type RouteContext = { params: Promise<{ assetType: string }> };
 
 export const runtime = "nodejs";
 
-const bankAssetTypes = new Set(["partner-agreement", "account", "bank-transfer", "mandate", "premium-payment", "premium-adjustment", "collection", "liability", "settlement"]);
+const bankAssetTypes = new Set(["partner-agreement", "account", "bank-link", "bank-transfer", "mandate", "premium-payment", "premium-adjustment", "collection", "liability", "settlement"]);
 
 export async function GET(_request: Request, context: RouteContext) {
   const session = await currentSession().catch(() => null);
@@ -215,6 +215,14 @@ export async function GET(_request: Request, context: RouteContext) {
         if (session.role !== "policyholder") { result = transfers; break; }
         const ownedPolicyIds = new Set((await ledger.listPolicies()).filter((item) => item.policyholderId === session.subjectId).map((item) => item.id));
         result = transfers.filter((item) => ownedPolicyIds.has(item.policyId));
+        break;
+      }
+      case "bank-link": {
+        if (!["bankOfficer", "insurerAdmin", "policyholder"].includes(session.role)) {
+          return NextResponse.json({ message: "Bank account link requests are visible only to the Bank, insurer, and requesting policyholder" }, { status: 403 });
+        }
+        const links = await ledger.listBankAccountLinks();
+        result = session.role === "policyholder" ? links.filter((item) => item.ownerId === session.subjectId) : links;
         break;
       }
       case "mandate": {

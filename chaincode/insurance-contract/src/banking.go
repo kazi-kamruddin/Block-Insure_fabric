@@ -167,6 +167,9 @@ func (c *Contract) ExpireBankMandate(ctx contractapi.TransactionContextInterface
 	if err != nil {
 		return nil, err
 	}
+	if err := requireNotAfterLedgerDate(ctx, "asOfDate", asOfDate); err != nil {
+		return nil, err
+	}
 	mandate, err := c.ReadBankMandate(ctx, id)
 	if err != nil {
 		return nil, err
@@ -317,6 +320,9 @@ func (c *Contract) QueuePremiumCollection(ctx contractapi.TransactionContextInte
 	if _, err := validateDate("dueDate", dueDate); err != nil {
 		return nil, err
 	}
+	if err := requireNotAfterLedgerDate(ctx, "dueDate", dueDate); err != nil {
+		return nil, err
+	}
 	collections, err := c.ListPremiumCollections(ctx)
 	if err != nil {
 		return nil, err
@@ -357,6 +363,9 @@ func (c *Contract) SchedulePremiumCollections(ctx contractapi.TransactionContext
 		return nil, err
 	}
 	if _, err := validateDate("asOfDate", asOfDate); err != nil {
+		return nil, err
+	}
+	if err := requireNotAfterLedgerDate(ctx, "asOfDate", asOfDate); err != nil {
 		return nil, err
 	}
 	mandates, err := c.ListBankMandates(ctx)
@@ -405,6 +414,53 @@ func (c *Contract) SchedulePremiumCollections(ctx contractapi.TransactionContext
 	return created, nil
 }
 
+const maxPremiumCollectionAttempts = 3
+
+// RetryPremiumCollection lets the Insurer re-present a bounced EFT installment
+// after the customer's account is funded. The Bank still derives the outcome
+// from the account balance when it processes the retry.
+func (c *Contract) RetryPremiumCollection(ctx contractapi.TransactionContextInterface, collectionID string) (*PremiumCollection, error) {
+	if _, err := requireIdentity(ctx, "InsurerMSP", "insurerAdmin"); err != nil {
+		return nil, err
+	}
+	collection, err := c.ReadPremiumCollection(ctx, collectionID)
+	if err != nil {
+		return nil, err
+	}
+	if collection.Status != "BOUNCED" {
+		return nil, fmt.Errorf("premium collection %s must be BOUNCED to retry", collectionID)
+	}
+	if collection.AttemptCount >= maxPremiumCollectionAttempts {
+		return nil, fmt.Errorf("premium collection %s has reached the maximum of %d attempts", collectionID, maxPremiumCollectionAttempts)
+	}
+	mandate, err := c.ReadBankMandate(ctx, collection.MandateID)
+	if err != nil {
+		return nil, err
+	}
+	if mandate.Status != "ACTIVE" || mandate.NextDebitDate != collection.DueDate {
+		return nil, fmt.Errorf("mandate %s no longer owes the installment due on %s", mandate.ID, collection.DueDate)
+	}
+	policy, err := c.ReadPolicy(ctx, collection.PolicyID)
+	if err != nil {
+		return nil, err
+	}
+	if policy.Status == "CANCELLED" || policy.Status == "EXPIRED" || policy.Status == "LAPSED" {
+		return nil, fmt.Errorf("policy %s cannot retry a premium from %s", policy.ID, policy.Status)
+	}
+	collection.Status = "RETRY"
+	collection.UpdatedAt, err = timestamp(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if err := overwriteAsset(ctx, "premiumCollection", collection.ID, collection); err != nil {
+		return nil, err
+	}
+	if err := emit(ctx, "PremiumCollectionRetryQueued", collection); err != nil {
+		return nil, err
+	}
+	return collection, nil
+}
+
 func (c *Contract) CompletePremiumCollection(ctx contractapi.TransactionContextInterface, collectionID, paymentID, periodEndDate, externalReferenceHash string) (*PremiumCollection, error) {
 	if _, err := requireIdentity(ctx, "BankMSP", "bankOfficer"); err != nil {
 		return nil, err
@@ -441,6 +497,32 @@ func (c *Contract) ReadPremiumCollection(ctx contractapi.TransactionContextInter
 
 func (c *Contract) ReadPremiumAdjustment(ctx contractapi.TransactionContextInterface, id string) (*PremiumAdjustment, error) {
 	return getState[PremiumAdjustment](ctx, "premiumAdjustment", id)
+}
+
+// Bangladesh has no daylight saving time, so a fixed zone keeps endorsement
+// deterministic without depending on the runtime's time zone database.
+var dhakaBusinessZone = time.FixedZone("Asia/Dhaka", 6*60*60)
+
+// ledgerBusinessDate is the Dhaka calendar date of the transaction timestamp.
+func ledgerBusinessDate(ctx contractapi.TransactionContextInterface) (string, error) {
+	now, err := transactionDate(ctx)
+	if err != nil {
+		return "", err
+	}
+	return now.In(dhakaBusinessZone).Format(time.DateOnly), nil
+}
+
+// requireNotAfterLedgerDate stops a caller from moving premium obligations
+// forward in time by supplying a future calendar date.
+func requireNotAfterLedgerDate(ctx contractapi.TransactionContextInterface, field, value string) error {
+	today, err := ledgerBusinessDate(ctx)
+	if err != nil {
+		return err
+	}
+	if value > today {
+		return fmt.Errorf("%s %s is later than the ledger business date %s", field, value, today)
+	}
+	return nil
 }
 
 func transactionDate(ctx contractapi.TransactionContextInterface) (time.Time, error) {

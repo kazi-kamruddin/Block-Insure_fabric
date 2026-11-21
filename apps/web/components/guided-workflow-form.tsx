@@ -62,6 +62,7 @@ const actionGroups: ReadonlyArray<{ label: string; operations: ReadonlySet<strin
       "queuePremiumCollection", "requestBankMandate", "cancelBankMandate", "openBankAccount",
       "adjustBankAccountBalance", "reviewBankMandate", "recordPremiumAdjustment", "processPremiumCollection",
       "expireBankMandate", "confirmBenefitPayment", "confirmSettlement",
+      "requestBankAccountLink", "reviewBankAccountLink", "cancelBankAccountLink", "schedulePremiumCollections", "retryPremiumCollection",
     ]),
   },
 ];

@@ -18,6 +18,9 @@ import { MedicalSettlementTimeline } from "@/components/medical-timeline";
 import { MedicalOCR } from "@/components/medical-ocr";
 import { PresentationGuide } from "@/components/presentation-guide";
 import { StatusBadge } from "@/components/status-badge";
+import { PremiumCenter } from "@/components/premium-center";
+import { BankDesk } from "@/components/bank-desk";
+import { PremiumOperations } from "@/components/premium-operations";
 import type { WorkflowCommand } from "@/lib/workflows/commands";
 import { bdtToMinor, workflowFormDefinitions } from "@/lib/workflows/forms";
 import { decryptEvidenceBytes, encryptEvidenceBytes, sha256Hex } from "@/lib/evidence/browser-crypto";
@@ -886,6 +889,12 @@ export function WorkspaceClient({
 
       <div className="workGrid" id="transaction-console">
         {deployment.startsWith(`${medicalDevLiteChannel}/`) && account.role === "bankOfficer" && <MedicalSettlementTimeline />}
+        {account.role === "bankOfficer" && <BankDesk />}
+        {account.role === "insurerAdmin" && <PremiumOperations />}
+        {account.role === "policyholder" && <PremiumCenter onPreparePayment={(payment) => {
+          setManualPayment((current) => ({ ...current, ...payment, challengeId: "", otp: "", demoCode: "" }));
+          document.getElementById("manual-premium")?.scrollIntoView({ behavior: "smooth" });
+        }} />}
         {medicalReview && (account.role === "policyholder" || account.role === "insurerAdmin" || account.role === "auditor") &&
           <MedicalReview role={account.role} investigationEnabled={investigationEnabled} onEvidence={(id, grant) => {
             setRetrievalEvidenceId(id); setRetrievalGrantId(grant); setDecryptedEvidence(null);
@@ -925,7 +934,7 @@ export function WorkspaceClient({
         />
 
         {account.role === "policyholder" && (
-          <article className="workCard evidenceCard">
+          <article className="workCard evidenceCard" id="manual-premium">
             <span className="kicker">Manual premium</span>
             <h2>Pay with one-time authorization</h2>
             <p className="cardNote">The Bank emails an OTP for the exact payment details and recipient. Changing a detail requires a new code. Payment completes only after a valid committed Bank transfer.</p>

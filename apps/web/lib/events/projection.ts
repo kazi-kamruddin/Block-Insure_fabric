@@ -22,7 +22,7 @@ export type BankCommunication = {
   eventId: string;
   recipientSubject: string;
   policyId: string;
-  template: "bank-transaction-status" | "bank-mandate-status" | "bank-benefit-payment";
+  template: "bank-transaction-status" | "bank-mandate-status" | "bank-benefit-payment" | "bank-link-status";
   title: string;
   assetId: string;
   amountMinor: number;
@@ -97,7 +97,17 @@ function notificationTargets(event: IndexedFabricEvent) {
       { role: "bankOfficer", subject: "", title: `EFT mandate ${text(p, "status").toLowerCase()}`, asset: text(p, "id") },
       { role: "policyholder", subject: text(p, "ownerId"), title: `EFT mandate ${text(p, "status").toLowerCase()}`, asset: text(p, "id") },
     ];
-    case "PremiumCollectionProcessed": return [{ role: "insurerAdmin", subject: "", title: `Premium collection ${text(p, "status").toLowerCase()}`, asset: text(p, "id") }];
+    case "BankMandateRequested": return [{ role: "bankOfficer", subject: "", title: "EFT mandate awaiting Bank review", asset: text(p, "id") }];
+    case "BankAccountLinkRequested": return [{ role: "bankOfficer", subject: "", title: `Account link requested for ${text(p, "maskedAccount")}`, asset: text(p, "id") }];
+    case "BankAccountLinkReviewed": return [
+      { role: "policyholder", subject: text(p, "ownerId"), title: text(p, "status") === "LINKED" ? `Bank linked account ${text(p, "maskedAccount")}` : `Bank rejected the link for ${text(p, "maskedAccount")}`, asset: text(p, "id") },
+      { role: "insurerAdmin", subject: "", title: `Customer bank link ${text(p, "status").toLowerCase()}`, asset: text(p, "id") },
+    ];
+    case "PremiumCollectionRetryQueued": return [{ role: "bankOfficer", subject: "", title: "Bounced premium collection queued for retry", asset: text(p, "id") }];
+    case "PremiumCollectionProcessed": return [
+      { role: "insurerAdmin", subject: "", title: `Premium collection ${text(p, "status").toLowerCase()}`, asset: text(p, "id") },
+      ...(text(p, "status") === "BOUNCED" ? [{ role: "policyholder", subject: "", title: "Automatic premium payment bounced: insufficient funds", asset: text(p, "policyId") }] : []),
+    ];
     case "PremiumCollectionReconciled": return [
       { role: "insurerAdmin", subject: "", title: "Queued premium was already collected", asset: text(p, "id") },
       { role: "bankOfficer", subject: "", title: "Queued premium was already collected", asset: text(p, "id") },
@@ -149,6 +159,15 @@ function communicationFor(event: IndexedFabricEvent, createdAt: string): BankCom
       assetId: text(p, "id"), amountMinor: Number(p.amountMinor ?? 0), currency: "BDT",
       status: "PENDING", adapter: "", recipient: "", messageId: "", error: "", createdAt, deliveredAt: "",
       variables: { mandateId: text(p, "id"), policyId: text(p, "policyId"), status: text(p, "status"), amountMinor: Number(p.amountMinor ?? 0), currency: "BDT" },
+    };
+  }
+  if (event.eventName === "BankAccountLinkReviewed" && text(p, "ownerId")) {
+    return {
+      id: `${event.id}:email`, eventId: event.id, recipientSubject: text(p, "ownerId"), policyId: "",
+      template: "bank-link-status", title: text(p, "status") === "LINKED" ? "Bank account linked" : "Bank account link rejected",
+      assetId: text(p, "id"), amountMinor: 0, currency: "BDT",
+      status: "PENDING", adapter: "", recipient: "", messageId: "", error: "", createdAt, deliveredAt: "",
+      variables: { linkId: text(p, "id"), bankId: text(p, "bankId"), maskedAccount: text(p, "maskedAccount"), status: text(p, "status") },
     };
   }
   if (event.eventName === "BenefitPaymentConfirmed" && text(p, "requesterId")) {

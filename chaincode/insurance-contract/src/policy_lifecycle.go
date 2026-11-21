@@ -97,6 +97,10 @@ func (c *Contract) AdvancePolicyLifecycle(ctx contractapi.TransactionContextInte
 	if err != nil {
 		return nil, err
 	}
+	// A typed future date would let the Insurer lapse a paying customer early.
+	if err := requireNotAfterLedgerDate(ctx, "asOfDate", asOfDate); err != nil {
+		return nil, err
+	}
 	policy, err := c.ReadPolicy(ctx, id)
 	if err != nil {
 		return nil, err

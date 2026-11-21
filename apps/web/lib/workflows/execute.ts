@@ -68,6 +68,18 @@ export async function executeWorkflowCommand(command: WorkflowCommand, session: 
       return ledger.openBankAccount(command);
     case "adjustBankAccountBalance":
       return ledger.adjustBankAccountBalance(command);
+    case "requestBankAccountLink":
+      return ledger.requestBankAccountLink(command);
+    case "reviewBankAccountLink":
+      if (command.outcome === "APPROVE" && (!command.accountReferenceId || !command.accountTokenHash)) throw new Error("Approval needs a new account ID and the Bank-vault token.");
+      if (command.outcome === "REJECT" && command.accountReferenceId) throw new Error("A rejected link cannot name an account.");
+      return ledger.reviewBankAccountLink(command);
+    case "cancelBankAccountLink":
+      return ledger.cancelBankAccountLink(command.id);
+    case "schedulePremiumCollections":
+      return ledger.schedulePremiumCollections(command.asOfDate);
+    case "retryPremiumCollection":
+      return ledger.retryPremiumCollection(command.collectionId);
     case "requestBankMandate":
       return ledger.requestBankMandate(command);
     case "reviewBankMandate":

@@ -128,6 +128,21 @@ export type BankTransfer = {
   createdAt: LedgerTimestamp;
 };
 
+export type BankAccountLinkRequest = {
+  assetType: "bankAccountLink";
+  schemaVersion: number;
+  id: string;
+  bankId: string;
+  ownerId: string;
+  accountLabel: string;
+  maskedAccount: string;
+  status: "PENDING" | "LINKED" | "REJECTED" | "CANCELLED";
+  accountReferenceId: string;
+  decisionHash: string;
+  createdAt: LedgerTimestamp;
+  updatedAt: LedgerTimestamp;
+};
+
 export type BankMandate = {
   assetType: "bankMandate";
   schemaVersion: number;

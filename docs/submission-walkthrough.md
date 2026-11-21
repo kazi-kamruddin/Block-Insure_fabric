@@ -1,15 +1,19 @@
-# Submission walkthrough (LevelDB dev-lite, 1.9.0 sequence 5)
+# Submission walkthrough (LevelDB dev-lite, 1.9.0 sequence 6)
 
 A second operator can use this guide to check the submitted Fabric build by hand. It uses the
 isolated LevelDB dev-lite profile: channel `insurance-dev-lite-190`, chaincode
-1.9.0 sequence 5, package SHA-256
-`03245043975c1facb582542e964f012952e8775d226726de869877fea5c0cc01`. The
+1.9.0 sequence 6, package SHA-256
+`27a6b4e4ef031feae14de9d7c222a1a973891f93ec6b7e556d9c6c5e1acaf225`.
+Sequence 6 adds bank account link requests, retries for bounced EFT
+collections, and ledger-date checks on premium dates. The medical rules are
+unchanged from sequence 5. The
 accepted 1.8.0 deployment and the CouchDB profile stay stopped throughout.
 All cases are synthetic, and the system runs on one host.
 
 The claim and settlement IDs below were left on the ledger by the
-21 November 2026 closeout run. Before that run, all five peers read back
-sequence 5 at block height 646.
+21 November 2026 closeout run on sequence 5. They survived the upgrade to
+sequence 6. Before you start, `.\scripts\dev-lite-preflight.ps1` checks
+Docker, memory, ports, volumes and the backup without changing anything.
 
 | Case | Claim | What it shows |
 | --- | --- | --- |
@@ -18,6 +22,9 @@ sequence 5 at block height 646.
 | Suspected duplicate | `medical-0e7d0805-328e-4980-8a57-861c3edcbb4d` | A positive Oracle result still required panel review. Settlement `med-settlement-bd50e423-7ae`. |
 | Final rejection | `medical-11cf830e-a30e-4aef-b976-70e4af3a8113` | Voting expired twice and the one procedural recovery was used. BDT 40.00 of cover is still reserved, so this case is ready for Part 3. |
 | Bank drill | `medical-c7eae1e1-1f26-4d26-b937-92caa6bc34a4` | The Insurer authorized settlement `med-settlement-cbb65431-1ec`, which is waiting for the Bank. Part 5 uses it. |
+| Second final rejection (sequence 6 staging) | `medical-c2164263-ef23-421b-86c5-522ce1245554` | Same state as the first final rejection. Use one to practise Part 3 and keep the other for the demonstration. |
+| Payout waiting for the Bank (sequence 6 staging) | `medical-e94d3898-c709-45ba-96f9-fd5e218dfab3` | Settlement `med-settlement-6d33c2cb-d60` is authorized. The Bank can confirm it live in **Load medical settlement** while the app runs in normal custody. |
+| EFT collections due (sequence 6 staging) | Policies `prem-policy-rich-67c216d3` and `prem-policy-poor-67c216d3` | Approved mandates due 21 November on accounts `**** 4834` (enough money) and `**** 6558` (BDT 0.50). Part 3b, step 5 uses them; they stay due on later days. |
 
 ## Part 1 — Start (about 5 minutes)
 
@@ -54,6 +61,39 @@ The chaincode decides this with the transaction time. Under the rules,
 cover is held for 30 days after a rejection while an appeal or recovery
 remains possible. The live system cannot fast-forward that time, so the
 30-day path is covered by Go tests only.
+
+## Part 3b — Bank account, premiums and automatic payment
+
+All of this happens in the browser. It adds new synthetic records.
+
+1. As **Policyholder One**, open **My bank and premiums**. Choose the Bank,
+   enter a nickname and the last four digits of an account, and select
+   **Request account link**. The request shows as PENDING.
+2. As **Bangladesh Demo Commercial Bank**, open **Bank work queue**. Set a
+   verified balance (for example 5.00) and select **Verify and link**. The
+   customer receives a notification.
+3. As the policyholder, buy a medical package in the guided workflow
+   (**Accept terms and acquire medical policy**). The policy is
+   PENDING_PAYMENT. In **My bank and premiums**, choose the linked account and
+   select **Pay first premium now**. The OTP card below is filled in. Select
+   **Email OTP**, then **Authorize premium**. The policy becomes ACTIVE.
+4. Select **Set up automatic EFT payment**. As the Bank, select
+   **Approve mandate**.
+5. To see a collection, a bounce and a retry the same day, run
+   `.\scripts\stage-dev-lite-demo.ps1 -SkipDeadline -SkipBankPayout` the
+   day before. It leaves two mandates due today, one under-funded. Then:
+   as the Insurer, **Premium collections and policy status** →
+   **Schedule due EFT collections**; as the Bank, **Collect premium** on
+   both (one completes, one bounces with insufficient funds); **Record
+   customer deposit**; as the Insurer, **Retry collection**; as the Bank,
+   **Collect premium** again.
+6. Ask the Insurer panel to lapse a policy with a future date through the
+   JSON console: the ledger refuses any date after today in Asia/Dhaka.
+
+Start the app with `-Collections` to have the worker schedule and collect
+due premiums every minute instead of clicking. With `-Email` and a Brevo
+configuration (see `tools/email-gateway/README.md`) the OTP arrives by
+email instead of on screen.
 
 ## Part 4 — Verify the dossier against the ledger
 
@@ -147,7 +187,9 @@ command to `/api/medical/bank-signing-request`.
 
 With the app running, `.\scripts\test-dev-lite-medical.ps1` repeats the
 routine, appeal and duplicate journeys. It takes about 15 minutes and adds
-new synthetic claims.
+new synthetic claims. `.\scripts\test-dev-lite-premium.ps1` repeats the
+premium journey in about 2 minutes. Run it while the app is started without
+`-Collections`, so the worker does not race the scripted Bank clicks.
 
 To stop, press Ctrl+C in the app window, then run:
 

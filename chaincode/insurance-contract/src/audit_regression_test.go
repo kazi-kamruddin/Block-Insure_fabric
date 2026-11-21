@@ -85,6 +85,8 @@ func TestPolicyExpiryIncludesLastCoverageDayAndUnpaidPolicies(t *testing.T) {
 		t.Run(status, func(t *testing.T) {
 			c := &Contract{}
 			ctx := &testContext{stub: newMemoryStub()}
+			// Ledger time is 1 January 2027 in Dhaka, so both dates are allowed.
+			ctx.stub.timestamp = timestamppb.New(time.Date(2026, time.December, 31, 18, 0, 0, 0, time.UTC))
 			setIdentity(ctx, "admin", "InsurerMSP", "insurerAdmin", nil)
 			p := &Policy{ID: "policy-expiry", Status: status, EndDate: "2026-12-31", NextPremiumDueDate: "2027-01-01"}
 			requireNoError(t, putState(ctx, "policy", p.ID, p))

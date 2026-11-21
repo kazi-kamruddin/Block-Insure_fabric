@@ -43,13 +43,9 @@ func (c *Contract) openBankAccount(ctx contractapi.TransactionContextInterface, 
 	if openingBalanceMinor < 0 {
 		return nil, fmt.Errorf("opening balance cannot be negative")
 	}
-	accountLabel = strings.TrimSpace(accountLabel)
-	maskedAccount = strings.TrimSpace(maskedAccount)
-	if accountLabel == "" || len(accountLabel) > 80 {
-		return nil, fmt.Errorf("accountLabel must contain between 1 and 80 characters")
-	}
-	if len(maskedAccount) < 4 || len(maskedAccount) > 40 || !strings.Contains(maskedAccount, "*") {
-		return nil, fmt.Errorf("maskedAccount must contain a masked display value between 4 and 40 characters")
+	accountLabel, maskedAccount, err := normalizeAccountDisplay(accountLabel, maskedAccount)
+	if err != nil {
+		return nil, err
 	}
 	if err := validateHash("accountTokenHash", accountTokenHash); err != nil {
 		return nil, err
@@ -72,6 +68,18 @@ func (c *Contract) openBankAccount(ctx contractapi.TransactionContextInterface, 
 		return nil, err
 	}
 	return account, nil
+}
+
+func normalizeAccountDisplay(accountLabel, maskedAccount string) (string, string, error) {
+	accountLabel = strings.TrimSpace(accountLabel)
+	maskedAccount = strings.TrimSpace(maskedAccount)
+	if accountLabel == "" || len(accountLabel) > 80 {
+		return "", "", fmt.Errorf("accountLabel must contain between 1 and 80 characters")
+	}
+	if len(maskedAccount) < 4 || len(maskedAccount) > 40 || !strings.Contains(maskedAccount, "*") {
+		return "", "", fmt.Errorf("maskedAccount must contain a masked display value between 4 and 40 characters")
+	}
+	return accountLabel, maskedAccount, nil
 }
 
 func (c *Contract) AdjustBankAccountBalance(ctx contractapi.TransactionContextInterface, transferID, accountID, direction string, amountMinor int64, externalReferenceHash string) (*BankTransfer, error) {
@@ -429,6 +437,9 @@ func (c *Contract) ProcessPremiumCollection(ctx contractapi.TransactionContextIn
 	}
 	if collection.Status != "DUE" && collection.Status != "RETRY" {
 		return nil, fmt.Errorf("premium collection %s is not due", collectionID)
+	}
+	if err := requireNotAfterLedgerDate(ctx, "collection due date", collection.DueDate); err != nil {
+		return nil, err
 	}
 	mandate, err := c.ReadBankMandate(ctx, collection.MandateID)
 	if err != nil {

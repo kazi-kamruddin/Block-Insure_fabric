@@ -7,7 +7,7 @@ import { ledger } from "@/lib/fabric/ledger";
 import { canSeeDecision } from "@/lib/fabric/vote-visibility";
 
 const routeSchema = z.object({
-  assetType: z.enum(["partner-agreement", "hospital-invoice", "package", "policy", "claim", "evidence", "evidence-batch", "evidence-grant", "verification", "decision", "review", "appeal", "fraud-assessment", "settlement", "claim-history", "account", "bank-transfer", "mandate", "premium-payment", "premium-adjustment", "collection", "benefit-plan", "beneficiaries", "benefit-request", "liability", "oracle-snapshot", "oracle-request", "oracle-commitment", "oracle-result", "oracle-history", "privacy-credential", "privacy-presentation"]),
+  assetType: z.enum(["partner-agreement", "hospital-invoice", "package", "policy", "claim", "evidence", "evidence-batch", "evidence-grant", "verification", "decision", "review", "appeal", "fraud-assessment", "settlement", "claim-history", "account", "bank-link", "bank-transfer", "mandate", "premium-payment", "premium-adjustment", "collection", "benefit-plan", "beneficiaries", "benefit-request", "liability", "oracle-snapshot", "oracle-request", "oracle-commitment", "oracle-result", "oracle-history", "privacy-credential", "privacy-presentation"]),
   id: ledgerIdSchema,
 });
 
@@ -15,7 +15,7 @@ type RouteContext = { params: Promise<{ assetType: string; id: string }> };
 
 export const runtime = "nodejs";
 
-const bankAssetTypes = new Set(["partner-agreement", "account", "bank-transfer", "mandate", "premium-payment", "premium-adjustment", "collection", "liability", "settlement"]);
+const bankAssetTypes = new Set(["partner-agreement", "account", "bank-link", "bank-transfer", "mandate", "premium-payment", "premium-adjustment", "collection", "liability", "settlement"]);
 
 export async function GET(_request: Request, context: RouteContext) {
   const session = await currentSession().catch(() => null);
@@ -259,6 +259,15 @@ export async function GET(_request: Request, context: RouteContext) {
         const transfer = await ledger.readBankTransfer(id);
         if (session.role === "policyholder" && (!transfer.policyId || (await ledger.readPolicy(transfer.policyId)).policyholderId !== session.subjectId)) return NextResponse.json({ message: "Asset is not owned by this account" }, { status: 403 });
         result = transfer;
+        break;
+      }
+      case "bank-link": {
+        if (!["bankOfficer", "insurerAdmin", "policyholder"].includes(session.role)) {
+          return NextResponse.json({ message: "Bank account link requests are visible only to the Bank, insurer, and requesting policyholder" }, { status: 403 });
+        }
+        const link = await ledger.readBankAccountLink(id);
+        if (session.role === "policyholder" && link.ownerId !== session.subjectId) return NextResponse.json({ message: "Asset is not owned by this account" }, { status: 403 });
+        result = link;
         break;
       }
       case "mandate": {

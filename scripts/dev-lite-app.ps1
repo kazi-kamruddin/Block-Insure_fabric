@@ -1,5 +1,8 @@
 [CmdletBinding()]
-param([switch]$TwoOracles, [switch]$CouchDB)
+# -Collections starts the automatic EFT premium collection worker.
+# -Email sends OTPs and Bank notices through the local Brevo connector, which
+# needs data/<profile>/email-gateway.json (see tools/email-gateway/README.md).
+param([switch]$TwoOracles, [switch]$CouchDB, [switch]$Collections, [switch]$Email)
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 $profile = if ($CouchDB) { 'dev-lite-couchdb' } else { 'dev-lite' }
@@ -8,18 +11,26 @@ $web = Join-Path $root 'apps/web'
 $workers = Join-Path $root 'services/oracle-worker'
 $port = 3219
 $oraclePorts = if ($TwoOracles) { @(3311,3312) } else { @(3311,3312,3313) }
-if (@(Get-NetTCPConnection -LocalPort (@($port) + $oraclePorts) -State Listen -ErrorAction SilentlyContinue).Count) {
+$emailPort = 3330
+$ownedPorts = @($port) + $oraclePorts + $(if ($Email) { @($emailPort) } else { @() })
+if (@(Get-NetTCPConnection -LocalPort $ownedPorts -State Listen -ErrorAction SilentlyContinue).Count) {
     throw 'A dev-lite app or worker port already has an owner.'
 }
 if (-not (Test-Path -LiteralPath (Join-Path $state 'enrollment-complete'))) {
     throw "Enroll and deploy through network.sh --$profile before starting the app."
 }
 $secretPath = Join-Path $state 'app-secrets.json'
-if (-not (Test-Path -LiteralPath $secretPath)) {
-    $secret = @{}
+$secretNames = 'AUTH_SECRET','OTP_SECRET','ORACLE_REGISTRY_API_TOKEN','EVENT_WORKER_SECRET','FABRIC_MEDICAL_REVIEW_NOTE_KEY','BANKING_WORKER_SECRET','EMAIL_GATEWAY_TOKEN'
+$secret = [ordered]@{}
+if (Test-Path -LiteralPath $secretPath) {
+    foreach ($setting in (Get-Content -LiteralPath $secretPath -Raw | ConvertFrom-Json).PSObject.Properties) { $secret[$setting.Name] = $setting.Value }
+}
+# Existing secrets are never replaced; only newly introduced names are added.
+$missing = @($secretNames | Where-Object { -not $secret.Contains($_) })
+if ($missing.Count) {
     $rng = [Security.Cryptography.RandomNumberGenerator]::Create()
     try {
-        foreach ($name in 'AUTH_SECRET','OTP_SECRET','ORACLE_REGISTRY_API_TOKEN','EVENT_WORKER_SECRET','FABRIC_MEDICAL_REVIEW_NOTE_KEY') {
+        foreach ($name in $missing) {
             $bytes = New-Object byte[] 32
             $rng.GetBytes($bytes)
             $secret[$name] = ([BitConverter]::ToString($bytes)).Replace('-', '').ToLowerInvariant()
@@ -46,8 +57,20 @@ $env:SESSION_COOKIE_SECURE = 'false'
 $env:APP_ORIGIN = "http://127.0.0.1:$port"
 $env:ORACLE_REGISTRY_API_URL = "$env:APP_ORIGIN/api/public/oracle-registries"
 $env:EVENT_SYNC_URL = "$env:APP_ORIGIN/api/internal/events/sync"
-$env:EMAIL_GATEWAY_URL = ' '
-$env:EMAIL_GATEWAY_TOKEN = ' '
+$env:BANKING_COLLECTION_URL = "$env:APP_ORIGIN/api/internal/banking/collections"
+$env:BANKING_BUSINESS_TIMEZONE = 'Asia/Dhaka'
+if (-not $env:BANKING_COLLECTION_INTERVAL_MS) { $env:BANKING_COLLECTION_INTERVAL_MS = '60000' }
+$emailConfig = Join-Path $state 'email-gateway.json'
+if ($Email) {
+    if (-not (Test-Path -LiteralPath $emailConfig)) { throw "-Email needs $emailConfig. See tools/email-gateway/README.md." }
+    $env:EMAIL_GATEWAY_URL = "http://127.0.0.1:$emailPort/send"
+    $env:EMAIL_GATEWAY_CONFIG = $emailConfig
+    $env:EMAIL_GATEWAY_PORT = "$emailPort"
+} else {
+    # A blank gateway selects the on-screen demo delivery.
+    $env:EMAIL_GATEWAY_URL = ' '
+    $env:EMAIL_GATEWAY_TOKEN = ' '
+}
 $env:ORACLE_STATE_ROOT = Join-Path $state 'oracle'
 $env:EVIDENCE_STORAGE_ROOT = Join-Path $state 'evidence'
 $env:EVENT_PROJECTION_ROOT = Join-Path $state 'events'
@@ -70,6 +93,15 @@ function Launch([string]$Name, [string]$Directory, [string[]]$Arguments) {
 }
 
 try {
+    if ($Email) {
+        Launch 'email' $root @('tools/email-gateway/server.mjs')
+        $emailReady = $false
+        for ($attempt = 0; $attempt -lt 15; $attempt++) {
+            try { if ((Invoke-RestMethod "http://127.0.0.1:$emailPort/health" -TimeoutSec 2).status -eq 'ONLINE') { $emailReady = $true; break } } catch {}
+            Start-Sleep -Seconds 1
+        }
+        if (-not $emailReady) { throw 'The local email connector did not report ONLINE. Check its log under data/<profile>/logs.' }
+    }
     Launch 'web' $web @('node_modules/next/dist/bin/next','dev','--port',"$port",'--hostname','127.0.0.1')
     $healthy = $false
     for ($attempt = 0; $attempt -lt 30; $attempt++) {
@@ -89,6 +121,7 @@ try {
         Launch "oracle$id" $workers @('src/index.mjs')
     }
     Launch 'events' $web @('scripts/sync-events.mjs')
+    if ($Collections) { Launch 'collections' $web @('scripts/process-premium-collections.mjs') }
     $online = $false
     for ($attempt = 0; $attempt -lt 30; $attempt++) {
         $ready = @($oraclePorts | Where-Object {
@@ -99,6 +132,8 @@ try {
         Start-Sleep -Seconds 1
     }
     if (-not $online) { throw 'Dev-lite Oracle readiness did not confirm every selected worker.' }
+    $extras = @($(if ($Collections) { 'automatic premium collection' }), $(if ($Email) { 'email delivery through Brevo' })) | Where-Object { $_ }
+    if ($extras.Count) { Write-Host "Also running: $($extras -join ', ')." }
     Write-Host "Dev-lite application is available at $env:APP_ORIGIN. Stop this controller to stop its processes."
     while ($true) { Start-Sleep -Seconds 2 }
 } finally {

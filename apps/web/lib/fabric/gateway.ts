@@ -18,6 +18,20 @@ function deadlineAfter(seconds: number) {
   return () => new Date(Date.now() + seconds * 1_000);
 }
 
+// Endorsement failures report "see attached details"; the chaincode's reason is
+// only in error.details. Append it to the message so callers and the UI can
+// show why the ledger refused. The error object itself is kept for instanceof checks.
+export function withPeerReasons(error: unknown) {
+  if (!(error instanceof Error)) return error;
+  const details = (error as Error & { details?: unknown }).details;
+  if (!Array.isArray(details)) return error;
+  const reasons = [...new Set(details
+    .map((detail) => typeof detail?.message === "string" ? detail.message.replace(/^chaincode response \d+,\s*/, "").trim() : "")
+    .filter((reason) => reason && !error.message.includes(reason)))];
+  if (reasons.length) error.message = `${error.message}: ${reasons.join("; ")}`;
+  return error;
+}
+
 export async function withFabricContract<T>(
   role: FabricRole,
   action: (contract: Contract, gateway: Gateway, identity: Identity) => Promise<T>,
@@ -63,6 +77,8 @@ export async function withFabricContract<T>(
     const network = gateway.getNetwork(config.channelName);
     const contract = network.getContract(config.chaincodeName);
     return await action(contract, gateway, identity);
+  } catch (error) {
+    throw withPeerReasons(error);
   } finally {
     gateway.close();
     client.close();

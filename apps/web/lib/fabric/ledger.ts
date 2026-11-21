@@ -11,6 +11,7 @@ import { openMedicalReviewNote, sealMedicalReviewNote } from "./medical-review-n
 import type {
   AuditorDecision,
   BankAccountReference,
+  BankAccountLinkRequest,
   BankMandate,
   BankTransfer,
   BeneficiaryDesignation,
@@ -275,6 +276,14 @@ export const ledger = {
 
   listBankTransfers() {
     return evaluate<BankTransfer[]>("bankOfficer", "ListBankTransfers");
+  },
+
+  readBankAccountLink(id: string) {
+    return evaluate<BankAccountLinkRequest>("insurerAdmin", "ReadBankAccountLink", id);
+  },
+
+  listBankAccountLinks() {
+    return evaluate<BankAccountLinkRequest[]>("insurerAdmin", "ListBankAccountLinks");
   },
 
   readBankMandate(id: string) {
@@ -632,6 +641,23 @@ export const ledger = {
     return submit<BankMandate>("bankOfficer", "ReviewBankMandate", id, outcome, decisionHash);
   },
 
+  requestBankAccountLink(input: { id: string; bankId: string; accountLabel: string; maskedAccount: string }) {
+    return submit<BankAccountLinkRequest>("policyholder", "RequestBankAccountLink", input.id, input.bankId, input.accountLabel, input.maskedAccount);
+  },
+
+  reviewBankAccountLink(input: { id: string; outcome: "APPROVE" | "REJECT"; accountReferenceId: string; decisionHash: string; accountTokenHash: string; openingBalanceMinor: number }) {
+    const args = [input.id, input.outcome, input.outcome === "APPROVE" ? input.accountReferenceId : "", input.decisionHash];
+    // The account token and balance stay in transient data, as for OpenPrivateBankAccount.
+    return input.outcome === "APPROVE"
+      ? submitWithTransient<BankAccountLinkRequest>("bankOfficer", "ReviewBankAccountLink", args,
+        { bankAccountPrivate: JSON.stringify({ accountTokenHash: input.accountTokenHash, openingBalanceMinor: input.openingBalanceMinor }) })
+      : submit<BankAccountLinkRequest>("bankOfficer", "ReviewBankAccountLink", ...args);
+  },
+
+  cancelBankAccountLink(id: string) {
+    return submit<BankAccountLinkRequest>("policyholder", "CancelBankAccountLink", id);
+  },
+
   cancelBankMandate(id: string) {
     return submit<BankMandate>("policyholder", "CancelBankMandate", id);
   },
@@ -659,6 +685,10 @@ export const ledger = {
 
   queuePremiumCollection(id: string, mandateId: string, dueDate: string) {
     return submit<PremiumCollection>("insurerAdmin", "QueuePremiumCollection", id, mandateId, dueDate);
+  },
+
+  retryPremiumCollection(collectionId: string) {
+    return submit<PremiumCollection>("insurerAdmin", "RetryPremiumCollection", collectionId);
   },
 
   schedulePremiumCollections(asOfDate: string) {
