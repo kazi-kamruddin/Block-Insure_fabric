@@ -1,10 +1,11 @@
 import { redirect } from "next/navigation";
 import { SiteHeader } from "@/components/site-header";
 import { WorkspaceClient } from "@/components/workspace-client";
-import { findDemoAccount, workspaceForAccount } from "@/lib/auth/accounts";
+import { workspaceAccountForSession, workspaceForAccount } from "@/lib/auth/accounts";
 import { currentSession } from "@/lib/auth/current-session";
 import { loadRoleDashboard } from "@/lib/dashboard/load-dashboard";
 import { loadFabricConfig } from "@/lib/fabric/config";
+import { onboardingEnabled } from "@/lib/customers/settings";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +16,7 @@ export default async function RoleWorkspacePage({ params }: PageContext) {
   const session = await currentSession().catch(() => null);
   if (!session) redirect("/workspace");
 
-  const account = findDemoAccount(session.accountId);
+  const account = workspaceAccountForSession(session);
   if (!account) redirect("/workspace");
 
   const canonicalWorkspace = workspaceForAccount(account);
@@ -47,6 +48,7 @@ export default async function RoleWorkspacePage({ params }: PageContext) {
       />
       <main id="main-content" tabIndex={-1} className={`workspacePage workspacePage-${canonicalWorkspace}`}>
         <WorkspaceClient initialAccount={account} initialDashboard={dashboard} deployment={`${config.channelName}/${config.chaincodeName}`}
+          onboardingEnabled={onboardingEnabled()}
           medicalReviewEnabled={process.env.FABRIC_MEDICAL_REVIEW_ENABLED === "true"}
           investigationEnabled={Boolean(process.env.MEDICAL_FINDINGS_ROOT?.trim()) && account.role === "insurerAdmin" &&
             process.env.MEDICAL_FINDINGS_INVESTIGATOR?.trim() === account.id} />

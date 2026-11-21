@@ -2,8 +2,10 @@
 # -Collections starts the automatic EFT premium collection worker.
 # -Email sends OTPs and Bank notices through the local Brevo connector, which
 # needs data/<profile>/email-gateway.json (see tools/email-gateway/README.md).
-param([switch]$TwoOracles, [switch]$CouchDB, [switch]$Collections, [switch]$Email)
+# -Onboarding enables LevelDB dev-lite customer accounts and starts its Insurer CA.
+param([switch]$TwoOracles, [switch]$CouchDB, [switch]$Collections, [switch]$Email, [switch]$Onboarding)
 $ErrorActionPreference = 'Stop'
+if ($Onboarding -and $CouchDB) { throw '-Onboarding requires the LevelDB dev-lite profile.' }
 $root = Split-Path -Parent $PSScriptRoot
 $profile = if ($CouchDB) { 'dev-lite-couchdb' } else { 'dev-lite' }
 $state = Join-Path $root "data/$profile"
@@ -19,11 +21,28 @@ if (@(Get-NetTCPConnection -LocalPort $ownedPorts -State Listen -ErrorAction Sil
 if (-not (Test-Path -LiteralPath (Join-Path $state 'enrollment-complete'))) {
     throw "Enroll and deploy through network.sh --$profile before starting the app."
 }
+$onboardingCa = $null
+if ($Onboarding) {
+    $caContainers = @(& docker ps -a --no-trunc `
+        --filter 'label=com.docker.compose.project=block-insure-dev-lite' `
+        --filter 'label=com.docker.compose.service=ca-insurer' `
+        --format '{{.ID}}|{{.Names}}|{{.State}}')
+    if ($LASTEXITCODE -ne 0 -or $caContainers.Count -ne 1) {
+        throw 'Expected exactly one existing LevelDB dev-lite Insurer CA.'
+    }
+    $ca = [regex]::Match($caContainers[0], '^(?<id>[0-9a-f]{64})\|block-insure-dev-lite-ca-insurer-1\|(?:exited|created)$')
+    if (-not $ca.Success) { throw 'Expected the existing LevelDB dev-lite Insurer CA to be stopped.' }
+    $onboardingCa = $ca.Groups['id'].Value
+}
 $secretPath = Join-Path $state 'app-secrets.json'
 $secretNames = 'AUTH_SECRET','OTP_SECRET','ORACLE_REGISTRY_API_TOKEN','EVENT_WORKER_SECRET','FABRIC_MEDICAL_REVIEW_NOTE_KEY','BANKING_WORKER_SECRET','EMAIL_GATEWAY_TOKEN'
+if ($Onboarding) { $secretNames += 'CUSTOMER_WALLET_KEY','CUSTOMER_PII_KEY' }
 $secret = [ordered]@{}
 if (Test-Path -LiteralPath $secretPath) {
-    foreach ($setting in (Get-Content -LiteralPath $secretPath -Raw | ConvertFrom-Json).PSObject.Properties) { $secret[$setting.Name] = $setting.Value }
+    try { $settings = Get-Content -LiteralPath $secretPath -Raw | ConvertFrom-Json }
+    catch { throw 'Dev-lite app-secrets.json could not be read as JSON.' }
+    if (-not ($settings -is [pscustomobject])) { throw 'Dev-lite app-secrets.json must contain a JSON object.' }
+    foreach ($setting in $settings.PSObject.Properties) { $secret[$setting.Name] = $setting.Value }
 }
 # Existing secrets are never replaced; only newly introduced names are added.
 $missing = @($secretNames | Where-Object { -not $secret.Contains($_) })
@@ -38,8 +57,9 @@ if ($missing.Count) {
     } finally { $rng.Dispose() }
     $secret | ConvertTo-Json | Set-Content -LiteralPath $secretPath -Encoding Ascii
 }
-$settings = Get-Content -LiteralPath $secretPath -Raw | ConvertFrom-Json
-foreach ($setting in $settings.PSObject.Properties) { Set-Item -LiteralPath "Env:$($setting.Name)" -Value $setting.Value }
+foreach ($setting in $secret.GetEnumerator()) { Set-Item -LiteralPath "Env:$($setting.Key)" -Value $setting.Value }
+$env:DEV_LITE_ONBOARDING = if ($Onboarding) { 'true' } else { 'false' }
+if ($Onboarding) { $env:CUSTOMER_STATE_ROOT = $state }
 $env:FABRIC_CHANNEL_NAME = 'insurance-dev-lite-190'
 $env:FABRIC_CHAINCODE_NAME = 'insurance-contract'
 $env:FABRIC_EXPECTED_SCHEMA_VERSION = '15'
@@ -85,6 +105,7 @@ $stamp = [DateTime]::UtcNow.ToString('yyyyMMdd-HHmmss-ffff')
 $logs = Join-Path $state 'logs'
 New-Item -ItemType Directory -Path $logs -Force | Out-Null
 $children = [Collections.Generic.List[object]]::new()
+$startedOnboardingCA = $false
 function Launch([string]$Name, [string]$Directory, [string[]]$Arguments) {
     $receipt = & node (Join-Path $PSScriptRoot 'start-background-node.mjs') --directory $Directory --stdout (Join-Path $logs "$stamp-$Name.out.log") --stderr (Join-Path $logs "$stamp-$Name.err.log") -- @Arguments
     if ($LASTEXITCODE -ne 0) { throw "Could not start dev-lite $Name" }
@@ -93,6 +114,11 @@ function Launch([string]$Name, [string]$Directory, [string[]]$Arguments) {
 }
 
 try {
+    if ($onboardingCa) {
+        & docker start $onboardingCa | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw 'Could not start the existing LevelDB dev-lite Insurer CA.' }
+        $startedOnboardingCA = $true
+    }
     if ($Email) {
         Launch 'email' $root @('tools/email-gateway/server.mjs')
         $emailReady = $false
@@ -132,15 +158,22 @@ try {
         Start-Sleep -Seconds 1
     }
     if (-not $online) { throw 'Dev-lite Oracle readiness did not confirm every selected worker.' }
-    $extras = @($(if ($Collections) { 'automatic premium collection' }), $(if ($Email) { 'email delivery through Brevo' })) | Where-Object { $_ }
+    $extras = @($(if ($Collections) { 'automatic premium collection' }), $(if ($Email) { 'email delivery through Brevo' }), $(if ($Onboarding) { 'customer onboarding' })) | Where-Object { $_ }
     if ($extras.Count) { Write-Host "Also running: $($extras -join ', ')." }
     Write-Host "Dev-lite application is available at $env:APP_ORIGIN. Stop this controller to stop its processes."
     while ($true) { Start-Sleep -Seconds 2 }
 } finally {
-    foreach ($child in $children) {
-        $process = Get-Process -Id $child.Id -ErrorAction SilentlyContinue
-        if ($process -and $process.ProcessName -eq 'node' -and $process.StartTime.ToUniversalTime().Ticks -eq $child.Started) {
-            Stop-Process -Id $child.Id
+    try {
+        foreach ($child in $children) {
+            $process = Get-Process -Id $child.Id -ErrorAction SilentlyContinue
+            if ($process -and $process.ProcessName -eq 'node' -and $process.StartTime.ToUniversalTime().Ticks -eq $child.Started) {
+                Stop-Process -Id $child.Id -ErrorAction Continue
+            }
+        }
+    } finally {
+        if ($startedOnboardingCA) {
+            & docker stop $onboardingCa | Out-Null
+            if ($LASTEXITCODE -ne 0) { Write-Warning 'Could not stop the Insurer CA started by this controller.' }
         }
     }
 }

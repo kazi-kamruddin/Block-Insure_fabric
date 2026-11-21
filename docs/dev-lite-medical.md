@@ -285,6 +285,76 @@ because the worker may collect an installment before the scripted Bank click.
 Retroactive coverage (F22) is open. The older general workflow specs that use
 future dates were not re-run against this package.
 
+## Customer onboarding (21 November 2026 onward)
+
+On `insurance-dev-lite-190`, start the existing sequence-7 lab and run
+`.scriptsdev-lite-app.ps1 -TwoOracles -Onboarding` from PowerShell. The
+controller starts the existing stopped Insurer CA by container ID and stops
+it when the controller exits. It adds the wallet and profile HMAC keys to the
+existing app secret store when those entries are absent. The default rehearsal
+uses browser-visible codes on loopback. It does not need the email connector.
+
+An email code expires in ten minutes and allows five attempts. Resends wait
+60 seconds, with five sends per address and twenty per IP per hour. The
+loopback-only listener shares a single IP bucket. Completed sign-in rotates
+the signed session, and suspension blocks further Gateway signatures. An
+email-verified customer who interrupted sign-up can use **Customer sign-in** to
+recover the profile form before KYC. Only active customers get a ledger session.
+
+The Insurer approves the off-chain profile, then the CA issues an X.509 client
+certificate with `role=policyholder` and `subjectId=<memberId>`. The app
+persists an encrypted enrollment credential before registration and an
+encrypted P-256 private key before enrollment. It clears the enrollment
+credential after saving the key and certificate. The same member ID is used
+for the insurance card and for the signed policy and claim writes. The Bank's
+existing identity still executes the simulated money movements.
+
+The Hospital enters the member ID from the card when recording a stay. The
+episode stores the hash, and only the Insurer can look up the corresponding
+active profile and see the name and date of birth. The Insurer still confirms
+the association on-chain. Email, phone, date of birth, consent and the KYC
+decision stay off-chain. The national ID is retained as a keyed digest and a
+three-digit suffix.
+
+Run `.scripts	est-dev-lite-onboarding.ps1` against the running app.
+It checks all five peer definitions before running Playwright, disables
+traces, video and screenshots, and writes a sanitized journey and peer
+readback under `data/dev-lite/onboarding-20261121/`. Requests from failed
+attempts still count toward the hourly limit. If a run stops after confirmed
+payment, `-ResumeRun <dated evidence directory name>` checks the existing
+settlement and finishes the account checks within the same code-limit window.
+
+| Check | Result and evidence |
+| --- | --- |
+| Peer definitions | All five peers reported 1.9.0 sequence 7. See `data/dev-lite/onboarding-20261121/peer-definitions.txt`. |
+| Enrollment through settlement | Two customers registered and enrolled with CA HTTP 201 for each operation. The rejected profile had no wallet. The Insurer peer returned the enrolled member as policy owner. A BDT 1,250 OTP premium activated cover and the Insurer confirmed the Hospital match. Oracle auto-approval led to one BDT 64,000 payout. The 156.8-second run completed payment, then stopped on a certificate assertion in the wrong response. See `data/dev-lite/onboarding-20261121/20261121T1541558972Z/journey.json`. |
+| Settlement readback and remaining checks | The 120.8-second continuation matched the settlement certificate to the Bank view without replaying the payout. The insurance card fit at 320 px. The second member's policy and claim reads returned 403, and a cross-customer write returned 409. Both customer sign-in and an existing session transaction returned 401 after suspension. The sixth code request returned 429 after the resend cooldown. See `data/dev-lite/onboarding-20261121/20261121T1547254384Z/journey.json`. |
+| Premium regression | One legacy-policyholder journey passed in 1.8 minutes, including OTP, EFT, a bounced debit, funding and retry. See `data/dev-lite/premium-journey/20261121-154939-8647/report.json`. |
+| Medical regression | All three legacy-policyholder cases passed: routine and payout recovery (192.5 s), corrected appeal (537.0 s) and suspected duplicate (171.3 s). The reports are in the `routine/`, `appeal/` and `duplicate/` subdirectories of `data/dev-lite/medical-rehearsal/20261121-155136-3140/`. |
+| Shutdown | All five peers still reported 1.9.0 sequence 7 after testing. The app, Insurer CA and development network were stopped. All six volume names and twelve Compose container IDs matched the pre-run inventory. See `data/dev-lite/onboarding-20261121/network-after.json`. |
+| Offline gates | Web lint (16.0 s), typecheck (7.3 s), Vitest 169/169 (12.6 s), connector 6/6 (0.46 s), Oracle worker syntax (1.8 s) and both unchanged Go packages passed. The production build (30.1 s) and its offline browser suite, 11/11 (30.9 s), passed. The generated build was deleted and the original build and Next declaration were restored. See `data/dev-lite/onboarding-20261121/offline-gates-final.log`. |
+
+The scope is synthetic, one-host, live LevelDB dev-lite. This setup uses a custodial Gateway, an
+in-process file-store lock, an off-chain KYC record, a single host and
+synthetic people. Suspension is an application control. The run does not
+verify CRL revocation, real email delivery, identity verification against a
+national registry or automated certificate renewal.
+
+### Onboarding implementation files
+
+| Directory | Files and responsibilities |
+| --- | --- |
+| `apps/web/app/api/auth/` | `signup/route.ts` verifies and submits profiles, `login/route.ts` rotates customer sessions, and `session/route.ts` returns the active account view. |
+| `apps/web/app/api/customer/`, `apps/web/app/api/insurer/` | `profile/route.ts` provides self-service profile and email changes. `customers/route.ts` serves the Insurer queue, KYC decisions and member-ID matching. |
+| `apps/web/lib/auth/` | `customer-auth.ts` handles enrollment and sign-in code responses and cookies, `email-code.ts` persists code digests and limits, and `customer-recipient.ts` resolves the current premium recipient. `current-session.ts` checks active status and the current session ID, `session-token.ts` carries that ID, and `accounts.ts` maps a customer session for the workspace. |
+| `apps/web/lib/customers/` | `settings.ts` scopes the feature, `member-id.ts` allocates IDs, `pii.ts` digests the national ID, `state-file.ts` provides serialized atomic storage, `store.ts` defines the records and response view, `wallet.ts` encrypts signing material, and `onboarding.ts` applies KYC decisions and resumes certificate issuance. `customers.test.ts` exercises those controls and the code limits. |
+| `apps/web/lib/fabric/` | `ca-client.ts` generates the CSR and calls the Insurer CA. `gateway.ts` selects the active customer's wallet and checks the session before signing. `ca-client.test.ts` verifies the wire format and CSR, and `gateway-customer.test.ts` checks refusal before credentials load. |
+| `apps/web/app/api/banking/` | `otp/route.ts` binds the challenge to the customer's email. `premium-payment/route.ts` checks the same recipient when consuming it. `otp/route.test.ts` covers the existing Bank OTP behavior with that dependency. |
+| `apps/web/app/`, `apps/web/components/` | `signup/page.tsx`, `signin/page.tsx`, `workspace/page.tsx`, `workspace/[workspace]/page.tsx` and `globals.css` wire customer entry, workspace and print layout. `customer-access-page.tsx`, `customer-access.tsx` and `customer-api.ts` provide the shared forms and client. `customer-portal.tsx` shows the profile and card. `customer-onboarding-queue.tsx`, `workspace-client.tsx` and `medical-intake.tsx` integrate the Insurer queue and matching. `apps/web/lib/workflows/forms.ts` labels the Hospital's member-ID field. |
+| `tools/email-gateway/`, `scripts/` | `gateway.mjs` adds recipient policy and customer templates, with cases in `gateway.test.mjs`. `dev-lite-app.ps1` manages the existing CA and the two new key entries. `test-dev-lite-onboarding.ps1` gates and runs the isolated journey. |
+| `apps/web/` | `e2e/onboarding-journey.spec.ts` exercises the live case, and `playwright.onboarding.config.ts` gives it a separate runner. `playwright.premium.config.ts` and `playwright.medical.config.ts` support protected regression artifacts. |
+| Documentation | This runbook, `docs/submission-walkthrough.md`, `docs/results/FINDINGS.md`, and the local `.project-context/03_CURRENT_STATE.md` record the journey and its limits. The numbered local handoff mirrors those updates. |
+
 ## Realistic amounts and cover rules on sequence 7 (21 November 2026)
 
 Sequence 7 makes the dev-lite demonstration use realistic Bangladeshi taka

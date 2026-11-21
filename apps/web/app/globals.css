@@ -2822,3 +2822,101 @@ code {
     transition: none;
   }
 }
+.customerAccess {
+  max-width: 44rem;
+}
+
+.customerAccessOptions {
+  margin-block: 1.5rem;
+}
+
+.customerWorkspace,
+.customerQueueEntry {
+  min-width: 0;
+}
+
+.customerAccess .guidedForm,
+.customerWorkspace .guidedForm,
+.customerQueueEntry .guidedForm {
+  margin-block: 1rem;
+}
+
+.customerAccess .guidedForm input,
+.customerWorkspace .guidedForm input,
+.customerQueueEntry .guidedForm input {
+  min-width: 0;
+}
+
+.guidedForm .customerConsent {
+  display: flex;
+  align-items: start;
+  gap: .6rem;
+}
+
+.guidedForm .customerConsent input {
+  width: auto;
+  flex: 0 0 auto;
+  margin: .2em 0 0;
+}
+
+.customerCardDetails {
+  display: grid;
+  grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr);
+  gap: .35rem .8rem;
+}
+
+.customerCardDetails dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.customerEmail {
+  overflow-wrap: anywhere;
+}
+
+.customerQueueEntry {
+  display: block;
+  margin-top: .75rem;
+}
+
+.customerCardControls label {
+  display: grid;
+  max-width: 100%;
+}
+
+.customerCardControls select {
+  width: 100%;
+  min-width: 0;
+}
+
+@media print {
+  body:has(#insurance-card) {
+    background: #fff;
+    color: #000;
+  }
+
+  body:has(#insurance-card) > :not(.workspacePage),
+  body:has(#insurance-card) .workspace > :not(.customerWorkspace),
+  body:has(#insurance-card) .customerWorkspace > :not(#insurance-card),
+  #insurance-card .customerCardControls {
+    display: none !important;
+  }
+
+  body:has(#insurance-card) .workspacePage,
+  body:has(#insurance-card) .workspace,
+  body:has(#insurance-card) .customerWorkspace {
+    display: block;
+    margin: 0;
+    padding: 0;
+  }
+
+  #insurance-card {
+    break-inside: avoid;
+    margin: 0;
+    padding: 1rem;
+    border: 1px solid #000;
+    background: #fff;
+    color: #000;
+    box-shadow: none;
+  }
+}

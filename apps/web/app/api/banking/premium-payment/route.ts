@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createHmac } from "node:crypto";
 import { z } from "zod";
 import { premiumIntentSchema, premiumOtpBinding } from "@/lib/banking/premium-intent";
-import { findDemoAccount } from "@/lib/auth/accounts";
+import { policyholderRecipient } from "@/lib/auth/customer-recipient";
 import { currentSession, sessionSecret } from "@/lib/auth/current-session";
 import { ledger } from "@/lib/fabric/ledger";
 import { otpChallenges } from "@/lib/banking/otp";
@@ -42,7 +42,7 @@ export async function POST(request: Request) {
     }
     if (recoverOnly) return NextResponse.json({ status: "UNRESOLVED", message: "No matching committed transfer is visible. An unknown submission is not permission to create another payment." }, { status: 202 });
     if (!challengeId || !otp) throw new Error("A valid OTP challenge is required for a new payment");
-    const recipient = findDemoAccount(session.accountId)?.email ?? process.env.POLICYHOLDER_OTP_EMAIL;
+    const recipient = await policyholderRecipient(session);
     if (!recipient) throw new Error("No OTP recipient is configured");
     otpChallenges.consume(challengeId, otp, premiumOtpBinding(payment, session.subjectId, recipient), otpSecret());
     const authorizationHash = createHmac("sha256", otpSecret()).update(`${challengeId}:${session.subjectId}:consumed`).digest("hex");

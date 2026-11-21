@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+vi.mock("server-only", () => ({}));
 vi.mock("@/lib/auth/current-session", () => ({ currentSession: vi.fn(async () => ({ role: "policyholder", subjectId: "holder1", accountId: "holder1" })), sessionSecret: () => "synthetic-session-secret-at-least-32-characters" }));
 vi.mock("@/lib/auth/accounts", () => ({ findDemoAccount: () => ({ email: "holder@example.invalid" }) }));
 vi.mock("@/lib/security/request-origin", () => ({ checkMutationOrigin: () => ({ trusted: true }) }));

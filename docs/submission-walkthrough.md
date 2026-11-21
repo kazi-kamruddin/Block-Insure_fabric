@@ -42,11 +42,33 @@ wsl.exe -d Ubuntu -- bash -lc "cd '/mnt/e/4-1/4100 thesis/project/Block-Insure_f
 TLS handshake errors may appear while the peers boot. The last line must say `insurance-dev-lite-190 ready on five dev-lite peers`.
 
 ```powershell
-.\scripts\dev-lite-app.ps1 -TwoOracles
+.\scripts\dev-lite-app.ps1 -TwoOracles -Onboarding
 ```
 
-Leave this window open until the message `Dev-lite application is available` appears. Then open
-`http://127.0.0.1:3219/workspace`. Use the role buttons on that page to sign in. **Workspaces** returns you to the role list.
+Leave this window open until the message `Dev-lite application is available` appears. Open
+`http://127.0.0.1:3219/workspace`. Choose **Customer sign-in** for your own account or
+choose a role under **Staff sign-in (demo)**. **Workspaces** returns you to that page.
+The archived cases below belong to the legacy policyholder. To show those cases
+in the browser, set `$env:SHOW_LEGACY_POLICYHOLDER_LOGIN='true'` in the launcher
+PowerShell window before starting the app. This enables the legacy **Policyholder
+One** button for that session.
+
+### Sign up a new customer
+
+1. Choose **Create an insurance account**. Enter a synthetic email address, select
+   **Send code**, verify the on-screen demo code, and submit a synthetic profile
+   with consent. This rehearsal runs without the email connector.
+2. Sign in as **Insurer Administrator**. Open **Customer onboarding**, refresh
+   the queue, and approve the pending profile. Approval enrolls a distinct
+   Fabric identity and makes the account active.
+3. Use **Customer sign-in** once the 60-second resend window has passed.
+   **My profile** shows the account details. The printable **Insurance card**
+   shows the member ID, and shows policy and cover dates after a purchase.
+4. Buy a published medical package, link a Bank account, and pay the first
+   premium in **My bank and premiums**. At the Hospital, enter the member ID
+   from the card when recording a stay. The Insurer opens **Episode association
+   queue**, selects **Resolve association**, reviews the suggested match, and
+   confirms the covered patient through the existing association action.
 
 ## Part 2 — Follow a claim through each role
 

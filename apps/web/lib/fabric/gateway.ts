@@ -13,6 +13,19 @@ import {
 } from "@hyperledger/fabric-gateway";
 import { loadFabricConfig, resolveAuditorProfile, resolveHospitalProfile, resolveRoleProfile, type FabricRole } from "./config";
 import { loadRoleCredentials } from "./credentials";
+import { currentSession } from "@/lib/auth/current-session";
+import { memberForAccount } from "@/lib/customers/member-id";
+import { onboardingEnabled } from "@/lib/customers/settings";
+import { loadCustomerCredentials } from "@/lib/customers/wallet";
+
+async function policyholderIdentity() {
+  const session = await currentSession();
+  if (session?.role !== "policyholder") throw new Error("An active policyholder session is required");
+  if (session.accountId === "policyholder-1" && session.subjectId === "policyholder1") return;
+  const memberId = memberForAccount(session.accountId);
+  if (!memberId || memberId !== session.subjectId) throw new Error("An active policyholder session is required");
+  return { ...session, subjectId: memberId };
+}
 
 function deadlineAfter(seconds: number) {
   return () => new Date(Date.now() + seconds * 1_000);
@@ -37,6 +50,7 @@ export async function withFabricContract<T>(
   action: (contract: Contract, gateway: Gateway, identity: Identity) => Promise<T>,
   profileUserName?: string,
 ): Promise<T> {
+  const customer = role === "policyholder" && onboardingEnabled() ? await policyholderIdentity() : undefined;
   const config = loadFabricConfig();
   if (role === "bankOfficer" && config.externalBankCustody) {
     throw new Error("Dev-lite Bank credentials are managed by the external operator.");
@@ -47,7 +61,7 @@ export async function withFabricContract<T>(
       ? resolveHospitalProfile(profileUserName, config)
       : resolveRoleProfile(role, config);
   const [{ certificate, privateKey }, tlsRootCertificate] = await Promise.all([
-    loadRoleCredentials(profile.userMspPath),
+    customer ? loadCustomerCredentials(customer.subjectId) : loadRoleCredentials(profile.userMspPath),
     fs.readFile(profile.tlsCertificatePath),
   ]);
 
@@ -64,7 +78,13 @@ export async function withFabricContract<T>(
   const gateway = connect({
     client,
     identity,
-    signer,
+    signer: customer ? async digest => {
+      const active = await policyholderIdentity();
+      if (active?.accountId !== customer.accountId || active.sessionId !== customer.sessionId) {
+        throw new Error("An active policyholder session is required");
+      }
+      return signer(digest);
+    } : signer,
     hash: hash.sha256,
     evaluateOptions: () => ({ deadline: deadlineAfter(config.deadlines.evaluate)() }),
     endorseOptions: () => ({ deadline: deadlineAfter(config.deadlines.endorse)() }),

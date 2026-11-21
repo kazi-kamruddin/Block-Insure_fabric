@@ -5,8 +5,8 @@ import { createGateway, templates } from "./gateway.mjs";
 const token = "t".repeat(40);
 const config = { apiKey: "xkeysib-" + "k".repeat(30), sender: { email: "sender@example.org" }, recipients: { "policyholder1@block-insure.demo": "team@example.org" } };
 
-async function withGateway(fetchImpl, run) {
-  const server = createGateway({ config, token, fetchImpl });
+async function withGateway(fetchImpl, run, overrides = {}) {
+  const server = createGateway({ config: { ...config, ...overrides }, token, fetchImpl });
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
   const base = `http://127.0.0.1:${server.address().port}`;
   try { await run(base); } finally { await new Promise((resolve) => server.close(resolve)); }
@@ -56,4 +56,47 @@ test("renders every template the web app sends", () => {
   assert.match(templates["bank-transaction-status"]({ status: "SETTLED", amountMinor: 6_400_000, currency: "BDT", method: "CLAIM_PAYOUT" }).text, /BDT 64,000\.00/);
   assert.throws(() => createGateway({ config: { ...config, apiKey: "short" }, token }), /Brevo apiKey/);
   assert.throws(() => createGateway({ config, token: "short" }), /EMAIL_GATEWAY_TOKEN/);
+});
+
+test("direct delivery is opt-in and mappings override the supplied address", async () => {
+  const messages = [];
+  const stub = async (_url, init) => {
+    messages.push(JSON.parse(init.body));
+    return new Response(JSON.stringify({ messageId: "<mail@stub>" }), { status: 201 });
+  };
+  const body = { template: "bank-link-status", variables: { status: "LINKED" } };
+  await withGateway(stub, async (base) => {
+    assert.equal((await post(base, { ...body, to: "customer@domain.net" })).status, 422);
+  });
+  await withGateway(stub, async (base) => {
+    assert.equal((await post(base, { ...body, to: "customer@domain.net" })).status, 200);
+    assert.equal((await post(base, { ...body, to: "POLICYHOLDER1@block-insure.demo" })).status, 200);
+    for (const domain of ["app.demo", "local.test", "local.example", "local.invalid", "localhost", "sub.localhost"]) {
+      const response = await post(base, { ...body, to: `unmapped@${domain}` });
+      assert.equal(response.status, 422);
+    }
+  }, { recipientPolicy: "verified-accounts" });
+  assert.deepEqual(messages.map((message) => message.to[0].email), ["customer@domain.net", "team@example.org"]);
+  assert.throws(() => createGateway({ config: { ...config, recipientPolicy: "allow-all" }, token }), /recipientPolicy/);
+});
+
+test("onboarding templates send codes and member IDs to the recipient", () => {
+  const vars = { code: "1".repeat(6), expiresAt: "2026-11-21T10:00:00Z", memberId: "BI-7K3Q9XMP" };
+  for (const name of ["signup-code", "login-code"]) {
+    assert.ok(templates[name](vars).text.includes(vars.code));
+    assert.ok(templates[name](vars).text.includes(vars.expiresAt));
+    assert.ok(!templates[name](vars).subject.includes(vars.code));
+  }
+  assert.match(templates["signup-existing"]({}).text, /sign in/i);
+  assert.ok(templates["kyc-approved"](vars).text.includes(vars.memberId));
+  assert.match(templates["kyc-rejected"]({}).text, /not approved/i);
+});
+
+test("upstream errors do not echo request details", async () => {
+  const marker = "upstream private detail";
+  await withGateway(async () => { throw new Error(marker); }, async (base) => {
+    const response = await post(base, { to: "policyholder1@block-insure.demo", template: "bank-link-status" });
+    assert.equal(response.status, 502);
+    assert.ok(!(await response.text()).includes(marker));
+  });
 });

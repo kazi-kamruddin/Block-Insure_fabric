@@ -9,6 +9,7 @@ import type { PreparedWorkflow } from "@/components/guided-workflow-form";
 import { formatBdt } from "@/lib/money";
 
 type Intake = { episodes: MedicalEpisode[]; policies?: Policy[]; claims?: Claim[] };
+type CustomerMatch = { memberId: string; fullName: string; dateOfBirth: string };
 const money = formatBdt;
 
 async function json<T>(url: string, command?: WorkflowCommand): Promise<T> {
@@ -18,8 +19,13 @@ async function json<T>(url: string, command?: WorkflowCommand): Promise<T> {
   return data as T;
 }
 
-export function MedicalIntake({ insurer, onAssociation }: { insurer: boolean; onAssociation: (prepared: PreparedWorkflow) => void }) {
+export function MedicalIntake({ insurer, customerMatching = false, onAssociation }: {
+  insurer: boolean;
+  customerMatching?: boolean;
+  onAssociation: (prepared: PreparedWorkflow) => void;
+}) {
   const [intake, setIntake] = useState<Intake | null>(null);
+  const [matches, setMatches] = useState<Partial<Record<string, CustomerMatch | null>>>({});
   const [episodeId, setEpisodeId] = useState("");
   const [policyId, setPolicyId] = useState("");
   const [draft, setDraft] = useState<{ quote: MedicalQuote; receipt: MedicalPreparation | null; deadlineSoon: boolean }>();
@@ -56,6 +62,23 @@ export function MedicalIntake({ insurer, onAssociation }: { insurer: boolean; on
     setDraft({ quote, receipt, deadlineSoon });
   }
 
+  async function reviewAssociation(row: MedicalEpisode, selectionTime: number) {
+    let match = matches[row.id];
+    if (customerMatching && match === undefined) {
+      try {
+        const query = new URLSearchParams({ patientReferenceHash: row.patientReferenceHash });
+        ({ match } = await json<{ match: CustomerMatch | null }>("/api/insurer/customers?" + query));
+        setMatches(current => ({ ...current, [row.id]: match }));
+      } catch {
+        setStatus("The customer lookup is unavailable. You can still enter the member ID manually.");
+      }
+    }
+    onAssociation({ revision: selectionTime, command: {
+      operation: "verifyMedicalAssociation", episodeId: row.id, revision: row.revision,
+      beneficiaryId: row.beneficiaryId || match?.memberId,
+    } });
+  }
+
   async function submit() {
     if (!episode || !draft) return;
     const statementHash = draft.quote.statementHash;
@@ -74,7 +97,7 @@ export function MedicalIntake({ insurer, onAssociation }: { insurer: boolean; on
     <h2>{insurer ? "Episode association queue" : "Your medical episodes"}</h2>
     <div className="medicalButtonGroup">
       <button type="button" className="secondary button" disabled={busy} onClick={() => run(async () => {
-        setIntake(await json<Intake>("/api/medical/intake")); resetDraft();
+        setIntake(await json<Intake>("/api/medical/intake")); setMatches({}); resetDraft();
       })}>Refresh episodes</button>
     </div>
     {intake && insurer && <div className="queueList" style={{ marginTop: 14 }}>{intake.episodes.map(row => <div className="queueItem" key={row.id}>
@@ -84,10 +107,10 @@ export function MedicalIntake({ insurer, onAssociation }: { insurer: boolean; on
           <StatusBadge status={row.associationStatus} />
         </div>
         <small className="monoWrap">Patient reference fingerprint: {row.patientReferenceHash}</small>
+        {matches[row.id] && <p className="monoWrap">Suggested match: <strong>{matches[row.id]?.fullName}</strong> · Member ID {matches[row.id]?.memberId} · Date of birth {matches[row.id]?.dateOfBirth}</p>}
+        {matches[row.id] === null && <p>No customer match was found. Check the member ID against the card.</p>}
       </div>
-      <button type="button" className="secondary button" onClick={() => onAssociation({ revision: Date.now(), command: {
-        operation: "verifyMedicalAssociation", episodeId: row.id, revision: row.revision, beneficiaryId: row.beneficiaryId,
-      } })}>{row.associationStatus === "VERIFIED" ? "Review association" : "Resolve association"}</button>
+      <button type="button" className="secondary button" disabled={busy} onClick={event => void run(() => reviewAssociation(row, event.timeStamp))}>{row.associationStatus === "VERIFIED" ? "Review association" : "Resolve association"}</button>
     </div>)}</div>}
     {intake && !insurer && <div className="guidedForm" style={{ marginTop: 14 }}>
       <label>Medical policy<select disabled={busy} value={policyId} onChange={event => { setPolicyId(event.target.value); resetDraft(); }}>

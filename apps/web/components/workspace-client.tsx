@@ -2,12 +2,16 @@
 
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   demoAccounts,
   workspaceForAccount,
   type DemoAccount,
   type DemoAccountId,
+  type WorkspaceAccount,
 } from "@/lib/auth/accounts";
+import { CustomerPortal } from "@/components/customer-portal";
+import { CustomerOnboardingQueue } from "@/components/customer-onboarding-queue";
 import type { RoleDashboard } from "@/lib/dashboard/build-dashboard";
 import { GuidedWorkflowForm, type PreparedWorkflow } from "@/components/guided-workflow-form";
 import { isMedicalChannel, medicalDevLiteChannel } from "@/lib/fabric/medical-channel";
@@ -151,12 +155,18 @@ export function WorkspaceClient({
   deployment,
   medicalReviewEnabled = false,
   investigationEnabled = false,
+  onboardingEnabled = false,
+  demoAuthEnabled = false,
+  showLegacyPolicyholderLogin = false,
 }: {
-  initialAccount: DemoAccount | null;
+  initialAccount: WorkspaceAccount | null;
   initialDashboard: RoleDashboard | null;
   deployment: string;
   medicalReviewEnabled?: boolean;
   investigationEnabled?: boolean;
+  onboardingEnabled?: boolean;
+  demoAuthEnabled?: boolean;
+  showLegacyPolicyholderLogin?: boolean;
 }) {
   const router = useRouter();
   const [account, setAccount] = useState(initialAccount);
@@ -660,15 +670,25 @@ export function WorkspaceClient({
   }
 
   if (!account) {
+    const staffGroups = accountGroups.map(group => ({
+      ...group,
+      accountIds: group.accountIds.filter(id => id !== "policyholder-1" || showLegacyPolicyholderLogin),
+    })).filter(group => group.accountIds.length);
     return (
       <section className="shell signInPanel">
-        <span className="kicker">Local demonstration access</span>
-        <h1 className="workspaceTitle">Choose an organization account.</h1>
-        <p className="lede">The selected account ID is mapped to a role on the server. Fabric certificates and keys never enter the browser.</p>
-        <p className="presentationOrder"><strong>Suggested handoff:</strong> Insurer → Hospital → Policyholder → Bank → Insurer &amp; Oracles → Auditor → Bank</p>
-        <div className="accountGroups">
-          {accountGroups.map((group) => <section className="accountGroup" key={group.label}>
-            <header className="accountGroupHeader"><div><h2 className="kicker" style={{ margin: 0, lineHeight: 1.4 }}>{group.label}</h2><p>{group.description}</p></div><small>{group.accountIds.length} {group.accountIds.length === 1 ? "identity" : "identities"}</small></header>
+        <h1 className="workspaceTitle">Block-Insure workspaces</h1>
+        {onboardingEnabled && <section className="customerAccessOptions" aria-labelledby="customer-access-options">
+          <h2 id="customer-access-options">Customer access</h2>
+          <div className="medicalButtonGroup">
+            <Link className="primary button" href="/signin">Customer sign-in</Link>
+            <Link className="secondary button" href="/signup">Create an insurance account</Link>
+          </div>
+        </section>}
+        {demoAuthEnabled && <section aria-labelledby="staff-sign-in">
+          <h2 id="staff-sign-in">Staff sign-in (demo)</h2>
+          <div className="accountGroups">
+          {staffGroups.map((group) => <section className="accountGroup" key={group.label}>
+            <header className="accountGroupHeader"><div><h3 className="kicker" style={{ margin: 0, lineHeight: 1.4 }}>{group.label}</h3><p>{group.description}</p></div><small>{group.accountIds.length} {group.accountIds.length === 1 ? "identity" : "identities"}</small></header>
             <div className="accountGrid">
               {group.accountIds.map((accountId) => {
                 const candidate = demoAccounts[accountId];
@@ -680,8 +700,10 @@ export function WorkspaceClient({
               })}
             </div>
           </section>)}
-        </div>
-        <pre aria-live="polite" className="console compact">{output}</pre>
+          </div>
+          <pre aria-live="polite" className="console compact">{output}</pre>
+        </section>}
+        {!onboardingEnabled && !demoAuthEnabled && <p>Sign-in is unavailable for this deployment.</p>}
       </section>
     );
   }
@@ -699,6 +721,9 @@ export function WorkspaceClient({
           <button type="button" className="secondary button" onClick={logout}>Sign out</button>
         </div>
       </header>
+
+      {onboardingEnabled && account.role === "policyholder" && account.subjectId && account.id === "customer:" + account.subjectId &&
+        <CustomerPortal key={account.id} memberId={account.subjectId} />}
 
       {account.role !== "bankOfficer" && account.role !== "hospitalOfficer" && <PresentationGuide role={account.role} />}
 
@@ -888,6 +913,7 @@ export function WorkspaceClient({
       </div>
 
       <div className="workGrid" id="transaction-console">
+        {onboardingEnabled && account.role === "insurerAdmin" && <CustomerOnboardingQueue />}
         {deployment.startsWith(`${medicalDevLiteChannel}/`) && account.role === "bankOfficer" && <MedicalSettlementTimeline />}
         {account.role === "bankOfficer" && <BankDesk />}
         {account.role === "insurerAdmin" && <PremiumOperations />}
@@ -903,7 +929,7 @@ export function WorkspaceClient({
         {deployment.startsWith(`${medicalDevLiteChannel}/`) && (account.role === "insurerAdmin" || account.role === "hospitalOfficer") &&
           <MedicalRegistryControls role={account.role} />}
         {isMedicalChannel(deployment.split("/")[0]) && (account.role === "insurerAdmin" || account.role === "policyholder") &&
-          <MedicalIntake insurer={account.role === "insurerAdmin"} onAssociation={prepared => {
+          <MedicalIntake insurer={account.role === "insurerAdmin"} customerMatching={onboardingEnabled && account.role === "insurerAdmin"} onAssociation={prepared => {
             setPreparedWorkflow(prepared);
             document.getElementById("guided-workflow")?.scrollIntoView({ behavior: "smooth" });
           }} />}

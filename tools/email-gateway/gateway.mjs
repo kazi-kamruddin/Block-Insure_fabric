@@ -1,7 +1,7 @@
 // Local email connector for the web app's EMAIL_GATEWAY_URL contract.
 // POST /send {to, template, variables} -> {messageId}. It relays through the
-// Brevo transactional email API and only to recipients mapped in its config,
-// so synthetic demo addresses never leave the machine unmapped.
+// Brevo transactional email API. Direct delivery requires explicit opt-in,
+// and synthetic recipient domains still require a mapping.
 import { createServer } from "node:http";
 import { timingSafeEqual } from "node:crypto";
 
@@ -11,6 +11,10 @@ const maxBodyBytes = 16 * 1024;
 const grouped = new Intl.NumberFormat("en-BD", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const money = (variables) => `${variables.currency || "BDT"} ${grouped.format(Number(variables.amountMinor || 0) / 100)}`;
 const words = (value) => String(value || "").replaceAll("_", " ").toLowerCase();
+const accountCode = (purpose, v) => ({
+  subject: `Your Block-Insure ${purpose} code`,
+  text: `Your one-time code is ${v.code}. It expires at ${v.expiresAt}. Do not share it.`,
+});
 
 export const templates = {
   "bank-premium-otp": (v) => ({
@@ -35,17 +39,45 @@ export const templates = {
       ? `Your account ${v.maskedAccount} at ${v.bankId} is now linked to Block-Insure. You can pay premiums from it.`
       : `${v.bankId} did not approve linking account ${v.maskedAccount}. Contact your bank for details.`,
   }),
+  "signup-code": (v) => accountCode("sign-up", v),
+  "login-code": (v) => accountCode("sign-in", v),
+  "signup-existing": () => ({
+    subject: "Your Block-Insure account",
+    text: "You already have an account with this email address. Sign in with a one-time code instead.",
+  }),
+  "kyc-approved": (v) => ({
+    subject: "Your Block-Insure membership is approved",
+    text: `Your profile was approved. Your insurance member ID is ${v.memberId}. Sign in to view your insurance card.`,
+  }),
+  "kyc-rejected": () => ({
+    subject: "Your Block-Insure profile review",
+    text: "Your profile was not approved. Contact the insurer for help with your application.",
+  }),
 };
 
 export function validateConfig(config) {
   if (!config || typeof config !== "object") throw new Error("Email gateway config must be a JSON object");
   if (typeof config.apiKey !== "string" || config.apiKey.trim().length < 20) throw new Error("Email gateway config needs a Brevo apiKey");
   if (!config.sender || typeof config.sender.email !== "string" || !config.sender.email.includes("@")) throw new Error("Email gateway config needs sender.email (a sender verified in Brevo)");
-  if (!config.recipients || typeof config.recipients !== "object") throw new Error("Email gateway config needs a recipients map");
+  if (!config.recipients || typeof config.recipients !== "object" || Array.isArray(config.recipients)) throw new Error("Email gateway config needs a recipients map");
+  const recipientPolicy = config.recipientPolicy === undefined ? "mapped" : config.recipientPolicy;
+  if (recipientPolicy !== "mapped" && recipientPolicy !== "verified-accounts") throw new Error("Email gateway recipientPolicy must be mapped or verified-accounts");
   for (const [demo, real] of Object.entries(config.recipients)) {
     if (typeof real !== "string" || !real.includes("@")) throw new Error(`Recipient mapping for ${demo} must be an email address`);
   }
-  return { apiKey: config.apiKey.trim(), sender: { email: config.sender.email, name: config.sender.name || "Block-Insure demo" }, recipients: config.recipients };
+  return { apiKey: config.apiKey.trim(), sender: { email: config.sender.email, name: config.sender.name || "Block-Insure demo" }, recipients: config.recipients, recipientPolicy };
+}
+
+function resolveRecipient(settings, to) {
+  const address = typeof to === "string" ? to.trim() : "";
+  for (const key of [address.toLowerCase(), address]) {
+    if (Object.hasOwn(settings.recipients, key)) return settings.recipients[key];
+  }
+  if (settings.recipientPolicy !== "verified-accounts") return undefined;
+  const email = /^[a-z0-9.!#$%&'*+/=?^_`{|}~-]{1,64}@(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/i;
+  const nonDeliveryDomain = /\.(?:demo|test|example|invalid|localhost)$/i;
+  if (address.length <= 254 && email.test(address) && !nonDeliveryDomain.test(address)) return address;
+  return undefined;
 }
 
 function tokenMatches(header, token) {
@@ -74,17 +106,22 @@ export function createGateway({ config, token, fetchImpl = fetch, log = () => {}
 
   async function send(body, idempotencyKey) {
     if (idempotencyKey && delivered.has(idempotencyKey)) return delivered.get(idempotencyKey);
-    const render = templates[body?.template];
-    if (!render) throw Object.assign(new Error("Unknown email template"), { status: 422 });
-    const to = settings.recipients[String(body.to || "").toLowerCase()] ?? settings.recipients[String(body.to || "")];
-    if (!to) throw Object.assign(new Error("Recipient is not mapped to a real address"), { status: 422 });
+    if (!Object.hasOwn(templates, body?.template)) throw Object.assign(new Error("Unknown email template"), { status: 422 });
+    const render = templates[body.template];
+    const to = resolveRecipient(settings, body.to);
+    if (!to) throw Object.assign(new Error("Recipient is not allowed by the email gateway policy"), { status: 422 });
     const message = render(body.variables && typeof body.variables === "object" ? body.variables : {});
-    const response = await fetchImpl(brevoEndpoint, {
-      method: "POST",
-      headers: { "api-key": settings.apiKey, "content-type": "application/json", accept: "application/json" },
-      body: JSON.stringify({ sender: settings.sender, to: [{ email: to }], subject: message.subject, textContent: message.text }),
-      signal: AbortSignal.timeout(10_000),
-    });
+    let response;
+    try {
+      response = await fetchImpl(brevoEndpoint, {
+        method: "POST",
+        headers: { "api-key": settings.apiKey, "content-type": "application/json", accept: "application/json" },
+        body: JSON.stringify({ sender: settings.sender, to: [{ email: to }], subject: message.subject, textContent: message.text }),
+        signal: AbortSignal.timeout(10_000),
+      });
+    } catch {
+      throw Object.assign(new Error("Email provider unavailable"), { status: 502 });
+    }
     const result = await response.json().catch(() => ({}));
     if (!response.ok || typeof result.messageId !== "string") {
       throw Object.assign(new Error(`Brevo rejected the message (${response.status})`), { status: 502 });

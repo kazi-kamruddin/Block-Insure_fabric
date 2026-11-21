@@ -32,9 +32,9 @@ export const operationsByRole = {
 } as const satisfies Record<FabricRole, readonly WorkflowOperation[]>;
 
 export const workflowFormDefinitions: Record<WorkflowOperation, WorkflowFormDefinition> = {
-  saveMedicalEpisode: { label: "Save patient intake", description: "Use the hospital's existing episode and patient references. For a correction, enter the revision shown after the previous save.", fields: [
+  saveMedicalEpisode: { label: "Save patient intake", description: "Use the hospital's episode reference and the member ID from the patient's insurance card. For a correction, enter the revision shown after the previous save.", fields: [
     { name: "episodeReference", label: "Hospital episode reference" }, { name: "expectedRevision", label: "Current revision (0 for a new episode)" },
-    { name: "patientReference", label: "Hospital patient reference" },
+    { name: "patientReference", label: "Insurance member ID (from the patient's card)", help: "The member ID is hashed in this browser before submission." },
     { name: "service", label: "Service performed", kind: "select", options: ["SURGERY", "CONSULTATION", "DIAGNOSTIC", "INPATIENT", "OTHER"] },
     { name: "admissionDate", label: "Admission date", kind: "date" }, { name: "dischargeDate", label: "Discharge date", kind: "date" },
     { name: "serviceDate", label: "Documented service date (if known)", kind: "date" }, { name: "billBdt", label: "Billed BDT", kind: "money" },
@@ -292,7 +292,7 @@ export const workflowFormDefinitions: Record<WorkflowOperation, WorkflowFormDefi
     description: "Add an invoice to this Hospital's independent billing register. Sensitive references are hashed in the browser.",
     fields: [
       { name: "id", label: "Invoice ID", placeholder: "invoice-1001" },
-      { name: "patientReferenceText", label: "Patient reference", placeholder: "policyholder1", help: "Use the patient’s insurance account reference, for example policyholder1. Hashed locally; it must identify the policyholder." },
+      { name: "patientReferenceText", label: "Insurance member ID (from the patient's card)", help: "The member ID is hashed in this browser before submission." },
       { name: "invoiceReferenceText", label: "Invoice reference", help: "Give this reference to the patient for a future claim." },
       { name: "treatmentText", label: "Treatment reference", kind: "textarea", help: "Hashed locally." },
       { name: "amountBdt", label: "Invoice total (BDT)", kind: "money" },
@@ -670,7 +670,7 @@ export async function buildWorkflowCommand(
   switch (operation) {
     case "saveMedicalEpisode":
       command = { operation, episodeReferenceHash: await digest("episodeReference", "Hospital episode reference"),
-        expectedRevision: Number(required(values, "expectedRevision", "Revision")), patientReferenceHash: await digest("patientReference", "Hospital patient reference"),
+        expectedRevision: Number(required(values, "expectedRevision", "Revision")), patientReferenceHash: await digest("patientReference", "Insurance member ID"),
         service: values.service, admissionDate: values.admissionDate, dischargeDate: values.dischargeDate, serviceDate: values.serviceDate ?? "",
         billMinor: bdtToMinor(required(values, "billBdt", "Bill")), invoiceDate: values.invoiceDate ?? "", diagnosisCode: values.diagnosisCode ?? "" };
       break;
