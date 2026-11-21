@@ -29,6 +29,8 @@ const finalPayment = process.env.MEDICAL_FINAL_PAYMENT === "true";
 const governed = deadlines || process.env.MEDICAL_REVIEW_LIVE === "true";
 const devLite = process.env.FABRIC_CHANNEL_NAME === "insurance-dev-lite-190";
 const duplicateOnly = devLite && process.env.DEV_LITE_DUPLICATE_REVIEW === "true";
+// Leaves one Insurer-authorized payout for the separate-account Bank signer drill.
+const stopBeforeBank = devLite && !finalPayment && process.env.MEDICAL_STOP_BEFORE_BANK === "true";
 
 function day(offset: number, base?: string) {
   const now = base ? Date.parse(base) : Date.now() + 6 * 3_600_000;
@@ -770,7 +772,14 @@ test(journey, async ({ page }, info) => {
         await expect(page.getByRole("region", { name: "Medical settlement result" }).getByText(bank.approval.hash)).toBeVisible();
       }
       expect((await asset("account", id("customer"))).balanceMinor).toBe(9900);
-      const payout = { settlementId: id("settlement"), transferId: id("payout"), bankReferenceText: id("bank-receipt") };
+      if (stopBeforeBank) {
+        const receipt = info.outputPath("authorized-result.json");
+        await writeFile(receipt, JSON.stringify({ claimId, settlementId: id("settlement"), transferId: id("payout") }));
+        await info.attach("dev-lite-authorized-result", { path: receipt, contentType: "application/json" });
+        expect(errors).toEqual([]);
+        return;
+      }
+      const payout ={ settlementId: id("settlement"), transferId: id("payout"), bankReferenceText: id("bank-receipt") };
       if (finalPayment) {
         if (resumeClaim) {
           // The interrupted case used the routine receipt for its bounce.
