@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { StatusBadge } from "@/components/status-badge";
 import type { MedicalTimeline as Timeline } from "@/lib/fabric/medical-timeline";
+import { formatBdt } from "@/lib/money";
 
 function Approval({ approval }: { approval: NonNullable<Timeline["approval"]> }) {
   return <div>
@@ -15,7 +16,7 @@ function Approval({ approval }: { approval: NonNullable<Timeline["approval"]> })
 function Payout({ payout }: { payout: NonNullable<Timeline["payout"]> }) {
   return <div>
     <strong>Bank payout</strong> <StatusBadge status={payout.status} />
-    <p>BDT {(payout.amountMinor / 100).toFixed(2)} · <code className="medicalTimelineId">{payout.id}</code></p>
+    <p>{formatBdt(payout.amountMinor)} · <code className="medicalTimelineId">{payout.id}</code></p>
     {payout.failureCode && <p>Payment failure code <code>{payout.failureCode}</code></p>}
     {payout.status === "CONFIRMED" && <p>Transfer <code className="medicalTimelineId">{payout.transferId}</code>{payout.confirmedAt && <> · <time dateTime={payout.confirmedAt}>{payout.confirmedAt}</time></>}</p>}
   </div>;

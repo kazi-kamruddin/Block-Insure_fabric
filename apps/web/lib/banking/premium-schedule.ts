@@ -1,4 +1,7 @@
 import type { BankAccountReference, Policy } from "@/lib/fabric/types";
+import { formatBdt } from "@/lib/money";
+
+export { formatBdt };
 
 export const defaultPremiumIntervalDays = 30;
 
@@ -40,8 +43,34 @@ export function dhakaToday(now = new Date()) {
   return new Date(now.getTime() + 6 * 3_600_000).toISOString().slice(0, 10);
 }
 
-export function formatBdt(minor: number) {
-  return `BDT ${(minor / 100).toFixed(2)}`;
+export const defaultGracePeriodDays = 15;
+
+type StandingPolicy = Pick<Policy, "status" | "startDate" | "endDate" | "nextPremiumDueDate"> &
+  Partial<Pick<Policy, "medicalRulesVersion" | "gracePeriodDays" | "coverStartDate" | "reinstatedDate">>;
+
+// Mirrors the chaincode's medical premium timing rules so the interface only
+// offers payments the ledger will accept. The chaincode remains the authority.
+export function premiumStanding(policy: StandingPolicy, today: string): { canPay: boolean; note: string } {
+  if (policy.status === "CANCELLED" || policy.status === "EXPIRED") return { canPay: false, note: `This policy is ${policy.status.toLowerCase()}.` };
+  if (!policy.medicalRulesVersion) return { canPay: true, note: "" };
+  const grace = policy.gracePeriodDays || defaultGracePeriodDays;
+  if (policy.status === "PENDING_PAYMENT") {
+    const lastDay = addDays(policy.startDate, grace);
+    if (today > lastDay) return { canPay: false, note: `The first premium had to be paid by ${lastDay}. This offer has expired; buy a new policy.` };
+    return { canPay: true, note: policy.startDate > today
+      ? `Cover begins on ${policy.startDate} once the first premium is paid.`
+      : `Cover begins on the day the first premium is paid (last day ${lastDay}).` };
+  }
+  if (policy.status === "LAPSED") {
+    return policy.reinstatedDate === today && policy.nextPremiumDueDate === today
+      ? { canPay: true, note: `Reinstated today. Cover resumes once today's installment is paid; the lapse gap is not covered and waiting periods restart.` }
+      : { canPay: false, note: "This policy has lapsed. Missed installments cannot be paid; ask the Insurer to reinstate it." };
+  }
+  const due = policy.nextPremiumDueDate || policy.startDate;
+  const graceEnd = addDays(due, grace);
+  if (today > graceEnd) return { canPay: false, note: `The grace period for the installment due ${due} ended on ${graceEnd}. The policy has lapsed; ask the Insurer to reinstate it.` };
+  if (today > due) return { canPay: true, note: `In grace until ${graceEnd}. Paying now keeps cover continuous.` };
+  return { canPay: true, note: "" };
 }
 
 export function maskAccountNumber(lastDigits: string) {

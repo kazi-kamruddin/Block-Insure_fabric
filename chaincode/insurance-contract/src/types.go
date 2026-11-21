@@ -55,35 +55,46 @@ type PolicyPackage struct {
 }
 
 type Policy struct {
-	MedicalRulesVersion    int      `json:"medicalRulesVersion"`
-	AssetType              string   `json:"assetType"`
-	SchemaVersion          int      `json:"schemaVersion"`
-	ID                     string   `json:"id"`
-	PackageID              string   `json:"packageId"`
-	PackageVersion         int      `json:"packageVersion"`
-	PolicyholderID         string   `json:"policyholderId"`
-	StartDate              string   `json:"startDate"`
-	EndDate                string   `json:"endDate"`
-	PremiumMinor           int64    `json:"premiumMinor"`
-	CoverageLimitMinor     int64    `json:"coverageLimitMinor"`
-	TermsHash              string   `json:"termsHash"`
-	HospitalIDs            []string `json:"hospitalIds"`
-	BankIDs                []string `json:"bankIds"`
-	Status                 string   `json:"status"`
-	PremiumIntervalDays    int      `json:"premiumIntervalDays"`
-	GracePeriodDays        int      `json:"gracePeriodDays"`
-	PaidThroughDate        string   `json:"paidThroughDate"`
-	NextPremiumDueDate     string   `json:"nextPremiumDueDate"`
-	RenewedFromPolicyID    string   `json:"renewedFromPolicyId"`
-	CancellationReasonHash string   `json:"cancellationReasonHash"`
-	BenefitPlanID          string   `json:"benefitPlanId"`
-	BenefitPlanVersion     int      `json:"benefitPlanVersion"`
-	DeathBenefitMinor      int64    `json:"deathBenefitMinor"`
-	SurrenderBenefitMinor  int64    `json:"surrenderBenefitMinor"`
-	MaturityBenefitMinor   int64    `json:"maturityBenefitMinor"`
-	BenefitRulesHash       string   `json:"benefitRulesHash"`
-	CreatedAt              string   `json:"createdAt"`
-	UpdatedAt              string   `json:"updatedAt"`
+	MedicalRulesVersion int      `json:"medicalRulesVersion"`
+	AssetType           string   `json:"assetType"`
+	SchemaVersion       int      `json:"schemaVersion"`
+	ID                  string   `json:"id"`
+	PackageID           string   `json:"packageId"`
+	PackageVersion      int      `json:"packageVersion"`
+	PolicyholderID      string   `json:"policyholderId"`
+	StartDate           string   `json:"startDate"`
+	EndDate             string   `json:"endDate"`
+	PremiumMinor        int64    `json:"premiumMinor"`
+	CoverageLimitMinor  int64    `json:"coverageLimitMinor"`
+	TermsHash           string   `json:"termsHash"`
+	HospitalIDs         []string `json:"hospitalIds"`
+	BankIDs             []string `json:"bankIds"`
+	Status              string   `json:"status"`
+	PremiumIntervalDays int      `json:"premiumIntervalDays"`
+	GracePeriodDays     int      `json:"gracePeriodDays"`
+	PaidThroughDate     string   `json:"paidThroughDate"`
+	NextPremiumDueDate  string   `json:"nextPremiumDueDate"`
+	// CoverStartDate is when a medical policy's risk began: the later of its
+	// start date and the settlement date of its first premium. Policies
+	// written before this field existed leave it empty and keep their issued
+	// eligibility terms.
+	CoverStartDate string `json:"coverStartDate"`
+	// ReinstatedDate is the last date the Insurer reinstated a lapsed medical
+	// policy. The lapse gap is never covered and waiting periods restart here.
+	ReinstatedDate string `json:"reinstatedDate"`
+	// CancelledDate is the Asia/Dhaka date a policy was cancelled or ended by
+	// a terminal benefit. Treatment before it stays claimable; nothing after.
+	CancelledDate          string `json:"cancelledDate"`
+	RenewedFromPolicyID    string `json:"renewedFromPolicyId"`
+	CancellationReasonHash string `json:"cancellationReasonHash"`
+	BenefitPlanID          string `json:"benefitPlanId"`
+	BenefitPlanVersion     int    `json:"benefitPlanVersion"`
+	DeathBenefitMinor      int64  `json:"deathBenefitMinor"`
+	SurrenderBenefitMinor  int64  `json:"surrenderBenefitMinor"`
+	MaturityBenefitMinor   int64  `json:"maturityBenefitMinor"`
+	BenefitRulesHash       string `json:"benefitRulesHash"`
+	CreatedAt              string `json:"createdAt"`
+	UpdatedAt              string `json:"updatedAt"`
 }
 
 type BankAccountReference struct {

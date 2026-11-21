@@ -113,11 +113,11 @@ func (c *Contract) ListPartnerAgreements(ctx contractapi.TransactionContextInter
 }
 
 func (c *Contract) requireActivePartner(ctx contractapi.TransactionContextInterface, partnerType, partnerID string) (*PartnerAgreement, error) {
-	today, err := transactionDate(ctx)
+	// Agreements run on the Asia/Dhaka business calendar like every other date.
+	asOf, err := ledgerBusinessDate(ctx)
 	if err != nil {
 		return nil, err
 	}
-	asOf := today.Format("2006-01-02")
 	agreements, err := c.ListPartnerAgreements(ctx)
 	if err != nil {
 		return nil, err

@@ -2,10 +2,14 @@
 param([switch]$SkipPremium, [switch]$SkipDeadline, [switch]$SkipBankPayout)
 # Run the evening before a demo, with the network and app running
 # (.\scripts\dev-lite-app.ps1 -TwoOracles). It adds new synthetic records only:
-#  - Premium: a backdated policy pair whose EFT mandates are approved and due,
-#    one well funded and one under-funded (live collection, bounce, retry).
+#  - Premium: policies starting tomorrow whose first premiums are EFT mandates,
+#    approved and due on demo day, one well funded and one under-funded (live
+#    collection, bounce and retry), plus one already paid by OTP.
 #  - Deadline: a finally rejected claim whose cover can be returned live.
-#  - Bank payout: an Insurer-authorized payout waiting for the Bank.
+#  - Bank payout: a fresh routine claim, then the same stay claimed again on
+#    the same policy, referred as a duplicate, approved by the panel and left
+#    as an Insurer-authorized payout waiting for the Bank.
+# Cover is never backdated, so nothing here can be prepared with past dates.
 # The IDs are written to data/dev-lite/demo-staging/<stamp>/summary.json.
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
@@ -46,9 +50,20 @@ if (-not $SkipDeadline) {
     $summary.deadline = @{ evidence = $env:PLAYWRIGHT_OUTPUT_DIR; note = 'Load the newest REJECTED claim of Policyholder One; it offers Return reserved cover to the policy.'; after = $before.ToUniversalTime().ToString('o') }
 }
 if (-not $SkipBankPayout) {
-    $env:MEDICAL_DEADLINE_LIVE = 'false'; $env:MEDICAL_REVIEW_LIVE = 'false'; $env:DEV_LITE_DUPLICATE_REVIEW = 'true'
+    $env:MEDICAL_DEADLINE_LIVE = 'false'; $env:MEDICAL_REVIEW_LIVE = 'false'
+    if (-not $env:MEDICAL_PRIOR_CLAIM_ID) {
+        # The duplicate must repeat a stay on a policy that is still paid, so
+        # settle a fresh routine claim first and reuse its policy.
+        $env:DEV_LITE_DUPLICATE_REVIEW = 'false'; $env:MEDICAL_FINAL_PAYMENT = 'true'; $env:MEDICAL_BENCHMARK_EXISTS = 'false'
+        $env:PLAYWRIGHT_OUTPUT_DIR = Join-Path $out 'routine'
+        & node $browser test --config $medicalConfig
+        if ($LASTEXITCODE) { throw "Routine staging failed. Evidence: $env:PLAYWRIGHT_OUTPUT_DIR" }
+        $env:MEDICAL_PRIOR_CLAIM_ID = (Find-Receipt $env:PLAYWRIGHT_OUTPUT_DIR 'routine-result.json').claimId
+        $env:MEDICAL_FINAL_PAYMENT = 'false'; $env:MEDICAL_BENCHMARK_EXISTS = 'true'
+    }
+    $summary.priorClaimId = $env:MEDICAL_PRIOR_CLAIM_ID
+    $env:DEV_LITE_DUPLICATE_REVIEW = 'true'
     $env:MEDICAL_STOP_BEFORE_BANK = 'true'
-    if (-not $env:MEDICAL_PRIOR_CLAIM_ID) { $env:MEDICAL_PRIOR_CLAIM_ID = 'medical-dd367ca9-cca7-4ac1-9753-f947b14bc084' }
     $env:PLAYWRIGHT_OUTPUT_DIR = Join-Path $out 'bank-payout'
     & node $browser test --config $medicalConfig
     if ($LASTEXITCODE) { throw "Bank payout staging failed. Evidence: $env:PLAYWRIGHT_OUTPUT_DIR" }

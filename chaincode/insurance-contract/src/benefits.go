@@ -245,6 +245,20 @@ func (c *Contract) SubmitBenefitRequest(ctx contractapi.TransactionContextInterf
 	if !dateWithin(eventDate, start, end) {
 		return nil, fmt.Errorf("eventDate is outside the policy coverage period")
 	}
+	if err := requireNotAfterLedgerDate(ctx, "eventDate", eventDate); err != nil {
+		return nil, err
+	}
+	// Death, surrender and maturity each end the contract, so a policy pays at
+	// most one of them. Only a rejected request leaves room for another.
+	existing, err := c.ListBenefitRequests(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, other := range existing {
+		if other.PolicyID == policyID && other.Status != "REJECTED" {
+			return nil, fmt.Errorf("policy %s already has %s benefit request %s (%s); a policy pays one terminal benefit", policyID, strings.ToLower(other.BenefitType), other.ID, other.Status)
+		}
+	}
 	benefitType = strings.ToUpper(strings.TrimSpace(benefitType))
 	var amount int64
 	switch benefitType {
@@ -451,6 +465,26 @@ func (c *Contract) ConfirmBenefitPayment(ctx contractapi.TransactionContextInter
 	}
 	if err := overwriteAsset(ctx, "liability", liability.ID, liability); err != nil {
 		return nil, err
+	}
+	// A paid death or surrender benefit terminates the contract: no further
+	// premiums are owed and its debit authorities end.
+	if request.BenefitType == "DEATH" || request.BenefitType == "SURRENDER" {
+		policy, err := c.ReadPolicy(ctx, request.PolicyID)
+		if err != nil {
+			return nil, err
+		}
+		if policy.Status != "CANCELLED" && policy.Status != "EXPIRED" {
+			policy.Status, policy.CancellationReasonHash, policy.UpdatedAt = "CANCELLED", request.DecisionHash, now
+			if policy.CancelledDate, err = ledgerBusinessDate(ctx); err != nil {
+				return nil, err
+			}
+			if err := overwriteAsset(ctx, "policy", policy.ID, policy); err != nil {
+				return nil, err
+			}
+			if err := c.endPolicyDebits(ctx, policy.ID, now); err != nil {
+				return nil, err
+			}
+		}
 	}
 	if err := emit(ctx, "BenefitPaymentConfirmed", request); err != nil {
 		return nil, err

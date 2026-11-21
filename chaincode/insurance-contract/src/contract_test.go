@@ -961,6 +961,15 @@ func TestBenefitsBeneficiariesAndLiabilityLifecycle(t *testing.T) {
 	if fundingAccount.BalanceMinor != 100_000 {
 		t.Fatalf("benefit payment did not debit insurer funds: balance=%d", fundingAccount.BalanceMinor)
 	}
+	setIdentity(ctx, "insurer-admin", "InsurerMSP", "insurerAdmin", nil)
+	policy, err := contract.ReadPolicy(ctx, "policy-benefit")
+	requireNoError(t, err)
+	if policy.Status != "CANCELLED" {
+		t.Fatalf("a paid death benefit must end the policy, got %s", policy.Status)
+	}
+	setIdentity(ctx, "policyholder", "InsurerMSP", "policyholder", map[string]string{"subjectId": "policyholder1"})
+	_, err = contract.SubmitBenefitRequest(ctx, "benefit-request-2", "policy-benefit", "DEATH", "2026-06-15", hashC)
+	requireError(t, err, "already has death benefit request benefit-request-1")
 }
 
 func setupOracleRequest(t *testing.T, suffix string) (*Contract, *testContext, *OracleRequest) {

@@ -69,7 +69,7 @@ const roleLabels: Record<DemoAccount["role"], string> = {
 const commandTemplates = {
   insurerAdmin: [
     ["Register partner", { operation: "createPartnerAgreement", id: "agreement-hospital-1", partnerType: "HOSPITAL", partnerId: "hospital-demo", name: "Dhaka Central Medical Hospital", location: "Dhaka", tier: "Preferred", accessScope: "Read-only invoice verification fields", effectiveDate: "2026-01-01", expiryDate: "2028-12-31" }],
-    ["Create package", { operation: "createPolicyPackage", id: "package-1", name: "Essential Health", description: "Core inpatient coverage", premiumMinor: 10000, coverageLimitMinor: 1000000, termsHash: hash }],
+    ["Create package", { operation: "createPolicyPackage", id: "package-1", name: "Essential Health", description: "Core inpatient coverage", premiumMinor: 125000, coverageLimitMinor: 30000000, termsHash: hash }],
     ["Configure package network", { operation: "configurePolicyPackagePartners", id: "package-1", hospitalIdsJson: '["hospital-demo"]', bankIdsJson: '["bank-demo"]' }],
     ["Publish package", { operation: "publishPolicyPackage", id: "package-1" }],
     ["Retire package", { operation: "retirePolicyPackage", id: "package-1" }],
@@ -81,11 +81,11 @@ const commandTemplates = {
     ["Authorize settlement", { operation: "authorizeSettlement", settlementId: "settlement-1", claimId: "claim-1", sourceAccountId: "bank-insurer-premium", destinationAccountId: "showcase-customer-account" }],
   ],
   policyholder: [
-    ["Submit claim", { operation: "submitClaim", id: "claim-1", policyId: "policy-1", hospitalId: "hospital-demo", hospitalInvoiceId: "invoice-1", amountMinor: 250000, incidentDate: "2026-06-15", descriptionHash: hash }],
+    ["Submit claim", { operation: "submitClaim", id: "claim-1", policyId: "policy-1", hospitalId: "hospital-demo", hospitalInvoiceId: "invoice-1", amountMinor: 8500000, incidentDate: "2026-06-15", descriptionHash: hash }],
     ["Appeal claim", { operation: "submitClaimAppeal", appealId: "appeal-1", claimId: "claim-1", reasonCategory: "DOCUMENT_ERROR", reasonHash: hash, descriptionHash: hash, evidenceHash: "", proposedHospitalId: "", proposedAmountMinor: 0, proposedIncidentDate: "", proposedDescriptionHash: "", proposedClinicalReferenceHash: hash }],
   ],
   hospitalOfficer: [
-    ["Create invoice", { operation: "createHospitalInvoice", id: "invoice-1", patientReferenceHash: hash, invoiceReferenceHash: hash, treatmentHash: hash, amountMinor: 250000, admissionDate: "2026-06-15", dischargeDate: "2026-06-18", status: "FINALIZED" }],
+    ["Create invoice", { operation: "createHospitalInvoice", id: "invoice-1", patientReferenceHash: hash, invoiceReferenceHash: hash, treatmentHash: hash, amountMinor: 8500000, admissionDate: "2026-06-15", dischargeDate: "2026-06-18", status: "FINALIZED" }],
   ],
   auditor: [
     ["Approve claim", { operation: "recordAuditorDecision", reviewId: "review-1", decisionId: "decision-1", outcome: "APPROVE", reasonHash: hash }],

@@ -82,6 +82,9 @@ func (c *Contract) submitClaim(ctx contractapi.TransactionContextInterface, id, 
 	if incident.Before(start) || incident.After(end) {
 		return nil, fmt.Errorf("incidentDate is outside the policy coverage period")
 	}
+	if err := requireNotAfterLedgerDate(ctx, "incidentDate", incidentDate); err != nil {
+		return nil, err
+	}
 	if err := validateHash("descriptionHash", descriptionHash); err != nil {
 		return nil, err
 	}

@@ -604,6 +604,10 @@ export const ledger = {
     return submit<Policy>("insurerAdmin", "AdvancePolicyLifecycle", id, asOfDate);
   },
 
+  reinstatePolicy(id: string, reasonHash: string) {
+    return submit<Policy>("insurerAdmin", "ReinstatePolicy", id, reasonHash);
+  },
+
   cancelPolicy(id: string, reasonHash: string, role: "policyholder" | "insurerAdmin") {
     return submit<Policy>(role, "CancelPolicy", id, reasonHash);
   },

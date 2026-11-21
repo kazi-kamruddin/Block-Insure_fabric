@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { FabricRole } from "@/lib/fabric/config";
+import { formatBdt } from "@/lib/money";
 import type { PublishedMedicalOffer } from "@/lib/fabric/medical";
 import type { WorkflowCommand, WorkflowOperation } from "@/lib/workflows/commands";
 import {
@@ -37,7 +38,7 @@ const actionGroups: ReadonlyArray<{ label: string; operations: ReadonlySet<strin
     label: "Policies & Coverage",
     operations: new Set([
       "createPolicyPackage", "configurePolicyPackagePartners", "publishPolicyPackage", "retirePolicyPackage",
-      "issuePolicy", "issuePolicyPrivacyCredential", "revokePolicyPrivacyCredential", "advancePolicyLifecycle",
+      "issuePolicy", "issuePolicyPrivacyCredential", "revokePolicyPrivacyCredential", "advancePolicyLifecycle", "reinstatePolicy",
       "cancelPolicyAsInsurer", "acquirePolicy", "acquireMedicalPolicy", "renewPolicy", "cancelPolicy", "setBeneficiaries",
     ]),
   },
@@ -134,7 +135,8 @@ export function GuidedWorkflowForm({
     }
   }, [formError]);
   const selectedOffer = offers.find(offer => offer.id === values.packageId);
-  const exampleEligible = selectedOffer ? Math.min(10_000, selectedOffer.rules.serviceSublimitMinor) : 0;
+  const exampleBillMinor = 8_500_000;
+  const exampleEligible = selectedOffer ? Math.min(exampleBillMinor, selectedOffer.rules.serviceSublimitMinor) : 0;
   const exampleDeductible = selectedOffer ? Math.min(Math.floor(exampleEligible * selectedOffer.rules.deductibleBps / 10_000), selectedOffer.rules.deductibleCapMinor) : 0;
   const exampleShare = selectedOffer ? Math.floor((exampleEligible - exampleDeductible) * selectedOffer.rules.insurerShareBps / 10_000) : 0;
   const examplePayable = Math.min(exampleShare, selectedOffer?.coverageLimitMinor ?? 0);
@@ -211,11 +213,12 @@ export function GuidedWorkflowForm({
           {offers.map(offer => <option key={offer.id} value={offer.id}>{offer.name}</option>)}
         </select></label>
         {selectedOffer && <div className="wideField medicalSubpanel">
-          <p>BDT {(selectedOffer.premiumMinor / 100).toFixed(2)} per 30-day period, due at the start of each period. Coverage starts after payment. An overdue installment can enter grace and then lapse after 15 days. Only paid dates qualify.</p>
-          <p>{selectedOffer.rules.service} is covered. Other service categories are excluded. Service sublimit BDT {(selectedOffer.rules.serviceSublimitMinor / 100).toFixed(2)}, deductible {selectedOffer.rules.deductibleBps / 100}% capped at BDT {(selectedOffer.rules.deductibleCapMinor / 100).toFixed(2)}, insurer share {selectedOffer.rules.insurerShareBps / 100}%, overall limit BDT {(selectedOffer.coverageLimitMinor / 100).toFixed(2)}.</p>
-          <p>Wait {selectedOffer.rules.waitingDays} days from policy start. File within {selectedOffer.rules.filingDays} days of service, Asia/Dhaka. {selectedOffer.rules.evidenceRequired ? "Upload supporting invoice evidence." : "A complete verified episode can support routine processing."} Each monetary adjustment rounds down to the minor unit.</p>
+          <p>{formatBdt(selectedOffer.premiumMinor)} per 30-day period, due at the start of each period. The start date can be today or up to 60 days ahead, and the term is at most one year. Cover is never backdated: it begins on the start date, or on the payment date if the first premium is paid later.</p>
+          <p>An installment still unpaid 15 days after its due date lapses the policy. Missed installments cannot be paid afterwards; only reinstatement by the Insurer, with a new installment from that day, restores cover, and the lapse gap stays uncovered. Only paid dates qualify.</p>
+          <p>{selectedOffer.rules.service} is covered. Other service categories are excluded. Service sublimit {formatBdt(selectedOffer.rules.serviceSublimitMinor)}, deductible {selectedOffer.rules.deductibleBps / 100}% capped at {formatBdt(selectedOffer.rules.deductibleCapMinor)}, insurer share {selectedOffer.rules.insurerShareBps / 100}%, overall limit {formatBdt(selectedOffer.coverageLimitMinor)}.</p>
+          <p>The hospital stay must begin at least {selectedOffer.rules.waitingDays} days after cover starts, and again after any reinstatement; a stay that began before cover is excluded. File within {selectedOffer.rules.filingDays} days of service, Asia/Dhaka. {selectedOffer.rules.evidenceRequired ? "Upload supporting invoice evidence." : "A complete verified episode can support routine processing."} Each monetary adjustment rounds down to the minor unit.</p>
           {Number.isFinite(termDays) && termDays > 1 && <p>{Math.ceil(termDays / 30)} installments for the dates selected below. The first is due on {values.startDate}, then every 30 days through the final coverage period.</p>}
-          <p>Example: a BDT 100.00 bill yields BDT {(exampleEligible / 100).toFixed(2)} eligible, BDT {(exampleDeductible / 100).toFixed(2)} deductible and BDT {(exampleShare / 100).toFixed(2)} insurer share. With the full policy limit still available, BDT {(examplePayable / 100).toFixed(2)} is payable.</p>
+          <p>Example: a {formatBdt(exampleBillMinor)} bill yields {formatBdt(exampleEligible)} eligible, {formatBdt(exampleDeductible)} deductible and {formatBdt(exampleShare)} insurer share. With the full policy limit still available, {formatBdt(examplePayable)} is payable.</p>
           <label className="checkboxLabel"><input type="checkbox" checked={values.acceptedTermsHash === selectedOffer.rules.termsHash} onChange={(event) => {
             setValues(current => ({ ...current, acceptedTermsHash: event.target.checked ? selectedOffer.rules.termsHash : "" }));
           }} />I accept these published terms</label>

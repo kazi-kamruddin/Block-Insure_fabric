@@ -5,7 +5,7 @@ import { StatusBadge } from "@/components/status-badge";
 import type { BankAccountLinkRequest, BankMandate, PremiumCollection } from "@/lib/fabric/types";
 import { formatBdt } from "@/lib/banking/premium-schedule";
 import { postWorkflow, randomToken, readJson, shortId, textHash } from "@/lib/banking/client";
-import { bdtToMinor } from "@/lib/workflows/forms";
+import { bdtToMinor, nonNegativeBdtToMinor } from "@/lib/workflows/forms";
 
 type AccountDisplay = { id: string; ownerId: string; accountLabel: string; maskedAccount: string; balanceMinor: number } | null;
 type DeskView = {
@@ -60,14 +60,14 @@ export function BankDesk() {
     {view?.links.map((link) => <div className="queueItem" key={link.id}>
       <div><div className="queueTitle"><strong>{link.ownerId} · {link.accountLabel} · {link.maskedAccount}</strong><StatusBadge status={link.status} /></div>
         <p>{link.bankId} · {link.id}</p>
-        <label>Verified balance (BDT)<input inputMode="decimal" value={balances[link.id] ?? "100.00"} onChange={(event) => setBalances({ ...balances, [link.id]: event.target.value })} /></label>
+        <label>Verified balance (BDT)<input inputMode="decimal" value={balances[link.id] ?? "25000.00"} onChange={(event) => setBalances({ ...balances, [link.id]: event.target.value })} /></label>
       </div>
       <div className="evidenceActions">
         <button type="button" className="primary button" disabled={busy} onClick={() => void act(`Account ${link.maskedAccount} linked for ${link.ownerId}.`, async () => postWorkflow({
           operation: "reviewBankAccountLink", id: link.id, outcome: "APPROVE", accountReferenceId: shortId("account"),
           // The demo Bank has no core system, so a random vault token stands in for the real account number.
           accountTokenHash: await textHash(randomToken("vault")),
-          openingBalanceMinor: Math.round(Number(balances[link.id] ?? "100.00") * 100),
+          openingBalanceMinor: nonNegativeBdtToMinor(balances[link.id] ?? "25000.00"),
           decisionHash: await decision("bank-link", link.id, "APPROVE"),
         }))}>Verify and link</button>
         <button type="button" className="secondary button" disabled={busy} onClick={() => void act("Link request rejected.", async () => postWorkflow({
@@ -103,11 +103,11 @@ export function BankDesk() {
             method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "processCollection", collectionId: collection.id }),
           })))}>Collect premium</button>}
         {collection.account && <>
-          <label>Deposit (BDT)<input inputMode="decimal" value={funding[collection.id] ?? "10.00"} onChange={(event) => setFunding({ ...funding, [collection.id]: event.target.value })} /></label>
+          <label>Deposit (BDT)<input inputMode="decimal" value={funding[collection.id] ?? (collection.amountMinor / 100).toFixed(2)} onChange={(event) => setFunding({ ...funding, [collection.id]: event.target.value })} /></label>
           <button type="button" className="secondary button" disabled={busy} onClick={() => void act("Deposit recorded.", async () => {
             const reference = randomToken("deposit");
             return postWorkflow({ operation: "adjustBankAccountBalance", transferId: shortId("deposit"), accountId: collection.account!.id,
-              direction: "CREDIT", amountMinor: bdtToMinor(funding[collection.id] ?? "10.00"), externalReferenceHash: await textHash(reference) });
+              direction: "CREDIT", amountMinor: bdtToMinor(funding[collection.id] ?? (collection.amountMinor / 100).toFixed(2)), externalReferenceHash: await textHash(reference) });
           })}>Record customer deposit</button>
         </>}
       </div>

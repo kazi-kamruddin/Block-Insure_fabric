@@ -6,6 +6,7 @@ import { MedicalTimeline } from "@/components/medical-timeline";
 import { sha256Hex } from "@/lib/evidence/browser-crypto";
 import { medicalReasonLabels, medicalReleaseAvailableAt, type MedicalReviewCommand, type MedicalReviewView } from "@/lib/fabric/medical-review";
 import type { MedicalQuote } from "@/lib/fabric/medical";
+import { formatBdt } from "@/lib/money";
 import { researchFindings } from "@/lib/fabric/research-finding";
 
 const later = (hours: number) => new Date(Date.now() + hours * 3_600_000).toISOString();
@@ -82,7 +83,7 @@ export function MedicalReview({ role, onEvidence, investigationEnabled = false }
 
   function reservationPanel() {
     if (!view || !review) return null;
-    const reserved = `BDT ${(view.claim.amountMinor / 100).toFixed(2)}`;
+    const reserved = formatBdt(view.claim.amountMinor);
     if (view.claim.medicalReservationReleasedAt) {
       return <div className="medicalSubpanel"><p>{reserved} of reserved cover was returned to the policy on {new Date(view.claim.medicalReservationReleasedAt).toLocaleString()}. This rejection is final.</p></div>;
     }
@@ -124,7 +125,7 @@ export function MedicalReview({ role, onEvidence, investigationEnabled = false }
         </button>}
       {role === "auditor" && preparing && review && view.claim.medicalEscalatedAt &&
         <button type="button" className="primary button" disabled={busy} onClick={() => work(() => send({ action: "open", reviewId: review.id, deadline: later(24) }))}>Open escalated voting</button>}
-      <p>Billed BDT {(view.facts.quote.billedMinor / 100).toFixed(2)} · Eligible BDT {(view.facts.quote.eligibleMinor / 100).toFixed(2)} · Payable BDT {(view.facts.quote.payableMinor / 100).toFixed(2)}</p>
+      <p>Billed {formatBdt(view.facts.quote.billedMinor)} · Eligible {formatBdt(view.facts.quote.eligibleMinor)} · Payable {formatBdt(view.facts.quote.payableMinor)}</p>
       {view.appeal && <p>Appeal {view.appeal.status} · Disputed decision {view.appeal.disputedDecisionId}</p>}
       {view.appealExplanation && <p>Appeal explanation: {view.appealExplanation}</p>}
       {review && <div className="quorumCard">
@@ -224,7 +225,7 @@ export function MedicalReview({ role, onEvidence, investigationEnabled = false }
           <label>Corrected episode revision (optional)<input type="number" min="1" value={revision} onChange={event => { setRevision(event.target.value); setQuote(undefined); }} /></label>
           <div className="medicalButtonGroup">
             {revision && <button type="button" className="secondary button" disabled={busy} onClick={() => work(loadQuote)}>Calculate corrected reimbursement</button>}
-            {quote && <p>Corrected payable amount BDT {(quote.payableMinor / 100).toFixed(2)}. Filing this appeal accepts this revised calculation.</p>}
+            {quote && <p>Corrected payable amount {formatBdt(quote.payableMinor)}. Filing this appeal accepts this revised calculation.</p>}
             <button type="button" className="primary button" disabled={busy || !decisionId || !message.trim() || (revision ? !quote : !file)} onClick={() => work(async () => send({
               action: "appeal", id: id("appeal"), claimId: view.claim.id, decisionId, message, evidenceHash: await fileHash(file),
               revision: Number(revision || 0), acceptedStatementHash: quote?.statementHash ?? "",

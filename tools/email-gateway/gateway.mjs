@@ -8,7 +8,8 @@ import { timingSafeEqual } from "node:crypto";
 const brevoEndpoint = "https://api.brevo.com/v3/smtp/email";
 const maxBodyBytes = 16 * 1024;
 
-const money = (variables) => `${variables.currency || "BDT"} ${(Number(variables.amountMinor || 0) / 100).toFixed(2)}`;
+const grouped = new Intl.NumberFormat("en-BD", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const money = (variables) => `${variables.currency || "BDT"} ${grouped.format(Number(variables.amountMinor || 0) / 100)}`;
 const words = (value) => String(value || "").replaceAll("_", " ").toLowerCase();
 
 export const templates = {

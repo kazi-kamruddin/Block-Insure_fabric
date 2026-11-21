@@ -36,6 +36,20 @@ func (c *Contract) RequestBankMandate(ctx contractapi.TransactionContextInterfac
 	if policy.Status == "CANCELLED" || policy.Status == "EXPIRED" {
 		return nil, fmt.Errorf("policy %s cannot accept a mandate from %s", policyID, policy.Status)
 	}
+	// A mandate cannot reach back for installments the policy may no longer accept.
+	if err := validateMedicalPremiumTiming(ctx, policy, policy.NextPremiumDueDate); err != nil {
+		return nil, err
+	}
+	// One standing instruction per policy, so a customer is never debited twice.
+	existing, err := c.ListBankMandates(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, other := range existing {
+		if other.PolicyID == policyID && (other.Status == "PENDING" || other.Status == "ACTIVE") {
+			return nil, fmt.Errorf("policy %s already has a %s EFT mandate %s; cancel it before setting up another", policyID, strings.ToLower(other.Status), other.ID)
+		}
+	}
 	account, err := c.ReadBankAccountReference(ctx, accountReferenceID)
 	if err != nil {
 		return nil, err
@@ -393,6 +407,14 @@ func (c *Contract) SchedulePremiumCollections(ctx contractapi.TransactionContext
 		if existing[key] {
 			continue
 		}
+		policy, err := c.ReadPolicy(ctx, mandate.PolicyID)
+		if err != nil {
+			return nil, err
+		}
+		// Do not queue debits that the policy can no longer accept.
+		if policy.Status == "CANCELLED" || policy.Status == "EXPIRED" || validateMedicalPremiumTiming(ctx, policy, mandate.NextDebitDate) != nil {
+			continue
+		}
 		collection := PremiumCollection{
 			AssetType: "premiumCollection", SchemaVersion: SchemaVersion,
 			ID: automaticCollectionID(mandate.ID, mandate.NextDebitDate), PolicyID: mandate.PolicyID,
@@ -446,6 +468,9 @@ func (c *Contract) RetryPremiumCollection(ctx contractapi.TransactionContextInte
 	}
 	if policy.Status == "CANCELLED" || policy.Status == "EXPIRED" || policy.Status == "LAPSED" {
 		return nil, fmt.Errorf("policy %s cannot retry a premium from %s", policy.ID, policy.Status)
+	}
+	if err := validateMedicalPremiumTiming(ctx, policy, collection.DueDate); err != nil {
+		return nil, err
 	}
 	collection.Status = "RETRY"
 	collection.UpdatedAt, err = timestamp(ctx)

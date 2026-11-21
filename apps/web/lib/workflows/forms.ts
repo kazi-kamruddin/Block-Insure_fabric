@@ -24,7 +24,7 @@ export type WorkflowFormValues = Record<string, string>;
 export type HashText = (value: string) => Promise<string>;
 
 export const operationsByRole = {
-  insurerAdmin: ["startClaimProcessing", "createPartnerAgreement", "setPartnerAgreementStatus", "createPolicyPackage", "configurePolicyPackagePartners", "publishPolicyPackage", "retirePolicyPackage", "createBenefitPlan", "publishBenefitPlan", "retireBenefitPlan", "issuePolicy", "issuePolicyPrivacyCredential", "revokePolicyPrivacyCredential", "advancePolicyLifecycle", "cancelPolicyAsInsurer", "queuePremiumCollection", "schedulePremiumCollections", "retryPremiumCollection", "decideBenefitRequest", "markBenefitPaymentReady", "publishEvidenceMerkleBatch", "assessClaimFraud", "publishOracleRegistrySnapshot", "requestOracleVerification", "finalizeOracleTimeout", "routeOracleFailureToReview", "openClaimReview", "finalizeExpiredReview", "authorizeSettlement"],
+  insurerAdmin: ["startClaimProcessing", "createPartnerAgreement", "setPartnerAgreementStatus", "createPolicyPackage", "configurePolicyPackagePartners", "publishPolicyPackage", "retirePolicyPackage", "createBenefitPlan", "publishBenefitPlan", "retireBenefitPlan", "issuePolicy", "issuePolicyPrivacyCredential", "revokePolicyPrivacyCredential", "advancePolicyLifecycle", "reinstatePolicy", "cancelPolicyAsInsurer", "queuePremiumCollection", "schedulePremiumCollections", "retryPremiumCollection", "decideBenefitRequest", "markBenefitPaymentReady", "publishEvidenceMerkleBatch", "assessClaimFraud", "publishOracleRegistrySnapshot", "requestOracleVerification", "finalizeOracleTimeout", "routeOracleFailureToReview", "openClaimReview", "finalizeExpiredReview", "authorizeSettlement"],
   policyholder: ["acquirePolicy", "requestBankAccountLink", "cancelBankAccountLink", "requestBankMandate", "cancelBankMandate", "setBeneficiaries", "submitBenefitRequest", "renewPolicy", "cancelPolicy", "submitClaim", "registerClaimPrivacyPresentation", "submitClaimAppeal", "grantEvidenceAccess", "revokeEvidenceAccess"],
   hospitalOfficer: ["createHospitalInvoice", "updateHospitalInvoice", "recordHospitalModelFacts"],
   auditor: ["recordAuditorDecision"],
@@ -100,8 +100,8 @@ export const workflowFormDefinitions: Record<WorkflowOperation, WorkflowFormDefi
       { name: "id", label: "Package ID", placeholder: "package-essential" },
       { name: "name", label: "Package name", placeholder: "Essential Health" },
       { name: "description", label: "Public description", kind: "textarea", placeholder: "Coverage summary visible to channel members" },
-      { name: "premiumBdt", label: "Premium (BDT)", kind: "money", placeholder: "100.00" },
-      { name: "coverageLimitBdt", label: "Coverage limit (BDT)", kind: "money", placeholder: "10000.00" },
+      { name: "premiumBdt", label: "Premium (BDT)", kind: "money", placeholder: "1250.00", help: "Charged for each 30-day installment." },
+      { name: "coverageLimitBdt", label: "Coverage limit (BDT)", kind: "money", placeholder: "300000.00" },
       { name: "termsText", label: "Terms reference", kind: "textarea", placeholder: "Document identifier, version, or terms summary", help: "Hashed in this browser; only the SHA-256 digest is sent." },
     ],
   },
@@ -171,6 +171,11 @@ export const workflowFormDefinitions: Record<WorkflowOperation, WorkflowFormDefi
     label: "Advance policy lifecycle",
     description: "Apply a due-date transition to grace, lapse, or expiry using an explicit business date.",
     fields: [{ name: "id", label: "Policy ID" }, { name: "asOfDate", label: "Business date", kind: "date" }],
+  },
+  reinstatePolicy: {
+    label: "Reinstate a lapsed medical policy",
+    description: "Offer reinstatement from today. The customer pays a new installment starting today; the lapse gap is never covered and waiting periods restart.",
+    fields: [{ name: "id", label: "Policy ID" }, { name: "reasonText", label: "Reinstatement decision reference", kind: "textarea" }],
   },
   cancelPolicy: {
     label: "Cancel my policy",
@@ -318,7 +323,7 @@ export const workflowFormDefinitions: Record<WorkflowOperation, WorkflowFormDefi
       { name: "policyId", label: "Policy ID", placeholder: "policy-1001" },
       { name: "hospitalId", label: "Contracted hospital", kind: "select", options: ["hospital-demo", "hospital-2", "hospital-3", "hospital-4", "hospital-5"], help: "The Hospital must be included in the purchased policy's provider network." },
       { name: "hospitalInvoiceId", label: "Hospital invoice ID", placeholder: "invoice-1001", help: "Use the invoice supplied by your contracted Hospital. Its patient reference must match your account." },
-      { name: "amountBdt", label: "Claim amount (BDT)", kind: "money", placeholder: "2500.00" },
+      { name: "amountBdt", label: "Claim amount (BDT)", kind: "money", placeholder: "85000.00" },
       { name: "incidentDate", label: "Incident date", kind: "date" },
       { name: "descriptionText", label: "Claim description", kind: "textarea", placeholder: "Describe why you are claiming", help: "Write in your own words. You do not need to repeat the Hospital’s treatment wording. Hashed in this browser." },
     ],
@@ -498,8 +503,9 @@ export const workflowFormDefinitions: Record<WorkflowOperation, WorkflowFormDefi
   },
 };
 
+// Calendar dates follow Asia/Dhaka (UTC+06:00), the ledger's business day.
 function dateOffset(years: number) {
-  const value = new Date();
+  const value = new Date(Date.now() + 6 * 3_600_000);
   value.setUTCFullYear(value.getUTCFullYear() + years);
   return value.toISOString().slice(0, 10);
 }
@@ -519,7 +525,7 @@ export function createWorkflowFormValues(
   const today = dateOffset(0);
   const defaults: Record<WorkflowOperation, WorkflowFormValues> = {
     saveMedicalEpisode: { episodeReference: "", expectedRevision: "0", patientReference: "", service: "SURGERY", admissionDate: today, dischargeDate: today, serviceDate: "", invoiceDate: "", diagnosisCode: "", billBdt: "" },
-    configureMedicalRules: { packageId: "", service: "SURGERY", sublimit: "", deductibleBps: "1000", deductibleCap: "", shareBps: "8000", waitingDays: "0", filingDays: "30", evidenceRequired: "No" },
+    configureMedicalRules: { packageId: "", service: "SURGERY", sublimit: "", deductibleBps: "1000", deductibleCap: "", shareBps: "8000", waitingDays: "30", filingDays: "30", evidenceRequired: "No" },
     acquireMedicalPolicy: { id: generatedId("policy", idFactory), packageId: "", startDate: today, endDate: dateOffset(1), acceptedTermsHash: "" },
     verifyMedicalAssociation: { episodeId: "", revision: "", beneficiaryId: "", decisionBasis: "", associationDecision: "VERIFY" },
     registerMedicalOracleBenchmark: { hospitalId: "", service: "SURGERY", minimum: "", maximum: "", licenseStatus: "ACTIVE", sourceReference: "" },
@@ -539,6 +545,7 @@ export function createWorkflowFormValues(
     issuePolicy: { id: generatedId("policy", idFactory), packageId: "", policyholderId: "policyholder1", startDate: today, endDate: dateOffset(1) },
     acquirePolicy: { id: generatedId("policy", idFactory), packageId: "", startDate: today, endDate: dateOffset(1) },
     advancePolicyLifecycle: { id: "", asOfDate: today },
+    reinstatePolicy: { id: "", reasonText: "" },
     cancelPolicy: { id: "", reasonText: "" },
     cancelPolicyAsInsurer: { id: "", reasonText: "" },
     renewPolicy: { newId: generatedId("policy-renewal", idFactory), existingId: "", newEndDate: dateOffset(2) },
@@ -589,8 +596,17 @@ export function createWorkflowFormValues(
   return defaults[operation];
 }
 
+// Accepts plain digits or correctly grouped amounts in either the
+// international (150,000.00) or the South Asian lakh (1,50,000.00) style.
 export function bdtToMinor(value: string) {
-  const normalized = value.trim();
+  let normalized = value.trim();
+  const [whole = ""] = normalized.split(".");
+  if (whole.includes(",")) {
+    if (!/^\d{1,3}(,\d{3})+$/.test(whole) && !/^\d{1,2}(,\d{2})*,\d{3}$/.test(whole)) {
+      throw new Error("Group thousands as 150,000.00 or 1,50,000.00.");
+    }
+    normalized = normalized.replaceAll(",", "");
+  }
   const match = /^(\d+)(?:\.(\d{1,2}))?$/.exec(normalized);
   if (!match) throw new Error("Enter a positive BDT amount with at most two decimal places.");
   const minor = BigInt(match[1]) * 100n + BigInt((match[2] ?? "").padEnd(2, "0"));
@@ -600,8 +616,8 @@ export function bdtToMinor(value: string) {
   return Number(minor);
 }
 
-function nonNegativeBdtToMinor(value: string) {
-  if (value.trim() === "0" || value.trim() === "0.00") return 0;
+export function nonNegativeBdtToMinor(value: string) {
+  if (/^0+(\.0{1,2})?$/.test(value.trim())) return 0;
   return bdtToMinor(value);
 }
 
@@ -740,6 +756,9 @@ export async function buildWorkflowCommand(
       break;
     case "advancePolicyLifecycle":
       command = { operation, id: required(values, "id", "Policy ID"), asOfDate: required(values, "asOfDate", "Business date") };
+      break;
+    case "reinstatePolicy":
+      command = { operation, id: required(values, "id", "Policy ID"), reasonHash: await digest("reasonText", "Reinstatement decision reference") };
       break;
     case "cancelPolicy":
     case "cancelPolicyAsInsurer":

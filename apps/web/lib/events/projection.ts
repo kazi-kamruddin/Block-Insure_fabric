@@ -103,6 +103,10 @@ function notificationTargets(event: IndexedFabricEvent) {
       { role: "policyholder", subject: text(p, "ownerId"), title: text(p, "status") === "LINKED" ? `Bank linked account ${text(p, "maskedAccount")}` : `Bank rejected the link for ${text(p, "maskedAccount")}`, asset: text(p, "id") },
       { role: "insurerAdmin", subject: "", title: `Customer bank link ${text(p, "status").toLowerCase()}`, asset: text(p, "id") },
     ];
+    case "PolicyReinstated": return [
+      { role: "policyholder", subject: text(p, "policyholderId"), title: `Policy reinstated on ${text(p, "reinstatedDate")}: pay today's installment to resume cover`, asset: text(p, "policyId") },
+      { role: "insurerAdmin", subject: "", title: `Policy reinstated; uncovered from ${text(p, "uncoveredFrom")}`, asset: text(p, "policyId") },
+    ];
     case "PremiumCollectionRetryQueued": return [{ role: "bankOfficer", subject: "", title: "Bounced premium collection queued for retry", asset: text(p, "id") }];
     case "PremiumCollectionProcessed": return [
       { role: "insurerAdmin", subject: "", title: `Premium collection ${text(p, "status").toLowerCase()}`, asset: text(p, "id") },

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { currentSession } from "@/lib/auth/current-session";
 import { ledger } from "@/lib/fabric/ledger";
-import { choosePremiumAccount, nextInstallment } from "@/lib/banking/premium-schedule";
+import { choosePremiumAccount, dhakaToday, nextInstallment, premiumStanding } from "@/lib/banking/premium-schedule";
 
 export const runtime = "nodejs";
 
@@ -14,6 +14,7 @@ export async function GET() {
     return NextResponse.json({ message: "A policyholder session is required" }, { status: 403 });
   }
   const subject = session.subjectId;
+  const today = dhakaToday();
   try {
     const [policies, accounts, links, mandates, collections, agreements] = await Promise.all([
       ledger.listPolicies(), ledger.listBankAccountReferences(), ledger.listBankAccountLinks(),
@@ -35,6 +36,7 @@ export async function GET() {
           id: policy.id, packageId: policy.packageId, status: policy.status, createdAt: policy.createdAt, startDate: policy.startDate, endDate: policy.endDate,
           premiumMinor: policy.premiumMinor, paidThroughDate: policy.paidThroughDate ?? "", nextPremiumDueDate: policy.nextPremiumDueDate ?? "",
           bankIds: policy.bankIds ?? [], nextInstallment: ["CANCELLED", "EXPIRED"].includes(policy.status) ? null : nextInstallment(policy),
+          coverStartDate: policy.coverStartDate ?? "", reinstatedDate: policy.reinstatedDate ?? "", standing: premiumStanding(policy, today),
           insurerAccount: insurer ? { id: insurer.id, bankId: insurer.bankId, accountLabel: insurer.accountLabel, maskedAccount: insurer.maskedAccount } : null,
         };
       }),

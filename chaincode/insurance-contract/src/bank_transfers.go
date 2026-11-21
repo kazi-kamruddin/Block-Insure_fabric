@@ -151,9 +151,12 @@ func (c *Contract) AdjustBankAccountBalance(ctx contractapi.TransactionContextIn
 	return transfer, nil
 }
 
-func validatePremiumPeriod(policy *Policy, periodStartDate, periodEndDate string, amountMinor int64) error {
+func validatePremiumPeriod(ctx contractapi.TransactionContextInterface, policy *Policy, periodStartDate, periodEndDate string, amountMinor int64) error {
 	if policy.Status == "CANCELLED" || policy.Status == "EXPIRED" {
 		return fmt.Errorf("policy %s cannot accept a premium from %s", policy.ID, policy.Status)
+	}
+	if err := validateMedicalPremiumTiming(ctx, policy, periodStartDate); err != nil {
+		return err
 	}
 	start, err := validateDate("periodStartDate", periodStartDate)
 	if err != nil {
@@ -221,7 +224,7 @@ func validatePremiumAccounts(ctx contractapi.TransactionContextInterface, c *Con
 }
 
 func (c *Contract) writePremiumTransfer(ctx contractapi.TransactionContextInterface, transfer *BankTransfer, policy *Policy, mandate *BankMandate, periodStartDate, periodEndDate string, amountMinor int64) (*PremiumPayment, error) {
-	if err := validatePremiumPeriod(policy, periodStartDate, periodEndDate, amountMinor); err != nil {
+	if err := validatePremiumPeriod(ctx, policy, periodStartDate, periodEndDate, amountMinor); err != nil {
 		return nil, err
 	}
 	paymentMarker, err := paymentMarkerKey(ctx, transfer.ExternalReferenceHash)
@@ -254,6 +257,14 @@ func (c *Contract) writePremiumTransfer(ctx contractapi.TransactionContextInterf
 		return nil, fmt.Errorf("reserve external payment reference: %w", err)
 	}
 	end, _ := validateDate("periodEndDate", periodEndDate)
+	if policy.Status == "PENDING_PAYMENT" && policy.MedicalRulesVersion != 0 {
+		// No premium, no cover: risk begins when the first premium settles.
+		_, today, err := ledgerToday(ctx)
+		if err != nil {
+			return nil, err
+		}
+		policy.CoverStartDate = max(policy.StartDate, today)
+	}
 	policy.Status = "ACTIVE"
 	policy.PaidThroughDate = periodEndDate
 	policy.NextPremiumDueDate = end.AddDate(0, 0, 1).Format("2006-01-02")
@@ -338,7 +349,7 @@ func (c *Contract) ExecuteManualPremiumPayment(ctx contractapi.TransactionContex
 	if err != nil {
 		return nil, err
 	}
-	if err := validatePremiumPeriod(policy, periodStartDate, periodEndDate, amountMinor); err != nil {
+	if err := validatePremiumPeriod(ctx, policy, periodStartDate, periodEndDate, amountMinor); err != nil {
 		return nil, err
 	}
 	source, destination, err := validatePremiumAccounts(ctx, c, policy, sourceAccountID, destinationAccountID)
@@ -455,7 +466,7 @@ func (c *Contract) ProcessPremiumCollection(ctx contractapi.TransactionContextIn
 	if reconciled, err := c.reconcileCollectedPremium(ctx, collection, policy, destinationAccountID, periodEndDate); err != nil || reconciled != nil {
 		return reconciled, err
 	}
-	if err := validatePremiumPeriod(policy, collection.DueDate, periodEndDate, collection.AmountMinor); err != nil {
+	if err := validatePremiumPeriod(ctx, policy, collection.DueDate, periodEndDate, collection.AmountMinor); err != nil {
 		return nil, err
 	}
 	if collection.DueDate > mandate.ExpiryDate || periodEndDate > mandate.ExpiryDate {

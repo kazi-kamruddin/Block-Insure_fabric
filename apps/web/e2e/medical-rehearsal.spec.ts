@@ -32,6 +32,23 @@ const duplicateOnly = devLite && process.env.DEV_LITE_DUPLICATE_REVIEW === "true
 // Leaves one Insurer-authorized payout for the separate-account Bank signer drill.
 const stopBeforeBank = devLite && !finalPayment && process.env.MEDICAL_STOP_BEFORE_BANK === "true";
 
+// Realistic synthetic taka amounts (minor units are poisha). The rehearsal
+// package charges BDT 1,250 per 30 days with a BDT 300,000 limit; surgery is
+// sublimited to BDT 150,000 with a 10% deductible capped at BDT 5,000 and an
+// 80% insurer share. A routine BDT 85,000 stay therefore pays BDT 64,000; the
+// out-of-range BDT 190,000 bill pays BDT 116,000 until its appeal corrects it.
+const money = { premium: 125_000, coverage: 30_000_000, customerOpening: 2_500_000, reserveOpening: 10_000_000 };
+const routineQuote = { billedMinor: 8_500_000, eligibleMinor: 8_500_000, deductibleMinor: 500_000, insurerShareMinor: 6_400_000, payableMinor: 6_400_000 };
+const governedQuote = { billedMinor: 19_000_000, eligibleMinor: 15_000_000, deductibleMinor: 500_000, insurerShareMinor: 11_600_000, payableMinor: 11_600_000 };
+const payout = routineQuote.payableMinor;
+const grouped = new Intl.NumberFormat("en-BD", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const bdt = (minor: number) => "BDT " + grouped.format(minor / 100);
+// Categories the frozen model scores in its pooled group, tried in order so a
+// routine claim never overlaps an earlier stay claimed the same day. SURGERY is
+// left out: its dev-lite benchmark is the immutable BDT 250-750 record from
+// earlier sequences, so a realistic surgery bill would always be out of range.
+const routineServices = ["INPATIENT", "OTHER", "CONSULTATION"];
+
 function day(offset: number, base?: string) {
   const now = base ? Date.parse(base) : Date.now() + 6 * 3_600_000;
   return new Date(now + offset * 86_400_000).toISOString().slice(0, 10);
@@ -59,7 +76,12 @@ test(journey, async ({ page }, info) => {
   if (resumeClaim && !resumeSuffix) throw new Error("Supply the interrupted fixture suffix");
   const suffix = resumeClaim && resumeSuffix ? resumeSuffix : intakeCheckpoint?.suffix ?? randomUUID().slice(0, 12);
   const id = (prefix: string) => "med-" + prefix + "-" + suffix;
-  let start = day(-1), service = day(0), firstEnd = day(28), end = day(59);
+  let start = day(0), service = day(0), firstEnd = day(29), end = day(364);
+  let medicalService = "SURGERY";
+  // A duplicate is the same stay claimed again on the same policy, so that
+  // journey reuses the earlier claim's policy instead of buying a new one.
+  let policyId = id("policy");
+  let reusePolicy = false;
   const journal: unknown[] = [];
   const errors: string[] = [];
   const priorClaimId = process.env.MEDICAL_PRIOR_CLAIM_ID;
@@ -85,13 +107,15 @@ test(journey, async ({ page }, info) => {
     role = next;
   }
 
-  async function postFromButton(button: ReturnType<typeof page.getByRole>, path = "/api/workflows", status = 200) {
+  type Accept = number | ((status: number, body: { message?: string }) => boolean);
+  async function postFromButton(button: ReturnType<typeof page.getByRole>, path = "/api/workflows", status: Accept = 200) {
     const pending = page.waitForResponse(response => new URL(response.url()).pathname === path && response.request().method() === "POST", { timeout: 150_000 });
     await button.click();
     const response = await pending;
     const body = await response.json();
     journal.push({ actor: role, path, status: response.status(), result: body.result, message: body.message });
-    expect(response.status(), JSON.stringify(body)).toBe(status);
+    if (typeof status === "number") expect(response.status(), JSON.stringify(body)).toBe(status);
+    else expect(status(response.status(), body), JSON.stringify(body)).toBe(true);
     if (path === "/api/workflows" && await button.count()) await expect(button).toBeEnabled({ timeout: 120_000 });
     return body.result;
   }
@@ -112,7 +136,7 @@ test(journey, async ({ page }, info) => {
     return card.getByRole("button", { name: /^(Save intake|Submit verified transaction|Submit bank instruction)$/ });
   }
 
-  async function form(operation: string, input: Record<string, string>, status = 200) {
+  async function form(operation: string, input: Record<string, string>, status: Accept = 200) {
     return postFromButton(await fillForm(operation, input), "/api/workflows", status);
   }
 
@@ -232,8 +256,8 @@ test(journey, async ({ page }, info) => {
           await retrieval.getByRole("button", { name: "Extract invoice fields" }).click();
           await expect(retrieval.getByLabel("Invoice number", { exact: true })).toHaveValue(ocr[evidenceId], { timeout: 90_000 });
           await expect(retrieval.getByLabel("Documented service date")).toHaveValue(service);
-          await expect(retrieval.getByLabel("Invoice total in BDT")).toHaveValue("950.00");
-          await retrieval.getByLabel("Invoice total in BDT").fill("950.01");
+          await expect(retrieval.getByLabel("Invoice total in BDT")).toHaveValue("190000.00");
+          await retrieval.getByLabel("Invoice total in BDT").fill("190000.01");
           const downloaded = page.waitForEvent("download", { timeout: 120_000 });
           const confirmed = page.waitForResponse(r => new URL(r.url()).pathname === "/api/medical/review" && r.request().method() === "POST");
           await retrieval.getByRole("button", { name: "Confirm fields and download private receipt" }).click();
@@ -245,7 +269,7 @@ test(journey, async ({ page }, info) => {
           expect(sent.suggestionsHash).not.toBe(sent.confirmedHash);
           expect(receipt.suggestedFilename()).toBe(`ocr-review-${evidenceId}.json`);
           expect(JSON.parse(await readFile(await receipt.path(), "utf8"))).toMatchObject({
-            ...source, suggestions: { totalBdt: "950.00" }, confirmed: { totalBdt: "950.01" },
+            ...source, suggestions: { totalBdt: "190000.00" }, confirmed: { totalBdt: "190000.01" },
           });
           const projectionPath = process.env.MEDICAL_EVENT_PROJECTION_PATH;
           if (projectionPath) {
@@ -273,7 +297,7 @@ test(journey, async ({ page }, info) => {
 
   function hospitalFields(revision: number, billBdt: string) {
     return { episodeReference: id("episode"), expectedRevision: String(revision), patientReference: id("patient"),
-      service: "SURGERY", admissionDate: service, dischargeDate: service, serviceDate: service, billBdt, invoiceDate: service, diagnosisCode: "" };
+      service: medicalService, admissionDate: service, dischargeDate: service, serviceDate: service, billBdt, invoiceDate: service, diagnosisCode: "" };
   }
 
   try {
@@ -284,26 +308,42 @@ test(journey, async ({ page }, info) => {
     if (governed || finalPayment || duplicateOnly) {
       await login("insurer");
       await expect(reviewCard.getByRole("heading", { name: "Medical review and appeal" })).toBeVisible();
+      const episodeServices = async () => {
+        const response = await page.request.get("/api/medical/intake");
+        expect(response.ok(), await response.text()).toBe(true);
+        return new Map(((await response.json()).episodes as { id: string; service: string }[]).map(row => [row.id, row.service]));
+      };
       if (priorClaimId) {
         const prior = await asset("claim", priorClaimId);
-        expect(prior).toMatchObject({ status: "SETTLED", amountMinor: 4000 });
-        if (devLite) service = prior.incidentDate;
+        expect(prior).toMatchObject({ status: "SETTLED" });
+        if (devLite && duplicateOnly) {
+          service = prior.incidentDate;
+          medicalService = (await episodeServices()).get(prior.episodeId) ?? "SURGERY";
+          policyId = prior.policyId;
+          reusePolicy = true;
+        }
       }
       if (devLite && finalPayment && !resumeClaim && !intakeCheckpoint) {
-        const usedDates = new Set((await assets("claim") as { episodeId?: string; claimantId: string; incidentDate: string }[])
-          .filter(claim => claim.episodeId && claim.claimantId === "policyholder1").map(claim => claim.incidentDate));
-        const unused = Array.from({ length: 21 }, (_, offset) => day(-offset)).find(date => !usedDates.has(date));
-        if (!unused) throw new Error("No unused service date in the dev-lite fixture window");
-        service = unused;
+        // Cover is never backdated, so a routine stay is today's. Choose a
+        // category this patient has not claimed today to avoid an overlap.
+        const services = await episodeServices();
+        const today = day(0);
+        const used = new Set((await assets("claim") as { episodeId?: string; claimantId: string; incidentDate: string }[])
+          .filter(claim => claim.episodeId && claim.claimantId === "policyholder1" && claim.incidentDate === today)
+          .map(claim => services.get(claim.episodeId!)));
+        const unused = routineServices.find(candidate => !used.has(candidate));
+        if (!unused) throw new Error("Every routine service category already has a claim today; run the routine rehearsal tomorrow");
+        medicalService = unused;
+        service = today;
       }
     }
     if (intakeCheckpoint) service = intakeCheckpoint.service;
-    start = day(-1, service);
-    firstEnd = day(28, service);
-    end = day(59, service);
+    start = service;
+    firstEnd = day(29, service);
+    end = day(364, service);
     let claimId = resumeClaim ?? "";
     let episodeId = "";
-    if (!resumeClaim && !intakeCheckpoint) await test.step("register partners and publish the medical policy", async () => {
+    if (!resumeClaim && !intakeCheckpoint && !reusePolicy) await test.step("register partners and publish the medical policy", async () => {
       await login("insurer");
       const existing = await assets("partner-agreement") as { partnerId: string; status: string }[];
       for (const [partnerType, partnerId, name] of [
@@ -314,35 +354,41 @@ test(journey, async ({ page }, info) => {
         await form("createPartnerAgreement", { id: id(partnerId), partnerType, partnerId, name,
           location: "Dhaka", tier: "Preferred", accessScope: "Synthetic rehearsal only", effectiveDate: day(-30), expiryDate: day(365) });
       }
-      await form("createPolicyPackage", { id: id("package"), name: "Medical Reimbursement " + suffix,
-        description: "Isolated synthetic reimbursement", premiumBdt: "1.00", coverageLimitBdt: "40.00", termsText: id("terms") });
+      await form("createPolicyPackage", { id: id("package"), name: "Accident and Emergency Care " + suffix,
+        description: "Isolated synthetic reimbursement", premiumBdt: "1250.00", coverageLimitBdt: "300000.00", termsText: id("terms") });
       await form("configurePolicyPackagePartners", { id: id("package"), hospitalIdsJson: '["hospital-demo"]', bankIdsJson: '["bank-demo"]' });
-      await form("configureMedicalRules", { packageId: id("package"), service: "SURGERY", sublimit: "80.00",
-        deductibleBps: "1000", deductibleCap: "10.00", shareBps: "8000", waitingDays: "0", filingDays: "30", evidenceRequired: "No" });
+      // Emergency care has no waiting period, so a stay on the purchase day qualifies.
+      await form("configureMedicalRules", { packageId: id("package"), service: medicalService, sublimit: "150000.00",
+        deductibleBps: "1000", deductibleCap: "5000.00", shareBps: "8000", waitingDays: "0", filingDays: "30", evidenceRequired: "No" });
       await form("publishPolicyPackage", { id: id("package") });
     });
 
     if (!resumeClaim && !intakeCheckpoint) await test.step("accept policy terms and pay the first installment with OTP", async () => {
       await login("bank");
       for (const [name, ownerId, accountType, openingBalanceBdt] of [
-        ["customer", "policyholder1", "CUSTOMER", "100.00"],
+        ["customer", "policyholder1", "CUSTOMER", "25000.00"],
         ["premium", "insurer", "INSURER", "0.00"],
-        ["reserve", "insurer", "INSURER", finalPayment ? "0.00" : "100.00"],
+        ["reserve", "insurer", "INSURER", finalPayment ? "0.00" : "100000.00"],
       ]) await form("openBankAccount", { id: id(name), bankId: "bank-demo", ownerId, accountType,
         accountLabel: "Synthetic medical " + name, maskedAccount: "**** 1234", openingBalanceBdt, accountTokenText: id("token-" + name) });
+      if (reusePolicy) {
+        await login("insurer");
+        expect(await asset("policy", policyId)).toMatchObject({ status: "ACTIVE", medicalRulesVersion: 1 });
+        return;
+      }
       await login("holder");
       const offer = page.locator("#guided-workflow");
       await offer.getByLabel("Workflow action").selectOption("acquireMedicalPolicy");
       await offer.getByRole("button", { name: "Load published packages" }).click();
       await offer.getByLabel("Medical package").selectOption(id("package"));
-      await expect(offer.getByText(/BDT 40.00 is payable/)).toBeVisible();
+      await expect(offer.getByText(bdt(payout) + " is payable", { exact: false })).toBeVisible();
       await offer.getByLabel("I accept these published terms").check();
       const policy = await form("acquireMedicalPolicy", { id: id("policy"), startDate: start, endDate: end });
-      expect(policy).toMatchObject({ status: "PENDING_PAYMENT", coverageLimitMinor: 4000, medicalRulesVersion: 1 });
+      expect(policy).toMatchObject({ status: "PENDING_PAYMENT", coverageLimitMinor: money.coverage, medicalRulesVersion: 1, coverStartDate: "" });
       const card = page.locator("article").filter({ has: page.getByRole("heading", { name: "Pay with one-time authorization", exact: true }) });
       for (const [label, value] of Object.entries({ "Policy ID": id("policy"), "Customer account ID": id("customer"),
         "Insurer account ID": id("premium"), "Transfer ID": id("otp-transfer"), "Payment ID": id("otp-payment"),
-        "Period starts": start, "Period ends": firstEnd, "Premium (BDT)": "1.00", "External bank receipt": id("otp-reference") })) {
+        "Period starts": start, "Period ends": firstEnd, "Premium (BDT)": "1250.00", "External bank receipt": id("otp-reference") })) {
         await card.getByLabel(label, { exact: true }).fill(value);
       }
       await card.getByRole("button", { name: "Email OTP", exact: true }).click();
@@ -350,7 +396,7 @@ test(journey, async ({ page }, info) => {
       await expect(code).toHaveText(/^\d{6}$/);
       await card.getByLabel("Six-digit OTP", { exact: true }).fill((await code.textContent())!);
       await postFromButton(card.getByRole("button", { name: "Authorize premium", exact: true }), "/api/banking/premium-payment");
-      expect(await asset("policy", id("policy"))).toMatchObject({ status: "ACTIVE", paidThroughDate: firstEnd });
+      expect(await asset("policy", id("policy"))).toMatchObject({ status: "ACTIVE", paidThroughDate: firstEnd, coverStartDate: start });
     });
 
     if (!resumeClaim) await test.step("intake stays hidden until verified and the quote is pinned to the submitted claim", async () => {
@@ -361,8 +407,8 @@ test(journey, async ({ page }, info) => {
         const response = await page.request.get("/api/medical/intake");
         expect(response.ok(), await response.text()).toBe(true);
         const { episodes } = await response.json();
-        expect(episodes).toContainEqual(expect.objectContaining({ id: intakeCheckpoint.episodeId, revision: 1, serviceDate: service, billMinor: 50_000 }));
-        expect(episodes).toContainEqual(expect.objectContaining({ id: intakeCheckpoint.alternateId, revision: 1, serviceDate: service, billMinor: 2_500 }));
+        expect(episodes).toContainEqual(expect.objectContaining({ id: intakeCheckpoint.episodeId, revision: 1, serviceDate: service, billMinor: 8_500_000 }));
+        expect(episodes).toContainEqual(expect.objectContaining({ id: intakeCheckpoint.alternateId, revision: 1, serviceDate: service, billMinor: 4_500_000 }));
         episodeId = intakeCheckpoint.episodeId;
         alternate = { id: intakeCheckpoint.alternateId };
       } else {
@@ -373,13 +419,13 @@ test(journey, async ({ page }, info) => {
           expectedMinMinor: 1, expectedMaxMinor: 2, licenseStatus: "ACTIVE" } });
         expect(forbidden.status()).toBe(403);
         expect(await forbidden.json()).toMatchObject({ message: "Hospital accounts can only save factual episode intake." });
-        episodeId = (await form("saveMedicalEpisode", hospitalFields(0, governed ? "950.00" : "500.00"))).id;
+        episodeId = (await form("saveMedicalEpisode", hospitalFields(0, governed ? "190000.00" : "85000.00"))).id;
         if (finalPayment) {
-          alternate = await form("saveMedicalEpisode", { ...hospitalFields(0, "25.00"),
+          alternate = await form("saveMedicalEpisode", { ...hospitalFields(0, "45000.00"),
             episodeReference: id("alternate-episode"), patientReference: id("alternate-patient") });
           const payload = { operation: "saveMedicalEpisode", episodeReferenceHash: "a".repeat(64), expectedRevision: 0,
-            patientReferenceHash: "b".repeat(64), service: "SURGERY", serviceDate: service, admissionDate: service,
-            dischargeDate: service, billMinor: 2500, invoiceDate: service, diagnosisCode: "", fraudLabel: true };
+            patientReferenceHash: "b".repeat(64), service: medicalService, serviceDate: service, admissionDate: service,
+            dischargeDate: service, billMinor: 4_500_000, invoiceDate: service, diagnosisCode: "", fraudLabel: true };
           const label = await page.request.post("/api/workflows", { data: payload });
           expect(label.status()).toBe(400);
         }
@@ -389,7 +435,7 @@ test(journey, async ({ page }, info) => {
       const discovery = page.getByRole("article").filter({ has: page.getByRole("heading", { name: "Your medical episodes", exact: true }) });
       await discovery.getByRole("button", { name: "Refresh episodes" }).click();
       await expect(discovery.getByLabel("Verified episode").locator('option[value="' + episode.id + '"]')).toHaveCount(0);
-      const idOfPolicy = id("policy");
+      const idOfPolicy = policyId;
       const rawQuote = (episode: string) => "/api/medical/intake?" + new URLSearchParams({ policy: idOfPolicy, episode, revision: "1" });
       if (finalPayment) {
         const denied = await page.request.get(rawQuote(episode.id));
@@ -413,18 +459,22 @@ test(journey, async ({ page }, info) => {
       expect(registry.ok()).toBe(true);
       expect((await registry.json()).episodes.find((row: { id: string }) => row.id === episode.id)).toMatchObject({ associationStatus: "VERIFIED" });
 
-      // The benchmark is an immutable synthetic fixture local to this channel.
-      if (process.env.MEDICAL_BENCHMARK_EXISTS !== "true") {
-        await form("registerMedicalOracleBenchmark", { hospitalId: "hospital-demo", service: "SURGERY", minimum: "250.00", maximum: "750.00",
-          licenseStatus: "ACTIVE", sourceReference: "Synthetic benchmark range for documented BDT 500 surgery fixture" });
+      // Each hospital and service has one immutable synthetic benchmark on this
+      // channel. This spec always records the same realistic range, so a range
+      // an earlier run recorded is reused; any other refusal still fails.
+      if (process.env.MEDICAL_BENCHMARK_EXISTS !== "true" || medicalService !== "SURGERY") {
+        await form("registerMedicalOracleBenchmark", { hospitalId: "hospital-demo", service: medicalService, minimum: "50000.00", maximum: "120000.00",
+          licenseStatus: "ACTIVE", sourceReference: "Synthetic benchmark range for a documented BDT 85,000 " + medicalService.toLowerCase() + " fixture" },
+        (status, body) => status === 200 || (status === 409 && /private medicalOracleBenchmark [0-9a-f]{64} already exists/.test(body.message ?? "")));
       }
       await login("holder");
       await discovery.getByRole("button", { name: "Refresh episodes" }).click();
-      await discovery.getByLabel("Medical policy").selectOption(id("policy"));
+      await discovery.getByLabel("Medical policy").selectOption(policyId);
       await discovery.getByLabel("Verified episode").selectOption(episode.id);
       const receipt = await postFromButton(discovery.getByRole("button", { name: "Prepare claim and calculate reimbursement" }));
-      await expect(discovery.getByText(/Eligible BDT 80.00 · Deductible BDT 8.00 · Insurer share BDT 57.60/)).toBeVisible();
-      await expect(discovery.getByText("Payable BDT 40.00", { exact: true })).toBeVisible();
+      const expected = governed ? governedQuote : routineQuote;
+      await expect(discovery.getByText(`Eligible ${bdt(expected.eligibleMinor)} · Deductible ${bdt(expected.deductibleMinor)} · Insurer share ${bdt(expected.insurerShareMinor)}`, { exact: false })).toBeVisible();
+      await expect(discovery.getByText("Payable " + bdt(expected.payableMinor), { exact: true })).toBeVisible();
       await info.attach("reimbursement-statement", { body: await discovery.innerText(), contentType: "text/plain" });
       let claim;
       if (finalPayment) {
@@ -434,8 +484,8 @@ test(journey, async ({ page }, info) => {
         const offer = await page.request.get(rawQuote(episode.id));
         expect(offer.ok(), await offer.text()).toBe(true);
         const { quote } = await offer.json();
-        expect(quote).toMatchObject({ billedMinor: 50000, eligibleMinor: 8000, deductibleMinor: 800, insurerShareMinor: 5760, payableMinor: 4000 });
-        const facts = { policyId: id("policy"), episodeId: episode.id, revision: 1 };
+        expect(quote).toMatchObject(routineQuote);
+        const facts = { policyId, episodeId: episode.id, revision: 1 };
         const initial = { operation: "submitMedicalClaim", id: receipt.id, ...facts, statementHash: quote.statementHash };
         for (const malformed of [{ ...initial, amountMinor: 95000 }, { ...initial, revision: 2 }, { ...initial, statementHash: "0".repeat(64) }]) {
           const denial = await page.request.post("/api/workflows", { data: malformed });
@@ -453,7 +503,7 @@ test(journey, async ({ page }, info) => {
       } else {
         claim = await postFromButton(discovery.getByRole("button", { name: "Accept statement and submit claim" }));
       }
-      expect(claim).toMatchObject({ version: 1, amountMinor: 4000, episodeId: episode.id, episodeRevision: 1 });
+      expect(claim).toMatchObject({ version: 1, amountMinor: (governed ? governedQuote : routineQuote).payableMinor, episodeId: episode.id, episodeRevision: 1, policyId });
       if (!finalPayment) expect(claim.id).toBe(receipt.id);
       claimId = claim.id;
       if (duplicateOnly) expect(claim).toMatchObject({ medicalDuplicateReview: true, version: 1, appealCount: 0 });
@@ -463,7 +513,7 @@ test(journey, async ({ page }, info) => {
         const pdf = id("invoice-pdf"), jpeg = id("invoice-jpeg");
         if (!resumeClaim) {
           await uploadDocument(claimId, pdf, "INVOICE", {
-            name: "invoice.pdf", mimeType: "application/pdf", buffer: Buffer.from(invoicePDF("MED-250", service, "950.00")),
+            name: "invoice.pdf", mimeType: "application/pdf", buffer: Buffer.from(invoicePDF("MED-250", service, "190,000.00")),
           }, 1);
           const image = await page.evaluate(date => {
             const canvas = document.createElement("canvas");
@@ -474,7 +524,7 @@ test(journey, async ({ page }, info) => {
             brush.fillRect(0, 0, 1000, 330);
             brush.fillStyle = "black";
             brush.font = "42px Arial";
-            ["Invoice number: MED-251", "Service date: " + date, "Total due: BDT 950.00"].forEach((text, i) => brush.fillText(text, 50, 85 + i * 82));
+            ["Invoice number: MED-251", "Service date: " + date, "Total due: BDT 190,000.00"].forEach((text, i) => brush.fillText(text, 50, 85 + i * 82));
             return canvas.toDataURL("image/jpeg", 0.94).split(",")[1];
           }, service);
           await uploadDocument(claimId, jpeg, "MEDICAL_REPORT", {
@@ -524,7 +574,7 @@ test(journey, async ({ page }, info) => {
           expect(recovered.id).not.toBe(initial.id);
         }
         expect(oldGrants).toHaveLength(8);
-        expect((await loadReview(claimId)).claim).toMatchObject({ medicalRecoveryUsed: true, amountMinor: 4000 });
+        expect((await loadReview(claimId)).claim).toMatchObject({ medicalRecoveryUsed: true, amountMinor: governedQuote.payableMinor });
 
         await login("auditor1");
         const old = oldGrants.find((grant: { granteeSubject: string; evidenceId: string }) => grant.granteeSubject === "auditor1" && grant.evidenceId === pdf);
@@ -602,7 +652,7 @@ test(journey, async ({ page }, info) => {
         brush.fillRect(0, 0, canvas.width, canvas.height);
         brush.fillStyle = "black";
         brush.font = "42px Arial";
-        ["Invoice number: MED-250", "Service date: " + date, "Total due: BDT 950.00"].forEach((text, i) => brush.fillText(text, 50, 85 + i * 82));
+        ["Invoice number: MED-250", "Service date: " + date, "Total due: BDT 190,000.00"].forEach((text, i) => brush.fillText(text, 50, 85 + i * 82));
         return canvas.toDataURL("image/png").split(",")[1];
       }, service);
       const invoice = { name: "itemized-invoice.png", mimeType: "image/png", buffer: Buffer.from(image, "base64") };
@@ -642,7 +692,7 @@ test(journey, async ({ page }, info) => {
       expect(await asset("claim", claimId)).toMatchObject({ status: "REJECTED" });
 
       await login("hospital");
-      expect(await form("saveMedicalEpisode", hospitalFields(1, "500.00"))).toMatchObject({ id: episodeId, revision: 2 });
+      expect(await form("saveMedicalEpisode", hospitalFields(1, "85000.00"))).toMatchObject({ id: episodeId, revision: 2 });
       await login("insurer");
       await form("verifyMedicalAssociation", { episodeId, revision: "2", beneficiaryId: "policyholder1",
         decisionBasis: id("verified-corrected-source"), associationDecision: "VERIFY" });
@@ -650,12 +700,12 @@ test(journey, async ({ page }, info) => {
       await login("holder");
       await loadReview(claimId);
       await reviewCard.getByLabel("Disputed rejection").selectOption(disputed);
-      await reviewCard.getByLabel("What changed?").fill("The hospital corrected the billed amount to BDT 500.00 in episode revision 2.");
-      const newFile = { name: "corrected-supplement.txt", mimeType: "text/plain", buffer: Buffer.from(`Synthetic corrected BDT 500.00 itemization ${service} · ${suffix}`) };
+      await reviewCard.getByLabel("What changed?").fill("The hospital corrected the billed amount to BDT 85,000.00 in episode revision 2.");
+      const newFile = { name: "corrected-supplement.txt", mimeType: "text/plain", buffer: Buffer.from(`Synthetic corrected BDT 85,000.00 itemization ${service} · ${suffix}`) };
       await reviewCard.getByLabel("New appeal document").setInputFiles(newFile);
       await reviewCard.getByLabel("Corrected episode revision (optional)").fill("2");
       await reviewCard.getByRole("button", { name: "Calculate corrected reimbursement" }).click();
-      await expect(reviewCard.getByText(/Corrected payable amount BDT 40.00/)).toBeVisible();
+      await expect(reviewCard.getByText("Corrected payable amount " + bdt(payout), { exact: false })).toBeVisible();
       const appeal = await reviewAction("File medical appeal");
       expect(appeal).toMatchObject({ claimVersion: 3, disputedDecisionId: disputed, medicalPriorReviewId: returned.id });
       if (devLite && priorClaimId) {
@@ -691,7 +741,7 @@ test(journey, async ({ page }, info) => {
         await reviewCard.getByLabel("Reason reference").fill("Verified corrected amount, decrypted evidence and issued terms.");
         await reviewAction("Record reasoned vote");
       }
-      expect(await asset("claim", claimId)).toMatchObject({ version: 3, status: "APPROVED", amountMinor: 4000 });
+      expect(await asset("claim", claimId)).toMatchObject({ version: 3, status: "APPROVED", amountMinor: payout });
     });
 
     if (duplicateOnly) await test.step("refer a similar episode with a positive Oracle result", async () => {
@@ -751,9 +801,9 @@ test(journey, async ({ page }, info) => {
       }
       }
       if (finalPayment && resumeClaim) {
-        expect(await asset("claim", claimId)).toMatchObject({ id: claimId, policyId: id("policy"), status: "SETTLEMENT_AUTHORIZED", amountMinor: 4000 });
+        expect(await asset("claim", claimId)).toMatchObject({ id: claimId, policyId: id("policy"), status: "SETTLEMENT_AUTHORIZED", amountMinor: payout });
         expect(await asset("settlement", id("settlement"))).toMatchObject({ claimId, sourceAccountId: id("reserve"),
-          destinationAccountId: id("customer"), status: "PAYMENT_FAILED", amountMinor: 4000 });
+          destinationAccountId: id("customer"), status: "PAYMENT_FAILED", amountMinor: payout });
       } else {
         if (devLite) {
           const approved = await loadReview(claimId);
@@ -766,12 +816,14 @@ test(journey, async ({ page }, info) => {
       if (devLite) {
         const bank = await loadBankTimeline(id("settlement"));
         expect(bank).toMatchObject({ claimId, approval: { path: governed || duplicateOnly ? "PANEL" : "ORACLE_AUTO" },
-          payout: { status: finalPayment && resumeClaim ? "PAYMENT_FAILED" : "AUTHORIZED", amountMinor: 4000 } });
+          payout: { status: finalPayment && resumeClaim ? "PAYMENT_FAILED" : "AUTHORIZED", amountMinor: payout } });
         expect(Object.keys(bank).sort()).toEqual(["approval", "claimId", "claimVersion", "payout"]);
         expect((await page.request.get("/api/medical/review?" + new URLSearchParams({ claim: claimId }))).status()).toBe(403);
         await expect(page.getByRole("region", { name: "Medical settlement result" }).getByText(bank.approval.hash)).toBeVisible();
       }
-      expect((await asset("account", id("customer"))).balanceMinor).toBe(9900);
+      // The customer paid the first premium from this account unless the policy was reused.
+      const customerBefore = money.customerOpening - (reusePolicy ? 0 : money.premium);
+      expect((await asset("account", id("customer"))).balanceMinor).toBe(customerBefore);
       if (stopBeforeBank) {
         const receipt = info.outputPath("authorized-result.json");
         await writeFile(receipt, JSON.stringify({ claimId, settlementId: id("settlement"), transferId: id("payout") }));
@@ -779,19 +831,19 @@ test(journey, async ({ page }, info) => {
         expect(errors).toEqual([]);
         return;
       }
-      const payout ={ settlementId: id("settlement"), transferId: id("payout"), bankReferenceText: id("bank-receipt") };
+      const instruction = { settlementId: id("settlement"), transferId: id("payout"), bankReferenceText: id("bank-receipt") };
       if (finalPayment) {
         if (resumeClaim) {
           // The interrupted case used the routine receipt for its bounce.
-          payout.bankReferenceText = id("bank-receipt-recovered");
+          instruction.bankReferenceText = id("bank-receipt-recovered");
         } else {
-          expect(await form("confirmSettlement", { ...payout, transferId: id("underfunded"), bankReferenceText: id("bounced-receipt") }))
-            .toMatchObject({ status: "PAYMENT_FAILED", amountMinor: 4000 });
-          expect((await asset("account", id("customer"))).balanceMinor).toBe(9900);
+          expect(await form("confirmSettlement", { ...instruction, transferId: id("underfunded"), bankReferenceText: id("bounced-receipt") }))
+            .toMatchObject({ status: "PAYMENT_FAILED", amountMinor: payout });
+          expect((await asset("account", id("customer"))).balanceMinor).toBe(customerBefore);
           await form("adjustBankAccountBalance", { transferId: id("funding"), accountId: id("reserve"),
-            direction: "CREDIT", amountBdt: "100.00", externalReferenceText: id("funding-receipt") });
+            direction: "CREDIT", amountBdt: "1,00,000.00", externalReferenceText: id("funding-receipt") });
         }
-        expect((await asset("account", id("reserve"))).balanceMinor).toBe(10000);
+        expect((await asset("account", id("reserve"))).balanceMinor).toBe(money.reserveOpening);
         const capture = page.waitForEvent("requestfailed", { predicate: request => request.url().endsWith("/api/workflows"), timeout: 150_000 });
         let committed;
         const endpoint = "**/api/workflows";
@@ -802,31 +854,31 @@ test(journey, async ({ page }, info) => {
           committed = { httpStatus: response.status(), ...await response.json() };
           await route.abort("failed");
         });
-        await (await fillForm("confirmSettlement", payout)).click();
+        await (await fillForm("confirmSettlement", instruction)).click();
         await capture;
         await page.unroute(endpoint);
-        expect(committed, JSON.stringify(committed)).toMatchObject({ httpStatus: 200, state: "COMMITTED", result: { status: "CONFIRMED", amountMinor: 4000 } });
+        expect(committed, JSON.stringify(committed)).toMatchObject({ httpStatus: 200, state: "COMMITTED", result: { status: "CONFIRMED", amountMinor: payout } });
         await page.reload();
         const recovered = await postFromButton(page.getByRole("button", { name: "Check saved action" }));
-        expect(recovered).toMatchObject({ status: "CONFIRMED", amountMinor: 4000, id: id("settlement") });
+        expect(recovered).toMatchObject({ status: "CONFIRMED", amountMinor: payout, id: id("settlement") });
         journal.push({ scenario: "valid-commit-lost-response", committed, recovered });
       } else {
-        expect(await form("confirmSettlement", payout)).toMatchObject({ status: "CONFIRMED", amountMinor: 4000 });
+        expect(await form("confirmSettlement", instruction)).toMatchObject({ status: "CONFIRMED", amountMinor: payout });
       }
-      await form("confirmSettlement", { ...payout, transferId: id("duplicate") }, 409);
-      expect((await asset("account", id("customer"))).balanceMinor).toBe(13900);
-      expect((await asset("account", id("reserve"))).balanceMinor).toBe(6000);
+      await form("confirmSettlement", { ...instruction, transferId: id("duplicate") }, 409);
+      expect((await asset("account", id("customer"))).balanceMinor).toBe(customerBefore + payout);
+      expect((await asset("account", id("reserve"))).balanceMinor).toBe(money.reserveOpening - payout);
       const transfers = (await assets("bank-transfer") as { settlementId: string; status: string; id: string }[]).filter(row => row.settlementId === id("settlement"));
       expect(transfers.filter(row => row.status === "SETTLED")).toEqual([expect.objectContaining({ id: id("payout"), status: "SETTLED" })]);
       expect(transfers).toHaveLength(finalPayment ? 2 : 1);
       await login("holder");
-      expect(await asset("claim", claimId)).toMatchObject({ status: "SETTLED", amountMinor: 4000 });
+      expect(await asset("claim", claimId)).toMatchObject({ status: "SETTLED", amountMinor: payout });
       if (devLite) {
         const settled = await asset("settlement", id("settlement"));
         expect(settled.approvalCertificateHash).toMatch(/^[a-f0-9]{64}$/);
         const final = await loadReview(claimId);
         expect(final.timeline).toMatchObject({ approval: { hash: settled.approvalCertificateHash },
-          payout: { id: id("settlement"), status: "CONFIRMED", transferId: id("payout"), amountMinor: 4000 } });
+          payout: { id: id("settlement"), status: "CONFIRMED", transferId: id("payout"), amountMinor: payout } });
         await expect(timeline.getByText(/Payout complete/)).toBeVisible();
         await expect(timeline.getByText(id("payout"), { exact: true })).toBeVisible();
         expect((await page.request.get("/api/medical/settlement?" + new URLSearchParams({ settlement: id("settlement") }))).status()).toBe(403);
@@ -838,7 +890,7 @@ test(journey, async ({ page }, info) => {
         await login("holder");
         await loadReview(claimId);
       }
-      if (governed && priorClaimId) expect(await asset("claim", priorClaimId)).toMatchObject({ status: "SETTLED", amountMinor: 4000 });
+      if (governed && priorClaimId) expect(await asset("claim", priorClaimId)).toMatchObject({ status: "SETTLED" });
       if (finalPayment) {
         const reference = id("independent-review");
         const data = { claimId, version: 1, outcome: "DISMISSED", basisHash: createHash("sha256").update(reference).digest("hex") };
@@ -858,7 +910,7 @@ test(journey, async ({ page }, info) => {
         expect((await restored.json()).result).toEqual(finding);
         const replacement = await page.request.post("/api/medical/investigation", { data: { ...data, outcome: "SUBSTANTIATED" } });
         expect(replacement.status(), await replacement.text()).toBe(409);
-        expect(await asset("claim", claimId)).toMatchObject({ status: "SETTLED", amountMinor: 4000, version: 1 });
+        expect(await asset("claim", claimId)).toMatchObject({ status: "SETTLED", amountMinor: payout, version: 1 });
       }
       await info.attach("settled-workspace", { body: await page.screenshot(), contentType: "image/png" });
       expect(errors).toEqual([]);
@@ -869,6 +921,6 @@ test(journey, async ({ page }, info) => {
       }
     });
   } finally {
-    await info.attach("fabric-rehearsal-journal", { body: JSON.stringify({ suffix, start, service, end, journal, errors }, null, 2), contentType: "application/json" });
+    await info.attach("fabric-rehearsal-journal", { body: JSON.stringify({ suffix, start, service, medicalService, policyId, reusePolicy, end, journal, errors }, null, 2), contentType: "application/json" });
   }
 });

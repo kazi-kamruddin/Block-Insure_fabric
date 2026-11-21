@@ -284,3 +284,69 @@ collection worker and the scripted journey must not run at the same time,
 because the worker may collect an installment before the scripted Bank click.
 Retroactive coverage (F22) is open. The older general workflow specs that use
 future dates were not re-run against this package.
+
+## Realistic amounts and cover rules on sequence 7 (21 November 2026)
+
+Sequence 7 makes the dev-lite demonstration use realistic Bangladeshi taka
+amounts and adds medical cover rules R1–R6. All money is simulated BDT, and
+the frozen XGBoost weights, threshold and adapter are unchanged. Policies
+issued before sequence 7 keep their issued terms, and non-medical products
+keep their recorded behaviour. Findings F22 and F24–F31 in
+[FINDINGS](results/FINDINGS.md#realistic-amounts-and-medical-cover-rules--21-november-2026-night)
+describe each change.
+
+- **Amounts.** The demo product is BDT 1,250 per 30-day installment, with
+  BDT 300,000 of cover, a BDT 150,000 sublimit, a 10% deductible capped at
+  BDT 5,000 and an 80% insurer share. A routine BDT 85,000 hospital bill
+  pays BDT 64,000; the governed BDT 190,000 bill is capped at BDT 150,000
+  and its correction to BDT 85,000 pays BDT 64,000. The realistic benchmark
+  range is BDT 50,000–120,000. Amounts display as `BDT 150,000.00`, and
+  forms and OCR accept `150000`, `150,000.00` or `1,50,000.00`.
+- **R1 term.** A medical policy starts between the ledger's Asia/Dhaka date
+  and 60 days ahead, for at most one year. Cover is never backdated.
+- **R2 cover start.** Cover starts on the later of the start date and the
+  day the first premium settles (`coverStartDate`). The first premium is
+  accepted until the start date plus the 15-day grace period; then the offer
+  expires.
+- **R3 claims.** A stay must begin on or after cover start, after the
+  waiting period, and within a paid installment. Hospital episode dates,
+  claim incident dates and benefit event dates cannot be in the future.
+- **R4 grace.** An installment paid within grace keeps cover continuous.
+  After the due date plus grace, payment is refused and the policy has
+  lapsed.
+- **R5 reinstatement.** Missed installments cannot be paid. The Insurer's
+  **Reinstate from today** (`ReinstatePolicy`, hashed reason) restarts the
+  policy: the reinstatement premium is accepted that day only, the gap stays
+  uncovered, waiting periods restart, active mandates are re-dated to today
+  and older open collections become SUPERSEDED. Only expiry moves a policy
+  out of LAPSED through `AdvancePolicyLifecycle`.
+- **R6 EFT first premium.** A PENDING_PAYMENT policy can set up an EFT
+  mandate whose first debit is the start date, so the first premium need not
+  be paid by OTP.
+- **Clean-up.** Cancellation and a paid death or surrender benefit cancel
+  open collections and mandates. A policy holds one PENDING or ACTIVE
+  mandate and one non-rejected benefit request. A cancelled policy still
+  covers treatment before its cancellation date.
+
+Identity and evidence:
+
+| Item | Value |
+| --- | --- |
+| Package | `insurance-contract_1.9.0-realism-seq7.tar.gz`, SHA-256 `d6da2d7759681c5c50c895187844f3d6bd0e1b8a3caa31949c58e89000843ec9`, label `insurance-contract_1.9.0`. All 46 packaged source files matched the working tree (`data/dev-lite/realism-20261121/package-audit.json`). Built in the pinned Go 1.26.11 builder; `go build` and `go vet` passed. |
+| Lifecycle | Sequence 7 committed VALID in transaction `4c2db2c338eb9f00d3c23fda24dde9197380a523c347787df71aaebbdd7a7f77`. All five peers read back version 1.9.0, sequence 7, with all five approvals. |
+| Backup | Before the upgrade, the six stopped volumes were archived to `data/dev-lite/backups/pre-seq7-20261121-124702/` with SHA-256 sums. |
+| Preservation | After the upgrade the routine claim `medical-dd367ca9-…` still read SETTLED from the Insurer peer with certificate hash `5b94b770…84d5`. |
+| Offline | Go `gofmt`, `vet` and the full suite passed in the pinned container, with ten new cover-rule tests and extended benefit tests. Web lint, typecheck and 153/153 unit tests passed, and the email connector's 3/3. Offline paired model cases are in `data/dev-lite/realism-20261121/model-paired-cases.mjs`. |
+| Live premium journey | `scripts/test-dev-lite-premium.ps1` passed in 2.2 minutes (`data/dev-lite/premium-journey/20261121-130013-6880`). A backdated purchase returned 409 "never backdated". One policy paid its first premium by OTP. Two EFT-first policies collected on their start date: one completed, and one bounced with INSUFFICIENT_FUNDS and stayed PENDING_PAYMENT until a deposit and Insurer retry completed it. |
+| Live medical journeys | Under `data/dev-lite/medical-rehearsal/20261121-130242-3406`: the routine INPATIENT journey passed in 3.4 minutes and the corrected SURGERY appeal in 9.5 minutes. The first duplicate attempt failed when it re-registered the routine service's immutable benchmark (409 "already exists"). The spec now reuses an identical earlier range, and the re-run `duplicate-rerun` passed in 3.0 minutes, on the routine claim's policy. |
+| Evening staging | `scripts/stage-dev-lite-demo.ps1` passed every stage (`data/dev-lite/demo-staging/20261121-132229/summary.json`): EFT-first policies `prem-policy-rich-dc7d1795` and `prem-policy-poor-dc7d1795` due 22 November plus OTP-paid `prem-policy-otp-dc7d1795` (1.6 min); final rejection `medical-580007c9-…` (6.3 min); a fresh routine claim, then its duplicate `medical-328c1075-…` left SETTLEMENT_AUTHORIZED with settlement `med-settlement-cca3c736-52c` (2.8 min). |
+| Production build | With the network and app stopped, the 19 November `.next` (`qNmlApXQ…`) was moved aside. `next build` and the standalone preparation passed, and the offline e2e suite passed 11/11 against `npm run start`. The new build was then removed and the original `.next` restored by directory move. |
+
+Limits: synthetic data on one host. The 15-day grace expiry, reinstatement
+and offer expiry need ledger time to pass and were tested in Go only. The
+dev-lite SURGERY benchmark is an immutable BDT 250–750 record from earlier
+sequences, so the routine rotation uses INPATIENT, OTHER and CONSULTATION
+(three routine runs per day). The governed appeal still uses SURGERY, where
+BDT 190,000 is out of range under either benchmark. Claims and cases staged
+before sequence 7 keep their small amounts. There is no pro-rata refund on
+cancellation, and waiting periods do not vary by cause.

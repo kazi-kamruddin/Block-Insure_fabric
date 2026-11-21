@@ -24,7 +24,9 @@ $env:MEDICAL_FINAL_PAYMENT = 'true'
 $env:MEDICAL_REVIEW_LIVE = 'false'
 $env:MEDICAL_DEADLINE_LIVE = 'false'
 $env:DEV_LITE_DUPLICATE_REVIEW = 'false'
-$env:MEDICAL_BENCHMARK_EXISTS = if ($Activate) { 'false' } else { 'true' }
+# The routine journey records the realistic BDT 50,000-120,000 benchmark for
+# its service category, or reuses the identical range an earlier run recorded.
+$env:MEDICAL_BENCHMARK_EXISTS = 'false'
 $env:PLAYWRIGHT_OUTPUT_DIR = Join-Path $output 'routine'
 $browser = Join-Path $web 'node_modules/@playwright/test/cli.js'
 $config = Join-Path $web 'playwright.medical.config.ts'

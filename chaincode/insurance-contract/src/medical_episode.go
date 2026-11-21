@@ -115,6 +115,19 @@ func (c *Contract) SaveMedicalEpisode(ctx contractapi.TransactionContextInterfac
 			return nil, fmt.Errorf("invoice date cannot precede discharge")
 		}
 	}
+	// A hospital documents care that has happened, so no episode date may be
+	// later than the ledger's Asia/Dhaka business date.
+	for _, documented := range []struct{ field, value string }{
+		{"admission date", input.AdmissionDate}, {"discharge date", input.DischargeDate},
+		{"service date", input.ServiceDate}, {"invoice date", input.InvoiceDate},
+	} {
+		if documented.value == "" {
+			continue
+		}
+		if err := requireNotAfterLedgerDate(ctx, documented.field, documented.value); err != nil {
+			return nil, err
+		}
+	}
 	id := canonicalProtocolHash("fabric-medical-episode-v1", hospital, episodeReferenceHash)
 	key, err := stateKey(ctx, "medicalEpisode", id)
 	if err != nil {

@@ -10,6 +10,7 @@ type CenterPolicy = {
   id: string; packageId: string; status: string; createdAt: string; startDate: string; endDate: string; premiumMinor: number;
   paidThroughDate: string; nextPremiumDueDate: string; bankIds: string[];
   nextInstallment: { start: string; end: string; amountMinor: number } | null;
+  coverStartDate: string; reinstatedDate: string; standing: { canPay: boolean; note: string };
   insurerAccount: { id: string; bankId: string; accountLabel: string; maskedAccount: string } | null;
 };
 type CenterView = {
@@ -112,13 +113,14 @@ export function PremiumCenter({ onPreparePayment }: { onPreparePayment: (payment
       const collections = view.collections.filter((collection) => collection.policyId === policy.id).slice(-4);
       return <div className="queueItem" key={policy.id} style={{ display: "block" }}>
         <div className="queueTitle"><strong>{policy.id} · {formatBdt(policy.premiumMinor)} per installment</strong><StatusBadge status={policy.status} label={policy.status.replaceAll("_", " ")} /></div>
-        <p>Cover {policy.startDate} to {policy.endDate} · paid through {policy.paidThroughDate || "not yet paid"} · next due {policy.nextPremiumDueDate || policy.startDate}</p>
+        <p>Term {policy.startDate} to {policy.endDate} · cover from {policy.coverStartDate || "the first premium payment"}{policy.reinstatedDate ? ` · reinstated ${policy.reinstatedDate}` : ""} · paid through {policy.paidThroughDate || "not yet paid"} · next due {policy.nextPremiumDueDate || policy.startDate}</p>
+        {policy.standing.note && <p className={policy.standing.canPay ? "cardNote" : "evidenceWarning"}>{policy.standing.note}</p>}
         {accounts.length === 0 ? <p className="evidenceWarning">Link an account at {policy.bankIds.join(" or ") || "a partner bank"} to pay this policy.</p> : <>
           <label>Pay from<select aria-label="Pay from" value={sourceAccountId} onChange={(event) => setChoice({ ...choice, [policy.id]: event.target.value })}>
             {accounts.map((account) => <option key={account.id} value={account.id}>{account.accountLabel} {account.maskedAccount} ({formatBdt(account.balanceMinor)})</option>)}
           </select></label>
           <div className="evidenceActions">
-            <button type="button" className="primary button" disabled={busy || !policy.nextInstallment || !policy.insurerAccount}
+            <button type="button" className="primary button" disabled={busy || !policy.standing.canPay || !policy.nextInstallment || !policy.insurerAccount}
               onClick={() => {
                 if (!policy.nextInstallment || !policy.insurerAccount) return;
                 const tag = shortId("premium");
@@ -130,7 +132,7 @@ export function PremiumCenter({ onPreparePayment }: { onPreparePayment: (payment
                 });
                 setMessage(`Installment ${policy.nextInstallment.start} to ${policy.nextInstallment.end} is ready below. Request the code, then authorize.`);
               }}>{policy.status === "PENDING_PAYMENT" ? "Pay first premium now" : "Pay next installment by OTP"}</button>
-            {!live && <button type="button" className="secondary button" disabled={busy || policy.status === "PENDING_PAYMENT" || policy.status === "LAPSED"}
+            {!live && <button type="button" className="secondary button" disabled={busy || !policy.standing.canPay}
               onClick={() => void act("Automatic payment requested. The Bank must approve the mandate.", () => postWorkflow({
                 operation: "requestBankMandate", id: shortId("mandate"), policyId: policy.id, accountReferenceId: sourceAccountId, expiryDate: policy.endDate,
               }))}>Set up automatic EFT payment</button>}

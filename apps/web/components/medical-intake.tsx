@@ -6,9 +6,10 @@ import type { MedicalEpisode, MedicalPreparation, MedicalQuote } from "@/lib/fab
 import type { Claim, Policy } from "@/lib/fabric/types";
 import type { WorkflowCommand } from "@/lib/workflows/commands";
 import type { PreparedWorkflow } from "@/components/guided-workflow-form";
+import { formatBdt } from "@/lib/money";
 
 type Intake = { episodes: MedicalEpisode[]; policies?: Policy[]; claims?: Claim[] };
-const money = (minor: number) => "BDT " + (minor / 100).toFixed(2);
+const money = formatBdt;
 
 async function json<T>(url: string, command?: WorkflowCommand): Promise<T> {
   const response = await fetch(url, command ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(command) } : { cache: "no-store" });

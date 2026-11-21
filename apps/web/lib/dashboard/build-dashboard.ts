@@ -152,7 +152,7 @@ export function buildRoleDashboard(
         commandLabel: policy.status === "ACTIVE" ? "Prepare claim" : "Manage coverage",
         command: policy.status === "ACTIVE" ? {
           operation: "submitClaim", id: `claim-${Date.now()}`, policyId: policy.id, hospitalId: "hospital-demo",
-          hospitalInvoiceId: "", amountMinor: 250000, incidentDate: new Date().toISOString().slice(0, 10), descriptionHash: "a".repeat(64),
+          hospitalInvoiceId: "", amountMinor: 8500000, incidentDate: new Date(Date.now() + 6 * 3_600_000).toISOString().slice(0, 10), descriptionHash: "a".repeat(64),
         } : { operation: "requestBankMandate", policyId: policy.id },
         })),
       ],

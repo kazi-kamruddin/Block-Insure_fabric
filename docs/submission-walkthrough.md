@@ -1,18 +1,21 @@
-# Submission walkthrough (LevelDB dev-lite, 1.9.0 sequence 6)
+# Submission walkthrough (LevelDB dev-lite, 1.9.0 sequence 7)
 
 A second operator can use this guide to check the submitted Fabric build by hand. It uses the
 isolated LevelDB dev-lite profile: channel `insurance-dev-lite-190`, chaincode
-1.9.0 sequence 6, package SHA-256
-`27a6b4e4ef031feae14de9d7c222a1a973891f93ec6b7e556d9c6c5e1acaf225`.
-Sequence 6 adds bank account link requests, retries for bounced EFT
-collections, and ledger-date checks on premium dates. The medical rules are
-unchanged from sequence 5. The
+1.9.0 sequence 7, package SHA-256
+`d6da2d7759681c5c50c895187844f3d6bd0e1b8a3caa31949c58e89000843ec9`.
+Sequence 7 uses realistic taka amounts (a BDT 1,250 premium per 30 days,
+BDT 300,000 of cover, and a BDT 85,000 hospital bill that pays BDT 64,000)
+and adds the medical cover rules: no backdated cover, cover from the first
+paid premium, a 15-day grace period, Insurer reinstatement after a lapse,
+and EFT for the first premium. Sequence 6 added bank account links, EFT
+retries and ledger-date checks; sequence 5 the medical rules. The
 accepted 1.8.0 deployment and the CouchDB profile stay stopped throughout.
 All cases are synthetic, and the system runs on one host.
 
-The claim and settlement IDs below were left on the ledger by the
-21 November 2026 closeout run on sequence 5. They survived the upgrade to
-sequence 6. Before you start, `.\scripts\dev-lite-preflight.ps1` checks
+The first five claims below were left on the ledger by the 21 November
+2026 closeout run on sequence 5 and still use its small amounts (BDT 40.00
+payouts). They survived the upgrades to sequences 6 and 7. Before you start, `.\scripts\dev-lite-preflight.ps1` checks
 Docker, memory, ports, volumes and the backup without changing anything.
 
 | Case | Claim | What it shows |
@@ -22,9 +25,11 @@ Docker, memory, ports, volumes and the backup without changing anything.
 | Suspected duplicate | `medical-0e7d0805-328e-4980-8a57-861c3edcbb4d` | A positive Oracle result still required panel review. Settlement `med-settlement-bd50e423-7ae`. |
 | Final rejection | `medical-11cf830e-a30e-4aef-b976-70e4af3a8113` | Voting expired twice and the one procedural recovery was used. BDT 40.00 of cover is still reserved, so this case is ready for Part 3. |
 | Bank drill | `medical-c7eae1e1-1f26-4d26-b937-92caa6bc34a4` | The Insurer authorized settlement `med-settlement-cbb65431-1ec`, which is waiting for the Bank. Part 5 uses it. |
-| Second final rejection (sequence 6 staging) | `medical-c2164263-ef23-421b-86c5-522ce1245554` | Same state as the first final rejection. Use one to practise Part 3 and keep the other for the demonstration. |
-| Payout waiting for the Bank (sequence 6 staging) | `medical-e94d3898-c709-45ba-96f9-fd5e218dfab3` | Settlement `med-settlement-6d33c2cb-d60` is authorized. The Bank can confirm it live in **Load medical settlement** while the app runs in normal custody. |
-| EFT collections due (sequence 6 staging) | Policies `prem-policy-rich-67c216d3` and `prem-policy-poor-67c216d3` | Approved mandates due 21 November on accounts `**** 4834` (enough money) and `**** 6558` (BDT 0.50). Part 3b, step 5 uses them; they stay due on later days. |
+| Final rejection, realistic amounts (sequence 7 staging) | `medical-580007c9-2b0c-467f-9d4f-5c5fa5810a6b` | A BDT 190,000 surgery claim whose voting expired twice and whose one recovery was used. Its cover is still reserved. Use this or the claim above for Part 3. |
+| Payout waiting for the Bank (sequence 7 staging) | `medical-328c1075-969c-4726-a454-28127ba8f4be` | The same stay as routine claim `med-concurrent-ce3a3d8c-199` was claimed again on the same policy, referred as a suspected duplicate and approved by the panel. Settlement `med-settlement-cca3c736-52c` (BDT 64,000.00) is authorized. The Bank can confirm it live in **Load medical settlement** while the app runs in normal custody. |
+| EFT first premiums due (sequence 7 staging) | Policies `prem-policy-rich-dc7d1795` and `prem-policy-poor-dc7d1795` | Both start on 22 November and pay their first BDT 1,250.00 premium by an approved EFT mandate due that day, from accounts `**** 3696` (enough money) and `**** 7489` (under-funded). Part 3b, step 5 uses them. They can be collected until the first-premium deadline, 7 December. `prem-policy-otp-dc7d1795` was paid by OTP. |
+
+Sequence 6 staging also left final rejection `medical-c2164263-ef23-421b-86c5-522ce1245554` and authorized settlement `med-settlement-6d33c2cb-d60` (claim `medical-e94d3898-…`) with the older small amounts.
 
 ## Part 1 — Start (about 5 minutes)
 
@@ -70,25 +75,38 @@ All of this happens in the browser. It adds new synthetic records.
    enter a nickname and the last four digits of an account, and select
    **Request account link**. The request shows as PENDING.
 2. As **Bangladesh Demo Commercial Bank**, open **Bank work queue**. Set a
-   verified balance (for example 5.00) and select **Verify and link**. The
+   verified balance (the default is 25,000.00) and select **Verify and link**. The
    customer receives a notification.
 3. As the policyholder, buy a medical package in the guided workflow
-   (**Accept terms and acquire medical policy**). The policy is
+   (**Accept terms and acquire medical policy**). The start date must be
+   today or up to 60 days ahead, and the term at most one year; a past start
+   date is refused because cover is never backdated. The policy is
    PENDING_PAYMENT. In **My bank and premiums**, choose the linked account and
-   select **Pay first premium now**. The OTP card below is filled in. Select
-   **Email OTP**, then **Authorize premium**. The policy becomes ACTIVE.
+   select **Pay first premium now** (BDT 1,250.00). The OTP card below is
+   filled in. Select **Email OTP**, then **Authorize premium**. The policy
+   becomes ACTIVE and shows **cover from** today: cover starts when the
+   first premium is paid, not before.
 4. Select **Set up automatic EFT payment**. As the Bank, select
-   **Approve mandate**.
-5. To see a collection, a bounce and a retry the same day, run
+   **Approve mandate**. A second mandate for the same policy is refused.
+5. To see a collection, a bounce and a retry, run
    `.\scripts\stage-dev-lite-demo.ps1 -SkipDeadline -SkipBankPayout` the
-   day before. It leaves two mandates due today, one under-funded. Then:
+   day before. It buys two policies that start on demo day and pay their
+   first premium by EFT, one from an under-funded account. Then:
    as the Insurer, **Premium collections and policy status** →
    **Schedule due EFT collections**; as the Bank, **Collect premium** on
-   both (one completes, one bounces with insufficient funds); **Record
-   customer deposit**; as the Insurer, **Retry collection**; as the Bank,
-   **Collect premium** again.
+   both. One policy becomes ACTIVE; the other bounces with insufficient
+   funds and stays PENDING_PAYMENT. **Record customer deposit**; as the
+   Insurer, **Retry collection**; as the Bank, **Collect premium** again,
+   and the second policy becomes ACTIVE.
 6. Ask the Insurer panel to lapse a policy with a future date through the
    JSON console: the ledger refuses any date after today in Asia/Dhaka.
+
+An installment can be paid until 15 days after its due date. After that the
+policy has lapsed: the panel disables payment, and the Insurer's **Lapsed
+medical policies** list offers **Reinstate from today**. The reinstatement
+premium must be paid that day, the days in between stay uncovered and the
+waiting period restarts. A live demonstration would need 15 days of ledger
+time, so this path is covered by Go tests only.
 
 Start the app with `-Collections` to have the worker schedule and collect
 due premiums every minute instead of clicking. With `-Email` and a Brevo

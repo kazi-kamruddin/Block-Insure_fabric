@@ -62,7 +62,10 @@ func (c *Contract) medicalFacts(ctx contractapi.TransactionContextInterface, pol
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
-	if policy.PolicyholderID != owner || policy.MedicalRulesVersion != 1 || policy.Status == "PENDING_PAYMENT" || policy.Status == "CANCELLED" {
+	// A cancelled policy still answers for treatment before its cancellation
+	// date; policies cancelled before that date was recorded keep refusing.
+	if policy.PolicyholderID != owner || policy.MedicalRulesVersion != 1 || policy.Status == "PENDING_PAYMENT" ||
+		(policy.Status == "CANCELLED" && policy.CancelledDate == "") {
 		return nil, nil, nil, nil, fmt.Errorf("paid medical coverage for this patient is required")
 	}
 	head, err := medicalEpisodeHead(ctx, episodeID)
@@ -103,7 +106,13 @@ func (c *Contract) medicalFacts(ctx contractapi.TransactionContextInterface, pol
 	if service.Before(start.AddDate(0, 0, rules.WaitingDays)) || episode.ServiceDate > policy.EndDate || episode.ServiceDate > policy.PaidThroughDate {
 		return nil, nil, nil, nil, fmt.Errorf("service falls outside paid eligible coverage or the waiting period")
 	}
+	if policy.Status == "CANCELLED" && (episode.ServiceDate >= policy.CancelledDate || episode.AdmissionDate >= policy.CancelledDate) {
+		return nil, nil, nil, nil, fmt.Errorf("the policy was cancelled on %s; only treatment before that date is covered", policy.CancelledDate)
+	}
 	if err := c.requirePaidMedicalPeriod(ctx, policy, episode.ServiceDate); err != nil {
+		return nil, nil, nil, nil, err
+	}
+	if err := c.requireMedicalCoverForStay(ctx, policy, episode, rules); err != nil {
 		return nil, nil, nil, nil, err
 	}
 	deadline := service.AddDate(0, 0, rules.FilingDays).Format(time.DateOnly)

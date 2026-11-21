@@ -58,6 +58,8 @@ export async function executeWorkflowCommand(command: WorkflowCommand, session: 
       return ledger.acquirePolicy(command);
     case "advancePolicyLifecycle":
       return ledger.advancePolicyLifecycle(command.id, command.asOfDate);
+    case "reinstatePolicy":
+      return ledger.reinstatePolicy(command.id, command.reasonHash);
     case "cancelPolicy":
       return ledger.cancelPolicy(command.id, command.reasonHash, "policyholder");
     case "cancelPolicyAsInsurer":

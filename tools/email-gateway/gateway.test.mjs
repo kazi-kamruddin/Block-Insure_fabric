@@ -50,9 +50,10 @@ test("refuses bad tokens, unmapped recipients and unknown templates", async () =
 
 test("renders every template the web app sends", () => {
   for (const name of ["bank-premium-otp", "bank-transaction-status", "bank-mandate-status", "bank-benefit-payment", "bank-link-status"]) {
-    const message = templates[name]({ status: "LINKED", amountMinor: 4000, currency: "BDT", method: "EFT", failureCode: "INSUFFICIENT_FUNDS" });
+    const message = templates[name]({ status: "LINKED", amountMinor: 6_400_000, currency: "BDT", method: "EFT", failureCode: "INSUFFICIENT_FUNDS" });
     assert.ok(message.subject && message.text, name);
   }
+  assert.match(templates["bank-transaction-status"]({ status: "SETTLED", amountMinor: 6_400_000, currency: "BDT", method: "CLAIM_PAYOUT" }).text, /BDT 64,000\.00/);
   assert.throws(() => createGateway({ config: { ...config, apiKey: "short" }, token }), /Brevo apiKey/);
   assert.throws(() => createGateway({ config, token: "short" }), /EMAIL_GATEWAY_TOKEN/);
 });

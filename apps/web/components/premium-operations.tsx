@@ -3,8 +3,8 @@
 import { useEffect, useState } from "react";
 import { StatusBadge } from "@/components/status-badge";
 import type { Policy, PremiumCollection } from "@/lib/fabric/types";
-import { dhakaToday, formatBdt } from "@/lib/banking/premium-schedule";
-import { postWorkflow, readJson } from "@/lib/banking/client";
+import { dhakaToday, formatBdt, premiumStanding } from "@/lib/banking/premium-schedule";
+import { postWorkflow, readJson, textHash } from "@/lib/banking/client";
 
 const maxAttempts = 3;
 
@@ -49,8 +49,12 @@ export function PremiumOperations() {
     }
   }
 
-  const open = collections.filter((item) => item.status !== "COMPLETED").sort((left, right) => left.dueDate.localeCompare(right.dueDate));
+  const open = collections.filter((item) => item.status !== "COMPLETED" && item.status !== "SUPERSEDED").sort((left, right) => left.dueDate.localeCompare(right.dueDate));
   const overdue = policies.filter((policy) => ["ACTIVE", "GRACE"].includes(policy.status) && policy.nextPremiumDueDate && policy.nextPremiumDueDate <= today);
+  // Medical policies whose grace period has ended can only return through reinstatement.
+  const reinstatable = policies.filter((policy) => policy.medicalRulesVersion && today <= policy.endDate &&
+    ["ACTIVE", "GRACE", "LAPSED"].includes(policy.status) && !premiumStanding(policy, today).canPay)
+    .sort((left, right) => (left.nextPremiumDueDate ?? "").localeCompare(right.nextPremiumDueDate ?? ""));
 
   return <article className="workCard workCardWide" id="premium-operations" aria-label="Premium operations">
     <span className="kicker">Premium operations</span>
@@ -82,6 +86,17 @@ export function PremiumOperations() {
       <button type="button" className="secondary button" disabled={busy} onClick={() => void act(
         (result) => `Policy is now ${(result as Policy | undefined)?.status ?? "unchanged"}.`,
         () => postWorkflow({ operation: "advancePolicyLifecycle", id: policy.id, asOfDate: today }))}>Check grace and lapse</button>
+    </div>)}
+
+    <h3>Lapsed medical policies</h3>
+    <p className="cardNote">Reinstatement starts a new installment today. The customer must pay it today; the lapse gap stays uncovered and waiting periods restart.</p>
+    {reinstatable.length === 0 && <p>No medical policy is waiting for reinstatement.</p>}
+    {reinstatable.map((policy) => <div className="queueItem" key={policy.id}>
+      <div><div className="queueTitle"><strong>{policy.id} · paid through {policy.paidThroughDate || "—"}</strong><StatusBadge status={policy.status} /></div>
+        <p>{policy.policyholderId} · {formatBdt(policy.premiumMinor)} per installment{policy.reinstatedDate ? ` · last reinstated ${policy.reinstatedDate}` : ""}</p></div>
+      <button type="button" className="secondary button" disabled={busy} onClick={() => void act(
+        () => "Reinstatement offered for today. The customer can now pay today's installment.",
+        async () => postWorkflow({ operation: "reinstatePolicy", id: policy.id, reasonHash: await textHash(`reinstate ${policy.id} ${today}`) }))}>Reinstate from today</button>
     </div>)}
   </article>;
 }

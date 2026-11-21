@@ -3,18 +3,21 @@ import { randomUUID } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
-// Live dev-lite journey for the customer–Bank premium flows: account linking,
-// first premium by OTP, EFT mandates, automatic collection, an
+// Live dev-lite journey for the customer–Bank premium flows with realistic
+// taka amounts: account linking, a refused backdated purchase, a first premium
+// by OTP, first premiums by EFT mandate, automatic collection, an
 // insufficient-funds bounce, funding, retry, and the ledger-date guard.
 const accounts = { insurer: "insurer-admin", holder: "policyholder-1", bank: "bank-officer" } as const;
 const paths = { insurer: "insurer", holder: "policyholder", bank: "bank" } as const;
 const headings = { insurer: "Insurer Administrator", holder: "Policyholder One", bank: "Bangladesh Demo Commercial Bank" } as const;
-// Staging stops once both mandates are approved and due today, leaving one
-// well-funded and one under-funded collection for a live demonstration.
+// Staging runs the day before a demonstration. Its policies start tomorrow and
+// it stops once both mandates are approved, leaving one well-funded and one
+// under-funded first debit due on demonstration day.
 const stageOnly = process.env.PREMIUM_STAGE_ONLY === "true";
 
-function day(offset: number) {
-  return new Date(Date.now() + 6 * 3_600_000 + offset * 86_400_000).toISOString().slice(0, 10);
+function day(offset: number, base?: string) {
+  const from = base ? Date.parse(`${base}T00:00:00Z`) : Date.now() + 6 * 3_600_000;
+  return new Date(from + offset * 86_400_000).toISOString().slice(0, 10);
 }
 
 test("live bank linking, OTP and EFT premiums with a bounce and retry", async ({ page }, info) => {
@@ -25,7 +28,8 @@ test("live bank linking, OTP and EFT premiums with a bounce and retry", async ({
   const id = (prefix: string) => `prem-${prefix}-${suffix}`;
   const digits = { rich: String(1000 + Math.floor(Math.random() * 4000)), poor: String(5000 + Math.floor(Math.random() * 4000)), rejected: String(9000 + Math.floor(Math.random() * 900)) };
   const masked = (key: keyof typeof digits) => `**** ${digits[key]}`;
-  const start = day(-30), end = day(59), today = day(0);
+  // Cover is never backdated: policies start today, or tomorrow when staging.
+  const today = day(0), start = stageOnly ? day(1) : today, end = day(364, start);
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   let role: keyof typeof accounts | undefined;
@@ -44,9 +48,9 @@ test("live bank linking, OTP and EFT premiums with a bounce and retry", async ({
     const response = await pending;
     const body = await response.json();
     expect(response.status(), JSON.stringify(body)).toBe(status);
-    return body.result;
+    return status === 200 ? body.result : body;
   }
-  async function form(operation: string, input: Record<string, string>) {
+  async function form(operation: string, input: Record<string, string>, status = 200) {
     const card = page.locator("#guided-workflow");
     const selector = card.getByLabel("Workflow action");
     if (await selector.inputValue() !== operation) await selector.selectOption(operation);
@@ -55,7 +59,7 @@ test("live bank linking, OTP and EFT premiums with a bounce and retry", async ({
       if (await field.evaluate((element) => element.tagName === "SELECT")) await field.selectOption(value);
       else await field.fill(value);
     }
-    return clickAndWait(card.getByRole("button", { name: /^(Submit verified transaction|Submit bank instruction)$/ }), "/api/workflows");
+    return clickAndWait(card.getByRole("button", { name: /^(Submit verified transaction|Submit bank instruction)$/ }), "/api/workflows", status);
   }
   async function assets<T>(type: string): Promise<T[]> {
     const response = await page.request.get("/api/ledger/" + type);
@@ -78,9 +82,9 @@ test("live bank linking, OTP and EFT premiums with a bounce and retry", async ({
       if (agreements.some((row) => row.partnerId === partnerId && row.status === "ACTIVE")) continue;
       await form("createPartnerAgreement", { id: id(partnerId), partnerType, partnerId, name, location: "Dhaka", tier: "Preferred", accessScope: "Synthetic premium journey", effectiveDate: day(-60), expiryDate: day(365) });
     }
-    await form("createPolicyPackage", { id: id("package"), name: "Premium journey " + suffix, description: "Synthetic premium journey", premiumBdt: "1.00", coverageLimitBdt: "40.00", termsText: id("terms") });
+    await form("createPolicyPackage", { id: id("package"), name: "Family Surgical Care " + suffix, description: "Synthetic premium journey", premiumBdt: "1,250.00", coverageLimitBdt: "3,00,000.00", termsText: id("terms") });
     await form("configurePolicyPackagePartners", { id: id("package"), hospitalIdsJson: '["hospital-demo"]', bankIdsJson: '["bank-demo"]' });
-    await form("configureMedicalRules", { packageId: id("package"), service: "SURGERY", sublimit: "80.00", deductibleBps: "1000", deductibleCap: "10.00", shareBps: "8000", waitingDays: "0", filingDays: "30", evidenceRequired: "No" });
+    await form("configureMedicalRules", { packageId: id("package"), service: "SURGERY", sublimit: "150000.00", deductibleBps: "1000", deductibleCap: "5000.00", shareBps: "8000", waitingDays: "30", filingDays: "30", evidenceRequired: "No" });
     await form("publishPolicyPackage", { id: id("package") });
   });
 
@@ -103,7 +107,8 @@ test("live bank linking, OTP and EFT premiums with a bounce and retry", async ({
 
   await test.step("the Bank verifies two links and rejects one", async () => {
     await login("bank");
-    for (const [key, balance] of [["rich", "5.00"], ["poor", "1.50"]] as const) {
+    // BDT 25,000 covers two installments; BDT 800 cannot pay one BDT 1,250 premium.
+    for (const [key, balance] of [["rich", "25,000.00"], ["poor", "800.00"]] as const) {
       const item = desk.locator(".queueItem").filter({ hasText: masked(key) });
       await item.getByLabel("Verified balance (BDT)").fill(balance);
       await clickAndWait(item.getByRole("button", { name: "Verify and link" }), "/api/workflows");
@@ -115,39 +120,49 @@ test("live bank linking, OTP and EFT premiums with a bounce and retry", async ({
   });
 
   const accountIds = { rich: "", poor: "" };
-  const policies = { rich: id("policy-rich"), poor: id("policy-poor") };
-  await test.step("the customer buys two policies and pays each first premium by OTP", async () => {
+  const policies = { otp: id("policy-otp"), rich: id("policy-rich"), poor: id("policy-poor") };
+  async function buy(policyId: string, startDate: string, endDate: string, status = 200) {
+    const offer = page.locator("#guided-workflow");
+    await offer.getByLabel("Workflow action").selectOption("acquireMedicalPolicy");
+    await offer.getByRole("button", { name: "Load published packages" }).click();
+    await offer.getByLabel("Medical package").selectOption(id("package"));
+    await expect(offer.getByText(/^BDT 1,250\.00 per 30-day period/)).toBeVisible();
+    await offer.getByLabel("I accept these published terms").check();
+    return form("acquireMedicalPolicy", { id: policyId, startDate, endDate }, status);
+  }
+  await test.step("the ledger refuses a backdated purchase", async () => {
     await login("holder");
     const links = await assets<{ maskedAccount: string; status: string; accountReferenceId: string }>("bank-link");
     accountIds.rich = links.find((link) => link.maskedAccount === masked("rich"))!.accountReferenceId;
     accountIds.poor = links.find((link) => link.maskedAccount === masked("poor"))!.accountReferenceId;
-    await expect(center.getByText(`Salary account ${suffix} · ${masked("rich")}`)).toBeVisible();
-    await expect(center.getByText(`Unknown account ${suffix} · ${masked("rejected")}`)).toBeVisible();
-    for (const key of ["rich", "poor"] as const) {
-      const offer = page.locator("#guided-workflow");
-      await offer.getByLabel("Workflow action").selectOption("acquireMedicalPolicy");
-      await offer.getByRole("button", { name: "Load published packages" }).click();
-      await offer.getByLabel("Medical package").selectOption(id("package"));
-      await offer.getByLabel("I accept these published terms").check();
-      const policy = await form("acquireMedicalPolicy", { id: policies[key], startDate: start, endDate: end });
-      expect(policy).toMatchObject({ status: "PENDING_PAYMENT" });
-      await center.getByRole("button", { name: "Refresh" }).click();
-      const item = center.locator(".queueItem").filter({ hasText: policies[key] });
-      await item.getByRole("combobox", { name: "Pay from" }).selectOption(accountIds[key]);
-      await item.getByRole("button", { name: "Pay first premium now" }).click();
-      const card = page.locator("#manual-premium");
-      await expect(card.getByLabel("Policy ID", { exact: true })).toHaveValue(policies[key]);
-      await expect(card.getByLabel("Customer account ID", { exact: true })).toHaveValue(accountIds[key]);
-      await expect(card.getByLabel("Insurer account ID", { exact: true })).toHaveValue(id("insurer-premium"));
-      await card.getByRole("button", { name: "Email OTP", exact: true }).click();
-      await expect(card.locator(".evidenceWarning strong")).toHaveText(/^\d{6}$/);
-      const result = await clickAndWait(card.getByRole("button", { name: "Authorize premium", exact: true }), "/api/banking/premium-payment");
-      expect(result).toMatchObject({ status: "SETTLED", method: "OTP" });
-      expect(await asset("policy", policies[key])).toMatchObject({ status: "ACTIVE", paidThroughDate: day(-1), nextPremiumDueDate: today });
-    }
+    const refused = await buy(id("policy-backdated"), day(-1), day(363), 409);
+    expect(refused.message).toContain("never backdated");
   });
 
-  await test.step("the customer sets up EFT mandates and the Bank approves them", async () => {
+  await test.step("the customer buys a policy and pays the first premium by OTP", async () => {
+    await expect(center.getByText(`Salary account ${suffix} · ${masked("rich")}`)).toBeVisible();
+    await expect(center.getByText(`Unknown account ${suffix} · ${masked("rejected")}`)).toBeVisible();
+    expect(await buy(policies.otp, start, end)).toMatchObject({ status: "PENDING_PAYMENT", coverStartDate: "" });
+    await center.getByRole("button", { name: "Refresh" }).click();
+    const item = center.locator(".queueItem").filter({ hasText: policies.otp });
+    await item.getByRole("combobox", { name: "Pay from" }).selectOption(accountIds.rich);
+    await item.getByRole("button", { name: "Pay first premium now" }).click();
+    const card = page.locator("#manual-premium");
+    await expect(card.getByLabel("Policy ID", { exact: true })).toHaveValue(policies.otp);
+    await expect(card.getByLabel("Customer account ID", { exact: true })).toHaveValue(accountIds.rich);
+    await expect(card.getByLabel("Insurer account ID", { exact: true })).toHaveValue(id("insurer-premium"));
+    await expect(card.getByLabel("Premium (BDT)", { exact: true })).toHaveValue("1250.00");
+    await card.getByRole("button", { name: "Email OTP", exact: true }).click();
+    await expect(card.locator(".evidenceWarning strong")).toHaveText(/^\d{6}$/);
+    const result = await clickAndWait(card.getByRole("button", { name: "Authorize premium", exact: true }), "/api/banking/premium-payment");
+    expect(result).toMatchObject({ status: "SETTLED", method: "OTP", amountMinor: 125_000 });
+    expect(await asset("policy", policies.otp)).toMatchObject({ status: "ACTIVE", coverStartDate: start, paidThroughDate: day(29, start), nextPremiumDueDate: day(30, start) });
+  });
+
+  await test.step("two more policies take the first premium by EFT and the Bank approves the mandates", async () => {
+    for (const key of ["rich", "poor"] as const) {
+      expect(await buy(policies[key], start, end)).toMatchObject({ status: "PENDING_PAYMENT" });
+    }
     await center.getByRole("button", { name: "Refresh" }).click();
     for (const key of ["rich", "poor"] as const) {
       const item = center.locator(".queueItem").filter({ hasText: policies[key] });
@@ -157,15 +172,15 @@ test("live bank linking, OTP and EFT premiums with a bounce and retry", async ({
     await login("bank");
     for (const key of ["rich", "poor"] as const) {
       const mandate = (await assets<{ id: string; policyId: string }>("mandate")).find((row) => row.policyId === policies[key])!;
-      const item = desk.locator(".queueItem").filter({ hasText: `first debit ${today}` }).filter({ hasText: masked(key) });
+      const item = desk.locator(".queueItem").filter({ hasText: `first debit ${start}` }).filter({ hasText: masked(key) });
       await clickAndWait(item.getByRole("button", { name: "Approve mandate" }), "/api/workflows");
-      expect(await asset("mandate", mandate.id)).toMatchObject({ status: "ACTIVE", nextDebitDate: today });
+      expect(await asset("mandate", mandate.id)).toMatchObject({ status: "ACTIVE", nextDebitDate: start, amountMinor: 125_000 });
     }
   });
 
   async function writeReceipt(mode: string) {
     const receipt = info.outputPath("premium-result.json");
-    await writeFile(receipt, JSON.stringify({ mode, suffix, policies, accountIds, maskedAccounts: { rich: masked("rich"), poor: masked("poor") }, insurerAccount: id("insurer-premium"), package: id("package"), dueDate: today }, null, 2));
+    await writeFile(receipt, JSON.stringify({ mode, suffix, policies, accountIds, maskedAccounts: { rich: masked("rich"), poor: masked("poor") }, insurerAccount: id("insurer-premium"), package: id("package"), dueDate: start }, null, 2));
     await info.attach("premium-result", { path: receipt, contentType: "application/json" });
   }
   if (stageOnly) {
@@ -179,7 +194,7 @@ test("live bank linking, OTP and EFT premiums with a bounce and retry", async ({
     const early = await page.request.post("/api/workflows", { data: { operation: "schedulePremiumCollections", asOfDate: day(1) }, headers: { origin: new URL(page.url()).origin } });
     expect(early.status()).toBe(409);
     expect((await early.json()).message).toContain("later than the ledger business date");
-    const lapse = await page.request.post("/api/workflows", { data: { operation: "advancePolicyLifecycle", id: policies.rich, asOfDate: day(60) }, headers: { origin: new URL(page.url()).origin } });
+    const lapse = await page.request.post("/api/workflows", { data: { operation: "advancePolicyLifecycle", id: policies.otp, asOfDate: day(60) }, headers: { origin: new URL(page.url()).origin } });
     expect(lapse.status()).toBe(409);
     expect((await lapse.json()).message).toContain("later than the ledger business date");
   });
@@ -192,14 +207,16 @@ test("live bank linking, OTP and EFT premiums with a bounce and retry", async ({
     const collections = await assets<{ id: string; policyId: string; status: string; failureCode: string; attemptCount: number }>("collection");
     expect(collections.find((row) => row.policyId === policies.rich)).toMatchObject({ status: "COMPLETED", attemptCount: 1 });
     expect(collections.find((row) => row.policyId === policies.poor)).toMatchObject({ status: "BOUNCED", failureCode: "INSUFFICIENT_FUNDS", attemptCount: 1 });
-    expect(await asset("policy", policies.rich)).toMatchObject({ status: "ACTIVE", paidThroughDate: day(29) });
+    expect(await asset("policy", policies.rich)).toMatchObject({ status: "ACTIVE", coverStartDate: today, paidThroughDate: day(29) });
+    // A bounced first premium gives no cover.
+    expect(await asset("policy", policies.poor)).toMatchObject({ status: "PENDING_PAYMENT", coverStartDate: "" });
   });
 
   await test.step("the customer funds the account, the Insurer retries and the Bank collects", async () => {
     const bounced = (await assets<{ id: string; policyId: string }>("collection")).find((row) => row.policyId === policies.poor)!;
     await login("bank");
     const item = desk.locator(".queueItem").filter({ hasText: masked("poor") }).filter({ hasText: "bounced" });
-    await item.getByLabel("Deposit (BDT)").fill("1.00");
+    await item.getByLabel("Deposit (BDT)").fill("1,250.00");
     await clickAndWait(item.getByRole("button", { name: "Record customer deposit" }), "/api/workflows");
     await login("insurer");
     const open = operations.locator(".queueItem").filter({ hasText: bounced.id });
@@ -211,7 +228,7 @@ test("live bank linking, OTP and EFT premiums with a bounce and retry", async ({
     expect(processed).toMatchObject({ status: "COMPLETED", attemptCount: 2 });
     // The Bank portal cannot read policies; confirm the effect as the Insurer.
     await login("insurer");
-    expect(await asset("policy", policies.poor)).toMatchObject({ status: "ACTIVE", paidThroughDate: day(29) });
+    expect(await asset("policy", policies.poor)).toMatchObject({ status: "ACTIVE", coverStartDate: today, paidThroughDate: day(29) });
   });
 
   await test.step("the customer cancels automatic payment", async () => {

@@ -77,6 +77,9 @@ export type Policy = {
   gracePeriodDays?: number;
   paidThroughDate?: string;
   nextPremiumDueDate?: string;
+  coverStartDate?: string;
+  reinstatedDate?: string;
+  cancelledDate?: string;
   renewedFromPolicyId?: string;
   cancellationReasonHash?: string;
   benefitPlanId?: string;
@@ -199,7 +202,7 @@ export type PremiumCollection = {
   mandateId: string;
   dueDate: string;
   amountMinor: number;
-  status: "DUE" | "RETRY" | "COMPLETED" | "FAILED" | "BOUNCED";
+  status: "DUE" | "RETRY" | "COMPLETED" | "FAILED" | "BOUNCED" | "SUPERSEDED";
   paymentId: string;
   transferId: string;
   failureHash: string;
