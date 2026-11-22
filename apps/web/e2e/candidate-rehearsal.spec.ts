@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import { createHash, randomUUID } from "node:crypto";
 import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
+import { openOperation, openPage, workspaceIdentity } from "./workspace-pages";
 
 const sha = (text: string) => createHash("sha256").update(text).digest("hex");
 const accounts = {
@@ -27,13 +28,12 @@ test("@rehearsal ordinary forms complete premiums, automatic routing, review, ap
     else await page.goto("/workspace");
     await page.getByRole("button", { name: `Sign in as ${accounts[role][0]}`, exact: true }).click();
     await expect(page).toHaveURL(new RegExp(`/workspace/${accounts[role][1]}$`));
-    await expect(page.getByRole("heading", { name: accounts[role][0], exact: true })).toBeVisible();
+    await expect(workspaceIdentity(page, accounts[role][0])).toBeVisible();
     current = role;
   }
   async function form(operation: string, values: Record<string, string>, expectedStatus = 200) {
     console.log(`UI ${current}: ${operation}`);
-    const card = page.locator("#guided-workflow");
-    await card.getByLabel("Workflow action").selectOption(operation);
+    const card = await openOperation(page, operation);
     for (const [name, value] of Object.entries(values)) {
       const field = card.locator(`[name="${name}"]`);
       if (await field.evaluate(element => element.tagName) === "SELECT") await field.selectOption(value);
@@ -61,6 +61,7 @@ test("@rehearsal ordinary forms complete premiums, automatic routing, review, ap
   }
   const passphrase = "synthetic browser rehearsal evidence key";
   async function upload(claimId: string, evidenceId: string, documentType: string, text: string, expectedStatus = 200) {
+    await openPage(page, "documents");
     const card = page.locator("article").filter({ has: page.getByRole("heading", { name: "Encrypt, store, and anchor evidence", exact: true }) });
     await card.getByLabel("Claim ID", { exact: true }).fill(claimId);
     await card.getByLabel("Evidence ID", { exact: true }).fill(evidenceId);
@@ -79,6 +80,7 @@ test("@rehearsal ordinary forms complete premiums, automatic routing, review, ap
     journal.push({ actor: current, point: "UI browser encryption and ciphertext upload", claimId, evidenceId, documentType, httpStatus: response.status(), plaintextSha256: sha(text) });
   }
   async function decrypt(evidenceId: string, text: string) {
+    await openPage(page, current === "holder" ? "documents" : "evidence");
     const card = page.locator("article").filter({ has: page.getByRole("heading", { name: "Retrieve and decrypt evidence", exact: true }) });
     await card.getByLabel("Evidence ID", { exact: true }).fill(evidenceId);
     await card.getByLabel("Grant ID (optional)", { exact: true }).fill("");
@@ -126,6 +128,7 @@ test("@rehearsal ordinary forms complete premiums, automatic routing, review, ap
       await login("bank"); await form("reviewBankMandate", { id: id("mandate"), outcome: "APPROVE", decisionText: id("mandate-review") });
       await login("insurer"); await form("queuePremiumCollection", { id: id("queued-first"), mandateId: id("mandate"), dueDate: "2026-01-01" });
       await login("holder");
+      await openPage(page, "payments");
       const card = page.locator("article").filter({ has: page.getByRole("heading", { name: "Pay with one-time authorization", exact: true }) });
       for (const [label, value] of Object.entries({ "Policy ID": id("policy"), "Customer account ID": id("customer"), "Insurer account ID": id("premium"), "Transfer ID": id("otp-transfer"), "Payment ID": id("otp-payment"), "Period starts": "2026-01-01", "Period ends": "2026-01-30", "Premium (BDT)": "100.00", "External bank receipt": id("otp-bank-reference") })) await card.getByLabel(label, { exact: true }).fill(value);
       await card.getByRole("button", { name: "Email OTP", exact: true }).click();
@@ -142,6 +145,7 @@ test("@rehearsal ordinary forms complete premiums, automatic routing, review, ap
       expect((await asset("account", id("customer"))).balanceMinor).toBe(280000);
       expect((await asset("account", id("premium"))).balanceMinor).toBe(20000);
       await login("holder");
+      await openPage(page, "policies");
       const statement = page.locator("article").filter({ has: page.getByRole("heading", { name: "Export coverage and payment history", exact: true }) });
       await statement.getByLabel("Policy ID", { exact: true }).fill(id("policy"));
       const downloadPromise = page.waitForEvent("download"); await statement.getByRole("link", { name: "Download statement JSON" }).click();
@@ -244,7 +248,7 @@ test("@rehearsal ordinary forms complete premiums, automatic routing, review, ap
       journal.push({ point: "exactly one settled payout", settlement: await asset("settlement", id("settlement")), account: await asset("account", id("customer")) });
       await page.setViewportSize({ width: 320, height: 800 });
       for (const role of ["bank", "holder", "hospital", "insurer", "auditor1"] as const) {
-        await login(role); await expect(page.getByLabel("Workflow action")).toBeVisible();
+        await login(role); await expect(page.getByRole("navigation", { name: "Workspace pages" })).toBeVisible();
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), `${role} horizontal overflow`).toBe(true);
         await screenshot(`mobile-${role}`);
       }

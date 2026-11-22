@@ -57,9 +57,8 @@ export function PremiumOperations() {
     .sort((left, right) => (left.nextPremiumDueDate ?? "").localeCompare(right.nextPremiumDueDate ?? ""));
 
   return <article className="workCard workCardWide" id="premium-operations" aria-label="Premium operations">
-    <span className="kicker">Premium operations</span>
     <h2>Premium collections and policy status</h2>
-    <p className="cardNote">Ledger business date {today} (Asia/Dhaka). The chaincode refuses any later date, so premiums cannot be collected early and policies cannot be lapsed ahead of time.</p>
+    <p className="cardNote">Business date {today} (Asia/Dhaka). Collections and lapses are processed up to this date only.</p>
     {message && <p className="evidenceWarning" role="status">{message}</p>}
     <div className="evidenceActions">
       <button type="button" className="primary button" disabled={busy} onClick={() => void act(

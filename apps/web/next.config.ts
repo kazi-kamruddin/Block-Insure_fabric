@@ -2,7 +2,9 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   output: "standalone",
-  experimental: { cpus: 1 },
+  // mcpServer off: its dev log (.next/dev/logs) is rewritten on every browser
+  // console line, and Turbopack's watcher then rebuilds and reloads the page in a loop.
+  experimental: { cpus: 1, mcpServer: false },
   serverExternalPackages: ["@grpc/grpc-js", "@hyperledger/fabric-gateway"],
   async headers() {
     return [

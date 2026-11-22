@@ -29,7 +29,7 @@ for (const account of accounts) {
     await page.goto("/workspace");
     await page.getByRole("button", { name: account.selector }).click();
     await page.waitForLoadState("networkidle");
-    await expect(page.getByLabel("Workflow action")).toBeVisible();
+    await expect(page.getByRole("navigation", { name: "Workspace pages" })).toBeVisible();
     await expectWcagAA(page, `${account.name} workspace`);
   });
 }
@@ -38,6 +38,7 @@ test("ledger-derived research dashboard passes automated WCAG 2.1 AA checks", as
   test.setTimeout(60_000);
   await page.goto("/workspace");
   await page.getByRole("button", { name: /Insurer Administrator/ }).click();
+  await page.waitForURL(/\/workspace\/insurer$/);
   await page.goto("/research");
   await expect(page.getByRole("heading", { name: "Block-Insure thesis dashboard" })).toBeVisible();
   await expectWcagAA(page, "research dashboard");

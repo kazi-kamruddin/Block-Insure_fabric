@@ -3,6 +3,7 @@ import { execFileSync } from "node:child_process";
 import path from "node:path";
 import { expect, request, test, type APIRequestContext } from "@playwright/test";
 import { encryptEvidenceBytes, decryptEvidenceBytes } from "../lib/evidence/browser-crypto";
+import { openOperation } from "./workspace-pages";
 
 const sha = (x: string) => createHash("sha256").update(x).digest("hex");
 const channel = "insurance-workflow-alignment-20261108", deployment = channel + "/insurance-contract";
@@ -67,8 +68,7 @@ test("@alignment-recovery real browser response loss and app restart preserve cl
       expect(response.status(), JSON.stringify(body)).toBe(200); expect(body).toMatchObject({ state: "COMMITTED", validationCode: 0 });
       accepted = body; await route.abort("connectionreset"); // discard a real valid committed response
     });
-    const form = page.locator("#guided-workflow");
-    await form.getByLabel("Workflow action").selectOption("submitClaim");
+    const form = await openOperation(page, "submitClaim");
     for (const [name, value] of Object.entries({ id: claimId, policyId, hospitalInvoiceId: invoiceId, amountBdt: "250.00", incidentDate: today, descriptionText: "Synthetic lost response claim" })) await form.locator(`[name="${name}"]`).fill(value);
     await form.getByRole("button", { name: "Submit verified transaction" }).click();
     await expect.poll(() => Boolean(accepted), { timeout: 120000 }).toBe(true);

@@ -5,7 +5,7 @@ import { savedActionKey } from "../lib/workflows/saved-action";
 for (const firstOutcome of ["pending", "response-loss"] as const) {
   test(`offline evidence ${firstOutcome} preserves original bytes and freezes bindings until recovery`, async ({ page }) => {
     await page.request.post("/api/auth/demo-login", { data: { accountId: "policyholder-1" } });
-    await page.goto("/workspace/policyholder");
+    await page.goto("/workspace/policyholder/documents");
     const card = page.getByRole("article").filter({ hasText: "Encrypt, store, and anchor evidence" });
     await card.getByLabel("Claim ID", { exact: true }).fill("synthetic-pending-claim");
     await card.getByLabel("Evidence ID", { exact: true }).fill("synthetic-pending-evidence");
@@ -117,7 +117,7 @@ test("invalid dates and state keys are rejected before the Gateway", async ({ re
 
 test("changing an evidence binding invalidates previously encrypted bytes", async ({ page }) => {
   await page.request.post("/api/auth/demo-login", { data: { accountId: "policyholder-1" } });
-  await page.goto("/workspace/policyholder");
+  await page.goto("/workspace/policyholder/documents");
   const card = page.getByRole("article").filter({ hasText: "Encrypt, store, and anchor evidence" });
   await card.getByLabel("Claim ID").fill("claim-browser-1");
   await card.getByLabel("Evidence ID").fill("evidence-browser-1");
@@ -135,7 +135,7 @@ test("changing an evidence binding invalidates previously encrypted bytes", asyn
 test("encrypted recovery backup restores the original evidence key at 320px without a ledger write", async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 320, height: 780 });
   await page.request.post("/api/auth/demo-login", { data: { accountId: "policyholder-1" } });
-  await page.goto("/workspace/policyholder");
+  await page.goto("/workspace/policyholder/documents");
   const upload = page.getByRole("article").filter({ hasText: "Encrypt, store, and anchor evidence" });
   await upload.getByLabel("Claim ID").fill("claim-backup-browser");
   await upload.getByLabel("Evidence ID").fill("evidence-backup-browser");

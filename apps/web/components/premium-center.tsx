@@ -76,9 +76,8 @@ export function PremiumCenter({ onPreparePayment }: { onPreparePayment: (payment
   const hidden = Math.max(0, (view?.accounts.length ?? 0) - 4) + Math.max(0, (view?.policies.length ?? 0) - 4);
 
   return <article className="workCard workCardWide" id="premium-center" aria-label="My bank and premiums">
-    <span className="kicker">Bank and premiums</span>
     <h2>My bank and premiums</h2>
-    <p className="cardNote">Link a bank account, then pay each premium from it with a one-time code or let the Bank collect it automatically through an EFT mandate.</p>
+    <p className="cardNote">Pay each premium from a linked account with a one-time code, or let the Bank collect it automatically.</p>
     {message && <p className="evidenceWarning" role="status">{message}</p>}
 
     <h3>Linked bank accounts</h3>

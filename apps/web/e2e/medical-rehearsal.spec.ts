@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import { createHash, randomUUID } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
 import { invoicePDF } from "./invoice-pdf";
+import { openOperation, openPage, workspaceIdentity } from "./workspace-pages";
 
 const roles = {
   insurer: ["Insurer Administrator", "insurer"],
@@ -103,7 +104,7 @@ test(journey, async ({ page }, info) => {
       await page.getByRole("button", { name: "Sign in as " + roles[next][0], exact: true }).click();
     }
     await expect(page).toHaveURL(new RegExp("/workspace/" + roles[next][1] + "$"), { timeout: 45_000 });
-    await expect(page.getByRole("heading", { name: roles[next][0], exact: true })).toBeVisible();
+    await expect(workspaceIdentity(page, roles[next][0])).toBeVisible();
     role = next;
   }
 
@@ -122,11 +123,7 @@ test(journey, async ({ page }, info) => {
 
   async function fillForm(operation: string, input: Record<string, string>) {
     console.log(role + " " + operation);
-    const card = page.locator("#guided-workflow");
-    if (role !== "hospital") {
-      const selector = card.getByLabel("Workflow action");
-      if (await selector.inputValue() !== operation) await selector.selectOption(operation);
-    }
+    const card = await openOperation(page, operation);
     for (const [name, value] of Object.entries(input)) {
       const field = card.locator('[name="' + name + '"]');
       await expect(field).toBeVisible();
@@ -155,6 +152,7 @@ test(journey, async ({ page }, info) => {
   const reviewCard = page.locator("#medical-review");
   const timeline = page.getByRole("region", { name: "Medical claim timeline" });
   async function loadReview(claimId: string) {
+    await openPage(page, role?.startsWith("auditor") ? "reviews" : "claims");
     const input = reviewCard.getByLabel("Medical claim ID");
     const loadButton = reviewCard.getByRole("button", { name: "Load medical case" });
     // The server-rendered input may exist before React attaches after a role
@@ -180,6 +178,7 @@ test(journey, async ({ page }, info) => {
   }
 
   async function loadBankTimeline(settlementId: string) {
+    await openPage(page, "payouts");
     const card = page.getByRole("article", { name: "Medical settlement timeline" });
     const button = card.getByRole("button", { name: "Load medical settlement" });
     await expect(async () => {
@@ -196,10 +195,12 @@ test(journey, async ({ page }, info) => {
   async function attestRegistry() {
     if (!devLite) return;
     await login("insurer");
+    await openPage(page, "partners");
     const registry = page.locator("#medical-registry");
     await registry.getByLabel("Hospital ID").fill("hospital-demo");
     const proposed = await postFromButton(registry.getByRole("button", { name: "Propose registry snapshot" }), "/api/medical/registry");
     await login("hospital");
+    await openPage(page, "registry");
     await registry.getByRole("button", { name: "Refresh registry proposals" }).click();
     const entry = registry.getByRole("listitem").filter({ hasText: proposed.id + " ·" });
     await expect(entry).toBeVisible({ timeout: 60_000 });
@@ -224,6 +225,7 @@ test(journey, async ({ page }, info) => {
   type FixtureFile = { name: string; mimeType: string; buffer: Buffer };
   const passphrase = "Live-synthetic-document-passphrase";
   async function uploadDocument(claimId: string, evidenceId: string, documentType: string, file: FixtureFile, version: number) {
+    await openPage(page, "documents");
     const upload = page.locator("article").filter({ has: page.getByRole("heading", { name: "Encrypt, store, and anchor evidence" }) });
     const fields = { "Claim ID": claimId, "Evidence ID": evidenceId, "Document type": documentType, "Evidence passphrase": passphrase, "Confirm passphrase": passphrase };
     for (const [label, value] of Object.entries(fields)) await upload.getByLabel(label, { exact: true }).fill(value);
@@ -303,10 +305,12 @@ test(journey, async ({ page }, info) => {
   try {
     if (devLite && process.env.DEV_LITE_ACTIVATE === "true") {
       await login("insurer");
+      await openPage(page, "partners");
       await postFromButton(page.getByRole("button", { name: "Activate approval certificates" }), "/api/medical/registry");
     }
     if (governed || finalPayment || duplicateOnly) {
       await login("insurer");
+      await openPage(page, "claims");
       await expect(reviewCard.getByRole("heading", { name: "Medical review and appeal" })).toBeVisible();
       const episodeServices = async () => {
         const response = await page.request.get("/api/medical/intake");
@@ -377,14 +381,14 @@ test(journey, async ({ page }, info) => {
         return;
       }
       await login("holder");
-      const offer = page.locator("#guided-workflow");
-      await offer.getByLabel("Workflow action").selectOption("acquireMedicalPolicy");
+      const offer = await openOperation(page, "acquireMedicalPolicy");
       await offer.getByRole("button", { name: "Load published packages" }).click();
       await offer.getByLabel("Medical package").selectOption(id("package"));
       await expect(offer.getByText(bdt(payout) + " is payable", { exact: false })).toBeVisible();
       await offer.getByLabel("I accept these published terms").check();
       const policy = await form("acquireMedicalPolicy", { id: id("policy"), startDate: start, endDate: end });
       expect(policy).toMatchObject({ status: "PENDING_PAYMENT", coverageLimitMinor: money.coverage, medicalRulesVersion: 1, coverStartDate: "" });
+      await openPage(page, "payments");
       const card = page.locator("article").filter({ has: page.getByRole("heading", { name: "Pay with one-time authorization", exact: true }) });
       for (const [label, value] of Object.entries({ "Policy ID": id("policy"), "Customer account ID": id("customer"),
         "Insurer account ID": id("premium"), "Transfer ID": id("otp-transfer"), "Payment ID": id("otp-payment"),
@@ -413,6 +417,7 @@ test(journey, async ({ page }, info) => {
         alternate = { id: intakeCheckpoint.alternateId };
       } else {
         await login("hospital");
+        await openPage(page, "intake");
         await expect(page.locator("#guided-workflow").getByLabel("Workflow action")).toHaveCount(0);
         const forbidden = await page.request.post("/api/workflows", { data: { operation: "recordHospitalModelFacts",
           invoiceId: id("hospital-model"), treatmentType: "SURGERY", diagnosisCode: "", invoiceDate: service,
@@ -432,6 +437,7 @@ test(journey, async ({ page }, info) => {
       }
       const episode = { id: episodeId };
       await login("holder");
+      await openPage(page, "claims");
       const discovery = page.getByRole("article").filter({ has: page.getByRole("heading", { name: "Your medical episodes", exact: true }) });
       await discovery.getByRole("button", { name: "Refresh episodes" }).click();
       await expect(discovery.getByLabel("Verified episode").locator('option[value="' + episode.id + '"]')).toHaveCount(0);
@@ -442,6 +448,7 @@ test(journey, async ({ page }, info) => {
         expect(denied.status(), await denied.text()).toBe(409);
       }
       await login("insurer");
+      await openPage(page, "customers");
       const queue = page.getByRole("article").filter({ has: page.getByRole("heading", { name: "Episode association queue", exact: true }) });
       const [intake] = await Promise.all([
         page.waitForResponse(response => new URL(response.url()).pathname === "/api/medical/intake"),
@@ -468,6 +475,7 @@ test(journey, async ({ page }, info) => {
         (status, body) => status === 200 || (status === 409 && /private medicalOracleBenchmark [0-9a-f]{64} already exists/.test(body.message ?? "")));
       }
       await login("holder");
+      await openPage(page, "claims");
       await discovery.getByRole("button", { name: "Refresh episodes" }).click();
       await discovery.getByLabel("Medical policy").selectOption(policyId);
       await discovery.getByLabel("Verified episode").selectOption(episode.id);

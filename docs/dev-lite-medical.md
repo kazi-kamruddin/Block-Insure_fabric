@@ -256,8 +256,9 @@ channel. The medical rules are unchanged from sequence 5.
 - **Web app.** The policyholder has **My bank and premiums**: link requests,
   linked accounts, and per-policy **Pay first premium now** / **Pay next
   installment by OTP**, which fills the OTP card, plus **Set up automatic EFT
-  payment**. The Bank has **Bank work queue** (verify links, approve
-  mandates, collect premiums, record deposits). The Insurer has **Premium
+  payment**. The Bank has **Account link requests** on its Accounts page and
+  **Waiting for the Bank** on its Mandates & collections page (verify links,
+  approve mandates, collect premiums, record deposits). The Insurer has **Premium
   collections and policy status** (schedule due collections, retry bounces,
   check grace and lapse). Endorsement errors now show the chaincode's reason
   (F23).

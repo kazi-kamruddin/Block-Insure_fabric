@@ -18,7 +18,7 @@ async function fetchDesk() {
   return readJson<DeskView>(await fetch("/api/banking/bank-desk", { cache: "no-store" }));
 }
 
-export function BankDesk() {
+export function BankDesk({ show = "all" }: { show?: "all" | "links" | "collections" }) {
   const [view, setView] = useState<DeskView | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
@@ -49,13 +49,13 @@ export function BankDesk() {
 
   const decision = (kind: string, id: string, outcome: string) => textHash(`${kind}:${id}:${outcome}:${new Date().toISOString()}`);
 
-  return <article className="workCard workCardWide" id="bank-desk" aria-label="Bank work queue">
-    <span className="kicker">Bank operations</span>
-    <h2>Bank work queue</h2>
-    <p className="cardNote">Verify customer accounts, approve EFT mandates and collect due premiums. The Bank sees accounts and amounts, never medical facts.</p>
+  const title = show === "links" ? "Account link requests" : show === "collections" ? "Waiting for the Bank" : "Bank work queue";
+  return <article className="workCard workCardWide" id="bank-desk" aria-label={title}>
+    <h2>{title}</h2>
     {message && <p className="evidenceWarning" role="status">{message}</p>}
 
-    <h3>Account link requests</h3>
+    {show !== "collections" && <>
+    {show === "all" && <h3>Account link requests</h3>}
     {view?.links.length === 0 && <p>No pending link requests.</p>}
     {view?.links.map((link) => <div className="queueItem" key={link.id}>
       <div><div className="queueTitle"><strong>{link.ownerId} · {link.accountLabel} · {link.maskedAccount}</strong><StatusBadge status={link.status} /></div>
@@ -77,6 +77,9 @@ export function BankDesk() {
       </div>
     </div>)}
 
+    </>}
+
+    {show !== "links" && <>
     <h3>EFT mandates to review</h3>
     {view?.mandates.length === 0 && <p>No pending mandates.</p>}
     {view?.mandates.map((mandate) => <div className="queueItem" key={mandate.id}>
@@ -112,6 +115,7 @@ export function BankDesk() {
         </>}
       </div>
     </div>)}
+    </>}
     <div className="evidenceActions"><button type="button" className="secondary button" disabled={busy} onClick={() => void act("Refreshed from the ledger.", async () => undefined)}>Refresh</button></div>
   </article>;
 }

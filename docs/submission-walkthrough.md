@@ -107,13 +107,13 @@ remains possible. The live system cannot fast-forward that time, so the
 
 All of this happens in the browser. It adds new synthetic records.
 
-1. As **Policyholder One**, open **My bank and premiums**. Choose the Bank,
+1. As **Policyholder One**, open the **Payments** page (**My bank and premiums**). Choose the Bank,
    enter a nickname and the last four digits of an account, and select
    **Request account link**. The request shows as PENDING.
-2. As **Bangladesh Demo Commercial Bank**, open **Bank work queue**. Set a
+2. As **Bangladesh Demo Commercial Bank**, open the **Accounts** page (**Account link requests**). Set a
    verified balance (the default is 25,000.00) and select **Verify and link**. The
    customer receives a notification.
-3. As the policyholder, buy a medical package in the guided workflow
+3. As the policyholder, buy a medical package on the **Policies** page
    (**Accept terms and acquire medical policy**). The start date must be
    today or up to 60 days ahead, and the term at most one year; a past start
    date is refused because cover is never backdated. The policy is

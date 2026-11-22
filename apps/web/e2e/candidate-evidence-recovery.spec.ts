@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { randomUUID, createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
+import { openOperation, openPage, workspaceIdentity } from "./workspace-pages";
 
 test("@rehearsal-evidence-recovery lost real committed upload response recovers original ciphertext and one ledger reference", async ({ page }, info) => {
   test.setTimeout(240000);
@@ -14,13 +15,13 @@ test("@rehearsal-evidence-recovery lost real committed upload response recovers 
     await page.getByRole("button", { name: `Sign in as ${name}`, exact: true }).click();
     const workspace = name === "Insurer Administrator" ? "insurer" : name === "Policyholder One" ? "policyholder" : "hospital";
     await expect(page).toHaveURL(new RegExp(`/workspace/${workspace}$`));
-    await expect(page.getByRole("heading", { name, exact: true })).toBeVisible();
+    await expect(workspaceIdentity(page, name)).toBeVisible();
     await expect(page.getByRole("button", { name: "Sign out", exact: true })).toBeVisible();
     signedIn = true;
   }
   async function form(operation: string, values: Record<string, string>) {
     console.log(`UI evidence recovery: ${operation}`);
-    const card = page.locator("#guided-workflow"); await card.getByLabel("Workflow action").selectOption(operation);
+    const card = await openOperation(page, operation);
     for (const [name, value] of Object.entries(values)) {
       const field = card.locator(`[name="${name}"]`);
       await expect(field).toBeVisible({ timeout: 15000 });
@@ -38,6 +39,7 @@ test("@rehearsal-evidence-recovery lost real committed upload response recovers 
   await form("recordHospitalModelFacts", { invoiceId, treatmentType: "SURGERY", diagnosisCode: "", invoiceDate: "2026-01-15", expectedMinBdt: "250.00", expectedMaxBdt: "750.00", licenseStatus: "ACTIVE" });
   await login("Policyholder One");
   await form("submitClaim", { id: claimId, policyId, hospitalInvoiceId: invoiceId, amountBdt: "250.00", incidentDate: "2026-01-15", descriptionText: "Synthetic real committed upload response loss" });
+  await openPage(page, "documents");
   const card = page.locator("article").filter({ has: page.getByRole("heading", { name: "Encrypt, store, and anchor evidence", exact: true }) });
   const text = "Synthetic real browser upload recovery invoice", passphrase = "synthetic real recovery passphrase";
   await card.getByLabel("Claim ID", { exact: true }).fill(claimId); await card.getByLabel("Evidence ID", { exact: true }).fill(evidenceId);

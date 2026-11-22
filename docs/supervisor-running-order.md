@@ -54,22 +54,24 @@ customer for each run. The same patient's stays on one day are screened as
 possible duplicates, so a second same-day INPATIENT claim for one customer
 goes to review instead of paying automatically.
 
+Each workspace has a sidebar of pages. The **page** named first in each action is the sidebar entry to open.
+
 | # | Window and role | Action | What to say |
 | --- | --- | --- | --- |
 | 1 | Customer | **Create an insurance account**: email, code, then profile (name, phone, date of birth 18–100 years, address, 10/13/17-digit NID). | Passwordless email sign-up. The NID is stored off-chain, encrypted and never shown in full. |
-| 2 | Staff · Insurer | Customer onboarding queue → **Approve**. | The Insurer CA issues this customer's own Fabric certificate (`role=policyholder`, `subjectId=` member ID). Its private key stays server-side. |
-| 3 | Customer | Sign in. Note the member ID on the insurance card. **Request account link** (bank-demo, nickname, last digits). | The name is locked after KYC; only the Insurer can correct it. |
-| 4 | Staff · Bank | **Verify and link** with a balance such as BDT 25,000. | The Bank sees accounts and amounts, never medical facts. |
-| 5 | Customer | Guided transaction → **Accept terms and acquire medical policy** → Load published packages → **Block-Insure Hospital Care Plus**. Keep the default dates. Submit. | The terms digest is accepted on the ledger. Cover starts on the day the first premium is paid. |
-| 6 | Customer | My bank and premiums → **Pay first premium now** → **Email OTP** → enter the code → **Authorize premium**. | BDT 1,250 moves from the customer to the Insurer premium account. The card shows ACTIVE and the paid-through date. |
-| 7 | Staff · Hospital (Dhaka Central) | **Save patient intake**: an episode reference, revision 0, the member ID, INPATIENT, today's dates, BDT 85,000. Keep the default service and billing dates. | The member ID is hashed in the browser. The Hospital records facts only. |
-| 8 | Staff · Insurer | Episode association queue → **Refresh episodes** → **Resolve association** → check the suggested match → **Submit verified transaction**. | Only the Insurer links a hospital episode to a customer. |
-| 9 | Customer | Your medical episodes → **Refresh episodes** → pick the policy and episode → **Prepare claim and calculate reimbursement** → **Accept statement and submit claim**. | (85,000 − 5,000 deductible cap) × 80% = BDT 64,000 payable. |
-| 10 | Staff · Insurer | Medical registry approvals → **Propose registry snapshot** (Hospital ID `hospital-demo`). | The registry pins the Hospital records that the Oracles may check. |
-| 11 | Staff · Hospital | **Refresh registry proposals** → **Attest this snapshot**. | The Hospital co-signs its own records. |
-| 12 | Staff · Insurer | Insurer action queue → **Start claim processing** → **Submit verified transaction**. Wait about one minute, then **Refresh**. | Two Oracle workers commit and reveal; the frozen XGBoost evaluator only routes. The claim becomes APPROVED. |
-| 13 | Staff · Insurer | Insurer action queue → **Prepare settlement** (the payout accounts fill in automatically; otherwise use **Find payout accounts**) → **Submit verified transaction**. | The source is the Insurer claims reserve (`**** 7001`); the destination is the customer's linked account. |
-| 14 | Staff · Bank | Mandates, collections, and payouts → **Execute payout** on this settlement → enter an EFT reference → **Submit bank instruction**. | Payment is final only after the Bank commits it. |
+| 2 | Staff · Insurer | **Customers** page → Customer onboarding → **Approve**. | The Insurer CA issues this customer's own Fabric certificate (`role=policyholder`, `subjectId=` member ID). Its private key stays server-side. |
+| 3 | Customer | Sign in. Note the member ID on the insurance card (**Overview**). **Payments** page → **Request account link** (bank-demo, nickname, last digits). | The name is locked after KYC; only the Insurer can correct it. |
+| 4 | Staff · Bank | **Accounts** page → **Verify and link** with a balance such as BDT 25,000. | The Bank sees accounts and amounts, never medical facts. |
+| 5 | Customer | **Policies** page → **Accept terms and acquire medical policy** → Load published packages → **Block-Insure Hospital Care Plus**. Keep the default dates. Submit. | The terms digest is accepted on the ledger. Cover starts on the day the first premium is paid. |
+| 6 | Customer | **Payments** page → **Pay first premium now** → **Email OTP** → enter the code → **Authorize premium**. | BDT 1,250 moves from the customer to the Insurer premium account. The card shows ACTIVE and the paid-through date. |
+| 7 | Staff · Hospital (Dhaka Central) | **Patient billing** page → **Save patient intake**: an episode reference, revision 0, the member ID, INPATIENT, today's dates, BDT 85,000. Keep the default service and billing dates. | The member ID is hashed in the browser. The Hospital records facts only. |
+| 8 | Staff · Insurer | **Customers** page → Episode association queue → **Refresh episodes** → **Resolve association** → check the suggested match → **Submit verified transaction**. | Only the Insurer links a hospital episode to a customer. |
+| 9 | Customer | **Claims** page → Your medical episodes → **Refresh episodes** → pick the policy and episode → **Prepare claim and calculate reimbursement** → **Accept statement and submit claim**. | (85,000 − 5,000 deductible cap) × 80% = BDT 64,000 payable. |
+| 10 | Staff · Insurer | **Partners** page → Medical registry approvals → **Propose registry snapshot** (Hospital ID `hospital-demo`). | The registry pins the Hospital records that the Oracles may check. |
+| 11 | Staff · Hospital | **Registry** page → **Refresh registry proposals** → **Attest this snapshot**. | The Hospital co-signs its own records. |
+| 12 | Staff · Insurer | **Overview** → Insurer action queue → **Start claim processing** (opens the **Claims** page with the form filled) → **Submit verified transaction**. Wait about one minute, then **Refresh**. | Two Oracle workers commit and reveal; the frozen XGBoost evaluator only routes. The claim becomes APPROVED. |
+| 13 | Staff · Insurer | **Overview** → Insurer action queue → **Prepare settlement** (opens **Claims**) (the payout accounts fill in automatically; otherwise use **Find payout accounts**) → **Submit verified transaction**. | The source is the Insurer claims reserve (`**** 7001`); the destination is the customer's linked account. |
+| 14 | Staff · Bank | **Payouts** page → **Execute payout** on this settlement → enter an EFT reference → **Submit bank instruction**. | Payment is final only after the Bank commits it. |
 | 15 | Customer | Refresh: the claim is SETTLED and the balance has risen by BDT 64,000 (BDT 25,000 − 1,250 + 64,000 = BDT 87,750). | End-to-end, every step was a Fabric transaction from the right organization. |
 
 Order that saves customer codes: steps 7–8 and 10–11 need no customer, so

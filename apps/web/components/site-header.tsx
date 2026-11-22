@@ -13,6 +13,7 @@ export function SiteHeader({
   pillHref,
   showResearch = false,
   portalVariant,
+  signedIn = false,
 }: {
   activeRoute: ActiveRoute;
   navLabel?: string;
@@ -23,6 +24,8 @@ export function SiteHeader({
   pillHref?: string;
   showResearch?: boolean;
   portalVariant?: "hospital" | "bank";
+  /** Signed-in workspaces navigate from their own sidebar. */
+  signedIn?: boolean;
 }) {
   const brandNode = (
     <>
@@ -47,20 +50,22 @@ export function SiteHeader({
           )}
 
           <div className="navLinks">
-            <Link href="/" aria-current={activeRoute === "/" ? "page" : undefined}>
-              Home
-            </Link>
-            <Link href="/showcase" aria-current={activeRoute === "/showcase" ? "page" : undefined}>
-              Presentation
-            </Link>
-            <Link href="/workspace" aria-current={activeRoute === "/workspace" ? "page" : undefined}>
-              Workspaces
-            </Link>
-            {showResearch && (
-              <Link href="/research" aria-current={activeRoute === "/research" ? "page" : undefined}>
-                Research
+            {!signedIn && <>
+              <Link href="/" aria-current={activeRoute === "/" ? "page" : undefined}>
+                Home
               </Link>
-            )}
+              <Link href="/showcase" aria-current={activeRoute === "/showcase" ? "page" : undefined}>
+                How it works
+              </Link>
+              {showResearch && (
+                <Link href="/research" aria-current={activeRoute === "/research" ? "page" : undefined}>
+                  Research
+                </Link>
+              )}
+              <Link href="/workspace" aria-current={activeRoute === "/workspace" ? "page" : undefined}>
+                Sign in
+              </Link>
+            </>}
             {pillText && (
               pillHref ? (
                 <Link className="networkPill" href={pillHref}>

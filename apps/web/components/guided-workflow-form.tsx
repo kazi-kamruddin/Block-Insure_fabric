@@ -93,26 +93,46 @@ async function sha256(value: string) {
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
-export function GuidedWorkflowForm({
-  role,
-  busy,
-  prepared,
-  onSubmit,
-  medical = false,
-}: {
+type GuidedWorkflowFormProps = {
   role: FabricRole;
   busy: boolean;
   prepared: PreparedWorkflow | null;
   onSubmit: (command: WorkflowCommand) => Promise<void>;
   medical?: boolean;
-}) {
-  const [maintenance, setMaintenance] = useState(false);
-  const operations: readonly WorkflowOperation[] = medical && role === "hospitalOfficer" ? ["saveMedicalEpisode"]
+  /** Limits the form to the operations of the current workspace page. */
+  allowed?: readonly WorkflowOperation[];
+  title?: string;
+};
+
+export function roleOperations(role: FabricRole, medical: boolean, maintenance = false): readonly WorkflowOperation[] {
+  return medical && role === "hospitalOfficer" ? ["saveMedicalEpisode"]
     : medical && role === "insurerAdmin" ? [...operationsByRole[role].filter((operation) => operation !== "issuePolicy"), "configureMedicalRules", "verifyMedicalAssociation", "registerMedicalOracleBenchmark"]
     : medical && role === "policyholder" ? ["acquireMedicalPolicy", ...operationsByRole[role].filter((operation) => !["acquirePolicy", "renewPolicy", "submitClaim", "submitClaimAppeal"].includes(operation))]
     : role === "hospitalOfficer" && maintenance
     ? [...operationsByRole[role], "issueInvoicePrivacyCredential", "revokeInvoicePrivacyCredential"]
     : operationsByRole[role];
+}
+
+export function GuidedWorkflowForm(props: GuidedWorkflowFormProps) {
+  const [maintenance, setMaintenance] = useState(false);
+  const available = roleOperations(props.role, props.medical ?? false, maintenance);
+  // A workspace page lists its operations in its own order.
+  const operations = props.allowed ? props.allowed.filter((operation) => available.includes(operation)) : available;
+  if (operations.length === 0) return null;
+  return <GuidedWorkflowFormBody {...props} operations={operations} maintenance={maintenance} setMaintenance={setMaintenance} />;
+}
+
+function GuidedWorkflowFormBody({
+  role,
+  busy,
+  prepared,
+  onSubmit,
+  medical = false,
+  title,
+  operations,
+  maintenance,
+  setMaintenance,
+}: GuidedWorkflowFormProps & { operations: readonly WorkflowOperation[]; maintenance: boolean; setMaintenance: (next: boolean) => void }) {
   const preparedOperation = typeof prepared?.command.operation === "string"
     && operations.includes(prepared.command.operation as never)
     ? prepared.command.operation as WorkflowOperation
@@ -144,10 +164,11 @@ export function GuidedWorkflowForm({
   const termDays = (Date.parse(values.endDate) - Date.parse(values.startDate)) / 86_400_000 + 1;
   const definition = workflowFormDefinitions[operation];
   const portalCopy = role === "bankOfficer"
-    ? { kicker: "Banking instruction", heading: "Process a banking operation", submit: "Submit bank instruction" }
+    ? { heading: "Banking instruction", submit: "Submit bank instruction" }
     : role === "hospitalOfficer"
-      ? { kicker: "Intake desk", heading: medical ? "Save patient intake" : "Update the patient billing register", submit: medical ? "Save intake" : "Save invoice record" }
-      : { kicker: "Guided transaction", heading: "Complete your next ledger action", submit: "Submit verified transaction" };
+      ? { heading: medical ? "Patient intake" : "Billing record", submit: medical ? "Save intake" : "Save invoice record" }
+      : { heading: "New transaction", submit: "Submit verified transaction" };
+  const heading = operations.length === 1 ? definition.label : title ?? portalCopy.heading;
 
   function selectOperation(nextOperation: WorkflowOperation) {
     setOperation(nextOperation);
@@ -212,9 +233,8 @@ export function GuidedWorkflowForm({
   }
 
   return (
-    <article className="workCard guidedCard" id="guided-workflow">
-      <span className="kicker">{portalCopy.kicker}</span>
-      <h2>{portalCopy.heading}</h2>
+    <article className="workCard guidedCard workCardWide" id="guided-workflow" aria-label={heading}>
+      <h2>{heading}</h2>
       {role === "hospitalOfficer" && !medical && <details><summary>Credential maintenance</summary>
         <p className="cardNote">Credentials are issued automatically when an invoice is finalized. Voiding that invoice revokes its automatic credential.</p>
         <label className="checkboxLabel"><input type="checkbox" checked={maintenance} onChange={(event) => { setMaintenance(event.target.checked); selectOperation("createHospitalInvoice"); }} />Show issuer maintenance actions</label>

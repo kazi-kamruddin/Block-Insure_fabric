@@ -50,7 +50,7 @@ export default async function ResearchPage() {
 
   return (
     <>
-      <SiteHeader activeRoute="/research" showResearch pillText="presentation" pillHref="/showcase" />
+      <SiteHeader activeRoute="/research" showResearch />
       <main id="main-content" tabIndex={-1} className="workspacePage">
         <div className="shell workspace researchSection">
           <header className="workspaceHeader">

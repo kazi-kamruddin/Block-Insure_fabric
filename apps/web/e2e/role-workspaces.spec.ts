@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { loadEnvConfig } from "@next/env";
+import { openOperation } from "./workspace-pages";
 
 function eventWorkerSecret() {
   if (!process.env.PLAYWRIGHT_BASE_URL) return "browser-event-worker-secret-with-32-characters";
@@ -86,7 +87,10 @@ for (const actor of actors) {
     await expect(page).toHaveURL(new RegExp(`/workspace/${actor.workspace}$`));
     await expect(page.getByRole("heading", { name: actor.heading })).toBeVisible();
     await expect(page.getByRole("navigation", { name: new RegExp("navigation$") })).toBeVisible();
-    await expect(page.getByLabel("Workflow action")).toHaveValue(actor.action);
+    await expect(page.getByRole("navigation", { name: "Workspace pages" })).toBeVisible();
+    const form = await openOperation(page, actor.action);
+    await expect(form.locator('[name]').first()).toBeVisible();
+    await page.goto(`/workspace/${actor.workspace}`);
 
     const anotherWorkspace = actor.workspace === "insurer" ? "bank" : "insurer";
     await page.goto(`/workspace/${anotherWorkspace}`);
@@ -126,7 +130,7 @@ test("research metrics are role-restricted and reproducibly identified", async (
 
 test("guided financial forms reject fractional poisha before submission", async ({ page }) => {
   await signIn(page, "insurer-admin");
-  await page.getByLabel("Workflow action").selectOption("createPolicyPackage");
+  await openOperation(page, "createPolicyPackage");
   await page.getByLabel("Package name").fill("Validation-only package");
   await page.getByLabel("Public description").fill("No ledger transaction should be submitted");
   await page.getByLabel("Premium (BDT)").fill("10.005");
@@ -138,6 +142,7 @@ test("guided financial forms reject fractional poisha before submission", async 
 
 test("policyholder encrypts evidence locally before upload", async ({ page }) => {
   await signIn(page, "policyholder-1");
+  await page.goto("/workspace/policyholder/documents");
   const evidenceCard = page.getByRole("article").filter({ hasText: "Encrypt, store, and anchor evidence" });
   await evidenceCard.getByLabel("Claim ID").fill("claim-browser-encryption");
   await evidenceCard.getByLabel("Evidence ID").fill("evidence-browser-encryption");

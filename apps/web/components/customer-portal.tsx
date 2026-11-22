@@ -7,7 +7,7 @@ import type { Policy } from "@/lib/fabric/types";
 
 const profileUrl = "/api/customer/profile";
 
-export function CustomerPortal({ memberId }: { memberId: string }) {
+export function CustomerPortal({ memberId, view = "both" }: { memberId: string; view?: "card" | "profile" | "both" }) {
   const [customer, setCustomer] = useState<CustomerView>();
   const [policies, setPolicies] = useState<Policy[]>();
   const [policyId, setPolicyId] = useState("");
@@ -100,7 +100,7 @@ export function CustomerPortal({ memberId }: { memberId: string }) {
   }
 
   return <section className="workGrid customerWorkspace" aria-label="Customer account">
-    <article className="workCard" aria-labelledby="my-profile-heading">
+    {view !== "card" && <article className="workCard" aria-labelledby="my-profile-heading">
       <h2 id="my-profile-heading">My profile</h2>
       {customer && <>
         <p className="customerEmail">Current email address <strong>{customer.email}</strong></p>
@@ -136,8 +136,8 @@ export function CustomerPortal({ memberId }: { memberId: string }) {
       </>}
       {profileNotice && <p role="status">{profileNotice}</p>}
       {profileError && <p className="formError" role="alert">{profileError}</p>}
-    </article>
-    <article className="workCard" id="insurance-card" aria-labelledby="insurance-card-heading">
+    </article>}
+    {view !== "profile" && <article className="workCard" id="insurance-card" aria-labelledby="insurance-card-heading">
       <h2 id="insurance-card-heading">Insurance card</h2>
       <p>Give this member ID to the hospital when you register a stay.</p>
       <dl className="customerCardDetails">
@@ -162,6 +162,6 @@ export function CustomerPortal({ memberId }: { memberId: string }) {
         <button type="button" className="secondary button" onClick={() => void refreshCoverage()}>Refresh coverage</button>
         <button type="button" className="secondary button" disabled={!customer} onClick={() => window.print()}>Print insurance card</button>
       </div>
-    </article>
+    </article>}
   </section>;
 }

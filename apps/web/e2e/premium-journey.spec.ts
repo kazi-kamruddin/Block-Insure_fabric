@@ -2,6 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { randomUUID } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { openOperation, openPage, workspaceIdentity } from "./workspace-pages";
 
 // Live dev-lite journey for the customer–Bank premium flows with realistic
 // taka amounts: account linking, a refused backdated purchase, a first premium
@@ -39,7 +40,7 @@ test("live bank linking, OTP and EFT premiums with a bounce and retry", async ({
     const response = await page.request.post("/api/auth/demo-login", { data: { accountId: accounts[next] }, maxRetries: 2 });
     expect(response.ok(), await response.text()).toBe(true);
     await page.goto("/workspace/" + paths[next]);
-    await expect(page.getByRole("heading", { name: headings[next], exact: true })).toBeVisible({ timeout: 45_000 });
+    await expect(workspaceIdentity(page, headings[next])).toBeVisible({ timeout: 45_000 });
     role = next;
   }
   async function clickAndWait(button: ReturnType<Page["getByRole"]>, pathname: string, status = 200) {
@@ -51,9 +52,7 @@ test("live bank linking, OTP and EFT premiums with a bounce and retry", async ({
     return status === 200 ? body.result : body;
   }
   async function form(operation: string, input: Record<string, string>, status = 200) {
-    const card = page.locator("#guided-workflow");
-    const selector = card.getByLabel("Workflow action");
-    if (await selector.inputValue() !== operation) await selector.selectOption(operation);
+    const card = await openOperation(page, operation);
     for (const [name, value] of Object.entries(input)) {
       const field = card.locator(`[name="${name}"]`);
       if (await field.evaluate((element) => element.tagName === "SELECT")) await field.selectOption(value);
@@ -96,6 +95,7 @@ test("live bank linking, OTP and EFT premiums with a bounce and retry", async ({
 
   await test.step("the customer asks the Bank to link three accounts", async () => {
     await login("holder");
+    await openPage(page, "payments");
     for (const [key, nickname] of [["rich", "Salary account"], ["poor", "Pocket account"], ["rejected", "Unknown account"]] as const) {
       await center.getByRole("combobox", { name: "Bank", exact: true }).selectOption("bank-demo");
       await center.getByLabel("Account nickname").fill(nickname + " " + suffix);
@@ -107,6 +107,7 @@ test("live bank linking, OTP and EFT premiums with a bounce and retry", async ({
 
   await test.step("the Bank verifies two links and rejects one", async () => {
     await login("bank");
+    await openPage(page, "accounts");
     // BDT 25,000 covers two installments; BDT 800 cannot pay one BDT 1,250 premium.
     for (const [key, balance] of [["rich", "25,000.00"], ["poor", "800.00"]] as const) {
       const item = desk.locator(".queueItem").filter({ hasText: masked(key) });
@@ -122,8 +123,7 @@ test("live bank linking, OTP and EFT premiums with a bounce and retry", async ({
   const accountIds = { rich: "", poor: "" };
   const policies = { otp: id("policy-otp"), rich: id("policy-rich"), poor: id("policy-poor") };
   async function buy(policyId: string, startDate: string, endDate: string, status = 200) {
-    const offer = page.locator("#guided-workflow");
-    await offer.getByLabel("Workflow action").selectOption("acquireMedicalPolicy");
+    const offer = await openOperation(page, "acquireMedicalPolicy");
     await offer.getByRole("button", { name: "Load published packages" }).click();
     await offer.getByLabel("Medical package").selectOption(id("package"));
     await expect(offer.getByText(/^BDT 1,250\.00 per 30-day period/)).toBeVisible();
@@ -140,9 +140,11 @@ test("live bank linking, OTP and EFT premiums with a bounce and retry", async ({
   });
 
   await test.step("the customer buys a policy and pays the first premium by OTP", async () => {
+    await openPage(page, "payments");
     await expect(center.getByText(`Salary account ${suffix} · ${masked("rich")}`)).toBeVisible();
     await expect(center.getByText(`Unknown account ${suffix} · ${masked("rejected")}`)).toBeVisible();
     expect(await buy(policies.otp, start, end)).toMatchObject({ status: "PENDING_PAYMENT", coverStartDate: "" });
+    await openPage(page, "payments");
     await center.getByRole("button", { name: "Refresh" }).click();
     const item = center.locator(".queueItem").filter({ hasText: policies.otp });
     await item.getByRole("combobox", { name: "Pay from" }).selectOption(accountIds.rich);
@@ -163,6 +165,7 @@ test("live bank linking, OTP and EFT premiums with a bounce and retry", async ({
     for (const key of ["rich", "poor"] as const) {
       expect(await buy(policies[key], start, end)).toMatchObject({ status: "PENDING_PAYMENT" });
     }
+    await openPage(page, "payments");
     await center.getByRole("button", { name: "Refresh" }).click();
     for (const key of ["rich", "poor"] as const) {
       const item = center.locator(".queueItem").filter({ hasText: policies[key] });
@@ -170,6 +173,7 @@ test("live bank linking, OTP and EFT premiums with a bounce and retry", async ({
       await clickAndWait(item.getByRole("button", { name: "Set up automatic EFT payment" }), "/api/workflows");
     }
     await login("bank");
+    await openPage(page, "collections");
     for (const key of ["rich", "poor"] as const) {
       const mandate = (await assets<{ id: string; policyId: string }>("mandate")).find((row) => row.policyId === policies[key])!;
       const item = desk.locator(".queueItem").filter({ hasText: `first debit ${start}` }).filter({ hasText: masked(key) });
@@ -215,14 +219,17 @@ test("live bank linking, OTP and EFT premiums with a bounce and retry", async ({
   await test.step("the customer funds the account, the Insurer retries and the Bank collects", async () => {
     const bounced = (await assets<{ id: string; policyId: string }>("collection")).find((row) => row.policyId === policies.poor)!;
     await login("bank");
+    await openPage(page, "collections");
     const item = desk.locator(".queueItem").filter({ hasText: masked("poor") }).filter({ hasText: "bounced" });
     await item.getByLabel("Deposit (BDT)").fill("1,250.00");
     await clickAndWait(item.getByRole("button", { name: "Record customer deposit" }), "/api/workflows");
     await login("insurer");
+    await openPage(page, "premiums");
     const open = operations.locator(".queueItem").filter({ hasText: bounced.id });
     await clickAndWait(open.getByRole("button", { name: "Retry collection" }), "/api/workflows");
     expect(await asset("collection", bounced.id)).toMatchObject({ status: "RETRY" });
     await login("bank");
+    await openPage(page, "collections");
     const retry = desk.locator(".queueItem").filter({ hasText: masked("poor") }).filter({ hasText: "attempts 1" });
     const processed = await clickAndWait(retry.getByRole("button", { name: "Collect premium" }), "/api/banking/bank-desk");
     expect(processed).toMatchObject({ status: "COMPLETED", attemptCount: 2 });
@@ -233,6 +240,7 @@ test("live bank linking, OTP and EFT premiums with a bounce and retry", async ({
 
   await test.step("the customer cancels automatic payment", async () => {
     await login("holder");
+    await openPage(page, "payments");
     const item = center.locator(".queueItem").filter({ hasText: policies.rich });
     await clickAndWait(item.getByRole("button", { name: "Cancel automatic payment" }), "/api/workflows");
     const mandate = (await assets<{ policyId: string; status: string }>("mandate")).find((row) => row.policyId === policies.rich);

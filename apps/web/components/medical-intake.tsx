@@ -102,7 +102,6 @@ export function MedicalIntake({ insurer, customerMatching = false, onAssociation
   const queue = episodes.filter(row => showVerified || row.associationStatus !== "VERIFIED");
 
   return <article className="workCard guidedCard">
-    <span className="kicker">Hospital episode coordination</span>
     <h2>{insurer ? "Episode association queue" : "Your medical episodes"}</h2>
     <div className="medicalButtonGroup">
       <button type="button" className="secondary button" disabled={busy} onClick={() => run(async () => {

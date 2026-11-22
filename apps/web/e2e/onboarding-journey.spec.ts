@@ -181,8 +181,9 @@ test("onboard real CA identities and settle a synthetic medical claim on LevelDB
       const firstState = await first.storageState();
       await page.context().addCookies(firstState.cookies);
       await page.setViewportSize({ width: 320, height: 640 });
-      await page.goto("/workspace/policyholder");
+      await page.goto("/workspace/policyholder/profile");
       await expect(page.getByRole("heading", { name: "My profile", exact: true })).toBeVisible();
+      await page.goto("/workspace/policyholder");
       const card = page.getByRole("article", { name: "Insurance card" });
       await expect(card.getByText(memberId, { exact: true })).toBeVisible();
       await expect(card.getByText(policyId, { exact: true })).toBeVisible();

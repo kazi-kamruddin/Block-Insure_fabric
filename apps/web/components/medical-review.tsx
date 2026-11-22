@@ -99,7 +99,6 @@ export function MedicalReview({ role, onEvidence, investigationEnabled = false }
   }
 
   return <article className="workCard workCardWide" id="medical-review">
-    <span className="kicker">Governed adjudication</span>
     <h2>Medical review and appeal</h2>
     <p className="authorityDistinction">
       A panel decision requires three approvals or two rejections from the four assigned auditors. Offline model scores never authorize payment.

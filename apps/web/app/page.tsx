@@ -19,7 +19,6 @@ function money(minor: number) {
 }
 
 export default async function Home() {
-  const channelName = process.env.FABRIC_CHANNEL_NAME ?? "insurance-channel";
   const [packages, agreements] = await Promise.all([
     ledger.listPolicyPackages().then((items) => items.filter((item) => item.status === "PUBLISHED")).catch(() => []),
     ledger.listPartnerAgreements().then((items) => items.filter((item) => item.status === "ACTIVE")).catch(() => []),
@@ -40,29 +39,29 @@ export default async function Home() {
   );
   return (
     <>
-      <SiteHeader activeRoute="/" brandHref="#top" pillText={channelName} />
+      <SiteHeader activeRoute="/" brandHref="#top" />
       <main id="main-content" tabIndex={-1}>
         <section className="shell hero" id="top">
           <div className="eyebrow">Hyperledger Fabric · Permissioned by design</div>
           <h1>Insurance coordination with proof built in.</h1>
           <p className="lede">
-            A shared ledger for insurers, policyholders, hospitals, auditors, and banks—where
-            every organization acts through an issued identity and every transition is verifiable.
+            Health insurance shared between insurers, policyholders, hospitals, auditors and banks.
+            Every organisation works from its own portal, and every decision is recorded and verifiable.
           </p>
           <div className="actions">
-            <Link className="primary" href="/workspace">Open role workspace</Link>
-            <Link className="secondary" href="/showcase">Open presentation board</Link>
-            <a className="secondary" href="/api/fabric/health">Check ledger connection</a>
+            <Link className="primary" href="/signup">Get covered</Link>
+            <Link className="secondary" href="/workspace">Sign in</Link>
+            <Link className="secondary" href="/showcase">How it works</Link>
           </div>
         </section>
 
         <section className="shell network" id="policies">
           <div className="sectionHeading">
-            <div><span className="kicker">Public policy catalog</span><h2>Published coverage packages</h2></div>
-            <p>These package versions are read from the live Fabric ledger. Purchase and policy management remain inside the policyholder workspace.</p>
+            <div><h2>Published coverage packages</h2></div>
+            <p>Current packages from our partner network. Create an account to buy cover and manage it online.</p>
           </div>
           <div className="capabilityGrid featuredCatalog">
-            {featuredPackages.length ? featuredPackages.map(packageCard) : <article className="capability"><h3>Catalog unavailable</h3><p>Start or verify the Fabric network to load published packages.</p></article>}
+            {featuredPackages.length ? featuredPackages.map(packageCard) : <article className="capability"><h3>Catalog unavailable</h3><p>Packages are temporarily unavailable. Please try again shortly.</p></article>}
           </div>
           {remainingPackages.length > 0 && (
             <details className="catalogMore">
@@ -75,10 +74,9 @@ export default async function Home() {
         <section className="shell network" id="network">
           <div className="sectionHeading">
             <div>
-              <span className="kicker">One governed workflow</span>
               <h2>Five organizations. Six operational roles.</h2>
             </div>
-            <p>Private keys stay server-side. The ledger contract validates both MSP membership and certificate role attributes.</p>
+            <p>Each organisation acts only through its own issued identity, and the shared ledger checks every action against it.</p>
           </div>
           <div className="capabilityGrid">
             {capabilities.map(([role, description], index) => (
@@ -92,8 +90,8 @@ export default async function Home() {
         </section>
       </main>
       <footer className="shell footer">
-        <span>Block-Insure Fabric</span>
-        <span>Deterministic · Auditable · Organization-scoped</span>
+        <span>Block-Insure</span>
+        <span><Link href="/showcase">How it works</Link> · <Link href="/signin">Customer sign-in</Link> · <Link href="/workspace">Staff sign-in</Link></span>
       </footer>
     </>
   );

@@ -16,15 +16,15 @@ export default async function WorkspacePage() {
 
   return (
     <>
-      <SiteHeader activeRoute="/workspace" pillText="presentation board" pillHref="/showcase" />
+      <SiteHeader activeRoute="/workspace" />
       <main id="main-content" tabIndex={-1} className="workspacePage">
         <WorkspaceClient initialAccount={null} initialDashboard={null} deployment={`${config.channelName}/${config.chaincodeName}`}
           onboardingEnabled={onboardingEnabled()} demoAuthEnabled={process.env.ENABLE_DEMO_AUTH === "true"}
           showLegacyPolicyholderLogin={process.env.SHOW_LEGACY_POLICYHOLDER_LOGIN === "true"} />
       </main>
       <footer className="shell footer">
-        <span>Block-Insure Fabric</span>
-        <span>Server-side Gateway · Identity-scoped sessions</span>
+        <span>Block-Insure</span>
+        <span>Secure sign-in for customers and partner staff</span>
       </footer>
     </>
   );

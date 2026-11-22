@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSelectedLayoutSegment } from "next/navigation";
 import Link from "next/link";
 import {
   demoAccounts,
@@ -20,12 +20,13 @@ import { MedicalIntake } from "@/components/medical-intake";
 import { MedicalReview } from "@/components/medical-review";
 import { MedicalSettlementTimeline } from "@/components/medical-timeline";
 import { MedicalOCR } from "@/components/medical-ocr";
-import { PresentationGuide } from "@/components/presentation-guide";
+import { WorkspaceIconGlyph } from "@/components/workspace-icon";
+import { findSection, overviewSection, sectionForOperation, sectionHref, sectionsFor } from "@/lib/workspace/sections";
 import { StatusBadge } from "@/components/status-badge";
 import { PremiumCenter } from "@/components/premium-center";
 import { BankDesk } from "@/components/bank-desk";
 import { PremiumOperations } from "@/components/premium-operations";
-import type { WorkflowCommand } from "@/lib/workflows/commands";
+import type { WorkflowCommand, WorkflowOperation } from "@/lib/workflows/commands";
 import { bdtToMinor, workflowFormDefinitions } from "@/lib/workflows/forms";
 import { decryptEvidenceBytes, encryptEvidenceBytes, sha256Hex } from "@/lib/evidence/browser-crypto";
 import { createEvidenceRecovery, restoreEvidenceRecovery } from "@/lib/evidence/recovery";
@@ -63,12 +64,14 @@ const accountGroups: ReadonlyArray<{
 ];
 
 const roleLabels: Record<DemoAccount["role"], string> = {
-  insurerAdmin: "Administrator",
+  insurerAdmin: "Insurer administrator",
   policyholder: "Policyholder",
-  hospitalOfficer: "Hospital officer",
-  auditor: "Auditor",
-  bankOfficer: "Bank officer",
+  hospitalOfficer: "Hospital billing officer",
+  auditor: "Independent auditor",
+  bankOfficer: "Bank operations officer",
 };
+
+const readyOutput = "Ready.";
 
 const commandTemplates = {
   insurerAdmin: [
@@ -158,6 +161,8 @@ export function WorkspaceClient({
   onboardingEnabled = false,
   demoAuthEnabled = false,
   showLegacyPolicyholderLogin = false,
+  workspace = "",
+  children,
 }: {
   initialAccount: WorkspaceAccount | null;
   initialDashboard: RoleDashboard | null;
@@ -167,6 +172,8 @@ export function WorkspaceClient({
   onboardingEnabled?: boolean;
   demoAuthEnabled?: boolean;
   showLegacyPolicyholderLogin?: boolean;
+  workspace?: string;
+  children?: React.ReactNode;
 }) {
   const router = useRouter();
   const [account, setAccount] = useState(initialAccount);
@@ -199,7 +206,7 @@ export function WorkspaceClient({
   const [proofBatchId, setProofBatchId] = useState("");
   const [manualPayment, setManualPayment] = useState({ policyId: "", sourceAccountId: "", destinationAccountId: "bank-insurer-premium", transferId: "", paymentId: "", periodStartDate: "", periodEndDate: "", amountBdt: "", externalReference: "", challengeId: "", otp: "", demoCode: "" });
   const [statementPolicyId, setStatementPolicyId] = useState("");
-  const [output, setOutput] = useState("Ready.");
+  const [output, setOutput] = useState(readyOutput);
   const [copiedOutput, setCopiedOutput] = useState(false);
   const [busy, setBusy] = useState(false);
   const gatewaySummary = useMemo(() => parseGatewaySummary(output), [output]);
@@ -221,6 +228,41 @@ export function WorkspaceClient({
   const [researchSnapshot, setResearchSnapshot] = useState<ResearchSnapshotView | null>(null);
   const [oracleOperations, setOracleOperations] = useState<OracleOperationsView | null>(null);
   const templates = useMemo(() => account ? commandTemplates[account.role] : [], [account]);
+  const segment = useSelectedLayoutSegment();
+  const sectionOptions = useMemo(() => ({ medical: isMedicalChannel(deployment.split("/")[0]), onboarding: onboardingEnabled }), [deployment, onboardingEnabled]);
+  const section = account ? findSection(account.role, segment, sectionOptions) : undefined;
+  const [preparedSection, setPreparedSection] = useState<string | null>(null);
+  const [expandedLists, setExpandedLists] = useState<Record<string, boolean>>({});
+  const [pendingScroll, setPendingScroll] = useState<{ section: string; anchor: string } | null>(null);
+
+  // After moving to another sub-page, bring the requested card into view.
+  useEffect(() => {
+    if (!pendingScroll || section?.id !== pendingScroll.section) return;
+    const timer = window.setTimeout(() => {
+      document.getElementById(pendingScroll.anchor)?.scrollIntoView({ behavior: "smooth", block: "start" });
+      setPendingScroll(null);
+    }, 80);
+    return () => window.clearTimeout(timer);
+  }, [pendingScroll, section?.id]);
+
+  function goTo(target: string, anchor?: string) {
+    if (section?.id === target) {
+      if (anchor) document.getElementById(anchor)?.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
+    if (anchor) setPendingScroll({ section: target, anchor });
+    router.push(sectionHref(workspace, target));
+  }
+
+  // Fill the transaction form on the sub-page that owns the operation.
+  function prepare(next: PreparedWorkflow) {
+    if (!account) return;
+    const operation = typeof next.command.operation === "string" ? next.command.operation : "";
+    const target = sectionForOperation(account.role, operation)?.id ?? section?.id ?? overviewSection;
+    setPreparedWorkflow(next);
+    setPreparedSection(target);
+    goTo(target, "guided-workflow");
+  }
 
   useEffect(() => () => {
     if (decryptedEvidence) URL.revokeObjectURL(decryptedEvidence.url);
@@ -680,16 +722,16 @@ export function WorkspaceClient({
     })).filter(group => group.accountIds.length);
     return (
       <section className="shell signInPanel">
-        <h1 className="workspaceTitle">Block-Insure workspaces</h1>
+        <h1 className="workspaceTitle">Sign in to Block-Insure</h1>
         {onboardingEnabled && <section className="customerAccessOptions" aria-labelledby="customer-access-options">
-          <h2 id="customer-access-options">Customer access</h2>
+          <h2 id="customer-access-options">Customers</h2>
           <div className="medicalButtonGroup">
             <Link className="primary button" href="/signin">Customer sign-in</Link>
             <Link className="secondary button" href="/signup">Create an insurance account</Link>
           </div>
         </section>}
         {demoAuthEnabled && <section aria-labelledby="staff-sign-in">
-          <h2 id="staff-sign-in">Staff sign-in (demo)</h2>
+          <h2 id="staff-sign-in">Partner staff</h2>
           <div className="accountGroups">
           {staffGroups.map((group) => <section className="accountGroup" key={group.label}>
             <header className="accountGroupHeader"><div><h3 className="kicker" style={{ margin: 0, lineHeight: 1.4 }}>{group.label}</h3><p>{group.description}</p></div><small>{group.accountIds.length} {group.accountIds.length === 1 ? "identity" : "identities"}</small></header>
@@ -705,503 +747,506 @@ export function WorkspaceClient({
             </div>
           </section>)}
           </div>
-          <pre aria-live="polite" className="console compact">{output}</pre>
+          {output !== readyOutput && <p aria-live="polite" className="signInStatus" role="status">{output}</p>}
         </section>}
         {!onboardingEnabled && !demoAuthEnabled && <p>Sign-in is unavailable for this deployment.</p>}
       </section>
     );
   }
 
-  return (
-    <section className={`shell workspace workspace-${account.role}`}>
-      <header className="workspaceHeader">
-        <div>
-          <span className="kicker">{account.role === "bankOfficer" ? "Independent banking portal" : account.role === "hospitalOfficer" ? "Independent hospital portal" : account.organization}</span>
-          <h1 className="workspaceTitle">{account.displayName}</h1>
-          <p>{account.role === "bankOfficer" ? "Treasury operations · BDT clearing · EFT mandates" : account.role === "hospitalOfficer" ? "Patient billing register · insurer read-only connection" : <>Application role: <code>{account.role}</code></>}</p>
-        </div>
-        <div className="workspaceHeaderActions">
-          <a className="secondary button" href="/showcase">Presentation board</a>
-          <button type="button" className="secondary button" onClick={logout}>Sign out</button>
-        </div>
-      </header>
+  const customerAccount = onboardingEnabled && account.role === "policyholder" && account.subjectId && account.id === "customer:" + account.subjectId ? account.subjectId : null;
+  // Only registered customers have an editable profile.
+  const sections = sectionsFor(account.role, sectionOptions).filter((item) => item.id !== "profile" || customerAccount);
+  const isAdmin = account.role === "insurerAdmin" || account.role === "auditor";
+  // Staff queues are work waiting for them; a customer's list is their policies.
+  const queueCount = account.role === "policyholder" ? 0 : dashboard?.queue.length ?? 0;
+  const identityLine = account.role === "policyholder"
+    ? (account.subjectId ? `Member ${account.subjectId}` : "Policyholder")
+    : roleLabels[account.role];
+  const initials = account.displayName.split(/\s+/).filter(Boolean).slice(0, 2).map(word => word[0]?.toUpperCase()).join("");
+  const preparedOperation = preparedWorkflow && section && preparedSection === section.id && typeof preparedWorkflow.command.operation === "string"
+    ? preparedWorkflow.command.operation as WorkflowOperation : null;
+  const formOperations: WorkflowOperation[] | null = section && (section.operations || preparedOperation)
+    ? [...(section.operations ?? []), ...(preparedOperation && !section.operations?.includes(preparedOperation) ? [preparedOperation] : [])]
+    : null;
+  // Long lists show their first rows; the rest open on request.
+  const visible = <T,>(key: string, items: readonly T[], limit = 6) => expandedLists[key] ? items : items.slice(0, limit);
+  const showMore = (key: string, total: number, noun: string, limit = 6) => total > limit
+    ? <button type="button" className="textButton showMoreButton" onClick={() => setExpandedLists((current) => ({ ...current, [key]: !current[key] }))}>
+      {expandedLists[key] ? "Show fewer" : `Show all ${total} ${noun}`}
+    </button> : null;
+  const money = (minor: number, currency = "BDT") => new Intl.NumberFormat("en-BD", { style: "currency", currency }).format(minor / 100);
+  const medicalChannel = isMedicalChannel(deployment.split("/")[0]);
+  const devLite = deployment.startsWith(`${medicalDevLiteChannel}/`);
 
-      {onboardingEnabled && account.role === "policyholder" && account.subjectId && account.id === "customer:" + account.subjectId &&
-        <CustomerPortal key={account.id} memberId={account.subjectId} />}
-
-      {account.role !== "bankOfficer" && account.role !== "hospitalOfficer" && <PresentationGuide role={account.role} />}
-
-      {(account.role === "bankOfficer" || account.role === "hospitalOfficer") && <nav className="partnerPortalNav" aria-label="Partner portal sections">
-        <strong>{account.role === "bankOfficer" ? "BDCB Treasury Online" : "Hospital Billing Registry"}</strong>
-        <div><a href="#overview">Overview</a><a href="#operations">Operations</a><a href="#transaction-console">Records</a></div>
-        <span>Connected to Block-Insure via Fabric Gateway</span>
-      </nav>}
-
-      <section className="roleDashboard" id="overview" aria-busy={dashboardLoading}>
-        <div className="dashboardIntro">
-          <div>
-            <span className="kicker">Organization-scoped overview</span>
-            <h2>{dashboard?.title ?? (dashboardLoading ? "Loading ledger overview…" : "Overview unavailable offline")}</h2>
+  const dashboardBlock = <section className="roleDashboard" aria-busy={dashboardLoading} aria-labelledby="dashboard-title">
+    <div className="dashboardIntro">
+      <h2 id="dashboard-title">{dashboard?.title ?? (dashboardLoading ? "Loading overview…" : "Overview unavailable")}</h2>
+      {dashboard?.description && <p>{dashboard.description}</p>}
+    </div>
+    {dashboardLoading && !dashboard && <div className="metricGrid" aria-hidden="true">
+      {[0, 1, 2, 3].map((slot) => <div className="skeletonCard" key={slot}>
+        <div className="skeletonLine" style={{ width: "42%" }} /><div className="skeletonMetric" /><div className="skeletonLine" />
+      </div>)}
+    </div>}
+    {!dashboardLoading && !dashboard && <div className="dashboardUnavailable" role="status">
+      <div>
+        <StatusBadge status="DEGRADED" label="Overview unavailable" tone="pending" />
+        <h3>The ledger could not be reached</h3>
+        <p>{dashboardError ?? "Live figures could not be loaded. Try again in a moment."}</p>
+      </div>
+      <button type="button" className="primary button" onClick={refreshDashboard} disabled={dashboardLoading}>Try again</button>
+    </div>}
+    {dashboard && <>
+      <div className="metricGrid">
+        {dashboard.metrics.map((metric) => <article className="metricCard" key={metric.label}>
+          <span>{metric.label}</span><strong>{metric.value}</strong><small>{metric.hint}</small>
+        </article>)}
+      </div>
+      <div className={account.role === "hospitalOfficer" || account.role === "bankOfficer" ? "dashboardGrid dashboardGridSingle" : "dashboardGrid"}>
+        <article className="queuePanel">
+          <div className="panelHeading">
+            <h3>{dashboard.queueTitle}</h3>
+            <button type="button" className="textButton" disabled={dashboardLoading} onClick={refreshDashboard}>Refresh</button>
           </div>
-          <p>{dashboard?.description ?? (dashboardLoading ? "Evaluating current world state through Fabric Gateway." : "Start or verify the Fabric network, then retry to query organization-scoped ledger state.")}</p>
-        </div>
-
-        {dashboardLoading && !dashboard && (
-          <div className="metricGrid" aria-hidden="true">
-            {[0, 1, 2, 3].map((slot) => (
-              <div className="skeletonCard" key={slot}>
-                <div className="skeletonLine" style={{ width: "42%" }} />
-                <div className="skeletonMetric" />
-                <div className="skeletonLine" />
+          {dashboard.queue.length === 0 ? <p className="emptyState">Nothing is waiting for you.</p> : <div className="queueList">
+            {visible("queue", dashboard.queue).map((item) => <div className="queueItem" key={item.id}>
+              <div>
+                <div className="queueTitle"><strong>{item.title}</strong><StatusBadge status={item.status} label={item.status.replaceAll("_", " ")} /></div>
+                <p>{item.detail}</p>
               </div>
-            ))}
-          </div>
-        )}
-
-        {!dashboardLoading && !dashboard && (
-          <div className="dashboardUnavailable" role="status">
-            <div>
-              <StatusBadge status="DEGRADED" label="Ledger overview unavailable" tone="pending" />
-              <h2>Unable to reach Fabric Gateway overview</h2>
-              <p>{dashboardError ?? "Live ledger metrics could not be loaded. Transaction recovery and client-side tools below remain accessible."}</p>
-            </div>
-            <button type="button" className="primary button" onClick={refreshDashboard} disabled={dashboardLoading}>Retry overview</button>
-          </div>
-        )}
-
-        {dashboard && (
-          <>
-            <div className="metricGrid">
-              {dashboard.metrics.map((metric) => (
-                <article className="metricCard" key={metric.label}>
-                  <span>{metric.label}</span>
-                  <strong>{metric.value}</strong>
-                  <small>{metric.hint}</small>
-                </article>
-              ))}
-            </div>
-
-            {dashboard.accountCards && dashboard.accountCards.length > 0 && <div className="bankAccountGrid">
-              {dashboard.accountCards.map((bankAccount) => <article className="bankAccountCard" key={bankAccount.id}>
-                <span>{bankAccount.accountType === "INSURER" ? "Corporate settlement account" : bankAccount.label || "Customer account"}</span>
-                <strong>{bankAccount.maskedAccount || "**** **** ****"}</strong>
-                <b>{new Intl.NumberFormat("en-BD", { style: "currency", currency: "BDT" }).format(bankAccount.balanceMinor / 100)}</b>
-                <small>{bankAccount.id} · {bankAccount.status}</small>
-              </article>)}
-            </div>}
-
-            <div className="dashboardGrid">
-              <article className="queuePanel">
-                <div className="panelHeading">
-                  <div><span className="kicker">Actionable now</span><h3>{dashboard.queueTitle}</h3></div>
-                  <button type="button" className="textButton" disabled={dashboardLoading} onClick={refreshDashboard}>Refresh</button>
-                </div>
-                {dashboard.queue.length === 0 ? (
-                  <p className="emptyState">No ledger records currently require this role.</p>
-                ) : (
-                  <div className="queueList">
-                    {dashboard.queue.map((item) => (
-                      <div className="queueItem" key={item.id}>
-                        <div>
-                          <div className="queueTitle"><strong>{item.title}</strong><StatusBadge status={item.status} label={item.status.replaceAll("_", " ")} /></div>
-                          <p>{item.detail}</p>
-                          {item.command && <div className="queueItemMeta">Prefills Guided form below · explicit submit required</div>}
-                        </div>
-                        {item.command && <button type="button" onClick={() => {
-                          if (!item.command) return;
-                          setPreparedWorkflow({ command: item.command, revision: Date.now() });
-                          document.getElementById("guided-workflow")?.scrollIntoView({ behavior: "smooth" });
-                        }}>{item.commandLabel}</button>}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </article>
-
-              {account.role === "hospitalOfficer" ? <article className="recentPanel">
-                <span className="kicker">Organizational boundary</span>
-                <h3>Independent from Block-Insure</h3>
-                <p className="emptyState">This portal maintains Hospital invoices only. The contracted insurer can read verification fields but cannot edit these records.</p>
-              </article> : account.role === "bankOfficer" ? <article className="recentPanel bankBoundaryPanel">
-                <span className="kicker">Bank responsibility</span>
-                <h3>Payments, not insurance decisions</h3>
-                <p className="emptyState">This Bank can operate accounts, EFT mandates, premium transfers, and authorized claim payouts. It cannot inspect claim evidence or decide claim eligibility.</p>
-              </article> : <article className="recentPanel">
-                <span className="kicker">Ledger activity</span>
-                <h3>Recently updated claims</h3>
-                {dashboard.recentClaims.length === 0 ? <p className="emptyState">No visible claims yet.</p> : (
-                  <div className="recentList">
-                    {dashboard.recentClaims.map((claim) => (
-                      <button type="button" key={claim.id} onClick={() => { setAssetType("claim"); setAssetId(claim.id); }}>
-                        <span><strong>{claim.id}</strong><small>{claim.policyId}</small></span>
-                        <StatusBadge status={claim.status} label={claim.status.replaceAll("_", " ")} />
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </article>}
-            </div>
-          </>
-        )}
-      </section>
-
-      <div className="workGrid" id="operations">
-        <article className="workCard">
-          <span className="kicker">Event-driven operations</span>
-          <h2>Fabric activity inbox</h2>
-          <p className="cardNote">Durable, replay-safe projection checkpoint: {eventCheckpoint}. Notifications are derived from committed chaincode events.</p>
-          <div className="medicalButtonGroup" style={{ marginBottom: 14 }}>
-            {account.role === "insurerAdmin" && <button type="button" className="secondary button" disabled={busy} onClick={synchronizeEvents}>Synchronize Fabric events</button>}
-            <button type="button" className="textButton" disabled={busy} onClick={refreshNotifications}>Refresh inbox</button>
-          </div>
-          {notifications.length === 0 ? <p className="emptyState">No projected events currently require this identity.</p> : (
-            <div className="recentList">{notifications.slice(0, 8).map((item) => (
-              <div className="queueItem" key={item.id}><div><strong>{item.title}</strong><p>{item.assetId || item.message}</p></div><StatusBadge status="BLOCK" label={`Block ${item.blockNumber}`} tone="neutral" /></div>
-            ))}</div>
-          )}
-        </article>
-
-        {account.role === "bankOfficer" && <article className="workCard">
-          <span className="kicker">Bank communications</span>
-          <h2>Customer delivery monitor</h2>
-          <p className="cardNote">Committed transfers, mandate decisions, and benefit payouts create replay-safe email deliveries. This screen exposes delivery metadata, never OTP codes.</p>
-          <div className="medicalButtonGroup" style={{ marginBottom: 14 }}>
-            <button type="button" className="textButton" disabled={busy} onClick={refreshBankCommunications}>Refresh deliveries</button>
-          </div>
-          {bankCommunications.length === 0 ? <p className="emptyState">No transaction communications have been projected yet.</p> : (
-            <div className="recentList">{bankCommunications.slice(0, 12).map((item) => (
-              <div className="queueItem" key={item.id}>
-                <div><strong>{item.title}</strong><p>{item.assetId} · {new Intl.NumberFormat("en-BD", { style: "currency", currency: item.currency || "BDT" }).format(item.amountMinor / 100)}</p><small>{item.recipient || "recipient pending"}{item.error ? ` · ${item.error}` : ""}</small></div>
-                <StatusBadge status={item.status} label={`${item.status}${item.adapter ? ` · ${item.adapter}` : ""}`} />
-              </div>
-            ))}</div>
-          )}
-        </article>}
-
-        {(account.role === "insurerAdmin" || account.role === "auditor") && <article className="workCard">
-          <span className="kicker">Research dashboard</span>
-          <h2>Ledger-derived thesis snapshot</h2>
-          <p className="cardNote">Current-world-state metrics carry Fabric provenance and a reproducibility hash. They do not claim clinical or causal validity.</p>
-          <div className="evidenceActions">
-            <button type="button" className="primary button" disabled={busy} onClick={refreshResearchSnapshot}>Refresh metrics</button>
-            <a className="secondary button" href="/research">Open full dashboard</a>
-            <a className="secondary button" download href="/api/research/snapshot?download=1">Download snapshot</a>
-          </div>
-          {researchSnapshot && <div className="metricGrid" style={{ marginTop: 16 }}>
-            <div className="metricCard"><span>Policies / claims</span><strong>{researchSnapshot.portfolio.policies} / {researchSnapshot.portfolio.claims}</strong><small>Current ledger assets</small></div>
-            <div className="metricCard"><span>Reviews / appeals</span><strong>{researchSnapshot.adjudication.reviewRounds} / {researchSnapshot.adjudication.appeals}</strong><small>Immutable rounds</small></div>
-            <div className="metricCard"><span>Fraud assessments</span><strong>{researchSnapshot.fraudDecisionSupport.assessments}</strong><small>{researchSnapshot.fraudDecisionSupport.advisoryOnly ? "Advisory only" : "Boundary violation"}</small></div>
-            <div className="metricCard"><span>Evidence grants / access</span><strong>{researchSnapshot.evidenceGovernance.grants} / {researchSnapshot.evidenceGovernance.accesses}</strong><small>{researchSnapshot.evidenceGovernance.grantBackedAccesses} grant-backed</small></div>
-            <div className="metricCard"><span>Private credentials / proofs</span><strong>{researchSnapshot.privacyPreservingVerification.credentials} / {researchSnapshot.privacyPreservingVerification.presentations}</strong><small>{researchSnapshot.privacyPreservingVerification.privacyBoundOracleRequests} requests bound</small></div>
+              {item.command && <button type="button" onClick={() => { if (item.command) prepare({ command: item.command, revision: Date.now() }); }}>{item.commandLabel}</button>}
+            </div>)}
+            {showMore("queue", dashboard.queue.length, "items")}
           </div>}
-          {researchSnapshot && <p className="cardNote" style={{ marginTop: 14 }}>Schema {researchSnapshot.provenance.ledgerSchemaVersion}; indexed events {researchSnapshot.provenance.indexedEvents}; hash <code>{researchSnapshot.reproducibilityHash.slice(0, 16)}…</code></p>}
-        </article>}
-
-        {(account.role === "insurerAdmin" || account.role === "auditor") && <article className="workCard workCardWide">
-          <span className="kicker">Certificate-bound services</span>
-          <h2>Oracle operations and consensus</h2>
-          <p className="cardNote">Each worker uses a different OracleMSP certificate and independently validates the exact committed registry snapshot. Unrevealed results are never displayed.</p>
-          <button type="button" className="primary button" disabled={busy} onClick={refreshOracleOperations}>Refresh Oracle health</button>
-          {oracleOperations && <>
-            <div className="metricGrid" style={{ marginTop: 16 }}>
-              <div className="metricCard"><span>Requests / pending</span><strong>{oracleOperations.metrics.requests} / {oracleOperations.metrics.pending}</strong><small>Ledger requests</small></div>
-              <div className="metricCard"><span>Exact agreements</span><strong>{oracleOperations.metrics.agreements}</strong><small>positive and negative</small></div>
-              <div className="metricCard"><span>Conflicts / timeouts</span><strong>{oracleOperations.metrics.conflicts} / {oracleOperations.metrics.timeouts}</strong><small>auditor fallback outcomes</small></div>
-            </div>
-            <div className="queueList" style={{ marginTop: 14 }}>{oracleOperations.workers.map((worker) => <div className="queueItem" key={worker.oracleId}>
-              <div><div className="queueTitle"><strong>{worker.label} · {worker.oracleId}</strong><StatusBadge status={worker.status} /></div><p>{worker.registrySource} · snapshot {worker.registrySnapshotId || "unavailable"} v{worker.registryVersion} · model {worker.modelVersion || "unavailable"}</p>{worker.registryDatasetId && <small>{worker.registryDatasetId}@{worker.registryDatasetVersion} · transform {worker.registryTransformationVersion} · input {worker.registryInputSha256?.slice(0, 12)}…</small>}<small>Block {worker.lastProcessedBlock ?? "—"} · request {worker.lastProcessedRequestId ?? "—"} · {worker.lastProcessingLatencyMs ?? "—"} ms</small>{worker.lastError && <p className="evidenceWarning">{worker.lastError}</p>}</div>
-              <span>{worker.counts.commitments} commit / {worker.counts.reveals} reveal</span>
-            </div>)}</div>
-          </>}
-        </article>}
-      </div>
-
-      <div className="workGrid" id="transaction-console">
-        {onboardingEnabled && account.role === "insurerAdmin" && <CustomerOnboardingQueue />}
-        {deployment.startsWith(`${medicalDevLiteChannel}/`) && account.role === "bankOfficer" && <MedicalSettlementTimeline />}
-        {account.role === "bankOfficer" && <BankDesk />}
-        {account.role === "insurerAdmin" && <PremiumOperations />}
-        {account.role === "policyholder" && <PremiumCenter onPreparePayment={(payment) => {
-          setManualPayment((current) => ({ ...current, ...payment, challengeId: "", otp: "", demoCode: "" }));
-          document.getElementById("manual-premium")?.scrollIntoView({ behavior: "smooth" });
-        }} />}
-        {medicalReview && (account.role === "policyholder" || account.role === "insurerAdmin" || account.role === "auditor") &&
-          <MedicalReview role={account.role} investigationEnabled={investigationEnabled} onEvidence={(id, grant) => {
-            setRetrievalEvidenceId(id); setRetrievalGrantId(grant); setDecryptedEvidence(null);
-            document.getElementById("retrieve-evidence")?.scrollIntoView({ behavior: "smooth" });
-          }} />}
-        {deployment.startsWith(`${medicalDevLiteChannel}/`) && (account.role === "insurerAdmin" || account.role === "hospitalOfficer") &&
-          <MedicalRegistryControls role={account.role} />}
-        {isMedicalChannel(deployment.split("/")[0]) && (account.role === "insurerAdmin" || account.role === "policyholder") &&
-          <MedicalIntake insurer={account.role === "insurerAdmin"} customerMatching={onboardingEnabled && account.role === "insurerAdmin"} onAssociation={prepared => {
-            setPreparedWorkflow(prepared);
-            document.getElementById("guided-workflow")?.scrollIntoView({ behavior: "smooth" });
-          }} />}
-        {savedSnapshot && !savedAction && <p className="formError" role="alert">Saved action storage is unavailable or invalid. Preserve it for recovery; nothing new will be sent until storage is usable.</p>}
-        {savedAction && <article className="workCard workCardWide" aria-label="Saved workflow action">
-          <div className="reviewSummaryRow">
-            <h2>Recover saved action</h2>
-            <StatusBadge status={savedAction.state ?? "PENDING"} />
-          </div>
-          <p>{workflowFormDefinitions[savedAction.command.operation].label} · {savedAction.state ?? "Outcome unresolved"}. Check this action before submitting another instruction.</p>
-          <div className="evidenceActions">
-            <button type="button" className="primary button" disabled={busy} onClick={() => submitWorkflow(savedAction.command, true)}>Check saved action</button>
-            {["INVALID", "REJECTED", "NOT_SUBMITTED"].includes(savedAction.state ?? "") && <button type="button" className="secondary button" disabled={busy} onClick={() => {
-              if (!account) return;
-              localStorage.removeItem(savedActionKey(deployment, account.id)); notifySavedAction();
-              setPreparedWorkflow({ command: savedAction.command, revision: Date.now() });
-              setOutput("Confirmed failed action cleared. Review the original instruction before explicitly making a new attempt.");
-            }}>Review failed action for a new attempt</button>}
-          </div>
-        </article>}
-        <GuidedWorkflowForm
-          medical={isMedicalChannel(deployment.split("/")[0])}
-          key={`${account.role}-${preparedWorkflow?.revision ?? 0}`}
-          role={account.role}
-          busy={busy}
-          prepared={preparedWorkflow}
-          onSubmit={submitWorkflow}
-        />
-
-        {account.role === "policyholder" && (
-          <article className="workCard evidenceCard" id="manual-premium">
-            <span className="kicker">Manual premium</span>
-            <h2>Pay with one-time authorization</h2>
-            <p className="cardNote">The Bank emails an OTP for the exact payment details and recipient. Changing a detail requires a new code. Payment completes only after a valid committed Bank transfer.</p>
-            <div className="evidenceFields">
-              <label>Policy ID<input spellCheck={false} autoComplete="off" value={manualPayment.policyId} onChange={(event) => updateManualPayment("policyId", event.target.value)} /></label>
-              <label>Customer account ID<input spellCheck={false} autoComplete="off" value={manualPayment.sourceAccountId} onChange={(event) => updateManualPayment("sourceAccountId", event.target.value)} /></label>
-              <label>Insurer account ID<input spellCheck={false} autoComplete="off" value={manualPayment.destinationAccountId} onChange={(event) => updateManualPayment("destinationAccountId", event.target.value)} /></label>
-              <label>Transfer ID<input spellCheck={false} autoComplete="off" value={manualPayment.transferId} onChange={(event) => updateManualPayment("transferId", event.target.value)} /></label>
-              <label>Payment ID<input spellCheck={false} autoComplete="off" value={manualPayment.paymentId} onChange={(event) => updateManualPayment("paymentId", event.target.value)} /></label>
-              <label>Period starts<input type="date" value={manualPayment.periodStartDate} onChange={(event) => updateManualPayment("periodStartDate", event.target.value)} /></label>
-              <label>Period ends<input type="date" value={manualPayment.periodEndDate} onChange={(event) => updateManualPayment("periodEndDate", event.target.value)} /></label>
-              <label>Premium (BDT)<input inputMode="decimal" value={manualPayment.amountBdt} onChange={(event) => updateManualPayment("amountBdt", event.target.value)} /></label>
-              <label>External bank receipt<input spellCheck={false} autoComplete="off" value={manualPayment.externalReference} onChange={(event) => updateManualPayment("externalReference", event.target.value)} /></label>
-            </div>
-            <div className="otpSection">
-              <span className="kicker">Step 2 · Challenge code</span>
-              <h3>Confirm one-time authorization code</h3>
-              <div className="evidenceFields">
-                <label>Six-digit OTP<input inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={manualPayment.otp} onChange={(event) => updateManualPayment("otp", event.target.value.replace(/\D/g, ""))} /></label>
-              </div>
-              {manualPayment.demoCode && <p className="evidenceWarning">Local demo delivery code: <strong>{manualPayment.demoCode}</strong></p>}
-              <div className="evidenceActions" style={{ marginTop: 14 }}>
-                <button type="button" className="secondary button" disabled={busy || !manualPayment.policyId || !manualPayment.sourceAccountId} onClick={requestPremiumOtp}>Email OTP</button>
-                <button type="button" className="primary button" disabled={busy || !manualPayment.challengeId || manualPayment.otp.length !== 6} onClick={submitManualPremium}>Authorize premium</button>
-                <button type="button" className="secondary button" disabled={busy} onClick={recoverManualPremium}>Recover saved payment</button>
-              </div>
-            </div>
-          </article>
-        )}
-
-        {account.role === "policyholder" && (
-          <article className="workCard workCardWide">
-            <span className="kicker">Policy statement</span>
-            <h2>Export coverage and payment history</h2>
-            <p className="cardNote">Download premiums, reversals, mandates, collections, claims, benefits, and liabilities reconciled to one owned policy.</p>
-            <div className="auditExport">
-              <label>Policy ID<input spellCheck={false} autoComplete="off" value={statementPolicyId} onChange={(event) => setStatementPolicyId(event.target.value)} placeholder="policy-1" /></label>
-              <a
-                aria-disabled={!statementPolicyId.trim()}
-                tabIndex={statementPolicyId.trim() ? undefined : -1}
-                className={`primary button${statementPolicyId.trim() ? "" : " disabledLink"}`}
-                download
-                href={statementPolicyId.trim() ? `/api/policies/${encodeURIComponent(statementPolicyId.trim())}/statement` : undefined}
-              >Download statement JSON</a>
-            </div>
-          </article>
-        )}
-
-        <article className="workCard" id="ledger-tools">
-          <span className="kicker">Evaluate transaction</span>
-          <h2>Find ledger asset</h2>
-          <label>Asset type
-            <select value={assetType} onChange={(event) => setAssetType(event.target.value as AssetType)}>
-              {account.role === "hospitalOfficer" ? <>
-                <option value="hospital-invoice">Hospital invoice</option>
-                <option value="partner-agreement">Insurer agreement</option>
-                <option value="package">Connected policy packages</option>
-              </> : account.role === "bankOfficer" ? <>
-                <option value="account">Bank account</option><option value="mandate">EFT mandate</option>
-                <option value="collection">Premium collection</option><option value="premium-payment">Premium payment</option>
-                <option value="premium-adjustment">Premium reversal</option><option value="bank-transfer">Bank transfer</option>
-                <option value="settlement">Authorized claim payout</option><option value="liability">Payment liability</option>
-                <option value="partner-agreement">Insurer agreement</option>
-              </> : <>
-              {account.role === "insurerAdmin" && <option value="partner-agreement">Partner agreement</option>}
-              {account.role === "insurerAdmin" && <option value="hospital-invoice">Hospital invoice</option>}
-              <option value="package">Policy package</option><option value="policy">Policy</option>
-              <option value="claim">Claim</option><option value="evidence">Evidence reference</option><option value="evidence-batch">Evidence Merkle batch</option><option value="evidence-grant">Evidence access grant</option>
-              <option value="verification">Invoice cross-check</option><option value="decision">Auditor decision</option>
-              <option value="review">Claim review round</option><option value="appeal">Claim appeal</option><option value="fraud-assessment">Fraud assessment</option>
-              <option value="settlement">Settlement</option><option value="claim-history">Claim history</option>
-              <option value="oracle-snapshot">Oracle registry snapshot</option><option value="oracle-request">Oracle request</option>
-              <option value="oracle-commitment">Oracle commitment</option><option value="oracle-result">Oracle revealed result</option><option value="oracle-history">Oracle request history</option>
-              <option value="privacy-credential">Privacy credential anchor</option><option value="privacy-presentation">Selective disclosure presentation</option>
-              <option value="account">Bank account</option><option value="bank-transfer">Bank transfer</option><option value="mandate">Debit mandate</option>
-              <option value="premium-payment">Premium payment</option><option value="premium-adjustment">Premium reversal</option><option value="collection">Premium collection</option>
-              <option value="benefit-plan">Benefit plan</option><option value="beneficiaries">Beneficiary designation</option>
-              <option value="benefit-request">Benefit request</option><option value="liability">Liability</option>
-              {(account.role === "insurerAdmin" || account.role === "auditor") && <option value="access">Evidence access log</option>}
-              </>}
-            </select>
-          </label>
-          <label>Asset ID<input spellCheck={false} autoComplete="off" value={assetId} onChange={(event) => setAssetId(event.target.value)} placeholder="claim-1" /></label>
-          <div className="queryActions">
-            <button type="button" className="primary button" disabled={busy || assetType === "access"} onClick={queryAsset}>Find by ID</button>
-            <button type="button" className="secondary button" disabled={busy || assetType === "claim-history" || assetType === "oracle-history"} onClick={listAssets}>List all allowed</button>
-          </div>
         </article>
-
-        {account.role !== "bankOfficer" && account.role !== "hospitalOfficer" && <article className="workCard advancedCard">
-          <span className="kicker">Advanced diagnostics</span>
-          <h2>JSON command console</h2>
-          <p className="cardNote">Use the guided form for normal work. This console remains available for development and contract diagnostics.</p>
-          <details>
-            <summary>Open advanced console</summary>
-            <div className="templateButtons">
-              {templates.map(([label, template]) => (
-                <button type="button" key={label} onClick={() => setCommand(JSON.stringify(template, null, 2))}>{label}</button>
-              ))}
-            </div>
-            <textarea aria-label="Command JSON payload" value={command} onChange={(event) => setCommand(event.target.value)} placeholder="Select a command template" spellCheck={false} />
-            <button type="button" className="primary button" disabled={busy || !command} onClick={submitCommand}>Submit raw command</button>
-          </details>
+        {account.role !== "hospitalOfficer" && account.role !== "bankOfficer" && <article className="recentPanel">
+          <h3>Recently updated claims</h3>
+          {dashboard.recentClaims.length === 0 ? <p className="emptyState">No claims yet.</p> : <div className="recentList">
+            {visible("recent", dashboard.recentClaims).map((claim) => <button type="button" key={claim.id} onClick={() => {
+              if (isAdmin) { setAssetType("claim"); setAssetId(claim.id); goTo("tools", "ledger-tools"); }
+              else goTo("claims");
+            }}>
+              <span><strong>{claim.id}</strong><small>{claim.policyId}</small></span>
+              <StatusBadge status={claim.status} label={claim.status.replaceAll("_", " ")} />
+            </button>)}
+            {showMore("recent", dashboard.recentClaims.length, "claims")}
+          </div>}
         </article>}
+      </div>
+    </>}
+  </section>;
 
-        {account.role === "policyholder" && (
-          <article className="workCard evidenceCard">
-            <span className="kicker">Ciphertext evidence</span>
-            <h2>Encrypt, store, and anchor evidence</h2>
-            <p className="cardNote">Encryption happens in this browser with AES-256-GCM. The passphrase and plaintext never reach the server; only the generated <code>.enc</code> envelope is stored, and Fabric receives integrity hashes.</p>
-            <div className="stepBanner">
-              <span><strong>Step 1:</strong> Encrypt original file in browser</span>
-              <span><strong>Step 2:</strong> Store ciphertext and anchor integrity hashes on Fabric</span>
+  const activityCard = <article className="workCard workCardWide">
+    <div className="cardHeading">
+      <h2>Recent activity</h2>
+      <div className="medicalButtonGroup">
+        {account.role === "insurerAdmin" && <button type="button" className="secondary button" disabled={busy} onClick={synchronizeEvents}>Synchronise events</button>}
+        <button type="button" className="textButton" disabled={busy} onClick={refreshNotifications}>Refresh</button>
+      </div>
+    </div>
+    <p className="cardNote">{eventCheckpoint === "Not synchronized" ? "Events have not been synchronised yet." : `Synchronised to ${eventCheckpoint.toLowerCase()}.`}</p>
+    {notifications.length === 0 ? <p className="emptyState">No recent activity.</p> : <div className="recentList">{visible("activity", notifications, 8).map((item) => (
+      <div className="queueItem" key={item.id}><div><strong>{item.title}</strong><p>{item.assetId || item.message}</p></div><StatusBadge status="BLOCK" label={`Block ${item.blockNumber}`} tone="neutral" /></div>
+    ))}{showMore("activity", notifications.length, "events", 8)}</div>}
+  </article>;
+
+  const communicationsCard = <article className="workCard workCardWide">
+    <div className="cardHeading">
+      <h2>Customer notifications</h2>
+      <button type="button" className="textButton" disabled={busy} onClick={refreshBankCommunications}>Refresh</button>
+    </div>
+    <p className="cardNote">Emails sent to customers for transfers, mandate decisions and payouts.</p>
+    {bankCommunications.length === 0 ? <p className="emptyState">No notifications have been sent yet.</p> : <div className="recentList">{visible("communications", bankCommunications, 8).map((item) => (
+      <div className="queueItem" key={item.id}>
+        <div><strong>{item.title}</strong><p>{item.assetId} · {money(item.amountMinor, item.currency || "BDT")}</p><small>{item.recipient || "Recipient pending"}{item.error ? ` · ${item.error}` : ""}</small></div>
+        <StatusBadge status={item.status} label={item.status} />
+      </div>
+    ))}{showMore("communications", bankCommunications.length, "notifications", 8)}</div>}
+  </article>;
+
+  const reportsCard = <article className="workCard workCardWide">
+    <h2>Portfolio metrics</h2>
+    <p className="cardNote">Figures are calculated from the current ledger state.</p>
+    <div className="evidenceActions">
+      <button type="button" className="primary button" disabled={busy} onClick={refreshResearchSnapshot}>Load metrics</button>
+      <a className="secondary button" href="/research">Open full report</a>
+      <a className="secondary button" download href="/api/research/snapshot?download=1">Download snapshot</a>
+    </div>
+    {researchSnapshot && <div className="metricGrid" style={{ marginTop: 16 }}>
+      <div className="metricCard"><span>Policies / claims</span><strong>{researchSnapshot.portfolio.policies} / {researchSnapshot.portfolio.claims}</strong><small>On the ledger</small></div>
+      <div className="metricCard"><span>Reviews / appeals</span><strong>{researchSnapshot.adjudication.reviewRounds} / {researchSnapshot.adjudication.appeals}</strong><small>Review rounds</small></div>
+      <div className="metricCard"><span>Fraud assessments</span><strong>{researchSnapshot.fraudDecisionSupport.assessments}</strong><small>{researchSnapshot.fraudDecisionSupport.advisoryOnly ? "Advisory only" : "Check boundary"}</small></div>
+      <div className="metricCard"><span>Evidence grants / access</span><strong>{researchSnapshot.evidenceGovernance.grants} / {researchSnapshot.evidenceGovernance.accesses}</strong><small>{researchSnapshot.evidenceGovernance.grantBackedAccesses} by grant</small></div>
+      <div className="metricCard"><span>Credentials / proofs</span><strong>{researchSnapshot.privacyPreservingVerification.credentials} / {researchSnapshot.privacyPreservingVerification.presentations}</strong><small>{researchSnapshot.privacyPreservingVerification.privacyBoundOracleRequests} verification requests</small></div>
+    </div>}
+    {researchSnapshot && <p className="cardNote" style={{ marginTop: 14 }}>Schema {researchSnapshot.provenance.ledgerSchemaVersion} · {researchSnapshot.provenance.indexedEvents} events · snapshot <code>{researchSnapshot.reproducibilityHash.slice(0, 16)}…</code></p>}
+  </article>;
+
+  const oracleCard = <article className="workCard workCardWide">
+    <div className="cardHeading">
+      <h2>Oracle verification</h2>
+      <button type="button" className="primary button" disabled={busy} onClick={refreshOracleOperations}>Refresh status</button>
+    </div>
+    <p className="cardNote">Three independent Oracle workers check each claim against the Hospital record. Two matching results are required; anything else goes to auditor review.</p>
+    {oracleOperations && <>
+      <div className="metricGrid" style={{ marginTop: 16 }}>
+        <div className="metricCard"><span>Requests / pending</span><strong>{oracleOperations.metrics.requests} / {oracleOperations.metrics.pending}</strong><small>Verification requests</small></div>
+        <div className="metricCard"><span>Agreements</span><strong>{oracleOperations.metrics.agreements}</strong><small>Matching results</small></div>
+        <div className="metricCard"><span>Conflicts / timeouts</span><strong>{oracleOperations.metrics.conflicts} / {oracleOperations.metrics.timeouts}</strong><small>Sent to auditors</small></div>
+      </div>
+      <div className="queueList" style={{ marginTop: 14 }}>{oracleOperations.workers.map((worker) => <div className="queueItem" key={worker.oracleId}>
+        <div><div className="queueTitle"><strong>{worker.label} · {worker.oracleId}</strong><StatusBadge status={worker.status} /></div><p>{worker.registrySource} · snapshot {worker.registrySnapshotId || "unavailable"} v{worker.registryVersion} · model {worker.modelVersion || "unavailable"}</p>{worker.registryDatasetId && <small>{worker.registryDatasetId}@{worker.registryDatasetVersion} · transform {worker.registryTransformationVersion} · input {worker.registryInputSha256?.slice(0, 12)}…</small>}<small>Block {worker.lastProcessedBlock ?? "—"} · request {worker.lastProcessedRequestId ?? "—"} · {worker.lastProcessingLatencyMs ?? "—"} ms</small>{worker.lastError && <p className="evidenceWarning">{worker.lastError}</p>}</div>
+        <span>{worker.counts.commitments} commit / {worker.counts.reveals} reveal</span>
+      </div>)}</div>
+    </>}
+  </article>;
+
+  const accountCards = dashboard?.accountCards && dashboard.accountCards.length > 0 ? <section className="workCardWide" aria-labelledby="bank-accounts-heading">
+    <h2 id="bank-accounts-heading" className="sectionSubheading">Accounts held at this Bank</h2>
+    <div className="bankAccountGrid">
+      {visible("accounts", dashboard.accountCards).map((bankAccount) => <article className="bankAccountCard" key={bankAccount.id}>
+        <span>{bankAccount.accountType === "INSURER" ? "Corporate settlement account" : bankAccount.label || "Customer account"}</span>
+        <strong>{bankAccount.maskedAccount || "**** **** ****"}</strong>
+        <b>{money(bankAccount.balanceMinor)}</b>
+        <small>{bankAccount.id} · {bankAccount.status}</small>
+      </article>)}
+    </div>
+    {showMore("accounts", dashboard.accountCards.length, "accounts")}
+  </section> : null;
+
+  const savedActionBlock = <>
+    {savedSnapshot && !savedAction && <p className="formError workCardWide" role="alert">Saved action storage is unavailable or invalid. Nothing new will be sent until browser storage is usable.</p>}
+    {savedAction && <article className="workCard workCardWide savedActionCard" aria-label="Saved workflow action">
+      <div className="reviewSummaryRow">
+        <h2>Recover saved action</h2>
+        <StatusBadge status={savedAction.state ?? "PENDING"} />
+      </div>
+      <p>{workflowFormDefinitions[savedAction.command.operation].label} · {savedAction.state ?? "Outcome unresolved"}. Check this action before submitting another one.</p>
+      <div className="evidenceActions">
+        <button type="button" className="primary button" disabled={busy} onClick={() => submitWorkflow(savedAction.command, true)}>Check saved action</button>
+        {["INVALID", "REJECTED", "NOT_SUBMITTED"].includes(savedAction.state ?? "") && <button type="button" className="secondary button" disabled={busy} onClick={() => {
+          if (!account) return;
+          localStorage.removeItem(savedActionKey(deployment, account.id)); notifySavedAction();
+          prepare({ command: savedAction.command, revision: Date.now() });
+          setOutput("The failed action was cleared. Review it before trying again.");
+        }}>Review failed action for a new attempt</button>}
+      </div>
+    </article>}
+  </>;
+
+  const guidedForm = section && formOperations && formOperations.length > 0 ? <GuidedWorkflowForm
+    medical={medicalChannel}
+    key={`${account.role}-${section.id}-${preparedWorkflow?.revision ?? 0}`}
+    role={account.role}
+    busy={busy}
+    allowed={formOperations}
+    title={section.formTitle}
+    prepared={preparedSection === section.id ? preparedWorkflow : null}
+    onSubmit={submitWorkflow}
+  /> : null;
+
+  const manualPremiumCard = <article className="workCard evidenceCard workCardWide" id="manual-premium">
+    <h2>Pay with one-time authorization</h2>
+    <p className="cardNote">A one-time code is emailed to you for these exact payment details. Changing any detail needs a new code.</p>
+    <div className="evidenceFields">
+      <label>Policy ID<input spellCheck={false} autoComplete="off" value={manualPayment.policyId} onChange={(event) => updateManualPayment("policyId", event.target.value)} /></label>
+      <label>Customer account ID<input spellCheck={false} autoComplete="off" value={manualPayment.sourceAccountId} onChange={(event) => updateManualPayment("sourceAccountId", event.target.value)} /></label>
+      <label>Insurer account ID<input spellCheck={false} autoComplete="off" value={manualPayment.destinationAccountId} onChange={(event) => updateManualPayment("destinationAccountId", event.target.value)} /></label>
+      <label>Transfer ID<input spellCheck={false} autoComplete="off" value={manualPayment.transferId} onChange={(event) => updateManualPayment("transferId", event.target.value)} /></label>
+      <label>Payment ID<input spellCheck={false} autoComplete="off" value={manualPayment.paymentId} onChange={(event) => updateManualPayment("paymentId", event.target.value)} /></label>
+      <label>Period starts<input type="date" value={manualPayment.periodStartDate} onChange={(event) => updateManualPayment("periodStartDate", event.target.value)} /></label>
+      <label>Period ends<input type="date" value={manualPayment.periodEndDate} onChange={(event) => updateManualPayment("periodEndDate", event.target.value)} /></label>
+      <label>Premium (BDT)<input inputMode="decimal" value={manualPayment.amountBdt} onChange={(event) => updateManualPayment("amountBdt", event.target.value)} /></label>
+      <label>External bank receipt<input spellCheck={false} autoComplete="off" value={manualPayment.externalReference} onChange={(event) => updateManualPayment("externalReference", event.target.value)} /></label>
+    </div>
+    <div className="otpSection">
+      <h3>Confirm one-time authorization code</h3>
+      <div className="evidenceFields">
+        <label>Six-digit OTP<input inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={manualPayment.otp} onChange={(event) => updateManualPayment("otp", event.target.value.replace(/\D/g, ""))} /></label>
+      </div>
+      {manualPayment.demoCode && <p className="evidenceWarning">Local demo delivery code: <strong>{manualPayment.demoCode}</strong></p>}
+      <div className="evidenceActions" style={{ marginTop: 14 }}>
+        <button type="button" className="secondary button" disabled={busy || !manualPayment.policyId || !manualPayment.sourceAccountId} onClick={requestPremiumOtp}>Email OTP</button>
+        <button type="button" className="primary button" disabled={busy || !manualPayment.challengeId || manualPayment.otp.length !== 6} onClick={submitManualPremium}>Authorize premium</button>
+        <button type="button" className="secondary button" disabled={busy} onClick={recoverManualPremium}>Recover saved payment</button>
+      </div>
+    </div>
+  </article>;
+
+  const statementCard = <article className="workCard workCardWide">
+    <h2>Export coverage and payment history</h2>
+    <p className="cardNote">Premiums, mandates, collections, claims and benefits for one of your policies.</p>
+    <div className="auditExport">
+      <label>Policy ID<input spellCheck={false} autoComplete="off" value={statementPolicyId} onChange={(event) => setStatementPolicyId(event.target.value)} placeholder="policy-1" /></label>
+      <a aria-disabled={!statementPolicyId.trim()} tabIndex={statementPolicyId.trim() ? undefined : -1}
+        className={`primary button${statementPolicyId.trim() ? "" : " disabledLink"}`} download
+        href={statementPolicyId.trim() ? `/api/policies/${encodeURIComponent(statementPolicyId.trim())}/statement` : undefined}>Download statement JSON</a>
+    </div>
+  </article>;
+
+  const lookupCard = <article className="workCard" id="ledger-tools">
+    <h2>Find ledger asset</h2>
+    <label>Asset type
+      <select value={assetType} onChange={(event) => setAssetType(event.target.value as AssetType)}>
+        {account.role === "hospitalOfficer" ? <>
+          <option value="hospital-invoice">Hospital invoice</option>
+          <option value="partner-agreement">Insurer agreement</option>
+          <option value="package">Connected policy packages</option>
+        </> : account.role === "bankOfficer" ? <>
+          <option value="account">Bank account</option><option value="mandate">EFT mandate</option>
+          <option value="collection">Premium collection</option><option value="premium-payment">Premium payment</option>
+          <option value="premium-adjustment">Premium reversal</option><option value="bank-transfer">Bank transfer</option>
+          <option value="settlement">Authorized claim payout</option><option value="liability">Payment liability</option>
+          <option value="partner-agreement">Insurer agreement</option>
+        </> : <>
+          {account.role === "insurerAdmin" && <option value="partner-agreement">Partner agreement</option>}
+          {account.role === "insurerAdmin" && <option value="hospital-invoice">Hospital invoice</option>}
+          <option value="package">Policy package</option><option value="policy">Policy</option>
+          <option value="claim">Claim</option><option value="evidence">Evidence reference</option><option value="evidence-batch">Evidence Merkle batch</option><option value="evidence-grant">Evidence access grant</option>
+          <option value="verification">Invoice cross-check</option><option value="decision">Auditor decision</option>
+          <option value="review">Claim review round</option><option value="appeal">Claim appeal</option><option value="fraud-assessment">Fraud assessment</option>
+          <option value="settlement">Settlement</option><option value="claim-history">Claim history</option>
+          <option value="oracle-snapshot">Oracle registry snapshot</option><option value="oracle-request">Oracle request</option>
+          <option value="oracle-commitment">Oracle commitment</option><option value="oracle-result">Oracle revealed result</option><option value="oracle-history">Oracle request history</option>
+          <option value="privacy-credential">Privacy credential anchor</option><option value="privacy-presentation">Selective disclosure presentation</option>
+          <option value="account">Bank account</option><option value="bank-transfer">Bank transfer</option><option value="mandate">Debit mandate</option>
+          <option value="premium-payment">Premium payment</option><option value="premium-adjustment">Premium reversal</option><option value="collection">Premium collection</option>
+          <option value="benefit-plan">Benefit plan</option><option value="beneficiaries">Beneficiary designation</option>
+          <option value="benefit-request">Benefit request</option><option value="liability">Liability</option>
+          {isAdmin && <option value="access">Evidence access log</option>}
+        </>}
+      </select>
+    </label>
+    <label>Asset ID<input spellCheck={false} autoComplete="off" value={assetId} onChange={(event) => setAssetId(event.target.value)} placeholder="claim-1" /></label>
+    <div className="queryActions">
+      <button type="button" className="primary button" disabled={busy || assetType === "access"} onClick={queryAsset}>Find by ID</button>
+      <button type="button" className="secondary button" disabled={busy || assetType === "claim-history" || assetType === "oracle-history"} onClick={listAssets}>List all allowed</button>
+    </div>
+  </article>;
+
+  const connectionCard = <article className="workCard">
+    <h2>Connection details</h2>
+    <dl className="connectionDetails">
+      <dt>Organisation</dt><dd>{account.organization}</dd>
+      <dt>Role</dt><dd>{roleLabels[account.role]}</dd>
+      <dt>Channel</dt><dd><code>{deployment.split("/")[0]}</code></dd>
+      <dt>Chaincode</dt><dd><code>{deployment.split("/")[1]}</code></dd>
+    </dl>
+  </article>;
+
+  const consoleCard = <article className="workCard workCardWide advancedCard">
+    <h2>JSON command console</h2>
+    <p className="cardNote">Submit a raw ledger command. The forms on the other pages cover day-to-day work.</p>
+    <details>
+      <summary>Open console</summary>
+      <div className="templateButtons">
+        {templates.map(([label, template]) => <button type="button" key={label} onClick={() => setCommand(JSON.stringify(template, null, 2))}>{label}</button>)}
+      </div>
+      <textarea aria-label="Command JSON payload" value={command} onChange={(event) => setCommand(event.target.value)} placeholder="Select a command template" spellCheck={false} />
+      <button type="button" className="primary button" disabled={busy || !command} onClick={submitCommand}>Submit raw command</button>
+    </details>
+  </article>;
+
+  const uploadCard = <article className="workCard evidenceCard workCardWide">
+    <h2>Encrypt, store, and anchor evidence</h2>
+    <p className="cardNote">Files are encrypted in your browser before upload. Only the encrypted file is stored, and the ledger records its fingerprint.</p>
+    <div className="evidenceFields">
+      <label>Claim ID<input spellCheck={false} autoComplete="off" disabled={busy || encrypting || uploadPending} value={evidenceClaimId} onChange={(event) => { setEvidenceClaimId(event.target.value); setCiphertext(null); setContentHash(""); setRecoveryDownload(null); setUploadNotice(null); }} placeholder="claim-1" /></label>
+      <label>Evidence ID<input spellCheck={false} autoComplete="off" disabled={busy || encrypting || uploadPending} value={evidenceId} onChange={(event) => { setEvidenceId(event.target.value); setCiphertext(null); setContentHash(""); setRecoveryDownload(null); setUploadNotice(null); }} placeholder="evidence-1" /></label>
+      <label>Document type<input spellCheck={false} autoComplete="off" disabled={busy || encrypting || uploadPending} value={documentType} onChange={(event) => { setDocumentType(event.target.value); setUploadNotice(null); }} /></label>
+      <label>Original file<input disabled={busy || encrypting || uploadPending} type="file" onChange={(event) => { setPlaintextEvidence(event.target.files?.[0] ?? null); setCiphertext(null); setContentHash(""); setRecoveryDownload(null); setUploadNotice(null); }} /></label>
+      <label>Evidence passphrase<input disabled={busy || encrypting} type="password" autoComplete="new-password" value={evidencePassphrase} onChange={(event) => setEvidencePassphrase(event.target.value)} placeholder="At least 12 characters" /></label>
+      <label>Confirm passphrase<input disabled={busy || encrypting} type="password" autoComplete="new-password" value={evidencePassphraseConfirmation} onChange={(event) => setEvidencePassphraseConfirmation(event.target.value)} /></label>
+      <label>Separate backup password (optional)<input disabled={busy || encrypting} type="password" autoComplete="new-password" value={backupPassword} onChange={(event) => setBackupPassword(event.target.value)} placeholder="Protect a downloadable recovery key" /></label>
+      <label>Original content SHA-256<input className="monoWrap" value={contentHash} readOnly placeholder="Calculated after encryption" /></label>
+      <div className="encryptionStatus">
+        <strong>{ciphertext ? "Ciphertext ready" : "Not encrypted yet"}</strong>
+        <span>{ciphertext ? `${ciphertext.name} · ${ciphertext.size} bytes` : "Choose a file and protect it with a passphrase."}</span>
+      </div>
+    </div>
+    <div className="evidenceActions">
+      <button type="button" className="secondary button" disabled={busy || encrypting || uploadPending} onClick={encryptEvidence}>{encrypting ? "Encrypting…" : "Encrypt in browser"}</button>
+      <button type="button" className="primary button" disabled={busy || encrypting || !ciphertext} onClick={uploadEvidence}>{uploadPending ? "Retry original ciphertext" : "Store ciphertext and record reference"}</button>
+      {recoveryDownload && <a className="secondary button" href={recoveryDownload.url} download={recoveryDownload.name}>Download recovery key</a>}
+    </div>
+    {uploadPending && uploadNotice && <div className="pendingFreezeBanner" role="status">
+      <strong>Upload awaiting retry. The claim and evidence fields are locked until it completes.</strong>
+      <p>{uploadNotice.message}</p>
+    </div>}
+    {!uploadPending && uploadNotice && <p className="evidenceWarning" role="status">{uploadNotice.message}</p>}
+    <p className="cardNote" style={{ marginTop: 16 }}>{medicalReview
+      ? "For a clarification or appeal, use the document type shown on the case."
+      : "An appeal accepts only the APPEAL_DOCUMENT recorded with it."}</p>
+    <p className="evidenceWarning">Keep the passphrase, or download the recovery key and remember its backup password. Without either, the file cannot be recovered.</p>
+  </article>;
+
+  const retrieveCard = <article className="workCard evidenceCard workCardWide">
+    <h2 id="retrieve-evidence">Retrieve and decrypt evidence</h2>
+    <p className="cardNote">Access is checked and recorded on the ledger. The file is decrypted only in this browser.</p>
+    <div className="evidenceFields">
+      <label>Evidence ID<input spellCheck={false} autoComplete="off" disabled={retrieving} value={retrievalEvidenceId} onChange={(event) => { setRetrievalEvidenceId(event.target.value); setDecryptedEvidence(null); }} placeholder="evidence-1" /></label>
+      <label>Grant ID (optional)<input spellCheck={false} autoComplete="off" disabled={retrieving} value={retrievalGrantId} onChange={(event) => { setRetrievalGrantId(event.target.value); setDecryptedEvidence(null); }} placeholder="grant-1" /></label>
+      <label>Evidence passphrase<input type="password" autoComplete="current-password" value={retrievalPassphrase} onChange={(event) => setRetrievalPassphrase(event.target.value)} /></label>
+      <label>Recovery key file<input type="file" accept=".bifkey,application/json" onChange={(event) => setRecoveryFile(event.target.files?.[0] ?? null)} /></label>
+      <label>Backup password<input type="password" autoComplete="current-password" value={restorePassword} onChange={(event) => setRestorePassword(event.target.value)} /></label>
+    </div>
+    <div className="evidenceActions">
+      <button type="button" className="primary button" disabled={busy || retrieving} onClick={retrieveEvidence}>{retrieving ? "Retrieving…" : "Retrieve and decrypt"}</button>
+      <button type="button" className="secondary button" disabled={busy || retrieving || !recoveryFile} onClick={restoreEvidenceKey}>Restore recovery key</button>
+      {decryptedEvidence && <a className="secondary button" download={decryptedEvidence.name} href={decryptedEvidence.url}>Download verified plaintext</a>}
+      {medicalReview && decryptedEvidence?.reviewId && <button type="button" className="secondary button" disabled={busy} onClick={confirmMedicalReadiness}>Confirm decryption for this review</button>}
+    </div>
+    {medicalReview && decryptedEvidence && (account.role === "policyholder" || account.role === "auditor") &&
+      <MedicalOCR key={decryptedEvidence.accessId} file={decryptedEvidence.blob} evidenceId={decryptedEvidence.id} accessId={decryptedEvidence.accessId} />}
+  </article>;
+
+  const dossierCard = <article className="workCard evidenceCard">
+    <h2>Export claim dossier</h2>
+    <p className="cardNote">Claim history, verification, evidence access, reviews and settlement in one file.</p>
+    <div className="auditExport">
+      <label>Claim ID<input spellCheck={false} autoComplete="off" value={auditClaimId} onChange={(event) => setAuditClaimId(event.target.value)} placeholder="claim-1" /></label>
+      <a aria-disabled={!auditClaimId.trim()} tabIndex={auditClaimId.trim() ? undefined : -1}
+        className={`primary button${auditClaimId.trim() ? "" : " disabledLink"}`} download
+        href={auditClaimId.trim() ? `/api/audit/claims/${encodeURIComponent(auditClaimId.trim())}` : undefined}>Download audit JSON</a>
+    </div>
+  </article>;
+
+  const proofCard = <article className="workCard evidenceCard">
+    <h2>Verify anchored evidence</h2>
+    <p className="cardNote">Checks that a document belongs to a published evidence batch.</p>
+    <div className="evidenceFields">
+      <label>Evidence ID<input spellCheck={false} autoComplete="off" value={proofEvidenceId} onChange={(event) => setProofEvidenceId(event.target.value)} placeholder="evidence-1001" /></label>
+      <label>Merkle batch ID<input spellCheck={false} autoComplete="off" value={proofBatchId} onChange={(event) => setProofBatchId(event.target.value)} placeholder="evidence-batch-1001" /></label>
+    </div>
+    <div className="evidenceActions">
+      <button type="button" className="primary button" disabled={busy || !proofEvidenceId.trim() || !proofBatchId.trim()} onClick={verifyEvidenceProof}>Verify proof</button>
+      <a aria-disabled={!proofEvidenceId.trim() || !proofBatchId.trim()} tabIndex={proofEvidenceId.trim() && proofBatchId.trim() ? undefined : -1}
+        className={`secondary button${proofEvidenceId.trim() && proofBatchId.trim() ? "" : " disabledLink"}`} download
+        href={proofEvidenceId.trim() && proofBatchId.trim() ? `/api/evidence/${encodeURIComponent(proofEvidenceId.trim())}/proof?batchId=${encodeURIComponent(proofBatchId.trim())}&download=1` : undefined}>Download proof JSON</a>
+    </div>
+  </article>;
+
+  const reviewCard = medicalReview && account.role !== "hospitalOfficer" && account.role !== "bankOfficer" ? <MedicalReview role={account.role} investigationEnabled={investigationEnabled} onEvidence={(id, grant) => {
+    setRetrievalEvidenceId(id); setRetrievalGrantId(grant); setDecryptedEvidence(null);
+    goTo(account.role === "policyholder" ? "documents" : account.role === "auditor" ? "reviews" : "evidence", "retrieve-evidence");
+  }} /> : null;
+  const intakeCard = medicalChannel && (account.role === "insurerAdmin" || account.role === "policyholder")
+    ? <MedicalIntake insurer={account.role === "insurerAdmin"} customerMatching={onboardingEnabled && account.role === "insurerAdmin"} onAssociation={prepare} /> : null;
+
+  let content: React.ReactNode = null;
+  if (section) switch (`${account.role}:${section.id}`) {
+    case "policyholder:overview":
+      content = <>{customerAccount && <CustomerPortal key={account.id} memberId={customerAccount} view="card" />}{dashboardBlock}</>; break;
+    case "insurerAdmin:overview": case "auditor:overview": case "hospitalOfficer:overview": case "bankOfficer:overview":
+      content = dashboardBlock; break;
+    case "insurerAdmin:claims":
+      content = <div className="workGrid">{reviewCard}{guidedForm}{dossierCard}</div>; break;
+    case "auditor:reviews":
+      content = <div className="workGrid">{reviewCard}{retrieveCard}{guidedForm}{dossierCard}</div>; break;
+    case "insurerAdmin:customers":
+      content = <div className="workGrid">{onboardingEnabled && <CustomerOnboardingQueue />}{intakeCard}{guidedForm}</div>; break;
+    case "insurerAdmin:products":
+      content = <div className="workGrid">{guidedForm}</div>; break;
+    case "insurerAdmin:evidence": case "auditor:evidence":
+      content = <div className="workGrid">{retrieveCard}{proofCard}{guidedForm}</div>; break;
+    case "policyholder:documents":
+      content = <div className="workGrid">{uploadCard}{retrieveCard}{proofCard}{guidedForm}</div>; break;
+    case "insurerAdmin:partners":
+      content = <div className="workGrid">{devLite && <MedicalRegistryControls role="insurerAdmin" />}{guidedForm}</div>; break;
+    case "insurerAdmin:premiums":
+      content = <div className="workGrid"><PremiumOperations />{guidedForm}</div>; break;
+    case "insurerAdmin:verification": case "auditor:verification":
+      content = <div className="workGrid">{oracleCard}{guidedForm}</div>; break;
+    case "insurerAdmin:reports": case "auditor:reports":
+      content = <div className="workGrid">{reportsCard}</div>; break;
+    case "insurerAdmin:tools": case "auditor:tools":
+      content = <div className="workGrid">{lookupCard}{connectionCard}{consoleCard}</div>; break;
+    case "hospitalOfficer:records": case "bankOfficer:records":
+      content = <div className="workGrid">{lookupCard}{connectionCard}</div>; break;
+    case "policyholder:policies":
+      content = <div className="workGrid">{guidedForm}{statementCard}</div>; break;
+    case "policyholder:payments":
+      content = <div className="workGrid"><PremiumCenter onPreparePayment={(payment) => {
+        setManualPayment((current) => ({ ...current, ...payment, challengeId: "", otp: "", demoCode: "" }));
+        document.getElementById("manual-premium")?.scrollIntoView({ behavior: "smooth" });
+      }} />{manualPremiumCard}{guidedForm}</div>; break;
+    case "policyholder:claims":
+      content = <div className="workGrid">{intakeCard}{reviewCard}{guidedForm}</div>; break;
+    case "policyholder:profile":
+      content = customerAccount ? <CustomerPortal key={account.id} memberId={customerAccount} view="profile" />
+        : <p className="emptyState">A profile is available to registered customers.</p>; break;
+    case "hospitalOfficer:intake":
+      content = <div className="workGrid">{guidedForm}</div>; break;
+    case "hospitalOfficer:registry":
+      content = <div className="workGrid"><MedicalRegistryControls role="hospitalOfficer" /></div>; break;
+    case "bankOfficer:accounts":
+      content = <div className="workGrid">{accountCards}<BankDesk show="links" />{guidedForm}</div>; break;
+    case "bankOfficer:collections":
+      content = <div className="workGrid"><BankDesk show="collections" />{guidedForm}</div>; break;
+    case "bankOfficer:payouts":
+      content = <div className="workGrid">{devLite && <MedicalSettlementTimeline />}{guidedForm}</div>; break;
+    case "bankOfficer:notifications":
+      content = <div className="workGrid">{communicationsCard}{activityCard}</div>; break;
+    default:
+      content = section.id === "activity" ? <div className="workGrid">{activityCard}</div> : null;
+  }
+
+  return (
+    <div className={`workspaceShell workspace-${account.role}`}>
+      <aside className="workspaceSidebar" aria-label="Workspace">
+        <div className="sidebarIdentity">
+          <span className="sidebarAvatar" aria-hidden="true">{initials || "BI"}</span>
+          <div><strong>{account.displayName}</strong><small>{identityLine}</small></div>
+        </div>
+        <nav className="sidebarNav" aria-label="Workspace pages">
+          <ul>
+            {sections.map((item) => <li key={item.id}>
+              <Link href={sectionHref(workspace, item.id)} aria-current={section?.id === item.id ? "page" : undefined} className="sidebarLink">
+                <WorkspaceIconGlyph name={item.icon} />
+                <span>{item.label}</span>
+                {item.id === overviewSection && queueCount > 0 && <span className="sidebarBadge" aria-label={`${queueCount} waiting`}>{queueCount}</span>}
+              </Link>
+            </li>)}
+          </ul>
+        </nav>
+        <div className="sidebarFooter">
+          <button type="button" className="secondary button" disabled={busy} onClick={logout}>Sign out</button>
+        </div>
+      </aside>
+
+      <section className="workspaceContent" aria-labelledby={section ? "workspace-page-title" : undefined}>
+        {section ? <>
+          <header className="pageHeader">
+            <div>
+              <h1 id="workspace-page-title" className="pageTitle">{section.title}</h1>
+              <p>{section.description}</p>
             </div>
-            <div className="evidenceFields">
-              <label>Claim ID<input spellCheck={false} autoComplete="off" disabled={busy || encrypting || uploadPending} value={evidenceClaimId} onChange={(event) => { setEvidenceClaimId(event.target.value); setCiphertext(null); setContentHash(""); setRecoveryDownload(null); setUploadNotice(null); }} placeholder="claim-1" /></label>
-              <label>Evidence ID<input spellCheck={false} autoComplete="off" disabled={busy || encrypting || uploadPending} value={evidenceId} onChange={(event) => { setEvidenceId(event.target.value); setCiphertext(null); setContentHash(""); setRecoveryDownload(null); setUploadNotice(null); }} placeholder="evidence-1" /></label>
-              <label>Document type<input spellCheck={false} autoComplete="off" disabled={busy || encrypting || uploadPending} value={documentType} onChange={(event) => { setDocumentType(event.target.value); setUploadNotice(null); }} /></label>
-              <label>Original file<input disabled={busy || encrypting || uploadPending} type="file" onChange={(event) => { setPlaintextEvidence(event.target.files?.[0] ?? null); setCiphertext(null); setContentHash(""); setRecoveryDownload(null); setUploadNotice(null); }} /></label>
-              <label>Evidence passphrase<input disabled={busy || encrypting} type="password" autoComplete="new-password" value={evidencePassphrase} onChange={(event) => setEvidencePassphrase(event.target.value)} placeholder="At least 12 characters" /></label>
-              <label>Confirm passphrase<input disabled={busy || encrypting} type="password" autoComplete="new-password" value={evidencePassphraseConfirmation} onChange={(event) => setEvidencePassphraseConfirmation(event.target.value)} /></label>
-              <label>Separate backup password (optional)<input disabled={busy || encrypting} type="password" autoComplete="new-password" value={backupPassword} onChange={(event) => setBackupPassword(event.target.value)} placeholder="Protect a downloadable recovery key" /></label>
-              <label>Original content SHA-256<input className="monoWrap" value={contentHash} readOnly placeholder="Calculated after encryption" /></label>
-              <div className="encryptionStatus">
-                <strong>{ciphertext ? "Ciphertext ready" : "Not encrypted yet"}</strong>
-                <span>{ciphertext ? `${ciphertext.name} · ${ciphertext.size} bytes` : "Choose a file and protect it with a passphrase."}</span>
+            {busy && <span className="pageBusy" role="status">Working…</span>}
+          </header>
+          {(savedAction || savedSnapshot) && <div className="workGrid savedActionRow">{savedActionBlock}</div>}
+          {content}
+          {output !== readyOutput && <section className="resultPanel" aria-label="Last result">
+            <div className="resultPanelHeading">
+              <h2>Last result</h2>
+              <div className="evidenceActions" style={{ alignItems: "center" }}>
+                {gatewaySummary?.status && <StatusBadge status={gatewaySummary.status} />}
+                <span role="status" className="copyStatus">{copiedOutput ? "Copied" : ""}</span>
+                <button type="button" className="textButton" onClick={copyGatewayOutput}>Copy</button>
+                <button type="button" className="textButton" onClick={() => setOutput(readyOutput)}>Dismiss</button>
               </div>
             </div>
-            <div className="evidenceActions">
-              <button type="button" className="secondary button" disabled={busy || encrypting || uploadPending} onClick={encryptEvidence}>{encrypting ? "Encrypting…" : "Encrypt in browser"}</button>
-              <button type="button" className="primary button" disabled={busy || encrypting || !ciphertext} onClick={uploadEvidence}>{uploadPending ? "Retry original ciphertext" : "Store ciphertext and record reference"}</button>
-              {recoveryDownload && <a className="secondary button" href={recoveryDownload.url} download={recoveryDownload.name}>Download recovery key</a>}
-            </div>
-            {uploadPending && uploadNotice && (
-              <div className="pendingFreezeBanner" role="status">
-                <strong>Ciphertext upload is awaiting retry — identity fields locked to prevent digest mismatch</strong>
-                <p>{uploadNotice.message}</p>
-              </div>
-            )}
-            {!uploadPending && uploadNotice && <p className="evidenceWarning" role="status">{uploadNotice.message}</p>}
-            <p className="cardNote" style={{ marginTop: 16 }}>{medicalReview
-              ? "For a clarification or appeal, use the document type shown on the case and upload the exact file committed there."
-              : "After rejection, the appeal accepts only APPEAL_DOCUMENT matching its committed evidence hash. Add supported optional documents with the initial claim."}</p>
-            <p className="evidenceWarning">Keep the evidence passphrase, or download its recovery key and remember the separate backup password. Losing both paths makes the ciphertext unrecoverable. The server cannot restore either secret.</p>
-          </article>
-        )}
-
-        {account.role !== "bankOfficer" && account.role !== "hospitalOfficer" && (
-          <article className="workCard evidenceCard">
-            <span className="kicker">Authorized evidence access</span>
-            <h2 id="retrieve-evidence">Retrieve and decrypt evidence</h2>
-            <p className="cardNote">The server validates your organization and the claim state, records this access on Fabric, and returns ciphertext. Decryption and integrity verification happen only in this browser.</p>
-            <div className="evidenceFields">
-              <label>Evidence ID<input spellCheck={false} autoComplete="off" disabled={retrieving} value={retrievalEvidenceId} onChange={(event) => { setRetrievalEvidenceId(event.target.value); setDecryptedEvidence(null); }} placeholder="evidence-1" /></label>
-              <label>Grant ID (optional)<input spellCheck={false} autoComplete="off" disabled={retrieving} value={retrievalGrantId} onChange={(event) => { setRetrievalGrantId(event.target.value); setDecryptedEvidence(null); }} placeholder="grant-1" /></label>
-              <label>Evidence passphrase<input type="password" autoComplete="current-password" value={retrievalPassphrase} onChange={(event) => setRetrievalPassphrase(event.target.value)} /></label>
-              <label>Recovery key file<input type="file" accept=".bifkey,application/json" onChange={(event) => setRecoveryFile(event.target.files?.[0] ?? null)} /></label>
-              <label>Backup password<input type="password" autoComplete="current-password" value={restorePassword} onChange={(event) => setRestorePassword(event.target.value)} /></label>
-            </div>
-            <div className="evidenceActions">
-              <button type="button" className="primary button" disabled={busy || retrieving} onClick={retrieveEvidence}>{retrieving ? "Retrieving…" : "Retrieve and decrypt"}</button>
-              <button type="button" className="secondary button" disabled={busy || retrieving || !recoveryFile} onClick={restoreEvidenceKey}>Restore recovery key</button>
-              {decryptedEvidence && <a className="secondary button" download={decryptedEvidence.name} href={decryptedEvidence.url}>Download verified plaintext</a>}
-              {medicalReview && decryptedEvidence?.reviewId && <button type="button" className="secondary button" disabled={busy} onClick={confirmMedicalReadiness}>Confirm decryption for this review</button>}
-            </div>
-            {medicalReview && decryptedEvidence && (account.role === "policyholder" || account.role === "auditor") &&
-              <MedicalOCR key={decryptedEvidence.accessId} file={decryptedEvidence.blob} evidenceId={decryptedEvidence.id} accessId={decryptedEvidence.accessId} />}
-          </article>
-        )}
-
-        {(account.role === "insurerAdmin" || account.role === "auditor") && (
-          <article className="workCard evidenceCard">
-            <span className="kicker">Portable audit artifact</span>
-            <h2>Export claim dossier</h2>
-            <p className="cardNote">Download claim history, Oracle provenance, evidence access, review and appeal records, and settlement as one JSON record.</p>
-            <div className="auditExport">
-              <label>Claim ID<input spellCheck={false} autoComplete="off" value={auditClaimId} onChange={(event) => setAuditClaimId(event.target.value)} placeholder="claim-1" /></label>
-              <a
-                aria-disabled={!auditClaimId.trim()}
-                tabIndex={auditClaimId.trim() ? undefined : -1}
-                className={`primary button${auditClaimId.trim() ? "" : " disabledLink"}`}
-                download
-                href={auditClaimId.trim() ? `/api/audit/claims/${encodeURIComponent(auditClaimId.trim())}` : undefined}
-              >Download audit JSON</a>
-            </div>
-          </article>
-        )}
-
-        {account.role !== "bankOfficer" && account.role !== "hospitalOfficer" && (
-          <article className="workCard evidenceCard">
-            <span className="kicker">Merkle integrity proof</span>
-            <h2>Verify anchored evidence</h2>
-            <p className="cardNote">Reconstruct an evidence leaf from its Fabric reference, apply the inclusion path, and compare the computed root with the insurer-published batch root.</p>
-            <div className="evidenceFields">
-              <label>Evidence ID<input spellCheck={false} autoComplete="off" value={proofEvidenceId} onChange={(event) => setProofEvidenceId(event.target.value)} placeholder="evidence-1001" /></label>
-              <label>Merkle batch ID<input spellCheck={false} autoComplete="off" value={proofBatchId} onChange={(event) => setProofBatchId(event.target.value)} placeholder="evidence-batch-1001" /></label>
-            </div>
-            <div className="evidenceActions">
-              <button type="button" className="primary button" disabled={busy || !proofEvidenceId.trim() || !proofBatchId.trim()} onClick={verifyEvidenceProof}>Verify proof</button>
-              <a
-                aria-disabled={!proofEvidenceId.trim() || !proofBatchId.trim()}
-                tabIndex={proofEvidenceId.trim() && proofBatchId.trim() ? undefined : -1}
-                className={`secondary button${proofEvidenceId.trim() && proofBatchId.trim() ? "" : " disabledLink"}`}
-                download
-                href={proofEvidenceId.trim() && proofBatchId.trim() ? `/api/evidence/${encodeURIComponent(proofEvidenceId.trim())}/proof?batchId=${encodeURIComponent(proofBatchId.trim())}&download=1` : undefined}
-              >Download proof JSON</a>
-            </div>
-          </article>
-        )}
-      </div>
-
-      <div className="consoleToolbar" id="gateway-proof">
-        <div className="resultHeading" style={{ margin: 0, gap: 12 }}>
-          <span className="kicker">Gateway response</span>
-          <span>{busy ? "Working…" : "Ready"}</span>
-        </div>
-        <div className="evidenceActions" style={{ alignItems: "center" }}>
-          <span role="status" style={{ fontSize: 12, color: "var(--text-muted)" }}>{copiedOutput ? "Copied" : ""}</span>
-          <button type="button" className="secondary button" onClick={copyGatewayOutput} disabled={!output}>Copy JSON</button>
-        </div>
-      </div>
-      {gatewaySummary && (
-        <div className="responseSummary">
-          <div className="reviewSummaryRow">
-            <strong>Parsed ledger summary</strong>
-            {gatewaySummary.status && <StatusBadge status={gatewaySummary.status} />}
-          </div>
-          <div className="responseSummaryGrid">
-            {gatewaySummary.identifier && <div><span>Identifier</span><strong>{gatewaySummary.identifier}</strong></div>}
-            {gatewaySummary.operation && <div><span>Operation / Asset</span><strong>{gatewaySummary.operation}</strong></div>}
-            {gatewaySummary.version && <div><span>Version</span><strong>{gatewaySummary.version}</strong></div>}
-            {gatewaySummary.count !== undefined && <div><span>Items returned</span><strong>{gatewaySummary.count}</strong></div>}
-            {gatewaySummary.txId && <div><span>Transaction ID</span><strong>{gatewaySummary.txId}</strong></div>}
-          </div>
-        </div>
-      )}
-      <pre aria-live="polite" className="console">{output}</pre>
-    </section>
+            {gatewaySummary && <div className="responseSummaryGrid">
+              {gatewaySummary.identifier && <div><span>Identifier</span><strong>{gatewaySummary.identifier}</strong></div>}
+              {gatewaySummary.operation && <div><span>Record</span><strong>{gatewaySummary.operation}</strong></div>}
+              {gatewaySummary.version && <div><span>Version</span><strong>{gatewaySummary.version}</strong></div>}
+              {gatewaySummary.count !== undefined && <div><span>Items returned</span><strong>{gatewaySummary.count}</strong></div>}
+              {gatewaySummary.txId && <div><span>Transaction ID</span><strong>{gatewaySummary.txId}</strong></div>}
+            </div>}
+            <pre aria-live="polite" className="console">{output}</pre>
+          </section>}
+        </> : children}
+      </section>
+    </div>
   );
 }
