@@ -6,6 +6,7 @@ import { currentSession } from "@/lib/auth/current-session";
 import { loadRoleDashboard } from "@/lib/dashboard/load-dashboard";
 import { loadFabricConfig } from "@/lib/fabric/config";
 import { onboardingEnabled } from "@/lib/customers/settings";
+import { CustomerStore } from "@/lib/customers/store";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +24,12 @@ export default async function RoleWorkspaceLayout({ children, params }: { childr
   if ((await params).workspace !== canonicalWorkspace) {
     redirect(`/workspace/${canonicalWorkspace}`);
   }
+
+  // A registered customer is shown by their verified name, not a generic label.
+  const customerName = account.role === "policyholder" && account.subjectId && account.id === `customer:${account.subjectId}`
+    ? await new CustomerStore().find(account.subjectId).then((record) => record?.fullName?.trim(), () => undefined)
+    : undefined;
+  const shownAccount = customerName ? { ...account, displayName: customerName } : account;
 
   const dashboard = await loadRoleDashboard(session).catch(() => null);
   const portalName = canonicalWorkspace === "hospital"
@@ -45,7 +52,7 @@ export default async function RoleWorkspaceLayout({ children, params }: { childr
         signedIn
       />
       <main id="main-content" tabIndex={-1} className={`workspacePage workspacePage-${canonicalWorkspace}`}>
-        <WorkspaceClient initialAccount={account} initialDashboard={dashboard} deployment={`${config.channelName}/${config.chaincodeName}`}
+        <WorkspaceClient initialAccount={shownAccount} initialDashboard={dashboard} deployment={`${config.channelName}/${config.chaincodeName}`}
           workspace={canonicalWorkspace}
           onboardingEnabled={onboardingEnabled()}
           medicalReviewEnabled={process.env.FABRIC_MEDICAL_REVIEW_ENABLED === "true"}

@@ -14,6 +14,7 @@ export function SiteHeader({
   showResearch = false,
   portalVariant,
   signedIn = false,
+  workspaceHref,
 }: {
   activeRoute: ActiveRoute;
   navLabel?: string;
@@ -26,6 +27,8 @@ export function SiteHeader({
   portalVariant?: "hospital" | "bank";
   /** Signed-in workspaces navigate from their own sidebar. */
   signedIn?: boolean;
+  /** Set on public pages when a session exists. */
+  workspaceHref?: string;
 }) {
   const brandNode = (
     <>
@@ -62,8 +65,8 @@ export function SiteHeader({
                   Research
                 </Link>
               )}
-              <Link href="/workspace" aria-current={activeRoute === "/workspace" ? "page" : undefined}>
-                Sign in
+              <Link href={workspaceHref ?? "/workspace"} aria-current={activeRoute === "/workspace" ? "page" : undefined}>
+                {workspaceHref ? "My workspace" : "Sign in"}
               </Link>
             </>}
             {pillText && (

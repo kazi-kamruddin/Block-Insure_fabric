@@ -25,6 +25,8 @@ export type WorkspaceSection = {
   medicalOnly?: boolean;
   /** Shown only when customer onboarding is enabled. */
   onboardingOnly?: boolean;
+  /** The form appears only when a queue item prepares one of its operations. */
+  formOnDemand?: boolean;
 };
 
 export const overviewSection = "overview";
@@ -75,7 +77,7 @@ export const workspaceSections: Record<FabricRole, readonly WorkspaceSection[]> 
       description: "Buy, renew or cancel cover and download statements.",
       formTitle: "Policy actions",
       operations: ["acquireMedicalPolicy", "acquirePolicy", "renewPolicy", "cancelPolicy", "setBeneficiaries", "submitBenefitRequest"] },
-    { id: "payments", label: "Payments", title: "Payments", icon: "payments",
+    { id: "payments", label: "Payments", title: "Payments", icon: "payments", formOnDemand: true,
       description: "Bank accounts, automatic debits and premium payments.",
       formTitle: "Bank and payment actions",
       operations: ["requestBankAccountLink", "cancelBankAccountLink", "requestBankMandate", "cancelBankMandate"] },

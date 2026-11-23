@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { SiteHeader } from "@/components/site-header";
+import { signedInWorkspaceHref } from "@/lib/auth/workspace-href";
 
 const organizations = [
   ["InsurerMSP", "Coordinates policies, verification, and liabilities", "Cannot edit Hospital records or confirm Bank execution"],
@@ -24,10 +25,11 @@ const stories = [
 ] as const;
 
 
-export default function ShowcasePage() {
+export default async function ShowcasePage() {
+  const workspaceHref = await signedInWorkspaceHref();
   return (
     <>
-      <SiteHeader activeRoute="/showcase" />
+      <SiteHeader activeRoute="/showcase" workspaceHref={workspaceHref} />
       <main id="main-content" tabIndex={-1} className="showcasePage">
         <section className="shell showcaseHero">
           <span className="eyebrow">How it works</span>

@@ -130,6 +130,7 @@ test("@rehearsal ordinary forms complete premiums, automatic routing, review, ap
       await login("holder");
       await openPage(page, "payments");
       const card = page.locator("article").filter({ has: page.getByRole("heading", { name: "Pay with one-time authorization", exact: true }) });
+      await card.getByText("Enter payment details manually").click();
       for (const [label, value] of Object.entries({ "Policy ID": id("policy"), "Customer account ID": id("customer"), "Insurer account ID": id("premium"), "Transfer ID": id("otp-transfer"), "Payment ID": id("otp-payment"), "Period starts": "2026-01-01", "Period ends": "2026-01-30", "Premium (BDT)": "100.00", "External bank receipt": id("otp-bank-reference") })) await card.getByLabel(label, { exact: true }).fill(value);
       await card.getByRole("button", { name: "Email OTP", exact: true }).click();
       const code = card.locator(".evidenceWarning strong"); await expect(code).toHaveText(/^\d{6}$/);

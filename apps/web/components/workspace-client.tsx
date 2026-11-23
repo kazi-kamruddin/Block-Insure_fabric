@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { useRouter, useSelectedLayoutSegment } from "next/navigation";
 import Link from "next/link";
+import { formatBdt } from "@/lib/money";
 import {
   demoAccounts,
   workspaceForAccount,
@@ -13,7 +14,7 @@ import {
 import { CustomerPortal } from "@/components/customer-portal";
 import { CustomerOnboardingQueue } from "@/components/customer-onboarding-queue";
 import type { RoleDashboard } from "@/lib/dashboard/build-dashboard";
-import { GuidedWorkflowForm, type PreparedWorkflow } from "@/components/guided-workflow-form";
+import { GuidedWorkflowForm, roleOperations, type PreparedWorkflow } from "@/components/guided-workflow-form";
 import { isMedicalChannel, medicalDevLiteChannel } from "@/lib/fabric/medical-channel";
 import { MedicalRegistryControls } from "./medical-registry-controls";
 import { MedicalIntake } from "@/components/medical-intake";
@@ -204,7 +205,7 @@ export function WorkspaceClient({
   const [auditClaimId, setAuditClaimId] = useState("");
   const [proofEvidenceId, setProofEvidenceId] = useState("");
   const [proofBatchId, setProofBatchId] = useState("");
-  const [manualPayment, setManualPayment] = useState({ policyId: "", sourceAccountId: "", destinationAccountId: "bank-insurer-premium", transferId: "", paymentId: "", periodStartDate: "", periodEndDate: "", amountBdt: "", externalReference: "", challengeId: "", otp: "", demoCode: "" });
+  const [manualPayment, setManualPayment] = useState({ policyId: "", sourceAccountId: "", destinationAccountId: "bank-insurer-premium", transferId: "", paymentId: "", periodStartDate: "", periodEndDate: "", amountBdt: "", externalReference: "", challengeId: "", otp: "", demoCode: "", sourceLabel: "" });
   const [statementPolicyId, setStatementPolicyId] = useState("");
   const [output, setOutput] = useState(readyOutput);
   const [copiedOutput, setCopiedOutput] = useState(false);
@@ -259,6 +260,12 @@ export function WorkspaceClient({
     if (!account) return;
     const operation = typeof next.command.operation === "string" ? next.command.operation : "";
     const target = sectionForOperation(account.role, operation)?.id ?? section?.id ?? overviewSection;
+    // An operation this network does not offer (such as the legacy claim form on
+    // the medical channel) opens its page without pre-filling a form.
+    if (!roleOperations(account.role, sectionOptions.medical, true).includes(operation as WorkflowOperation)) {
+      goTo(target);
+      return;
+    }
     setPreparedWorkflow(next);
     setPreparedSection(target);
     goTo(target, "guided-workflow");
@@ -497,6 +504,7 @@ export function WorkspaceClient({
   function updateManualPayment(name: keyof typeof manualPayment, value: string) {
     setManualPayment((current) => ({ ...current, [name]: value,
       ...(!["otp", "challengeId", "demoCode"].includes(name) ? { challengeId: "", otp: "", demoCode: "" } : {}),
+      ...(name === "sourceAccountId" ? { sourceLabel: "" } : {}),
     }));
   }
 
@@ -756,7 +764,10 @@ export function WorkspaceClient({
 
   const customerAccount = onboardingEnabled && account.role === "policyholder" && account.subjectId && account.id === "customer:" + account.subjectId ? account.subjectId : null;
   // Only registered customers have an editable profile.
-  const sections = sectionsFor(account.role, sectionOptions).filter((item) => item.id !== "profile" || customerAccount);
+  const devLite = deployment.startsWith(`${medicalDevLiteChannel}/`);
+  // Only registered customers have an editable profile; registry controls exist on dev-lite only.
+  const sections = sectionsFor(account.role, sectionOptions)
+    .filter((item) => (item.id !== "profile" || customerAccount) && (item.id !== "registry" || devLite));
   const isAdmin = account.role === "insurerAdmin" || account.role === "auditor";
   // Staff queues are work waiting for them; a customer's list is their policies.
   const queueCount = account.role === "policyholder" ? 0 : dashboard?.queue.length ?? 0;
@@ -766,9 +777,11 @@ export function WorkspaceClient({
   const initials = account.displayName.split(/\s+/).filter(Boolean).slice(0, 2).map(word => word[0]?.toUpperCase()).join("");
   const preparedOperation = preparedWorkflow && section && preparedSection === section.id && typeof preparedWorkflow.command.operation === "string"
     ? preparedWorkflow.command.operation as WorkflowOperation : null;
-  const formOperations: WorkflowOperation[] | null = section && (section.operations || preparedOperation)
-    ? [...(section.operations ?? []), ...(preparedOperation && !section.operations?.includes(preparedOperation) ? [preparedOperation] : [])]
-    : null;
+  const formOperations: WorkflowOperation[] | null = !section ? null
+    : section.formOnDemand ? (preparedOperation ? [preparedOperation] : null)
+      : section.operations || preparedOperation
+        ? [...(section.operations ?? []), ...(preparedOperation && !section.operations?.includes(preparedOperation) ? [preparedOperation] : [])]
+        : null;
   // Long lists show their first rows; the rest open on request.
   const visible = <T,>(key: string, items: readonly T[], limit = 6) => expandedLists[key] ? items : items.slice(0, limit);
   const showMore = (key: string, total: number, noun: string, limit = 6) => total > limit
@@ -777,7 +790,6 @@ export function WorkspaceClient({
     </button> : null;
   const money = (minor: number, currency = "BDT") => new Intl.NumberFormat("en-BD", { style: "currency", currency }).format(minor / 100);
   const medicalChannel = isMedicalChannel(deployment.split("/")[0]);
-  const devLite = deployment.startsWith(`${medicalDevLiteChannel}/`);
 
   const dashboardBlock = <section className="roleDashboard" aria-busy={dashboardLoading} aria-labelledby="dashboard-title">
     <div className="dashboardIntro">
@@ -903,7 +915,7 @@ export function WorkspaceClient({
   </article>;
 
   const accountCards = dashboard?.accountCards && dashboard.accountCards.length > 0 ? <section className="workCardWide" aria-labelledby="bank-accounts-heading">
-    <h2 id="bank-accounts-heading" className="sectionSubheading">Accounts held at this Bank</h2>
+    <h2 id="bank-accounts-heading" className="sectionSubheading">{account.role === "bankOfficer" ? "Accounts held at this Bank" : "Your bank accounts"}</h2>
     <div className="bankAccountGrid">
       {visible("accounts", dashboard.accountCards).map((bankAccount) => <article className="bankAccountCard" key={bankAccount.id}>
         <span>{bankAccount.accountType === "INSURER" ? "Corporate settlement account" : bankAccount.label || "Customer account"}</span>
@@ -946,9 +958,20 @@ export function WorkspaceClient({
     onSubmit={submitWorkflow}
   /> : null;
 
+  const paymentReady = Boolean(manualPayment.policyId && manualPayment.sourceAccountId && manualPayment.amountBdt);
   const manualPremiumCard = <article className="workCard evidenceCard workCardWide" id="manual-premium">
     <h2>Pay with one-time authorization</h2>
-    <p className="cardNote">A one-time code is emailed to you for these exact payment details. Changing any detail needs a new code.</p>
+    {paymentReady ? <>
+      <p className="cardNote">A one-time code is emailed to you for these exact payment details. Changing any detail needs a new code.</p>
+      <dl className="connectionDetails paymentSummary">
+        <dt>Policy</dt><dd>{manualPayment.policyId}</dd>
+        <dt>Pay from</dt><dd>{manualPayment.sourceLabel || manualPayment.sourceAccountId}</dd>
+        <dt>Amount</dt><dd>{Number.isFinite(Number(manualPayment.amountBdt)) ? formatBdt(Math.round(Number(manualPayment.amountBdt) * 100)) : `BDT ${manualPayment.amountBdt}`}</dd>
+        {manualPayment.periodStartDate && <><dt>Period</dt><dd>{manualPayment.periodStartDate} to {manualPayment.periodEndDate}</dd></>}
+      </dl>
+    </> : <p className="cardNote">Choose <strong>Pay first premium now</strong> or <strong>Pay next installment by OTP</strong> on a policy above.</p>}
+    <details className="paymentDetails">
+      <summary>{paymentReady ? "Edit payment details" : "Enter payment details manually"}</summary>
     <div className="evidenceFields">
       <label>Policy ID<input spellCheck={false} autoComplete="off" value={manualPayment.policyId} onChange={(event) => updateManualPayment("policyId", event.target.value)} /></label>
       <label>Customer account ID<input spellCheck={false} autoComplete="off" value={manualPayment.sourceAccountId} onChange={(event) => updateManualPayment("sourceAccountId", event.target.value)} /></label>
@@ -960,7 +983,8 @@ export function WorkspaceClient({
       <label>Premium (BDT)<input inputMode="decimal" value={manualPayment.amountBdt} onChange={(event) => updateManualPayment("amountBdt", event.target.value)} /></label>
       <label>External bank receipt<input spellCheck={false} autoComplete="off" value={manualPayment.externalReference} onChange={(event) => updateManualPayment("externalReference", event.target.value)} /></label>
     </div>
-    <div className="otpSection">
+    </details>
+    {(paymentReady || manualPayment.challengeId) && <div className="otpSection">
       <h3>Confirm one-time authorization code</h3>
       <div className="evidenceFields">
         <label>Six-digit OTP<input inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={manualPayment.otp} onChange={(event) => updateManualPayment("otp", event.target.value.replace(/\D/g, ""))} /></label>
@@ -971,7 +995,7 @@ export function WorkspaceClient({
         <button type="button" className="primary button" disabled={busy || !manualPayment.challengeId || manualPayment.otp.length !== 6} onClick={submitManualPremium}>Authorize premium</button>
         <button type="button" className="secondary button" disabled={busy} onClick={recoverManualPremium}>Recover saved payment</button>
       </div>
-    </div>
+    </div>}
   </article>;
 
   const statementCard = <article className="workCard workCardWide">
@@ -1137,7 +1161,8 @@ export function WorkspaceClient({
   let content: React.ReactNode = null;
   if (section) switch (`${account.role}:${section.id}`) {
     case "policyholder:overview":
-      content = <>{customerAccount && <CustomerPortal key={account.id} memberId={customerAccount} view="card" />}{dashboardBlock}</>; break;
+      content = <>{customerAccount && <CustomerPortal key={account.id} memberId={customerAccount} view="card" />}{dashboardBlock}
+        {accountCards && <div className="workGrid">{accountCards}</div>}</>; break;
     case "insurerAdmin:overview": case "auditor:overview": case "hospitalOfficer:overview": case "bankOfficer:overview":
       content = dashboardBlock; break;
     case "insurerAdmin:claims":
@@ -1168,8 +1193,9 @@ export function WorkspaceClient({
       content = <div className="workGrid">{guidedForm}{statementCard}</div>; break;
     case "policyholder:payments":
       content = <div className="workGrid"><PremiumCenter onPreparePayment={(payment) => {
-        setManualPayment((current) => ({ ...current, ...payment, challengeId: "", otp: "", demoCode: "" }));
-        document.getElementById("manual-premium")?.scrollIntoView({ behavior: "smooth" });
+        setManualPayment((current) => ({ ...current, sourceLabel: "", ...payment, challengeId: "", otp: "", demoCode: "" }));
+        // Scroll once the card has rendered the payment summary.
+        window.setTimeout(() => document.getElementById("manual-premium")?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
       }} />{manualPremiumCard}{guidedForm}</div>; break;
     case "policyholder:claims":
       content = <div className="workGrid">{intakeCard}{reviewCard}{guidedForm}</div>; break;
@@ -1179,7 +1205,8 @@ export function WorkspaceClient({
     case "hospitalOfficer:intake":
       content = <div className="workGrid">{guidedForm}</div>; break;
     case "hospitalOfficer:registry":
-      content = <div className="workGrid"><MedicalRegistryControls role="hospitalOfficer" /></div>; break;
+      content = devLite ? <div className="workGrid"><MedicalRegistryControls role="hospitalOfficer" /></div>
+        : <p className="emptyState">Registry approvals are not used on this network.</p>; break;
     case "bankOfficer:accounts":
       content = <div className="workGrid">{accountCards}<BankDesk show="links" />{guidedForm}</div>; break;
     case "bankOfficer:collections":

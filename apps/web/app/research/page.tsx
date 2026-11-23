@@ -50,7 +50,7 @@ export default async function ResearchPage() {
 
   return (
     <>
-      <SiteHeader activeRoute="/research" showResearch />
+      <SiteHeader activeRoute="/research" showResearch workspaceHref={`/workspace/${session.role === "auditor" ? "auditor" : "insurer"}`} />
       <main id="main-content" tabIndex={-1} className="workspacePage">
         <div className="shell workspace researchSection">
           <header className="workspaceHeader">

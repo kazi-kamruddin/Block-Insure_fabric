@@ -390,6 +390,7 @@ test(journey, async ({ page }, info) => {
       expect(policy).toMatchObject({ status: "PENDING_PAYMENT", coverageLimitMinor: money.coverage, medicalRulesVersion: 1, coverStartDate: "" });
       await openPage(page, "payments");
       const card = page.locator("article").filter({ has: page.getByRole("heading", { name: "Pay with one-time authorization", exact: true }) });
+      await card.getByText("Enter payment details manually").click();
       for (const [label, value] of Object.entries({ "Policy ID": id("policy"), "Customer account ID": id("customer"),
         "Insurer account ID": id("premium"), "Transfer ID": id("otp-transfer"), "Payment ID": id("otp-payment"),
         "Period starts": start, "Period ends": firstEnd, "Premium (BDT)": "1250.00", "External bank receipt": id("otp-reference") })) {

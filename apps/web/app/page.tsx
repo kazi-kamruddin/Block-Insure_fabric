@@ -2,6 +2,7 @@ import Link from "next/link";
 import { SiteHeader } from "@/components/site-header";
 import { StatusBadge } from "@/components/status-badge";
 import { ledger } from "@/lib/fabric/ledger";
+import { signedInWorkspaceHref } from "@/lib/auth/workspace-href";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +20,7 @@ function money(minor: number) {
 }
 
 export default async function Home() {
+  const workspaceHref = await signedInWorkspaceHref();
   const [packages, agreements] = await Promise.all([
     ledger.listPolicyPackages().then((items) => items.filter((item) => item.status === "PUBLISHED")).catch(() => []),
     ledger.listPartnerAgreements().then((items) => items.filter((item) => item.status === "ACTIVE")).catch(() => []),
@@ -39,7 +41,7 @@ export default async function Home() {
   );
   return (
     <>
-      <SiteHeader activeRoute="/" brandHref="#top" />
+      <SiteHeader activeRoute="/" brandHref="#top" workspaceHref={workspaceHref} />
       <main id="main-content" tabIndex={-1}>
         <section className="shell hero" id="top">
           <div className="eyebrow">Hyperledger Fabric · Permissioned by design</div>

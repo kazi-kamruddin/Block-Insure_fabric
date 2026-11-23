@@ -24,6 +24,8 @@ type CenterView = {
 export type PreparedPremiumPayment = {
   policyId: string; sourceAccountId: string; destinationAccountId: string; transferId: string; paymentId: string;
   periodStartDate: string; periodEndDate: string; amountBdt: string; externalReference: string;
+  /** Account name and masked number, for display only. */
+  sourceLabel?: string;
 };
 
 async function fetchCenter() {
@@ -129,6 +131,8 @@ export function PremiumCenter({ onPreparePayment }: { onPreparePayment: (payment
                 const tag = shortId("premium");
                 onPreparePayment({
                   policyId: policy.id, sourceAccountId, destinationAccountId: policy.insurerAccount.id,
+                  sourceLabel: accounts.find((account) => account.id === sourceAccountId)?.accountLabel
+                    ? `${accounts.find((account) => account.id === sourceAccountId)!.accountLabel} ${accounts.find((account) => account.id === sourceAccountId)!.maskedAccount}` : undefined,
                   transferId: `transfer-${tag}`, paymentId: `payment-${tag}`,
                   periodStartDate: policy.nextInstallment.start, periodEndDate: policy.nextInstallment.end,
                   amountBdt: (policy.nextInstallment.amountMinor / 100).toFixed(2), externalReference: `otp-${tag}`,

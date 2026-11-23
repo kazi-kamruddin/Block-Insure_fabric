@@ -882,6 +882,24 @@ details > summary {
   grid-template-columns: minmax(0, 1fr);
 }
 
+.paymentSummary {
+  margin: 6px 0 14px;
+}
+
+.paymentDetails {
+  margin: 6px 0 4px;
+}
+
+.paymentDetails summary {
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.paymentDetails[open] summary {
+  margin-bottom: 12px;
+}
+
 .showMoreButton {
   margin-top: 10px;
 }
