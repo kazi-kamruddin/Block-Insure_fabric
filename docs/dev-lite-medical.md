@@ -470,3 +470,75 @@ sequences, so the routine rotation uses INPATIENT, OTHER and CONSULTATION
 BDT 190,000 is out of range under either benchmark. Claims and cases staged
 before sequence 7 keep their small amounts. There is no pro-rata refund on
 cancellation, and waiting periods do not vary by cause.
+
+## Fresh ledger and demonstration seed (24 November 2026)
+
+The owner approved rebuilding only the LevelDB dev-lite ledger, because the
+old one had collected many test packages, partners and claims. The CouchDB
+dev-lite profile, the candidate and main networks, the CA state under
+`data/dev-lite/organizations/`, `app-secrets.json` and `email-gateway.json`
+were not touched. Source is commit `9322808` plus this session's
+uncommitted changes. Chaincode is unchanged.
+
+Procedure, in order:
+
+1. Stop the app. Move the ledger-bound app state (`oracle`, `evidence`,
+   `events`, `otp`, `journal`, `research-findings`, `customers.json`,
+   `customer-wallet`, `customer-email-codes.json`) into
+   `data/dev-lite/archive-ledger-<date>/`. The Oracle cursors and event
+   projection hold block positions of the old chain. If they stay, the
+   workers skip events on the new one.
+2. `network.sh --dev-lite teardown --confirm-dev-lite`. This removes the six
+   LevelDB volumes and every dev-lite container, the CA containers included.
+3. `network.sh --dev-lite up` with
+   `DEV_LITE_CHAINCODE_BUILDER=block-insure/fabric-ccenv:2.5.16-go1.26.11`.
+   It rejoins the channel from the retained
+   `channel-artifacts/insurance-dev-lite-190.block`.
+4. `DEV_LITE_PACKAGE=…/insurance-contract_1.9.0-realism-seq7.tar.gz`
+   (SHA-256 `d6da2d77…3ec9`) and `network.sh --dev-lite deploy`. A first
+   deployment must use sequence 1. All five peers read back 1.9.0,
+   sequence 1.
+5. `network.sh --dev-lite ca-start`, then stop the CA containers again.
+   `dev-lite-app.ps1 -Onboarding` refuses to start until the stopped
+   Insurer CA container exists.
+6. `dev-lite-app.ps1 -TwoOracles -Onboarding` without `-Email`, then
+   `scripts/seed-dev-lite-demo.ps1` once. The seed refuses a ledger that
+   already has packages.
+
+Seeded set (`data/dev-lite/demo-seed/20261123-182904/seed-summary.json`):
+
+- Four partner agreements.
+- Five single-service plans. `ConfigureMedicalRules` accepts one service per
+  draft package, so each plan covers one service.
+- INPATIENT and DIAGNOSTIC benchmarks for Dhaka Central and Chattogram.
+- The Insurer's premium and claims-reserve accounts.
+- Five onboarded customers (`@example.com` addresses), each with a verified
+  account and a policy from 24 November. Four paid by OTP; one has an
+  approved EFT mandate with the first premium due.
+- Claims `CLM-2026-000201` (SETTLED, BDT 64,000), `CLM-2026-000202`
+  (SETTLEMENT_AUTHORIZED, BDT 47,600) and `CLM-2026-000203` (SUBMITTED).
+  Both Oracle-routed claims were approved by the two running workers.
+
+The seed passed in 5.8 minutes after two aborted attempts:
+
+- The first was stopped by Windows PowerShell treating a Node warning on
+  stderr as an error. The script now relaxes the error preference around
+  the Playwright call.
+- The second was refused by the one-service rule after four agreements and
+  one draft plan. The ledger was rebuilt again rather than leave a draft
+  whose description no longer matched.
+
+A headless Edge pass over each role's pages showed only the seeded records,
+and the package list shows exactly the five plans.
+
+Limits:
+
+- The maintained journeys (`test-dev-lite-*.ps1`) and
+  `stage-dev-lite-demo.ps1` were not run on this ledger. They add their own
+  test partners, packages and customers, and the medical journey's
+  benchmark assumptions were written for the old ledger.
+- No appeal, suspected duplicate or finally rejected case is seeded.
+- The Khulna and Sylhet staff sign-ins have no partner agreement.
+- The Bank's display name still contains "Demo", and the identity
+  attributes `bank-demo` and `hospital-demo` are unchanged because they are
+  bound to enrolled certificates.

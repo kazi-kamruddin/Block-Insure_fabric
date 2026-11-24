@@ -184,6 +184,8 @@ test("onboard real CA identities and settle a synthetic medical claim on LevelDB
       await page.goto("/workspace/policyholder/profile");
       await expect(page.getByRole("heading", { name: "My profile", exact: true })).toBeVisible();
       await page.goto("/workspace/policyholder");
+      // A registered customer is shown by their verified name, not a generic member label.
+      await expect(page.getByRole("complementary", { name: "Workspace" }).getByText("Synthetic Onboarding First", { exact: true })).toBeVisible();
       const card = page.getByRole("article", { name: "Insurance card" });
       await expect(card.getByText(memberId, { exact: true })).toBeVisible();
       await expect(card.getByText(policyId, { exact: true })).toBeVisible();

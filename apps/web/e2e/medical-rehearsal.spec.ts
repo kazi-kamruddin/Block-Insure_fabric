@@ -622,7 +622,7 @@ test(journey, async ({ page }, info) => {
     if (resumeApprovedAppeal) await test.step("verify retained corrected appeal approval", async () => {
       await login("insurer");
       const retained = await loadReview(claimId);
-      expect(retained.claim).toMatchObject({ policyId: id("policy"), version: 3, status: "APPROVED", medicalDuplicateReview: true });
+      expect(retained.claim).toMatchObject({ policyId: id("policy"), version: 3, status: "APPROVED" });
       expect(retained.appeal).toMatchObject({ status: "OVERTURNED" });
       expect(retained.review).toMatchObject({ medicalVersion: 3, status: "APPROVED" });
       expect(retained.decisions.filter((decision: { outcome: string }) => decision.outcome === "APPROVE")).toHaveLength(3);
@@ -718,7 +718,26 @@ test(journey, async ({ page }, info) => {
       const appeal = await reviewAction("File medical appeal");
       expect(appeal).toMatchObject({ claimVersion: 3, disputedDecisionId: disputed, medicalPriorReviewId: returned.id });
       if (devLite && priorClaimId) {
-        expect(await asset("claim", claimId)).toMatchObject({ medicalDuplicateReview: true });
+        // Rule v2 refers a claim when the same customer has another claimed stay at the same
+        // hospital for the same service with overlapping dates. The routine settlement uses a
+        // different category, so whether this SURGERY appeal is referred depends on same-day
+        // SURGERY claims from earlier runs: assert the rule, not a fixed outcome.
+        await login("insurer");
+        const filed = await asset("claim", claimId);
+        const response = await page.request.get("/api/medical/intake");
+        expect(response.ok(), await response.text()).toBe(true);
+        type Stay = { id: string; hospitalId: string; service: string; admissionDate: string; dischargeDate: string };
+        const stays = new Map(((await response.json()).episodes as Stay[]).map(row => [row.id, row]));
+        const own = stays.get(filed.episodeId);
+        expect(own, "the appeal's episode must be listed").toBeTruthy();
+        const overlapping = (await assets("claim") as { id: string; claimantId: string; episodeId?: string }[]).some(other => {
+          const stay = other.id !== claimId && other.claimantId === filed.claimantId && other.episodeId ? stays.get(other.episodeId) : undefined;
+          return Boolean(stay && own && stay.id !== own.id && stay.hospitalId === own.hospitalId && stay.service === own.service
+            && stay.admissionDate <= own.dischargeDate && own.admissionDate <= stay.dischargeDate);
+        });
+        expect(filed.medicalDuplicateRuleVersion).toBe(2);
+        expect(Boolean(filed.medicalDuplicateReview)).toBe(overlapping);
+        await login("holder");
       }
       const appealDocument = id("appeal-document");
       await uploadDocument(claimId, appealDocument, "APPEAL_DOCUMENT", newFile, 3);

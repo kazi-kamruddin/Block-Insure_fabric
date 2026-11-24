@@ -249,7 +249,7 @@ export function buildRoleDashboard(
       description: "Operate the connected Bank simulation: maintain balances, approve EFT mandates, and process deterministic premium debits.",
       metrics: [
         { label: "Bank action queue", value: queue.length, hint: "mandates, collections, and payouts" },
-        { label: "Customer balances", value: bankAccounts.filter((item) => item.accountType === "CUSTOMER").reduce((sum, item) => sum + item.balanceMinor, 0) / 100, hint: "BDT across verified demo accounts" },
+        { label: "Customer balances", value: bankAccounts.filter((item) => item.accountType === "CUSTOMER").reduce((sum, item) => sum + item.balanceMinor, 0) / 100, hint: "BDT across verified customer accounts" },
         { label: "Settled / bounced", value: bankTransfers.filter((item) => item.status === "SETTLED").length, hint: `${bankTransfers.filter((item) => item.status === "BOUNCED").length} bounced for insufficient funds` },
       ],
       queueTitle: "Mandates, collections, and payouts",

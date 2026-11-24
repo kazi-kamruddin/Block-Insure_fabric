@@ -150,6 +150,12 @@ test("live bank linking, OTP and EFT premiums with a bounce and retry", async ({
     await item.getByRole("combobox", { name: "Pay from" }).selectOption(accountIds.rich);
     await item.getByRole("button", { name: "Pay first premium now" }).click();
     const card = page.locator("#manual-premium");
+    // The customer sees a readable summary; the raw fields stay behind "Edit payment details".
+    const summary = card.locator(".paymentSummary");
+    await expect(summary).toContainText(policies.otp);
+    await expect(summary).toContainText(`Salary account ${suffix} ${masked("rich")}`);
+    await expect(summary).toContainText("BDT 1,250.00");
+    await card.getByText("Edit payment details").click();
     await expect(card.getByLabel("Policy ID", { exact: true })).toHaveValue(policies.otp);
     await expect(card.getByLabel("Customer account ID", { exact: true })).toHaveValue(accountIds.rich);
     await expect(card.getByLabel("Insurer account ID", { exact: true })).toHaveValue(id("insurer-premium"));

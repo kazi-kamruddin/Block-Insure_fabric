@@ -196,7 +196,7 @@ export const workflowFormDefinitions: Record<WorkflowOperation, WorkflowFormDefi
   openBankAccount: {
     label: "Open simulated bank account",
     description: "Create a balance-bearing customer or insurer account at an actively contracted Bank.",
-    fields: [{ name: "id", label: "Account reference ID" }, { name: "bankId", label: "Contracted Bank ID" }, { name: "ownerId", label: "Account owner subject ID" }, { name: "accountType", label: "Account type", kind: "select", options: ["CUSTOMER", "INSURER"] }, { name: "accountLabel", label: "Account label", placeholder: "Primary savings" }, { name: "maskedAccount", label: "Masked account number", placeholder: "**** **** 4821", help: "Use dummy digits and hide all but the display suffix." }, { name: "openingBalanceBdt", label: "Opening balance (BDT)", kind: "money" }, { name: "accountTokenText", label: "Bank-vault token", help: "Hashed locally before Fabric submission." }],
+    fields: [{ name: "id", label: "Account reference ID" }, { name: "bankId", label: "Contracted Bank ID" }, { name: "ownerId", label: "Account owner subject ID" }, { name: "accountType", label: "Account type", kind: "select", options: ["CUSTOMER", "INSURER"] }, { name: "accountLabel", label: "Account label", placeholder: "Primary savings" }, { name: "maskedAccount", label: "Masked account number", placeholder: "**** **** 4821", help: "Show only the last four digits; hide the rest with *." }, { name: "openingBalanceBdt", label: "Opening balance (BDT)", kind: "money" }, { name: "accountTokenText", label: "Bank-vault token", help: "Hashed locally before Fabric submission." }],
   },
   adjustBankAccountBalance: {
     label: "Adjust account balance",
