@@ -52,6 +52,13 @@ Bring up the same retained LevelDB profile, then launch
 build at `http://127.0.0.1:3219` and refuses a missing or stale build. Starting
 without `-Production` returns to the development server.
 
+For an approved verification session, add `-ReadOnly`. The launcher still
+starts the web app and the three Oracle health services. Oracle event
+processing, Gateway submissions, automatic premium collection and the
+projection/sender are disabled. Read-only startup also verifies the
+Insurer peer's provisioning block before choosing local application state.
+See the [R1 design](oracle-v2/R1-DESIGN.md) for the separately approved upgrade.
+
 The historical teardown uses Compose down for the entire dev-lite project,
 including its CA containers. If an earlier approved rebuild removed those
 containers, `network.sh --dev-lite ca-start` recreates the CA services from

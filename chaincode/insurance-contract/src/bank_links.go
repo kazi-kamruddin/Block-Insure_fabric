@@ -50,7 +50,7 @@ func (c *Contract) RequestBankAccountLink(ctx contractapi.TransactionContextInte
 			return nil, fmt.Errorf("a link request for %s at %s is already pending", maskedAccount, bankID)
 		}
 	}
-	now, err := timestamp(ctx)
+	now, err := ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -108,7 +108,7 @@ func (c *Contract) ReviewBankAccountLink(ctx contractapi.TransactionContextInter
 		request.Status = "REJECTED"
 	}
 	request.DecisionHash = strings.ToLower(decisionHash)
-	request.UpdatedAt, err = timestamp(ctx)
+	request.UpdatedAt, err = ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -140,7 +140,7 @@ func (c *Contract) CancelBankAccountLink(ctx contractapi.TransactionContextInter
 		return nil, fmt.Errorf("bank account link %s cannot be cancelled from %s", id, request.Status)
 	}
 	request.Status = "CANCELLED"
-	request.UpdatedAt, err = timestamp(ctx)
+	request.UpdatedAt, err = ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}

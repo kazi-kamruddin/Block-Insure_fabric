@@ -16,7 +16,7 @@ export async function readClaimDossierAnchor({ network, contract }, claimId) {
   const readTip = async () => {
     const info = common.BlockchainInfo.deserializeBinary(await qscc.evaluateTransaction("GetChainInfo", channel));
     const blockHeight = info.getHeight();
-    const blockHash = Buffer.from(info.getCurrentBlockHash_asU8()).toString("hex");
+    const blockHash = Buffer.from(info.getCurrentblockhash_asU8()).toString("hex");
     if (!Number.isSafeInteger(blockHeight) || blockHeight < 1 || blockHash.length !== 64) {
       throw new Error("Peer chain tip is unavailable");
     }

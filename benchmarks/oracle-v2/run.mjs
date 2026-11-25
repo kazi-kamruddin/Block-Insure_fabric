@@ -59,6 +59,8 @@ The panel budget is fixed at ${experiment.panelBudgetPercent}% of the full cohor
 
 ## Outcomes at the fixed panel budget
 
+The per-scenario rows are the primary results. The aggregate counts and percentages depend on the equal-weight scenario mix, and unresolved counts also depend on the panel budget.
+
 | Configuration | Auto approvals (% of all) | Wrong auto approvals (% of ineligible) | Legitimate referrals (% of eligible) | CONFLICT (% of all) | TIMEOUT | Panel demand (% of all) | Panel served | Unresolved | Routing p50/p95 (s) | Decision p50/p95 (s) |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 ${summaryLines.join("\n")}
@@ -73,7 +75,7 @@ ${scenarioLines.join("\n")}
 
 ## Replay of one shared-source decision
 
-The synthetic case ${replay[0].claimId} claims BDT ${taka(replay[0].billMinor)}. Its ground-truth invoice is BDT ${taka(replay[0].groundTruthInvoiceMinor)}. The regulator-signed accreditation record cites the hospital's invoice record, so their origin closures overlap even though their signer and control-domain metadata differ. The signed claimant receipt matches the hospital invoice as a derivative copy.
+The synthetic lineage stress case ${replay[0].claimId} claims BDT ${taka(replay[0].billMinor)}. Its ground-truth invoice is BDT ${taka(replay[0].groundTruthInvoiceMinor)}. The regulator-signed accreditation record cites the hospital's invoice record, an intentionally unrealistic dependency that makes their origin closures overlap even though their signer and control-domain metadata differ. The signed claimant receipt matches the hospital invoice as a derivative copy.
 
 | Configuration | Routing decision | Agreeing worker observations | Reveals needed before finalization | Evidence condition | Shared result or fact-vector hash |
 | --- | --- | ---: | ---: | --- | --- |

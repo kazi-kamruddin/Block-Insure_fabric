@@ -8,6 +8,7 @@ import type { ReceiptEpisodeFacts } from "@/components/receipt-review";
 import { bindReviewReason, ReviewReasonReceipts, saveReviewReason, type ReasonAttempt } from "@/components/review-reason-receipts";
 import { sha256Hex } from "@/lib/evidence/browser-crypto";
 import { medicalReasonLabels, medicalReleaseAvailableAt, readMedicalAppealWindow, type MedicalReviewCommand, type MedicalReviewView } from "@/lib/fabric/medical-review";
+import { MedicalOracleV2 } from "./medical-oracle-v2";
 import type { MedicalQuote } from "@/lib/fabric/medical";
 import { formatBdt } from "@/lib/money";
 import { researchFindings } from "@/lib/fabric/research-finding";
@@ -147,8 +148,10 @@ export function MedicalReview({ role, onEvidence, investigationEnabled = false }
       </div>
       <p>Recorded service {view.facts.service} on {view.facts.serviceDate} · episode revision {view.claim.episodeRevision}</p>
       {view.timeline && <MedicalTimeline timeline={view.timeline} />}
+      <MedicalOracleV2 view={view} isClaimant={role === "policyholder"} busy={busy} onAction={command => work(() => send(command))} />
       {view.devLite && role === "policyholder" && !review && !view.claim.medicalEscalatedAt &&
-        ["SUBMITTED", "APPEAL_SUBMITTED", "ORACLE_PENDING"].includes(view.claim.status) &&
+        (view.oracleV2 ? ["SUBMITTED", "APPEAL_SUBMITTED", "ORACLE_PENDING", "ORACLE_FAILED", "MEDICAL_REVIEW_REQUIRED", "MEDICAL_AUDIT_PENDING"] :
+          ["SUBMITTED", "APPEAL_SUBMITTED", "ORACLE_PENDING"]).includes(view.claim.status) &&
         <button type="button" className="secondary button" disabled={busy} onClick={() => work(() => send({ action: "escalate", claimId: view.claim.id }))}>
           Escalate after processing deadline
         </button>}
@@ -172,6 +175,9 @@ export function MedicalReview({ role, onEvidence, investigationEnabled = false }
           <StatusBadge status={review.status} />
         </div>
         <p className="cardNote">{review.status} · {preparing ? "Prepare by " + review.prepareBy : review.deadline ? "Voting deadline " + review.deadline : "Voting has not opened"}</p>
+        {view.oracleV2 && role !== "insurerAdmin" && ["PREPARING", "OPEN"].includes(review.status) &&
+          (view.readAt ?? 0) > Date.parse((preparing ? review.prepareBy : review.deadline) ?? "") &&
+          <button type="button" className="secondary button" disabled={busy} onClick={() => work(() => send({ action: "expire", reviewId: review.id }))}>Close expired review</button>}
         {review.status === "OPEN" ? <p>Votes sealed until the round closes</p> : <div className="quorumMeters">
           <div className="quorumMeterRow">
             <div className="quorumMeterRowHeader"><span>Approvals</span><span>{approveVotes} / 3</span></div>
@@ -237,6 +243,8 @@ export function MedicalReview({ role, onEvidence, investigationEnabled = false }
             <button type="button" className="secondary button" disabled={busy} onClick={() => work(() => send({ action: "expire", reviewId: review.id }))}>Finalize expired review</button>}
           {review && ["ACCESS_FAILED", "TIMED_OUT"].includes(review.status) && !view.claim.medicalRecoveryUsed &&
             <button type="button" className="secondary button" disabled={busy} onClick={() => work(() => send({ action: "recover", reviewId: review.id, newId: id("review"), prepareBy: later(48) }))}>Use one procedural recovery</button>}
+        {review?.status === "PROCEDURAL_FAILURE" &&
+          <button type="button" className="secondary button" disabled={busy} onClick={() => work(() => send({ action: "recover", reviewId: review.id, newId: id("review"), prepareBy: later(48) }))}>Restart review preparation</button>}
         </div>
       </>}
       {role === "policyholder" && <>

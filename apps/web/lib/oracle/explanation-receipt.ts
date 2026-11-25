@@ -32,6 +32,22 @@ export function hash(value: unknown) {
 
 export const explanationOodThreshold = 8.8;
 
+export function verifyV2Explanation(receipt: unknown, result: { requestId: string; oracleId: string; workerDiagnosticsHash?: string }, evaluatorHash: string) {
+  if (!receipt || typeof receipt !== "object" || !result.workerDiagnosticsHash) return false;
+  const row = receipt as Record<string, unknown>;
+  if (row.schema !== "oracle-v2-explanation-receipt-v1" || row.requestId !== result.requestId || row.oracleId !== result.oracleId ||
+      row.evaluatorHash !== evaluatorHash || row.workerDiagnosticsHash !== result.workerDiagnosticsHash ||
+      typeof row.contextHash !== "string" || !/^[a-f0-9]{64}$/.test(row.contextHash) ||
+      !["DIRECT", "MIRROR", "ORACLE_PEER_AND_SIGNED_FEEDS"].includes(String(row.retrievalPath))) return false;
+  const diagnostics = {
+    schema: "oracle-worker-diagnostics-v1",
+    evaluatorHash: row.evaluatorHash, contextHash: row.contextHash, explanation: row.explanation ?? null,
+    outOfDistribution: row.outOfDistribution ?? null, ratios: row.ratios ?? {},
+    retrievalPath: row.retrievalPath, retrievalReceipts: row.retrievalReceipts ?? [],
+  };
+  return createHash("sha256").update("oracle-v2:worker-diagnostics\0" + canonical(diagnostics)).digest("hex") === result.workerDiagnosticsHash;
+}
+
 export function verifyExplanation(
   receipts: ExplanationReceipt[],
   results: { oracleId: string; verificationCode: string }[],

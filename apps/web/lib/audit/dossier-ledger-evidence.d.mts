@@ -2,6 +2,8 @@ import type { Contract } from "@hyperledger/fabric-gateway";
 import type { Claim, ClaimHistoryRecord, MedicalApprovalCertificate, OracleRequest, OracleResult } from "@/lib/fabric/types";
 
 type DossierLedgerEvidence = {
+  oracleSourceIssuers?: unknown[];
+  oracleSourceFeeds?: unknown[];
   oracleReveals: { resultId: string; requestId: string; oracleId: string; txId: string; salt: string }[];
   certificateWrite: {
     transactionId: string; issuedAt: string; blockNumber: number; blockHash: string; approvalTimeLabel: string;

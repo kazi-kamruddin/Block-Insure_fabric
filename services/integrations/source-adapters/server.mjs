@@ -113,14 +113,14 @@ function handleRequests({ store, issuerId, privateKey, subjects }) {
   };
 }
 
-export async function listenAdapters({ store, receiptKeys, ports, tokens }) {
+export async function listenAdapters({ store, receiptKeys, ports, tokens, activeIssuers = issuerIds }) {
   const subjects = credentials(tokens);
   const servers = [];
   const urls = {};
   const close = () => Promise.all(servers.map(server => new Promise(resolveClosed => server.close(resolveClosed))));
 
   try {
-    for (const issuerId of issuerIds) {
+    for (const issuerId of activeIssuers) {
       const privateKey = receiptKeys[issuerId]?.privateKey;
       const port = ports[issuerId];
       if (!privateKey || !Number.isSafeInteger(port) || port < 0 || port > 65535) throw new Error("Invalid adapter listener settings");
@@ -166,8 +166,8 @@ async function loadLocalKey(directory, issuerId) {
   } finally { pem.fill(0); }
 }
 
-async function localKeys(directory) {
-  return Object.fromEntries(await Promise.all(issuerIds.map(async issuerId => [issuerId, await loadLocalKey(directory, issuerId)])));
+async function localKeys(directory, activeIssuers) {
+  return Object.fromEntries(await Promise.all(activeIssuers.map(async issuerId => [issuerId, await loadLocalKey(directory, issuerId)])));
 }
 
 const encodeKey = key => key.export({ type: "spki", format: "der" }).toString("base64url");
@@ -182,9 +182,9 @@ async function retainMetadata(filename, value) {
   }
 }
 
-async function publishFixtures(store, keys, seed) {
-  for (const [version, synthetic] of fixture(seed).versions.entries()) {
-    for (const issuerId of issuerIds) {
+async function publishFixtures(store, keys, versions, activeIssuers) {
+  for (const [version, synthetic] of versions.entries()) {
+    for (const issuerId of activeIssuers) {
       const { privateKey } = keys[issuerId];
       const records = synthetic.records[issuerId].map(row => signRecord({ issuerId, keyVersion: 1, ...row }, privateKey));
       const feed = createFeed({ issuerId, keyVersion: 1, feedVersion: version + 1, records, ...synthetic.coverage }, privateKey);
@@ -196,8 +196,9 @@ async function publishFixtures(store, keys, seed) {
 }
 
 async function main() {
-  const options = Object.fromEntries(["root", "mirror-from", "through-version", "seed", "port-his", "port-regulator", "port-receipt", "port-payment"]
+  const options = Object.fromEntries(["root", "mirror-from", "through-version", "seed", "dataset", "r1-only", "port-his", "port-regulator", "port-receipt", "port-payment"]
     .map(name => [name, { type: "string" }]));
+  options["r1-only"] = { type: "boolean" };
   const { values } = parseArgs({ options });
   const mirrorFrom = values["mirror-from"] ? resolve(values["mirror-from"]) : null;
   const defaultRoot = fileURLToPath(new URL("../../../data/dev-lite/source-adapters/", import.meta.url));
@@ -206,39 +207,45 @@ async function main() {
   const throughVersion = Number(values["through-version"] ?? Number.MAX_SAFE_INTEGER);
   if ((values["through-version"] && !mirrorFrom) || !validVersion(throughVersion)) throw new Error("A mirror version cap must be a positive integer");
   const seed = Number(values.seed ?? 42);
-  if (!mirrorFrom) fixture(seed);
+  const activeIssuers = values["r1-only"] ? issuerIds.filter(id => id !== "S-D") : issuerIds;
+  if (values.dataset && (mirrorFrom || values.seed || !values.root || !values["r1-only"])) {
+    throw new Error("A supplied R1 dataset requires an explicit root and --r1-only without --seed or --mirror-from");
+  }
+  const versions = mirrorFrom ? null : values.dataset ? JSON.parse(await readFile(resolve(values.dataset), "utf8")).versions : fixture(seed).versions;
+  if (!mirrorFrom && (!Array.isArray(versions) || !versions.length || versions.some(row =>
+    !row.coverage || activeIssuers.some(id => !Array.isArray(row.records?.[id]))))) throw new Error("Invalid source dataset shape");
   const tokens = Object.fromEntries(oracleIds.map(id => [id, process.env[`ORACLE_ADAPTER_TOKEN_${id.toUpperCase()}`]]));
   credentials(tokens);
   const firstPort = mirrorFrom ? 3421 : 3411;
   const portOptions = ["port-his", "port-regulator", "port-receipt", "port-payment"];
-  const ports = Object.fromEntries(issuerIds.map((id, index) => [id, Number(values[portOptions[index]] ?? firstPort + index)]));
-  if (Object.values(ports).some(port => !Number.isSafeInteger(port) || port < 1 || port > 65535) || new Set(Object.values(ports)).size !== issuerIds.length) {
-    throw new Error("Select four distinct listener ports");
+  const ports = Object.fromEntries(activeIssuers.map((id, index) => [id, Number(values[portOptions[index]] ?? firstPort + index)]));
+  if (Object.values(ports).some(port => !Number.isSafeInteger(port) || port < 1 || port > 65535) || new Set(Object.values(ports)).size !== activeIssuers.length) {
+    throw new Error("Select distinct listener ports");
   }
 
-  const keys = await localKeys(join(root, "keys"));
+  const keys = await localKeys(join(root, "keys"), activeIssuers);
   const registry = mirrorFrom ? JSON.parse(await readFile(join(mirrorFrom, "issuer-registry.json"), "utf8")) :
-    issuerIds.map(issuerId => ({ issuerId, ...issuers[issuerId], keyVersion: 1, ed25519PublicKey: encodeKey(keys[issuerId].publicKey),
+    activeIssuers.map(issuerId => ({ issuerId, ...issuers[issuerId], keyVersion: 1, ed25519PublicKey: encodeKey(keys[issuerId].publicKey),
       validFrom: "2026-11-01T00:00:00.000Z", validUntil: "2030-01-01T00:00:00.000Z", status: "ACTIVE" }));
   const publicKeys = Object.fromEntries(registry.map(row => [row.issuerId, decodeKey(row.ed25519PublicKey)]));
   const store = createFeedStore(root, publicKeys);
   await retainMetadata(join(root, "issuer-registry.json"), registry);
-  await retainMetadata(join(root, "retrieval-keys.json"), Object.fromEntries(issuerIds.map(id => [id, encodeKey(keys[id].publicKey)])));
+  await retainMetadata(join(root, "retrieval-keys.json"), Object.fromEntries(activeIssuers.map(id => [id, encodeKey(keys[id].publicKey)])));
 
   const source = mirrorFrom ? createFeedStore(mirrorFrom, publicKeys) : null;
   if (source) {
-    if (values["through-version"] && (await Promise.all(issuerIds.map(id => store.latestVersion(id)))).some(version => version > throughVersion)) {
+    if (values["through-version"] && (await Promise.all(activeIssuers.map(id => store.latestVersion(id)))).some(version => version > throughVersion)) {
       throw new Error("A stale mirror needs a new directory when the existing copy already exceeded the requested cap");
     }
-    await mirrorFeeds(source, store, issuerIds, throughVersion);
-  } else await publishFixtures(store, keys, seed);
+    await mirrorFeeds(source, store, activeIssuers, throughVersion);
+  } else await publishFixtures(store, keys, versions, activeIssuers);
 
-  const listener = await listenAdapters({ store, receiptKeys: keys, ports, tokens });
+  const listener = await listenAdapters({ store, receiptKeys: keys, ports, tokens, activeIssuers });
   console.info(JSON.stringify({ mode: source ? "mirror" : "direct", urls: listener.urls, memory: process.memoryUsage() }));
   let stopping = false;
   let timer;
   const refresh = async () => {
-    try { await mirrorFeeds(source, store, issuerIds, throughVersion); }
+    try { await mirrorFeeds(source, store, activeIssuers, throughVersion); }
     catch { console.warn("Source adapter mirror refresh failed"); }
     if (!stopping) timer = setTimeout(refresh, 15_000);
   };

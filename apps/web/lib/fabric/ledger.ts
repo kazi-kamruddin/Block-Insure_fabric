@@ -58,6 +58,10 @@ function stringifyArguments(arguments_: Array<string | number>): string[] {
   return arguments_.map(String);
 }
 
+function requireWritableLedger() {
+  if (process.env.FABRIC_DEMO_READ_ONLY === "true") throw new Error("Ledger submissions are disabled for this verification run");
+}
+
 async function evaluate<T>(role: FabricRole, transactionName: string, ...args: string[]) {
   return withFabricContract(role, async (contract) =>
     decodeJson<T>(await contract.evaluateTransaction(transactionName, ...args)),
@@ -69,6 +73,7 @@ async function submit<T>(
   transactionName: string,
   ...args: Array<string | number>
 ) {
+  requireWritableLedger();
   return withFabricContract(role, async (contract, gateway, identity) =>
     decodeJson<T>(
       await submitJournaled(contract, gateway, identity, role, transactionName, stringifyArguments(args)),
@@ -83,6 +88,7 @@ async function submitWithTransient<T>(
   transientData: Record<string, string | Uint8Array>,
   profileUserName?: string,
 ) {
+  requireWritableLedger();
   return withFabricContract(role, async (contract) => decodeJson<T>(
     await contract.submit(transactionName, { arguments: stringifyArguments(args), transientData }),
   ), profileUserName);
@@ -97,6 +103,7 @@ async function submitAsAuditor<T>(
   transactionName: string,
   ...args: Array<string | number>
 ) {
+  requireWritableLedger();
   if (!auditorUserName) throw new Error("This auditor account has no server-owned Fabric identity");
   return withFabricContract(
     "auditor",
@@ -112,6 +119,7 @@ async function submitAsHospital<T>(
   transactionName: string,
   ...args: Array<string | number>
 ) {
+  requireWritableLedger();
   if (!hospitalUserName) throw new Error("This Hospital account has no server-owned Fabric identity");
   return withFabricContract(
     "hospitalOfficer",
@@ -162,6 +170,8 @@ export const ledger = {
       case "open": return write("OpenMedicalVoting", input.reviewId, input.deadline);
       case "recover": return write("RecoverMedicalReview", input.reviewId, input.newId, input.prepareBy);
       case "expire": return write("FinalizeExpiredReview", input.reviewId);
+      case "oracleTimeout": return write("FinalizeOracleTimeout", input.requestId);
+      case "recordReceiptSummary": return this.recordPrivateMedicalReceipt(input.claimId, input.summary);
       case "ask": return message("RequestMedicalClarification", sealMedicalReviewNote("question", input.id, input.message), input.reviewId, input.id, input.deadline);
       case "respond": return message("RespondMedicalClarification", input.response === "EXPIRED" ? "" : sealMedicalReviewNote("answer", input.id, input.message), input.id, input.response, input.evidenceHash);
       case "share": return write("ShareMedicalReviewEvidence", input.reviewId, input.expiresAt);
@@ -903,8 +913,41 @@ export const ledger = {
     );
   },
 
-  finalizeOracleTimeout(requestId: string) {
-    return submit<OracleRequest>("insurerAdmin", "FinalizeOracleTimeout", requestId);
+  async supportsMedicalOracleV2() {
+    if (process.env.FABRIC_CHANNEL_NAME !== "insurance-dev-lite-190") return false;
+    try {
+      return (await evaluate<{ protocolVersion: string }>("insurerAdmin", "ReadMedicalOracleProtocol")).protocolVersion === "v2";
+    } catch {
+      return false;
+    }
+  },
+
+  requestOracleVerificationV2(requestId: string, claimId: string) {
+    return submit<OracleRequest>("insurerAdmin", "RequestOracleVerificationV2", requestId, claimId);
+  },
+
+  readOracleGovernance<T>(name: "ListSourceIssuers" | "ListSourceFeeds" | "ListOracleRosters" | "ListMedicalModelReleases") {
+    return evaluate<T>("insurerAdmin", name);
+  },
+
+  readSourceIssuer(id: string, version: string) {
+    return evaluate<{ issuerId: string; hospitalId: string; kind: string }>("insurerAdmin", "ReadSourceIssuer", id, version);
+  },
+
+  writeOracleGovernance(role: "insurerAdmin" | "auditor" | "hospitalOfficer", name: string, args: string[], user?: string) {
+    if (role === "auditor") return submitAsAuditor(user, name, ...args);
+    if (role === "hospitalOfficer") return submitAsHospital(user, name, ...args);
+    return submit(role, name, ...args);
+  },
+
+  recordPrivateMedicalReceipt(claimId: string, summary: unknown) {
+    return submitWithTransient("policyholder", "RecordMedicalOCRSummary", [claimId], { medicalOCRSummary: JSON.stringify(summary) });
+  },
+
+  finalizeOracleTimeout(requestId: string, role: "insurerAdmin" | "policyholder" | "auditor" = "insurerAdmin", user?: string) {
+    return role === "auditor"
+      ? submitAsAuditor<OracleRequest>(user, "FinalizeOracleTimeout", requestId)
+      : submit<OracleRequest>(role, "FinalizeOracleTimeout", requestId);
   },
 
   routeOracleFailureToReview(input: {

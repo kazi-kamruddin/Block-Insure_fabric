@@ -142,7 +142,7 @@ func (c *Contract) ConfirmMedicalEvidence(ctx contractapi.TransactionContextInte
 	if _, err := medicalReviewClockForGrant(ctx, grant.ExpiresAt); err != nil {
 		return nil, err
 	}
-	now, err := timestamp(ctx)
+	now, err := ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -155,12 +155,12 @@ func (c *Contract) ConfirmMedicalEvidence(ctx contractapi.TransactionContextInte
 }
 
 func medicalReviewClockForGrant(ctx contractapi.TransactionContextInterface, value string) (time.Time, error) {
-	ts, err := ctx.GetStub().GetTxTimestamp()
+	ts, err := ledgerNow(ctx)
 	if err != nil {
 		return time.Time{}, err
 	}
 	expiry, err := time.Parse(time.RFC3339, value)
-	if err != nil || !expiry.After(ts.AsTime()) {
+	if err != nil || !expiry.After(ts) {
 		return time.Time{}, fmt.Errorf("grant expired")
 	}
 	return expiry, nil

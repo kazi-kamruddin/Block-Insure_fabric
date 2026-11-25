@@ -81,7 +81,7 @@ func (c *Contract) RequestBankMandate(ctx contractapi.TransactionContextInterfac
 	if expiryDate < due {
 		return nil, fmt.Errorf("mandate expiry cannot precede the next premium due date")
 	}
-	now, err := timestamp(ctx)
+	now, err := ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -128,7 +128,7 @@ func (c *Contract) ReviewBankMandate(ctx contractapi.TransactionContextInterface
 		mandate.Status = "REJECTED"
 	}
 	mandate.DecisionHash = strings.ToLower(decisionHash)
-	mandate.UpdatedAt, err = timestamp(ctx)
+	mandate.UpdatedAt, err = ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -160,7 +160,7 @@ func (c *Contract) CancelBankMandate(ctx contractapi.TransactionContextInterface
 		return nil, fmt.Errorf("bank mandate %s cannot be cancelled from %s", id, mandate.Status)
 	}
 	mandate.Status = "CANCELLED"
-	mandate.UpdatedAt, err = timestamp(ctx)
+	mandate.UpdatedAt, err = ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -193,7 +193,7 @@ func (c *Contract) ExpireBankMandate(ctx contractapi.TransactionContextInterface
 		return nil, fmt.Errorf("bank mandate %s is not eligible for expiry", id)
 	}
 	mandate.Status = "EXPIRED"
-	mandate.UpdatedAt, err = timestamp(ctx)
+	mandate.UpdatedAt, err = ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -256,7 +256,7 @@ func (c *Contract) RecordPremiumAdjustment(ctx contractapi.TransactionContextInt
 	} else if marker != nil {
 		return nil, fmt.Errorf("external payment reference has already been recorded")
 	}
-	now, err := timestamp(ctx)
+	now, err := ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -346,7 +346,7 @@ func (c *Contract) QueuePremiumCollection(ctx contractapi.TransactionContextInte
 			return nil, fmt.Errorf("premium collection already exists for mandate %s on %s", mandateID, dueDate)
 		}
 	}
-	now, err := timestamp(ctx)
+	now, err := ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -394,7 +394,7 @@ func (c *Contract) SchedulePremiumCollections(ctx contractapi.TransactionContext
 	for _, collection := range existingCollections {
 		existing[collection.MandateID+":"+collection.DueDate] = true
 	}
-	now, err := timestamp(ctx)
+	now, err := ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -473,7 +473,7 @@ func (c *Contract) RetryPremiumCollection(ctx contractapi.TransactionContextInte
 		return nil, err
 	}
 	collection.Status = "RETRY"
-	collection.UpdatedAt, err = timestamp(ctx)
+	collection.UpdatedAt, err = ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -524,17 +524,13 @@ func (c *Contract) ReadPremiumAdjustment(ctx contractapi.TransactionContextInter
 	return getState[PremiumAdjustment](ctx, "premiumAdjustment", id)
 }
 
-// Bangladesh has no daylight saving time, so a fixed zone keeps endorsement
-// deterministic without depending on the runtime's time zone database.
-var dhakaBusinessZone = time.FixedZone("Asia/Dhaka", 6*60*60)
-
 // ledgerBusinessDate is the Dhaka calendar date of the transaction timestamp.
 func ledgerBusinessDate(ctx contractapi.TransactionContextInterface) (string, error) {
 	now, err := transactionDate(ctx)
 	if err != nil {
 		return "", err
 	}
-	return now.In(dhakaBusinessZone).Format(time.DateOnly), nil
+	return dhakaDate(now), nil
 }
 
 // requireNotAfterLedgerDate stops a caller from moving premium obligations
@@ -551,13 +547,5 @@ func requireNotAfterLedgerDate(ctx contractapi.TransactionContextInterface, fiel
 }
 
 func transactionDate(ctx contractapi.TransactionContextInterface) (time.Time, error) {
-	value, err := timestamp(ctx)
-	if err != nil {
-		return time.Time{}, err
-	}
-	parsed, err := time.Parse(time.RFC3339Nano, value)
-	if err != nil {
-		return time.Time{}, fmt.Errorf("parse transaction date: %w", err)
-	}
-	return parsed, nil
+	return ledgerNow(ctx)
 }

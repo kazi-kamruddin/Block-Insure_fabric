@@ -426,40 +426,48 @@ type OracleRegistrySnapshot struct {
 }
 
 type OracleRequest struct {
-	AuditPeriodID           string   `json:"auditPeriodId,omitempty" metadata:",optional"`
-	ModelReleaseID          string   `json:"modelReleaseId,omitempty" metadata:",optional"`
-	AssetType               string   `json:"assetType"`
-	SchemaVersion           int      `json:"schemaVersion"`
-	ID                      string   `json:"id"`
-	ClaimID                 string   `json:"claimId"`
-	ClaimVersion            int      `json:"claimVersion"`
-	HospitalVerificationID  string   `json:"hospitalVerificationId"`
-	AppealID                string   `json:"appealId"`
-	AppealCommitmentHash    string   `json:"appealCommitmentHash"`
-	PrivacyPresentationID   string   `json:"privacyPresentationId"`
-	PrivacyPresentationHash string   `json:"privacyPresentationHash"`
-	PrivacyProtocolVersion  string   `json:"privacyProtocolVersion"`
-	QueryHash               string   `json:"queryHash"`
-	RegistrySnapshotID      string   `json:"registrySnapshotId"`
-	RegistryVersion         int      `json:"registryVersion"`
-	RegistryRootHash        string   `json:"registryRootHash"`
-	RulesVersion            string   `json:"rulesVersion"`
-	RulesHash               string   `json:"rulesHash"`
-	ModelVersion            string   `json:"modelVersion"`
-	ModelHash               string   `json:"modelHash"`
-	AssignedOracleIDs       []string `json:"assignedOracleIds"`
-	RequiredConfirmations   int      `json:"requiredConfirmations"`
-	ExpectedResponses       int      `json:"expectedResponses"`
-	CommitmentCount         int      `json:"commitmentCount"`
-	RevealCount             int      `json:"revealCount"`
-	Status                  string   `json:"status"`
-	VerifiedResult          bool     `json:"verifiedResult"`
-	ResultHash              string   `json:"resultHash"`
-	FinalizationCode        string   `json:"finalizationCode"`
-	CommitDeadline          string   `json:"commitDeadline"`
-	RevealDeadline          string   `json:"revealDeadline"`
-	RequestedAt             string   `json:"requestedAt"`
-	FinalizedAt             string   `json:"finalizedAt"`
+	ProtocolVersion         string            `json:"protocolVersion,omitempty" metadata:",optional"`
+	Manifest                *OracleV2Manifest `json:"manifest,omitempty" metadata:",optional"`
+	ManifestHash            string            `json:"manifestHash,omitempty" metadata:",optional"`
+	PolicyVersion           string            `json:"policyVersion,omitempty" metadata:",optional"`
+	RosterVersion           string            `json:"rosterVersion,omitempty" metadata:",optional"`
+	FactVectorHash          string            `json:"factVectorHash,omitempty" metadata:",optional"`
+	Decision                string            `json:"decision,omitempty" metadata:",optional"`
+	FactVectorJSON          string            `json:"factVectorJSON,omitempty" metadata:",optional"`
+	AuditPeriodID           string            `json:"auditPeriodId,omitempty" metadata:",optional"`
+	ModelReleaseID          string            `json:"modelReleaseId,omitempty" metadata:",optional"`
+	AssetType               string            `json:"assetType"`
+	SchemaVersion           int               `json:"schemaVersion"`
+	ID                      string            `json:"id"`
+	ClaimID                 string            `json:"claimId"`
+	ClaimVersion            int               `json:"claimVersion"`
+	HospitalVerificationID  string            `json:"hospitalVerificationId"`
+	AppealID                string            `json:"appealId"`
+	AppealCommitmentHash    string            `json:"appealCommitmentHash"`
+	PrivacyPresentationID   string            `json:"privacyPresentationId"`
+	PrivacyPresentationHash string            `json:"privacyPresentationHash"`
+	PrivacyProtocolVersion  string            `json:"privacyProtocolVersion"`
+	QueryHash               string            `json:"queryHash"`
+	RegistrySnapshotID      string            `json:"registrySnapshotId"`
+	RegistryVersion         int               `json:"registryVersion"`
+	RegistryRootHash        string            `json:"registryRootHash"`
+	RulesVersion            string            `json:"rulesVersion"`
+	RulesHash               string            `json:"rulesHash"`
+	ModelVersion            string            `json:"modelVersion"`
+	ModelHash               string            `json:"modelHash"`
+	AssignedOracleIDs       []string          `json:"assignedOracleIds"`
+	RequiredConfirmations   int               `json:"requiredConfirmations"`
+	ExpectedResponses       int               `json:"expectedResponses"`
+	CommitmentCount         int               `json:"commitmentCount"`
+	RevealCount             int               `json:"revealCount"`
+	Status                  string            `json:"status"`
+	VerifiedResult          bool              `json:"verifiedResult"`
+	ResultHash              string            `json:"resultHash"`
+	FinalizationCode        string            `json:"finalizationCode"`
+	CommitDeadline          string            `json:"commitDeadline"`
+	RevealDeadline          string            `json:"revealDeadline"`
+	RequestedAt             string            `json:"requestedAt"`
+	FinalizedAt             string            `json:"finalizedAt"`
 }
 
 type OracleCommitment struct {
@@ -476,6 +484,10 @@ type OracleCommitment struct {
 }
 
 type OracleResult struct {
+	ProtocolVersion         string `json:"protocolVersion,omitempty" metadata:",optional"`
+	WorkerDiagnosticsHash   string `json:"workerDiagnosticsHash,omitempty" metadata:",optional"`
+	FactVectorJSON          string `json:"factVectorJSON,omitempty" metadata:",optional"`
+	Decision                string `json:"decision,omitempty" metadata:",optional"`
 	AssetType               string `json:"assetType"`
 	SchemaVersion           int    `json:"schemaVersion"`
 	ID                      string `json:"id"`
@@ -687,22 +699,23 @@ type FraudAssessment struct {
 }
 
 type Settlement struct {
-	ApprovalCertificateHash string `json:"approvalCertificateHash,omitempty" metadata:",optional"`
-	AssetType               string `json:"assetType"`
-	SchemaVersion           int    `json:"schemaVersion"`
-	ID                      string `json:"id"`
-	ClaimID                 string `json:"claimId"`
-	SourceAccountID         string `json:"sourceAccountId"`
-	DestinationAccountID    string `json:"destinationAccountId"`
-	TransferID              string `json:"transferId"`
-	AmountMinor             int64  `json:"amountMinor"`
-	Currency                string `json:"currency"`
-	Status                  string `json:"status"`
-	FailureCode             string `json:"failureCode"`
-	BankReferenceHash       string `json:"bankReferenceHash"`
-	AuthorizedAt            string `json:"authorizedAt"`
-	ConfirmedAt             string `json:"confirmedAt"`
-	UpdatedAt               string `json:"updatedAt"`
+	PostPaymentAuditRequired bool   `json:"postPaymentAuditRequired,omitempty" metadata:",optional"`
+	ApprovalCertificateHash  string `json:"approvalCertificateHash,omitempty" metadata:",optional"`
+	AssetType                string `json:"assetType"`
+	SchemaVersion            int    `json:"schemaVersion"`
+	ID                       string `json:"id"`
+	ClaimID                  string `json:"claimId"`
+	SourceAccountID          string `json:"sourceAccountId"`
+	DestinationAccountID     string `json:"destinationAccountId"`
+	TransferID               string `json:"transferId"`
+	AmountMinor              int64  `json:"amountMinor"`
+	Currency                 string `json:"currency"`
+	Status                   string `json:"status"`
+	FailureCode              string `json:"failureCode"`
+	BankReferenceHash        string `json:"bankReferenceHash"`
+	AuthorizedAt             string `json:"authorizedAt"`
+	ConfirmedAt              string `json:"confirmedAt"`
+	UpdatedAt                string `json:"updatedAt"`
 }
 
 type HistoryRecord struct {

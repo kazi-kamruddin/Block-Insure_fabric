@@ -6,6 +6,12 @@ Run the verifier with an Insurer dossier export. It checks settled, authorized, 
 python -B tools/verify-dossier/verify_dossier.py <export.json>
 ```
 
+For a version-8 dossier, the verifier recomputes the Oracle v2 manifest,
+exact fact vector, routing decision, subject-bound commitments and
+certificate fields. It checks the issuer's Ed25519 signatures over
+anchored feed roots with the existing Node 24 runtime. Version-7 and older
+dossiers retain their historical rules.
+
 A local export reports **INTERNALLY CONSISTENT — NOT ANCHORED** if its checks pass. The optional `--expected-certificate-hash` compares only the certificate hash with a separately obtained digest.
 
 For an anchored check, obtain a separate readback against the Insurer peer while the approved dev-lite stack is running. The command evaluates existing chaincode and QSCC queries. It writes its JSON under the ignored `data/dev-lite/dossier-readback/` directory and reports the path.

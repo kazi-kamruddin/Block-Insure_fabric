@@ -27,12 +27,16 @@ func (c *Contract) AuthorizeSettlement(ctx contractapi.TransactionContextInterfa
 			if err != nil {
 				return nil, err
 			}
-			if claim.MedicalHeldReleaseID == "" {
+			cert, err := c.ReadMedicalApprovalCertificate(ctx, claim.ID, claim.Version)
+			if err != nil {
+				return nil, fmt.Errorf("current medical approval certificate is required: %w", err)
+			}
+			if cert.Path == "ORACLE_AUTO" {
 				if err := c.requireUsableMedicalRelease(ctx, request); err != nil {
 					return nil, err
 				}
 			}
-			cert, err := c.verifyMedicalApproval(ctx, claim)
+			cert, err = c.verifyMedicalApproval(ctx, claim)
 			if err != nil {
 				return nil, err
 			}
@@ -53,7 +57,7 @@ func (c *Contract) AuthorizeSettlement(ctx contractapi.TransactionContextInterfa
 	if _, _, err := c.validateSettlementAccounts(ctx, claim, sourceAccountID, destinationAccountID); err != nil {
 		return nil, err
 	}
-	now, err := timestamp(ctx)
+	now, err := ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -134,46 +138,81 @@ func (c *Contract) ConfirmSettlement(ctx contractapi.TransactionContextInterface
 	if err != nil {
 		return nil, err
 	}
+	var execution *medicalBankExecution
 	if claim.EpisodeID != "" {
 		if claim.MedicalSettlementID != settlement.ID || claim.Status != "SETTLEMENT_AUTHORIZED" || claim.AmountMinor != settlement.AmountMinor {
 			return nil, fmt.Errorf("settlement belongs to a superseded medical claim version")
 		}
 		if usesMedicalApprovalCertificates(ctx) {
-			cert, err := c.verifyMedicalApproval(ctx, claim)
+			execution, err = readMedicalBankExecution(ctx, settlement.ID)
 			if err != nil {
 				return nil, err
 			}
-			if cert.Hash != settlement.ApprovalCertificateHash || cert.Currency != settlement.Currency {
-				return nil, fmt.Errorf("settlement has no matching medical approval certificate")
+			var cert *ApprovalCertificate
+			if execution != nil {
+				// Execution already verified the source revision, paid period and
+				// certificate. Confirm the same effective authorization even if
+				// the hospital has since published another episode revision.
+				cert, err = c.ReadMedicalApprovalCertificate(ctx, claim.ID, claim.Version)
+			} else {
+				cert, err = c.verifyMedicalApproval(ctx, claim)
+			}
+			if err != nil {
+				return nil, err
+			}
+			if cert.SupersededBy != "" || cert.ClaimID != claim.ID || cert.ClaimVersion != claim.Version ||
+				cert.Hash != settlement.ApprovalCertificateHash || cert.Currency != settlement.Currency {
+				return nil, fmt.Errorf("settlement has no matching effective medical approval certificate")
+			}
+			if cert.Path == "ORACLE_AUTO" {
+				request, err := c.medicalApprovalRequest(ctx, claim)
+				if err != nil {
+					return nil, err
+				}
+				held, err := c.heldMedicalRequest(ctx, request)
+				if err != nil {
+					return nil, err
+				}
+				if held && execution == nil {
+					return nil, fmt.Errorf("model held; settlement requires review")
+				}
+				settlement.PostPaymentAuditRequired = held
 			}
 		}
-		if _, err := currentMedicalHead(ctx, claim); err != nil {
-			return nil, err
+		if execution == nil {
+			if _, err := currentMedicalHead(ctx, claim); err != nil {
+				return nil, err
+			}
+			policy, err := c.ReadPolicy(ctx, claim.PolicyID)
+			if err != nil {
+				return nil, err
+			}
+			if err := c.requirePaidMedicalPeriod(ctx, policy, claim.IncidentDate); err != nil {
+				return nil, err
+			}
 		}
-		policy, err := c.ReadPolicy(ctx, claim.PolicyID)
+	}
+	now, err := ledgerTimestamp(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var transfer *BankTransfer
+	if execution != nil {
+		if execution.Status != "EXECUTED" || execution.TransferID != transferID || execution.ReferenceHash != strings.ToLower(bankReferenceHash) ||
+			execution.CertificateHash != settlement.ApprovalCertificateHash {
+			return nil, fmt.Errorf("confirmation does not match the executed private Bank transfer")
+		}
+		transfer, err = c.ReadBankTransfer(ctx, transferID)
+		if err != nil || transfer.Status != "SETTLED" || transfer.SettlementID != settlement.ID ||
+			transfer.AmountMinor != settlement.AmountMinor || transfer.SourceAccountID != settlement.SourceAccountID ||
+			transfer.DestinationAccountID != settlement.DestinationAccountID || transfer.ExternalReferenceHash != execution.ReferenceHash {
+			return nil, fmt.Errorf("executed Bank transfer does not match the settlement")
+		}
+	} else {
+		transfer, err = c.executeSettlementTransfer(ctx, claim, settlement, transferID, bankReferenceHash, now)
 		if err != nil {
 			return nil, err
 		}
-		if err := c.requirePaidMedicalPeriod(ctx, policy, claim.IncidentDate); err != nil {
-			return nil, err
-		}
-	}
-	now, err := timestamp(ctx)
-	if err != nil {
-		return nil, err
-	}
-	source, destination, err := c.validateSettlementAccounts(ctx, claim, settlement.SourceAccountID, settlement.DestinationAccountID)
-	if err != nil {
-		return nil, err
-	}
-	transfer := &BankTransfer{
-		AssetType: "bankTransfer", SchemaVersion: SchemaVersion, ID: transferID,
-		BankID: source.BankID, SourceAccountID: source.ID, DestinationAccountID: destination.ID,
-		PolicyID: claim.PolicyID, SettlementID: settlement.ID, AmountMinor: settlement.AmountMinor,
-		Currency: "BDT", Method: "CLAIM_PAYOUT", ExternalReferenceHash: strings.ToLower(bankReferenceHash), CreatedAt: now,
-	}
-	if err := c.settlePremiumTransfer(ctx, transfer, source, destination); err != nil {
-		return nil, err
 	}
 	settlement.TransferID = transfer.ID
 	settlement.BankReferenceHash = strings.ToLower(bankReferenceHash)
@@ -214,6 +253,118 @@ func (c *Contract) ConfirmSettlement(ctx contractapi.TransactionContextInterface
 		return nil, err
 	}
 	return settlement, nil
+}
+
+func (c *Contract) executeSettlementTransfer(ctx contractapi.TransactionContextInterface, claim *Claim, settlement *Settlement, transferID, referenceHash, now string) (*BankTransfer, error) {
+	source, destination, err := c.validateSettlementAccounts(ctx, claim, settlement.SourceAccountID, settlement.DestinationAccountID)
+	if err != nil {
+		return nil, err
+	}
+	transfer := &BankTransfer{
+		AssetType: "bankTransfer", SchemaVersion: SchemaVersion, ID: transferID,
+		BankID: source.BankID, SourceAccountID: source.ID, DestinationAccountID: destination.ID,
+		PolicyID: claim.PolicyID, SettlementID: settlement.ID, AmountMinor: settlement.AmountMinor,
+		Currency: "BDT", Method: "CLAIM_PAYOUT", ExternalReferenceHash: strings.ToLower(referenceHash), CreatedAt: now,
+	}
+	if err := c.settlePremiumTransfer(ctx, transfer, source, destination); err != nil {
+		return nil, err
+	}
+	return transfer, nil
+}
+
+type medicalBankExecution struct {
+	Status          string `json:"status"`
+	TransferID      string `json:"transferId"`
+	ReferenceHash   string `json:"referenceHash"`
+	CertificateHash string `json:"certificateHash"`
+}
+
+func readMedicalBankExecution(ctx contractapi.TransactionContextInterface, settlementID string) (*medicalBankExecution, error) {
+	key, err := stateKey(ctx, "medicalBankExecution", settlementID)
+	if err != nil {
+		return nil, err
+	}
+	raw, err := ctx.GetStub().GetPrivateData(bankInsurerPrivateCollection, key)
+	if err != nil || len(raw) == 0 {
+		return nil, err
+	}
+	var execution medicalBankExecution
+	if err := json.Unmarshal(raw, &execution); err != nil {
+		return nil, err
+	}
+	return &execution, nil
+}
+
+// ExecuteMedicalSettlementTransfer records the optional two-stage Bank flow.
+// The normal ConfirmSettlement flow remains a single atomic debit and close.
+func (c *Contract) ExecuteMedicalSettlementTransfer(ctx contractapi.TransactionContextInterface, settlementID, transferID, bankReferenceHash string) (*BankTransfer, error) {
+	if _, err := requireIdentity(ctx, "BankMSP", "bankOfficer"); err != nil {
+		return nil, err
+	}
+	if !usesMedicalApprovalCertificates(ctx) || !oracleV2Hash.MatchString(bankReferenceHash) {
+		return nil, fmt.Errorf("invalid medical transfer execution")
+	}
+	settlement, err := c.ReadSettlement(ctx, settlementID)
+	if err != nil {
+		return nil, err
+	}
+	claim, err := c.ReadClaim(ctx, settlement.ClaimID)
+	if err != nil {
+		return nil, err
+	}
+	if settlement.Status != "AUTHORIZED" || claim.EpisodeID == "" || claim.Status != "SETTLEMENT_AUTHORIZED" ||
+		claim.MedicalSettlementID != settlementID || claim.AmountMinor != settlement.AmountMinor {
+		return nil, fmt.Errorf("settlement is not eligible for medical transfer execution")
+	}
+	cert, err := c.verifyMedicalApproval(ctx, claim)
+	if err != nil {
+		return nil, err
+	}
+	if cert.Hash != settlement.ApprovalCertificateHash || cert.Currency != settlement.Currency {
+		return nil, fmt.Errorf("settlement does not match its medical certificate")
+	}
+	if cert.Path == "ORACLE_AUTO" {
+		request, err := c.medicalApprovalRequest(ctx, claim)
+		if err != nil {
+			return nil, err
+		}
+		if err := c.requireUsableMedicalRelease(ctx, request); err != nil {
+			return nil, err
+		}
+	}
+	if previous, err := readMedicalBankExecution(ctx, settlementID); err != nil || previous != nil {
+		return nil, fmt.Errorf("medical settlement transfer already executed or is unavailable")
+	}
+	policy, err := c.ReadPolicy(ctx, claim.PolicyID)
+	if err != nil {
+		return nil, err
+	}
+	if err := c.requirePaidMedicalPeriod(ctx, policy, claim.IncidentDate); err != nil {
+		return nil, err
+	}
+	now, err := ledgerTimestamp(ctx)
+	if err != nil {
+		return nil, err
+	}
+	transfer, err := c.executeSettlementTransfer(ctx, claim, settlement, transferID, bankReferenceHash, now)
+	if err != nil {
+		return nil, err
+	}
+	if transfer.Status != "SETTLED" {
+		return nil, fmt.Errorf("Bank did not execute the medical settlement transfer")
+	}
+	key, err := stateKey(ctx, "medicalBankExecution", settlementID)
+	if err != nil {
+		return nil, err
+	}
+	raw, err := json.Marshal(medicalBankExecution{Status: "EXECUTED", TransferID: transferID, ReferenceHash: bankReferenceHash, CertificateHash: cert.Hash})
+	if err != nil {
+		return nil, err
+	}
+	if err := ctx.GetStub().PutPrivateData(bankInsurerPrivateCollection, key, raw); err != nil {
+		return nil, err
+	}
+	return transfer, nil
 }
 
 func emitSettlementOutcome(ctx contractapi.TransactionContextInterface, name string, settlement *Settlement, claim *Claim) error {

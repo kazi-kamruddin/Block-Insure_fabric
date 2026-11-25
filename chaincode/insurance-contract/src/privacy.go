@@ -181,11 +181,11 @@ func validateCredentialExpiry(ctx contractapi.TransactionContextInterface, expir
 	if err != nil {
 		return "", fmt.Errorf("expiresAt must use RFC3339")
 	}
-	tx, err := ctx.GetStub().GetTxTimestamp()
+	tx, err := ledgerNow(ctx)
 	if err != nil {
 		return "", fmt.Errorf("read transaction timestamp: %w", err)
 	}
-	if !expires.After(tx.AsTime()) {
+	if !expires.After(tx) {
 		return "", fmt.Errorf("expiresAt must be after the transaction time")
 	}
 	return expires.UTC().Format(time.RFC3339), nil
@@ -209,7 +209,7 @@ func (c *Contract) issuePrivacyCredential(ctx contractapi.TransactionContextInte
 	}
 	fields := buildCredentialFields(values, salts)
 	root := privacyMerkleRoot(id, 1, fields)
-	now, err := timestamp(ctx)
+	now, err := ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -341,7 +341,7 @@ func (c *Contract) RevokePrivacyCredential(ctx contractapi.TransactionContextInt
 	if credential.Status != "ACTIVE" {
 		return nil, fmt.Errorf("credential %s is not active", id)
 	}
-	now, err := timestamp(ctx)
+	now, err := ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -475,13 +475,13 @@ func (c *Contract) RegisterClaimPrivacyPresentation(ctx contractapi.TransactionC
 	if policyCredential.CredentialType != "INSURANCE_POLICY" || policyCredential.SourceID != claim.PolicyID || policyCredential.Status != "ACTIVE" {
 		return nil, fmt.Errorf("policy credential %s is not active for claim %s", policyCredentialID, claimID)
 	}
-	tx, err := ctx.GetStub().GetTxTimestamp()
+	tx, err := ledgerNow(ctx)
 	if err != nil {
 		return nil, err
 	}
 	for _, credential := range []*PrivacyCredential{invoiceCredential, policyCredential} {
 		expiry, _ := time.Parse(time.RFC3339, credential.ExpiresAt)
-		if !expiry.After(tx.AsTime()) {
+		if !expiry.After(tx) {
 			return nil, fmt.Errorf("credential %s is expired", credential.ID)
 		}
 	}
@@ -531,7 +531,7 @@ func (c *Contract) RegisterClaimPrivacyPresentation(ctx contractapi.TransactionC
 		return nil, err
 	}
 	digest := sha256.Sum256(payload)
-	now, err := timestamp(ctx)
+	now, err := ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}

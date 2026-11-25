@@ -50,11 +50,11 @@ func (c *Contract) CommitMedicalAuditPeriod(ctx contractapi.TransactionContextIn
 	if err != nil {
 		return nil, err
 	}
-	txTime, err := ctx.GetStub().GetTxTimestamp()
+	txTime, err := ledgerNow(ctx)
 	if err != nil {
 		return nil, err
 	}
-	if !from.After(txTime.AsTime()) || !to.After(from) || rateBps < 1 || rateBps > 10_000 || !idPattern.MatchString(id) {
+	if !from.After(txTime) || !to.After(from) || rateBps < 1 || rateBps > 10_000 || !idPattern.MatchString(id) {
 		return nil, fmt.Errorf("invalid audit period or sampling rate")
 	}
 	key, err := stateKey(ctx, "medicalAuditActive", "period")
@@ -71,7 +71,7 @@ func (c *Contract) CommitMedicalAuditPeriod(ctx contractapi.TransactionContextIn
 			return nil, err
 		}
 		priorEnd, err := time.Parse(time.RFC3339, prior.EndsAt)
-		if err != nil || txTime.AsTime().Before(priorEnd) {
+		if err != nil || txTime.Before(priorEnd) {
 			return nil, fmt.Errorf("prior audit period has not ended")
 		}
 	}
@@ -94,12 +94,12 @@ func (c *Contract) RevealMedicalAuditSeed(ctx contractapi.TransactionContextInte
 	if err != nil {
 		return nil, err
 	}
-	now, err := ctx.GetStub().GetTxTimestamp()
+	now, err := ledgerNow(ctx)
 	if err != nil {
 		return nil, err
 	}
 	end, err := time.Parse(time.RFC3339, period.EndsAt)
-	if err != nil || now.AsTime().Before(end) || period.Seed != "" {
+	if err != nil || now.Before(end) || period.Seed != "" {
 		return nil, fmt.Errorf("audit seed may be revealed once after the period")
 	}
 	seed = strings.ToLower(seed)
@@ -192,7 +192,7 @@ func (c *Contract) ResolveMedicalAuditSelection(ctx contractapi.TransactionConte
 	} else if err := c.recordMedicalApproval(ctx, claim, request, nil); err != nil {
 		return nil, err
 	}
-	claim.UpdatedAt, err = timestamp(ctx)
+	claim.UpdatedAt, err = ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}

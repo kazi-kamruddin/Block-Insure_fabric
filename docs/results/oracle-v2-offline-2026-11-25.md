@@ -14,6 +14,8 @@ The panel budget is fixed at 50% of the full cohort, rounded down to 132 fixed s
 
 ## Outcomes at the fixed panel budget
 
+The per-scenario rows are the primary results. The aggregate counts and percentages depend on the equal-weight scenario mix, and unresolved counts also depend on the panel budget.
+
 | Configuration | Auto approvals (% of all) | Wrong auto approvals (% of ineligible) | Legitimate referrals (% of eligible) | CONFLICT (% of all) | TIMEOUT | Panel demand (% of all) | Panel served | Unresolved | Routing p50/p95 (s) | Decision p50/p95 (s) |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | v1 shared Insurer snapshot | 256 (97.0%) | 156 (100.0%) | 8 (7.4%) | 4 (1.5%) | 4 | 8 (3.0%) | 8 | 0 | 9/65 | 9/65 |
@@ -41,7 +43,7 @@ In the table below, each mode column reports wrong automatic approvals / legitim
 
 ## Replay of one shared-source decision
 
-The synthetic case agreeing-copies-001 claims BDT 3691.87. Its ground-truth invoice is BDT 2941.87. The regulator-signed accreditation record cites the hospital's invoice record, so their origin closures overlap even though their signer and control-domain metadata differ. The signed claimant receipt matches the hospital invoice as a derivative copy.
+The synthetic lineage stress case agreeing-copies-001 claims BDT 3691.87. Its ground-truth invoice is BDT 2941.87. The regulator-signed accreditation record cites the hospital's invoice record, an intentionally unrealistic dependency that makes their origin closures overlap even though their signer and control-domain metadata differ. The signed claimant receipt matches the hospital invoice as a derivative copy.
 
 | Configuration | Routing decision | Agreeing worker observations | Reveals needed before finalization | Evidence condition | Shared result or fact-vector hash |
 | --- | --- | ---: | ---: | --- | --- |

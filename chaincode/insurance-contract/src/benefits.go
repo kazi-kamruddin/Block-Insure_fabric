@@ -35,7 +35,7 @@ func (c *Contract) CreateBenefitPlan(ctx contractapi.TransactionContextInterface
 			version = existing.Version + 1
 		}
 	}
-	now, err := timestamp(ctx)
+	now, err := ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -66,7 +66,7 @@ func (c *Contract) RetireBenefitPlan(ctx contractapi.TransactionContextInterface
 		return nil, fmt.Errorf("benefit plan %s must be PUBLISHED to retire", id)
 	}
 	plan.Status = "RETIRED"
-	plan.UpdatedAt, err = timestamp(ctx)
+	plan.UpdatedAt, err = ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -118,7 +118,7 @@ func (c *Contract) PublishBenefitPlan(ctx contractapi.TransactionContextInterfac
 		}
 	}
 	plan.Status = "PUBLISHED"
-	plan.UpdatedAt, err = timestamp(ctx)
+	plan.UpdatedAt, err = ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -196,7 +196,7 @@ func (c *Contract) SetBeneficiaries(ctx contractapi.TransactionContextInterface,
 		}
 		revision = previous.Revision + 1
 	}
-	now, err := timestamp(ctx)
+	now, err := ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -293,7 +293,7 @@ func (c *Contract) SubmitBenefitRequest(ctx contractapi.TransactionContextInterf
 	if err != nil {
 		return nil, fmt.Errorf("beneficiaries must be designated before requesting a benefit: %w", err)
 	}
-	now, err := timestamp(ctx)
+	now, err := ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -332,7 +332,7 @@ func (c *Contract) DecideBenefitRequest(ctx contractapi.TransactionContextInterf
 	if request.Status != "SUBMITTED" {
 		return nil, fmt.Errorf("benefit request %s must be SUBMITTED for a decision", id)
 	}
-	now, err := timestamp(ctx)
+	now, err := ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -378,7 +378,7 @@ func (c *Contract) MarkBenefitPaymentReady(ctx contractapi.TransactionContextInt
 	if err != nil {
 		return nil, err
 	}
-	now, err := timestamp(ctx)
+	now, err := ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -445,7 +445,7 @@ func (c *Contract) ConfirmBenefitPayment(ctx contractapi.TransactionContextInter
 	if fundingAccount.BalanceMinor < request.AmountMinor {
 		return nil, fmt.Errorf("insurer account %s has insufficient funds for benefit %s", fundingAccount.ID, id)
 	}
-	now, err := timestamp(ctx)
+	now, err := ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}

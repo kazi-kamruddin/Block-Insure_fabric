@@ -36,6 +36,11 @@ The start script launches the connector, waits for its `/health` check and
 passes it the shared `EMAIL_GATEWAY_TOKEN` from `app-secrets.json`. The
 connector logs only the template name and Brevo message ID, never the code.
 
+Keyed delivery attempts use `email-delivery-state.json` in the ledger's
+ignored app-state directory. An acknowledged retry returns the stored message
+ID. An ambiguous provider response stays reserved for reconciliation, so a
+connector restart cannot send the same notice twice.
+
 If the demo room has no internet, start without `-Email`; the code then
 appears on screen as before.
 

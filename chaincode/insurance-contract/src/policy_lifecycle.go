@@ -77,7 +77,7 @@ func (c *Contract) acquirePolicy(ctx contractapi.TransactionContextInterface, id
 			return nil, err
 		}
 	}
-	now, err := timestamp(ctx)
+	now, err := ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -145,7 +145,7 @@ func (c *Contract) AdvancePolicyLifecycle(ctx contractapi.TransactionContextInte
 	if previous == "LAPSED" && policy.Status != "EXPIRED" {
 		return nil, fmt.Errorf("policy %s is LAPSED; only expiry or reinstatement can change it", id)
 	}
-	policy.UpdatedAt, err = timestamp(ctx)
+	policy.UpdatedAt, err = ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -193,7 +193,7 @@ func (c *Contract) CancelPolicy(ctx contractapi.TransactionContextInterface, id,
 	}
 	policy.Status = "CANCELLED"
 	policy.CancellationReasonHash = strings.ToLower(reasonHash)
-	policy.UpdatedAt, err = timestamp(ctx)
+	policy.UpdatedAt, err = ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -249,7 +249,7 @@ func (c *Contract) RenewPolicy(ctx contractapi.TransactionContextInterface, newI
 	if policyPackage.Status != "PUBLISHED" {
 		return nil, fmt.Errorf("policy package %s is not published for renewal", existing.PackageID)
 	}
-	now, err := timestamp(ctx)
+	now, err := ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { createHash } from "node:crypto";
 import vectors from "../../../../services/oracle-worker/test/fixtures/canonical-vectors.json";
-import { canonical, hash, verifyExplanation, type ExplanationReceipt } from "./explanation-receipt";
+import { canonical, hash, verifyExplanation, verifyV2Explanation, type ExplanationReceipt } from "./explanation-receipt";
 
 const payload = {
   evaluatorHash: "a".repeat(64), contextHash: "b".repeat(64),
@@ -35,5 +36,15 @@ describe("Oracle explanation receipts", () => {
     altered.assessment.explanation.contributions.amount = 2;
     expect(verifyExplanation([receipt("oracle1"), altered], finalResults, payload.evaluatorHash))
       .toMatchObject({ verified: false, matchingWorkers: 1 });
+  });
+  it("verifies each v2 worker against its own committed diagnostic hash", () => {
+    const diagnostics = { schema: "oracle-worker-diagnostics-v1", evaluatorHash: payload.evaluatorHash, contextHash: payload.contextHash,
+      explanation: payload.assessment.explanation, outOfDistribution: { distance: 9 }, ratios: {}, retrievalPath: "DIRECT", retrievalReceipts: [] };
+    const workerDiagnosticsHash = createHash("sha256").update("oracle-v2:worker-diagnostics\0" + canonical(diagnostics)).digest("hex");
+    const result = { requestId: "request-201", oracleId: "oracle1", workerDiagnosticsHash };
+    const report = { ...diagnostics, ...result, schema: "oracle-v2-explanation-receipt-v1" };
+    expect(verifyV2Explanation(report, result, payload.evaluatorHash)).toBe(true);
+    expect(verifyV2Explanation({ ...report, oracleId: "oracle2" }, result, payload.evaluatorHash)).toBe(false);
+    expect(verifyV2Explanation({ ...report, explanation: null }, result, payload.evaluatorHash)).toBe(false);
   });
 });

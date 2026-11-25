@@ -204,7 +204,7 @@ func (c *Contract) ReinstatePolicy(ctx contractapi.TransactionContextInterface, 
 	if !lapsed {
 		return nil, fmt.Errorf("policy %s is %s and cannot be reinstated", id, policy.Status)
 	}
-	now, err := timestamp(ctx)
+	now, err := ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}

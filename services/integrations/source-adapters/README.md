@@ -52,6 +52,15 @@ public diagnostics keys for a separately configured verifier.
 
 ## API and verification
 
+For a separately reviewed R1 diagnostic dataset, place the unsigned
+`{versions:[{records:{"S-A":[],"S-B":[],"S-C":[]},coverage:{issuedAt,from,through}}]}`
+input in the ignored dev-lite state tree. A direct adapter run takes
+`--r1-only --root data/dev-lite/r1-source-adapters --dataset data/dev-lite/r1-source-adapters/dataset.json`.
+An R1 mirror takes `--r1-only --root data/dev-lite/r1-source-adapters-mirror --mirror-from data/dev-lite/r1-source-adapters`.
+The worker launcher reads distinct adapter tokens per profile. Configure
+`ORACLE_V2_SOURCE_URLS` as a JSON object from worker ID to issuer IDs and
+their direct or mirror URLs. S-D remains part of the offline fixture.
+
 All routes require a worker bearer token. Feed versions and roots are pinned by
 the consuming request. The latest version is available for discovery.
 

@@ -88,7 +88,7 @@ func (c *Contract) submitClaim(ctx contractapi.TransactionContextInterface, id, 
 	if err := validateHash("descriptionHash", descriptionHash); err != nil {
 		return nil, err
 	}
-	now, err := timestamp(ctx)
+	now, err := ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -163,7 +163,7 @@ func (c *Contract) AddEvidenceReference(ctx contractapi.TransactionContextInterf
 			return nil, fmt.Errorf("appeal evidence content hash does not match the active commitment")
 		}
 	}
-	now, err := timestamp(ctx)
+	now, err := ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -259,7 +259,7 @@ func (c *Contract) recordClaimVerification(
 		}
 		appealID = appeal.ID
 	}
-	now, err := timestamp(ctx)
+	now, err := ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}

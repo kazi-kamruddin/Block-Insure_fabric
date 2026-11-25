@@ -1197,7 +1197,7 @@ export function WorkspaceClient({
     case "insurerAdmin:premiums":
       content = <div className="workGrid"><PremiumOperations />{guidedForm}</div>; break;
     case "insurerAdmin:verification": case "auditor:verification":
-      content = <div className="workGrid">{oracleCard}{guidedForm}</div>; break;
+      content = <div className="workGrid">{oracleCard}{devLite && <OracleGovernance role={account.role as "insurerAdmin" | "auditor"} />}{guidedForm}</div>; break;
     case "insurerAdmin:reports": case "auditor:reports":
       content = <div className="workGrid">{reportsCard}</div>; break;
     case "insurerAdmin:tools": case "auditor:tools":
@@ -1220,7 +1220,7 @@ export function WorkspaceClient({
     case "hospitalOfficer:intake":
       content = <div className="workGrid">{guidedForm}</div>; break;
     case "hospitalOfficer:registry":
-      content = devLite ? <div className="workGrid"><MedicalRegistryControls role="hospitalOfficer" /></div>
+      content = devLite ? <div className="workGrid"><OracleGovernance role="hospitalOfficer" fallback={<MedicalRegistryControls role="hospitalOfficer" />} /></div>
         : <p className="emptyState">Registry approvals are not used on this network.</p>; break;
     case "bankOfficer:accounts":
       content = <div className="workGrid">{accountCards}<BankDesk show="links" />{guidedForm}</div>; break;
@@ -1292,3 +1292,4 @@ export function WorkspaceClient({
     </div>
   );
 }
+import { OracleGovernance } from "./oracle-governance";

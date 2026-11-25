@@ -20,7 +20,7 @@ func (c *Contract) CreatePolicyPackage(ctx contractapi.TransactionContextInterfa
 	if err := validateHash("termsHash", termsHash); err != nil {
 		return nil, err
 	}
-	now, err := timestamp(ctx)
+	now, err := ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -51,7 +51,7 @@ func (c *Contract) PublishPolicyPackage(ctx contractapi.TransactionContextInterf
 	if policyPackage.Status != "DRAFT" {
 		return nil, fmt.Errorf("policy package %s must be DRAFT to publish", id)
 	}
-	now, err := timestamp(ctx)
+	now, err := ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -77,7 +77,7 @@ func (c *Contract) RetirePolicyPackage(ctx contractapi.TransactionContextInterfa
 	if policyPackage.Status != "PUBLISHED" {
 		return nil, fmt.Errorf("policy package %s must be PUBLISHED to retire", id)
 	}
-	now, err := timestamp(ctx)
+	now, err := ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -120,7 +120,7 @@ func (c *Contract) IssuePolicy(ctx contractapi.TransactionContextInterface, id, 
 	if policyPackage.MedicalRulesVersion != 0 {
 		return nil, fmt.Errorf("medical policies must be acquired by the holder and activated by a premium payment")
 	}
-	now, err := timestamp(ctx)
+	now, err := ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}

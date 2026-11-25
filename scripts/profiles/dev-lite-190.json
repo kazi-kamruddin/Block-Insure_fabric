@@ -9,5 +9,6 @@
   "packageSha256": "d6da2d7759681c5c50c895187844f3d6bd0e1b8a3caa31949c58e89000843ec9",
   "goBuilderImage": "block-insure/fabric-ccenv:2.5.16-go1.26.11",
   "nodeVersion": "v24.16.0",
+  "e2EvaluatorHash": "6b0b1df713f9b28da89052bf748886d4d15d743ecd4adde30f3f15a9596f6166",
   "repoRoot": null
 }

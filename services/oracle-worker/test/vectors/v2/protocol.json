@@ -144,5 +144,12 @@
       "integrity": "INVALID_SIGNATURE",
       "expected": "INTEGRITY_FAIL"
     }
+  ],
+  "rejectedIntegrity": [
+    { "field": "invoiceIssued", "status": "PASS", "integrity": "INVALID_SIGNATURE" },
+    { "field": "invoiceIssued", "status": "UNVERIFIABLE", "integrity": "UNKNOWN" },
+    { "field": "invoiceIssued", "status": "UNVERIFIABLE", "integrity": null },
+    { "field": "invoiceIssued", "status": "CONTRADICTED", "integrity": "INACTIVE_LICENCE" },
+    { "field": "licenceActiveOnServiceDate", "status": "INSUFFICIENT", "integrity": "INACTIVE_LICENCE" }
   ]
 }

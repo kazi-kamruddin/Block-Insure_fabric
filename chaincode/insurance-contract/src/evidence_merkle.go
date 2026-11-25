@@ -111,7 +111,7 @@ func (c *Contract) PublishEvidenceMerkleBatch(ctx contractapi.TransactionContext
 	if !strings.EqualFold(computedRoot, rootHash) {
 		return nil, fmt.Errorf("rootHash does not match the canonical evidence Merkle root")
 	}
-	now, err := timestamp(ctx)
+	now, err := ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}

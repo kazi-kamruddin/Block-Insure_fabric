@@ -29,26 +29,28 @@ async function persistRecord(file, value, keepExisting) {
   } finally { await fs.unlink(temporary).catch(() => undefined); }
 }
 
-export async function selectLedgerInstance(profileRoot, channel, blockOne) {
+export async function selectLedgerInstance(profileRoot, channel, blockOne, ledgerMarker = "") {
   if (!/^[a-z][a-z0-9.-]{0,248}$/.test(channel)) throw new Error("Invalid Fabric channel name");
   if (!(blockOne instanceof Uint8Array) || blockOne.length === 0) throw new Error("Block 1 is required to select an application-state directory");
-  const provisioningId = createHash("sha256").update(blockOne).digest("hex");
+  if (ledgerMarker && !digestPattern.test(ledgerMarker)) throw new Error("Invalid on-ledger provisioning marker");
+  const blockOneId = createHash("sha256").update(blockOne).digest("hex");
+  const provisioningId = ledgerMarker || blockOneId;
   // Pin the existing profile layout to the first verified ledger it serves.
   const legacy = path.join(profileRoot, `ledger-${channel}.legacy.json`);
   let anchor = await readRecord(legacy);
   if (!anchor) {
-    await persistRecord(legacy, { channel, provisioningId }, true);
+    await persistRecord(legacy, { channel, provisioningId, blockOneId }, true);
     anchor = await readRecord(legacy);
   }
   if (!anchor || anchor.channel !== channel || !digestPattern.test(anchor.provisioningId)) throw new Error("Invalid legacy ledger-instance cache");
-  const appStateRoot = provisioningId === anchor.provisioningId
-    ? profileRoot : path.join(profileRoot, "instances", provisioningId.slice(0, 32));
+  const appStateRoot = blockOneId === (anchor.blockOneId ?? anchor.provisioningId)
+    ? profileRoot : path.join(profileRoot, "instances", blockOneId.slice(0, 32));
   if (appStateRoot !== profileRoot) {
     await fs.mkdir(appStateRoot, { recursive: true });
     const identity = path.join(appStateRoot, "ledger-instance.json");
-    await persistRecord(identity, { channel, provisioningId }, true);
+    await persistRecord(identity, { channel, provisioningId: blockOneId }, true);
     const instance = await readRecord(identity);
-    if (instance?.channel !== channel || instance?.provisioningId !== provisioningId) {
+    if (instance?.channel !== channel || instance?.provisioningId !== blockOneId) {
       throw new Error("Application-state directory is bound to a different ledger");
     }
   }

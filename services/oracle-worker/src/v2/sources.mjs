@@ -34,14 +34,15 @@ function verifyEnvelope(domain, envelope, issuer) {
 }
 
 function instant(value) {
-  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/.test(value)) return NaN;
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?Z$/.test(value)) return NaN;
   const time = Date.parse(value);
   return Number.isFinite(time) && new Date(time).toISOString().slice(0, 19) === value.slice(0, 19) ? time : NaN;
 }
 
 function activeKey(issuer, requestedAt) {
   const requested = instant(requestedAt);
-  return issuer.status === "ACTIVE" && requested >= instant(issuer.validFrom) && requested < instant(issuer.validUntil);
+  const eligible = issuer.status === "ACTIVE" || (issuer.status === "REVOKED" && requested < instant(issuer.revokedAt));
+  return eligible && requested >= instant(issuer.validFrom) && requested < instant(issuer.validUntil);
 }
 
 export function verifyRecord(record, issuer, requestedAt) {
@@ -157,7 +158,18 @@ export async function fetchPinnedFeed({ baseUrl, token, checkpoint, issuer, requ
   try {
     const feed = await response.json();
     if (Number.isSafeInteger(feed?.feedVersion) && feed.feedVersion < checkpoint.feedVersion) return { status: "STALE_MIRROR" };
-    return verifyFeed(feed, checkpoint, issuer, requestedAt) ? { status: "VERIFIED", feed } : { status: "INVALID_EVIDENCE" };
+    if (verifyFeed(feed, checkpoint, issuer, requestedAt)) return { status: "VERIFIED", feed };
+    if (feed?.issuerId === checkpoint.issuerId && feed.keyVersion === checkpoint.keyVersion &&
+        feed.feedVersion === checkpoint.feedVersion && feed.merkleRoot === checkpoint.root) {
+      const { records, anchorSignature, ...header } = feed;
+      if (!verifyEnvelope("oracle-v2:feed", header, issuer) ||
+          (feed.coverage && !verifyEnvelope("oracle-v2:coverage", feed.coverage, issuer)) ||
+          (Array.isArray(records) && records.some(record => record?.issuerId === issuer.issuerId &&
+            record.keyVersion === issuer.keyVersion && !verifyEnvelope("oracle-v2:record", record, issuer)))) {
+        return { status: "INVALID_EVIDENCE", integrity: "INVALID_SIGNATURE" };
+      }
+    }
+    return { status: "INVALID_EVIDENCE" };
   } catch (error) {
     return { status: error.name === "TimeoutError" || error.name === "AbortError" ? "TIMEOUT" : "INVALID_EVIDENCE" };
   }

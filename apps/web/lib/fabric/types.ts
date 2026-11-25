@@ -389,6 +389,14 @@ export type OracleRegistrySnapshot = {
 };
 
 export type OracleRequest = {
+  protocolVersion?: "v2";
+  manifest?: { schema: string; requestedAt: string; pins: Array<{ issuerId: string; keyVersion: number; feedVersion: number; root: string; effectiveAt: string; anchoredAt: string }> };
+  manifestHash?: string;
+  rosterVersion?: string;
+  policyVersion?: string;
+  factVectorHash?: string;
+  factVectorJSON?: string;
+  decision?: "AUTO_APPROVE" | "PANEL_REVIEW" | "INTEGRITY_FAIL";
   assetType: "oracleRequest";
   schemaVersion: number;
   id: string;
@@ -437,6 +445,10 @@ export type OracleCommitment = {
 };
 
 export type OracleResult = {
+  protocolVersion?: "v2";
+  factVectorJSON?: string;
+  decision?: OracleRequest["decision"];
+  workerDiagnosticsHash?: string;
   assetType: "oracleResult";
   schemaVersion: number;
   id: string;
@@ -582,7 +594,7 @@ export type ClaimReview = {
   approvals: number;
   rejections: number;
   votesCast: number;
-  status: "PREPARING" | "OPEN" | "APPROVED" | "REJECTED" | "TIMED_OUT" | "ACCESS_FAILED" | "SUPERSEDED";
+  status: "PREPARING" | "OPEN" | "APPROVED" | "REJECTED" | "TIMED_OUT" | "ACCESS_FAILED" | "PROCEDURAL_FAILURE" | "SUPERSEDED";
   deadline: LedgerTimestamp;
   openedAt: LedgerTimestamp;
   closedAt: LedgerTimestamp;
@@ -654,6 +666,11 @@ export type Settlement = {
 };
 
 export type MedicalApprovalCertificate = {
+  manifestHash?: string;
+  factVectorHash?: string;
+  decision?: string;
+  policyVersion?: string;
+  supersededBy?: string;
   claimId: string;
   claimVersion: number;
   amountMinor: number;

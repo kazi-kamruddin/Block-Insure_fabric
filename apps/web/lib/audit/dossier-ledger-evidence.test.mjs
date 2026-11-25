@@ -2,17 +2,18 @@ import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { test } from "vitest";
 import { common, ledger, peer } from "@hyperledger/fabric-protos";
-import { decodeDossierTransaction, recomputePayoutBreakdown } from "./dossier-ledger-evidence.mjs";
+import { decodeDossierTransaction, readDossierLedgerEvidence, recomputePayoutBreakdown } from "./dossier-ledger-evidence.mjs";
 
 const require = createRequire(import.meta.url);
 const { Timestamp } = require("google-protobuf/google/protobuf/timestamp_pb.js");
 const identity = { txId: "tx-42", channel: "test-channel", chaincode: "insurance-contract" };
 
-function encodeProcessedTransaction(validation) {
+function encodeProcessedTransaction(validation, { txId = identity.txId,
+  args = ["RevealOracleResult", "req-42"], value = { id: "req-42:oracle1" } } = {}) {
   const chaincodeId = new peer.ChaincodeID();
   chaincodeId.setName(identity.chaincode);
   const input = new peer.ChaincodeInput();
-  input.setArgsList([Buffer.from("RevealOracleResult"), Buffer.from("req-42")]);
+  input.setArgsList(args.map(item => Buffer.from(item)));
   const chaincodeSpec = new peer.ChaincodeSpec();
   chaincodeSpec.setChaincodeId(chaincodeId);
   chaincodeSpec.setInput(input);
@@ -22,8 +23,8 @@ function encodeProcessedTransaction(validation) {
   proposal.setInput(invocation.serializeBinary());
 
   const write = new ledger.rwset.kvrwset.KVWrite();
-  write.setKey("\0oracleResult\0req-42:oracle1\0");
-  write.setValue(Buffer.from(JSON.stringify({ id: "req-42:oracle1" })));
+  write.setKey(`\0oracleResult\0${value.id}\0`);
+  write.setValue(Buffer.from(JSON.stringify(value)));
   const kv = new ledger.rwset.kvrwset.KVRWSet();
   kv.setWritesList([write]);
   const namespace = new ledger.rwset.NsReadWriteSet();
@@ -52,7 +53,7 @@ function encodeProcessedTransaction(validation) {
   const channelHeader = new common.ChannelHeader();
   channelHeader.setType(common.HeaderType.ENDORSER_TRANSACTION);
   channelHeader.setChannelId(identity.channel);
-  channelHeader.setTxId(identity.txId);
+  channelHeader.setTxId(txId);
   channelHeader.setTimestamp(timestamp);
   const header = new common.Header();
   header.setChannelHeader(channelHeader.serializeBinary());
@@ -76,6 +77,28 @@ test("dossier reads committed invocation and write set from the selected channel
   assert.throws(() => decodeDossierTransaction(bytes, { ...identity, channel: "other" }), /channel or type differs/);
   assert.throws(() => decodeDossierTransaction(encodeProcessedTransaction(peer.TxValidationCode.MVCC_READ_CONFLICT), identity),
     /not valid/);
+});
+
+test("dossier opens both reveals when Fabric returns newest history first", async () => {
+  const requestId = "req-42", digest = "a".repeat(64), modelHash = "b".repeat(64);
+  const results = ["oracle1", "oracle2"].map(oracleId => ({
+    id: `${requestId}:${oracleId}`, oracleId, requestId, verified: true, verificationCode: "VERIFIED",
+    claimVersion: 1, registryVersion: 1, modelVersion: "model-v1", recordHash: digest, resultHash: digest,
+  }));
+  const transmissions = Object.fromEntries(results.map((result, index) => [`tx-${index}`,
+    encodeProcessedTransaction(peer.TxValidationCode.VALID, { txId: `tx-${index}`, value: result,
+      args: ["RevealOracleResult", requestId, "true", "VERIFIED", digest, digest, "1", "1", "model-v1", modelHash, digest],
+    }),
+  ]));
+  const report = await readDossierLedgerEvidence({
+    ...identity,
+    contract: { evaluateTransaction: async () => Buffer.from(JSON.stringify([
+      { txId: "tx-1", value: { revealCount: 2 } }, { txId: "tx-0", value: { revealCount: 1 } },
+    ])) },
+    qscc: { evaluateTransaction: async (_fn, _channel, txId) => transmissions[txId] },
+  }, { claim: { id: "claim-42" }, history: [], oracleRequests: [{ id: requestId, modelHash }],
+    oracleResults: results, approvalCertificate: null });
+  assert.deepEqual(report.oracleReveals.map(reveal => reveal.oracleId), ["oracle1", "oracle2"]);
 });
 
 test("dossier reproduces the chaincode's capped and floored payout in minor units", () => {

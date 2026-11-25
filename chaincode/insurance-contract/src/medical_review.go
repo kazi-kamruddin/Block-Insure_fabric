@@ -12,12 +12,12 @@ import (
 var medicalPanel = []string{"auditor1", "auditor2", "auditor3", "auditor4"}
 
 func medicalReviewClock(ctx contractapi.TransactionContextInterface, deadline string) (time.Time, error) {
-	ts, err := ctx.GetStub().GetTxTimestamp()
+	ts, err := ledgerNow(ctx)
 	if err != nil {
 		return time.Time{}, err
 	}
 	end, err := time.Parse(time.RFC3339, deadline)
-	if err != nil || !end.After(ts.AsTime()) || end.After(ts.AsTime().Add(14*24*time.Hour)) {
+	if err != nil || !end.After(ts) || (usesMedicalApprovalCertificates(ctx) && end.Before(ts.Add(time.Minute))) || end.After(ts.Add(14*24*time.Hour)) {
 		return time.Time{}, fmt.Errorf("choose a future deadline within fourteen days")
 	}
 	return end, nil
@@ -33,7 +33,7 @@ func (c *Contract) PrepareMedicalReview(ctx contractapi.TransactionContextInterf
 	}
 	var request *OracleRequest
 	if usesMedicalApprovalCertificates(ctx) && claim.EpisodeID != "" && claim.CurrentOracleRequestID != "" &&
-		(claim.Status == "ORACLE_PENDING" || claim.Status == "APPROVED" ||
+		(claim.Status == "ORACLE_PENDING" || claim.Status == "APPROVED" || claim.Status == "SETTLEMENT_AUTHORIZED" ||
 			(claim.CurrentReviewID == "" && (claim.Status == "ORACLE_FAILED" || claim.Status == "MEDICAL_REVIEW_REQUIRED"))) {
 		request, err = c.ReadOracleRequest(ctx, claim.CurrentOracleRequestID)
 		if err != nil {
@@ -44,8 +44,24 @@ func (c *Contract) PrepareMedicalReview(ctx contractapi.TransactionContextInterf
 			return nil, err
 		}
 		if held && claim.MedicalHeldReleaseID == "" && request.ClaimVersion == claim.Version {
+			if claim.Status == "APPROVED" || claim.Status == "SETTLEMENT_AUTHORIZED" {
+				cert, err := c.ReadMedicalApprovalCertificate(ctx, claim.ID, claim.Version)
+				if err != nil {
+					return nil, err
+				}
+				if cert.Path != "ORACLE_AUTO" {
+					return nil, fmt.Errorf("held-release replacement requires an automatic certificate")
+				}
+			}
+			claim.MedicalHeldReleaseID = effectiveMedicalModelReleaseID(request)
+			if claim.Status == "SETTLEMENT_AUTHORIZED" {
+				if err := c.supersedeUnpaidMedicalSettlement(ctx, claim); err != nil {
+					return nil, err
+				}
+				claim.MedicalSettlementID = ""
+			}
 			if claim.Status == "ORACLE_PENDING" {
-				now, err := timestamp(ctx)
+				now, err := ledgerTimestamp(ctx)
 				if err != nil {
 					return nil, err
 				}
@@ -53,7 +69,6 @@ func (c *Contract) PrepareMedicalReview(ctx contractapi.TransactionContextInterf
 					return nil, err
 				}
 			}
-			claim.MedicalHeldReleaseID = effectiveMedicalModelReleaseID(request)
 			claim.CurrentReviewID, claim.AuditorDecisionID, claim.Status = "", "", "MEDICAL_REVIEW_REQUIRED"
 		}
 	}
@@ -120,7 +135,7 @@ func (c *Contract) createMedicalPreparation(ctx contractapi.TransactionContextIn
 	if err := validateReviewRules(panel, 3, 2); err != nil || len(panel) != 4 {
 		return nil, fmt.Errorf("exactly four assigned auditors required")
 	}
-	now, err := timestamp(ctx)
+	now, err := ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -210,7 +225,7 @@ func (c *Contract) OpenMedicalVoting(ctx contractapi.TransactionContextInterface
 			}
 		}
 	}
-	now, err := timestamp(ctx)
+	now, err := ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -243,11 +258,15 @@ func (c *Contract) RecoverMedicalReview(ctx contractapi.TransactionContextInterf
 	if err != nil {
 		return nil, err
 	}
-	if claim.Status != "REJECTED" || (prior.Status != "TIMED_OUT" && prior.Status != "ACCESS_FAILED") || claim.MedicalRecoveryUsed {
+	procedural := claim.Status == "MEDICAL_REVIEW_REQUIRED" && prior.Status == "PROCEDURAL_FAILURE"
+	legacy := claim.Status == "REJECTED" && (prior.Status == "TIMED_OUT" || prior.Status == "ACCESS_FAILED")
+	if !procedural && (!legacy || claim.MedicalRecoveryUsed) {
 		return nil, fmt.Errorf("no procedural recovery is available")
 	}
-	if err := requireOpenMedicalRejection(ctx, prior, claim); err != nil {
-		return nil, err
+	if legacy {
+		if err := requireOpenMedicalRejection(ctx, prior, claim); err != nil {
+			return nil, err
+		}
 	}
 	claim.MedicalRecoveryUsed = true
 	return c.createMedicalPreparation(ctx, claim, newID, prepareBy, prior.AssignedAuditorIDs)

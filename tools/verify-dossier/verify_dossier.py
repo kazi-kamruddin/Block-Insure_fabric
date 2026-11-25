@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify a Fabric v1 claim dossier and compare it with a separate peer readback."""
+"""Verify a Fabric claim dossier and compare it with a separate peer readback."""
 
 import argparse
 import hashlib
@@ -10,6 +10,7 @@ import re
 import sys
 from decimal import Decimal
 from pathlib import Path
+import oracle_v2
 
 
 FIELDS = (
@@ -124,6 +125,12 @@ def verify_oracle(dossier, claim, strict, missing):
     for result_id, result in results.items():
         request = requests[result["requestId"]]
         subject = result["oracleId"]
+        if request.get("protocolVersion") == "v2":
+            commitment = commitment_groups[request["id"]].get(subject)
+            require(commitment is not None and commitment.get("oracleIdentity") == result.get("oracleIdentity"),
+                    "Missing or different v2 Oracle commitment identity")
+            oracle_v2.verify_result(dossier, request, result, reveals.get(result_id), commitment)
+            continue
         require(type(result.get("verified")) is bool and isinstance(result.get("verificationCode"), str) and
                 valid_hash(result.get("recordHash")) and valid_hash(result.get("resultHash")), "Invalid Oracle result")
         require(result.get("registryVersion") == request.get("registryVersion") and
@@ -162,6 +169,10 @@ def verify_oracle(dossier, claim, strict, missing):
         for subject in submitted.keys() - observed.keys():
             missing.append(f"Oracle commitment unopened:{request['id']}:{subject}")
         finalization = request.get("finalizationCode")
+        if request.get("protocolVersion") == "v2":
+            oracle_v2.verify_manifest(dossier, request)
+            oracle_v2.verify_finalization(request, observed, submitted)
+            continue
         if finalization in {"EXACT_CONSENSUS", "NEGATIVE_RESULT"} or request.get("status") == "CONSENSUS":
             verified = finalization == "EXACT_CONSENSUS"
             threshold = request.get("requiredConfirmations")
@@ -284,6 +295,13 @@ def verify_certificate(claim, certificate, settlement, expected_hash):
         domain += ":duplicate-rule"
         canonical.append(encoded_field(certificate, "duplicateRuleVersion"))
         require(certificate["duplicateRuleVersion"] in (1, 2), "Unknown duplicate rule version")
+    if any(field in certificate for field in oracle_v2.V2_CERTIFICATE_FIELDS):
+        require(certificate.get("path") == "ORACLE_AUTO" and certificate.get("decision") == "AUTO_APPROVE" and
+                certificate.get("policyVersion") == "diagnostic-v1" and valid_hash(certificate.get("manifestHash")) and
+                valid_hash(certificate.get("factVectorHash")), "Invalid Oracle v2 certificate binding")
+        domain += ":oracle-v2"
+        canonical.extend(certificate[field] for field in oracle_v2.V2_CERTIFICATE_FIELDS)
+    require(not certificate.get("supersededBy"), "Certificate is superseded")
     derived = canonical_digest(domain, canonical)
     require(hmac.compare_digest(derived, observed), "Certificate hash mismatch")
     if expected_hash is not None:
@@ -436,7 +454,7 @@ def verify(dossier, expected_hash=None, readback=None, require_readback=False):
     claim, certificate, settlement = (dossier.get(key) for key in ("claim", "approvalCertificate", "settlement"))
     require(isinstance(claim, dict) and isinstance(claim.get("id"), str) and claim["id"] and
             type(claim.get("version")) is int and claim["version"] > 0, "Dossier requires a valid claim")
-    strict = dossier.get("schemaVersion", 0) == 7
+    strict = dossier.get("schemaVersion", 0) in (7, 8)
     missing = [section for section in READBACK_SECTIONS if section not in dossier]
     require(not strict or not missing, "Missing dossier sections: " + ", ".join(missing))
     status = claim.get("status")
@@ -468,7 +486,12 @@ def verify(dossier, expected_hash=None, readback=None, require_readback=False):
                          ("registrySnapshotId", "registrySnapshotId"), ("registryRootHash", "registryRootHash"))),
                     "Oracle request differs from the certificate")
             if certificate["path"] == "ORACLE_AUTO":
-                require(request.get("finalizationCode") == certificate["oracleOutcome"] == "EXACT_CONSENSUS" and
+                expected_code = "EXACT_CONSENSUS"
+                if request.get("protocolVersion") == "v2":
+                    require(all(request.get(field) and request[field] == certificate.get(field) for field in oracle_v2.V2_CERTIFICATE_FIELDS),
+                            "Oracle v2 request and certificate binding differ")
+                    expected_code = f"V2:AUTO_APPROVE:{request['factVectorHash']}"
+                require(request.get("finalizationCode") == certificate["oracleOutcome"] == expected_code and
                         request.get("finalizedAt") == certificate["approvedAt"], "Oracle approval finalization differs from the certificate")
         else:
             require(certificate["path"] == "PANEL", "Oracle approval is missing its Oracle request")
@@ -493,7 +516,8 @@ def verify(dossier, expected_hash=None, readback=None, require_readback=False):
                 "Dossier and readback channel or chaincode differs")
         sections = readback.get("sections")
         require(isinstance(sections, dict), "Peer readback has no sections")
-        for section in READBACK_SECTIONS:
+        v2_sections = ("oracleSourceIssuers", "oracleSourceFeeds") if any(row.get("protocolVersion") == "v2" for row in requests.values()) else ()
+        for section in READBACK_SECTIONS + v2_sections:
             require(section in sections and section in dossier, f"Missing peer readback section: {section}")
             require(sections[section] == dossier[section], f"Peer readback differs: {section}")
     return {"claimId": claim["id"], "claimVersion": claim["version"], "claimStatus": status,

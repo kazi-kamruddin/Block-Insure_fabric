@@ -22,6 +22,10 @@ test("uses block 1 and isolates a rebuilt channel while retaining the first ledg
     assert.equal(rebuilt.provisioningId, hash(newBytes));
     assert.notEqual(rebuilt.appStateRoot, root);
     assert.deepEqual(await selectLedgerInstance(root, channel, newBytes), rebuilt);
+    const marker = "a".repeat(64);
+    assert.deepEqual(await selectLedgerInstance(root, channel, newBytes, marker), {
+      ...rebuilt, provisioningId: marker,
+    });
     assert.deepEqual(await selectLedgerInstance(root, channel, oldBytes), initial);
     assert.equal(await fs.readFile(legacyFile, "utf8"), "original state");
     const record = JSON.parse(await fs.readFile(path.join(root, `ledger-${channel}.json`), "utf8"));

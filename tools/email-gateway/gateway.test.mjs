@@ -1,12 +1,15 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createGateway, templates } from "./gateway.mjs";
+import { mkdtemp, rm, rmdir } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
 
 const token = "t".repeat(40);
 const config = { apiKey: "xkeysib-" + "k".repeat(30), sender: { email: "sender@example.org" }, recipients: { "policyholder1@block-insure.demo": "team@example.org" } };
 
-async function withGateway(fetchImpl, run, overrides = {}) {
-  const server = createGateway({ config: { ...config, ...overrides }, token, fetchImpl });
+async function withGateway(fetchImpl, run, overrides = {}, stateFile) {
+  const server = createGateway({ config: { ...config, ...overrides }, token, fetchImpl, stateFile });
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
   const base = `http://127.0.0.1:${server.address().port}`;
   try { await run(base); } finally { await new Promise((resolve) => server.close(resolve)); }
@@ -14,6 +17,33 @@ async function withGateway(fetchImpl, run, overrides = {}) {
 
 const post = (base, body, headers = {}) => fetch(`${base}/send`, {
   method: "POST", headers: { authorization: `Bearer ${token}`, "content-type": "application/json", ...headers }, body: JSON.stringify(body),
+});
+
+test("persists acknowledgements and ambiguous attempts across connector restarts", async () => {
+  const dir = await mkdtemp(path.join(tmpdir(), "delivery-state-"));
+  const stateFile = path.join(dir, "state.json");
+  const body = { to: "policyholder1@block-insure.demo", template: "bank-link-status", variables: {} };
+  const send = (base, key) => post(base, body, { "idempotency-key": key });
+  let calls = 0;
+  const provider = async () => {
+    calls++;
+    if (calls === 2) throw new Error("Connection closed after submission");
+    return new Response(JSON.stringify({ messageId: "message-1" }), { status: 201 });
+  };
+  try {
+    await withGateway(provider, async base => {
+      assert.equal((await send(base, "completed-event")).status, 200);
+      assert.equal((await send(base, "ambiguous-event")).status, 502);
+    }, {}, stateFile);
+    await withGateway(provider, async base => {
+      assert.deepEqual(await (await send(base, "completed-event")).json(), { messageId: "message-1" });
+      assert.equal((await send(base, "ambiguous-event")).status, 502);
+    }, {}, stateFile);
+    assert.equal(calls, 2);
+  } finally {
+    await rm(stateFile, { force: true });
+    await rmdir(dir);
+  }
 });
 
 test("relays a mapped OTP through Brevo and replays an idempotent retry", async () => {

@@ -151,6 +151,24 @@ func (c *Contract) SaveMedicalEpisode(ctx contractapi.TransactionContextInterfac
 	if expectedRevision != head.Revision {
 		return nil, fmt.Errorf("episode revision changed; reload before saving a correction")
 	}
+	if usesMedicalApprovalCertificates(ctx) && input.InvoiceDate == "" {
+		return nil, fmt.Errorf("invoice date is required for a new finalized episode revision")
+	}
+	if head.Revision > 0 {
+		previous, err := readMedicalEpisode(ctx, id, head.Revision)
+		if err != nil {
+			return nil, err
+		}
+		if previous.InvoiceDate != "" {
+			oldIndex, err := ctx.GetStub().CreateCompositeKey("hospitalEpisodeByDate", []string{hospital, previous.InvoiceDate, id})
+			if err != nil {
+				return nil, err
+			}
+			if err := ctx.GetStub().DelState(oldIndex); err != nil {
+				return nil, err
+			}
+		}
+	}
 	head.Revision++
 	head.RevisionHash = digest
 	revision := &MedicalEpisode{ID: id, HospitalID: hospital, Revision: head.Revision,
@@ -161,6 +179,22 @@ func (c *Contract) SaveMedicalEpisode(ctx contractapi.TransactionContextInterfac
 	}
 	if err := overwriteState(ctx, key, head); err != nil {
 		return nil, err
+	}
+	if input.InvoiceDate != "" {
+		index, err := ctx.GetStub().CreateCompositeKey("hospitalEpisodeByDate", []string{hospital, input.InvoiceDate, id})
+		if err != nil {
+			return nil, err
+		}
+		if err := ctx.GetStub().PutState(index, []byte("1")); err != nil {
+			return nil, err
+		}
+		marker, err := stateKey(ctx, "hospitalEpisodeIndexed", id)
+		if err != nil {
+			return nil, err
+		}
+		if err := ctx.GetStub().PutState(marker, []byte("1")); err != nil {
+			return nil, err
+		}
 	}
 	return head, emit(ctx, "MedicalEpisodeSaved", head)
 }

@@ -30,7 +30,7 @@ import type {
 } from "@/lib/fabric/types";
 
 export type ClaimAuditDossier = Partial<Awaited<ReturnType<typeof readDossierLedgerEvidence>>> & {
-  schemaVersion: 6 | 7;
+  schemaVersion: 6 | 7 | 8;
   channel?: string;
   chaincode?: string;
   exportedAt: string;
@@ -110,7 +110,7 @@ export async function loadClaimAuditDossier(claimId: string, auditorSubject?: st
     }, { claim, history, oracleRequests, oracleResults, approvalCertificate }),
   ) : {};
   return {
-    schemaVersion: devLiteMedical ? 7 : 6,
+    schemaVersion: devLiteMedical ? (oracleRequests.some(request => request.protocolVersion === "v2") ? 8 : 7) : 6,
     exportedAt: new Date().toISOString(),
     claim,
     history,

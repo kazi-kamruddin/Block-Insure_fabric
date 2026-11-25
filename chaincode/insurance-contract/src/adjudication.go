@@ -96,11 +96,11 @@ func validateReviewDeadline(ctx contractapi.TransactionContextInterface, deadlin
 	if err != nil {
 		return "", fmt.Errorf("deadline must use RFC3339")
 	}
-	tx, err := ctx.GetStub().GetTxTimestamp()
+	tx, err := ledgerNow(ctx)
 	if err != nil {
 		return "", fmt.Errorf("read transaction timestamp: %w", err)
 	}
-	if !parsed.After(tx.AsTime()) {
+	if !parsed.After(tx) {
 		return "", fmt.Errorf("review deadline must be after the transaction time")
 	}
 	return parsed.UTC().Format(time.RFC3339), nil
@@ -130,7 +130,7 @@ func (c *Contract) openReview(
 	if err != nil {
 		return nil, err
 	}
-	now, err := timestamp(ctx)
+	now, err := ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -284,7 +284,7 @@ func (c *Contract) SubmitClaimAppeal(
 			return nil, fmt.Errorf("no finalized Hospital invoice matches the corrected clinical reference")
 		}
 	}
-	now, err := timestamp(ctx)
+	now, err := ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -402,12 +402,12 @@ func (c *Contract) recordAuditorDecision(ctx contractapi.TransactionContextInter
 	if !containsAssignment(review.AssignedAuditorIDs, auditorID) {
 		return nil, fmt.Errorf("auditor %s is not assigned to review %s", auditorID, reviewID)
 	}
-	txTime, err := ctx.GetStub().GetTxTimestamp()
+	txTime, err := ledgerNow(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("read transaction timestamp: %w", err)
 	}
 	deadline, _ := time.Parse(time.RFC3339, review.Deadline)
-	if txTime.AsTime().After(deadline) {
+	if txTime.After(deadline) {
 		return nil, fmt.Errorf("review %s deadline has passed", reviewID)
 	}
 	outcome = strings.ToUpper(strings.TrimSpace(outcome))
@@ -428,7 +428,7 @@ func (c *Contract) recordAuditorDecision(ctx contractapi.TransactionContextInter
 	if existing != nil {
 		return nil, fmt.Errorf("auditor %s has already voted in review %s", auditorID, reviewID)
 	}
-	now, err := timestamp(ctx)
+	now, err := ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -502,18 +502,30 @@ func (c *Contract) recordAuditorDecision(ctx contractapi.TransactionContextInter
 }
 
 func (c *Contract) FinalizeExpiredReview(ctx contractapi.TransactionContextInterface, reviewID string) (*ClaimReview, error) {
-	if _, err := requireIdentity(ctx, "InsurerMSP", "insurerAdmin"); err != nil {
-		return nil, err
-	}
 	review, err := c.ReadClaimReview(ctx, reviewID)
 	if err != nil {
 		return nil, err
 	}
+	claim, err := c.ReadClaim(ctx, review.ClaimID)
+	if err != nil {
+		return nil, err
+	}
+	r1Medical := review.MedicalVersion != 0 && usesMedicalApprovalCertificates(ctx)
+	if r1Medical {
+		if err := requireEligibleClaimDeadlineActor(ctx, claim, review.AssignedAuditorIDs); err != nil {
+			return nil, err
+		}
+	} else if _, err := requireIdentity(ctx, "InsurerMSP", "insurerAdmin"); err != nil {
+		return nil, err
+	}
 	preparation := review.MedicalVersion != 0 && review.Status == "PREPARING"
 	if review.Status != "OPEN" && !preparation {
+		if r1Medical {
+			return review, nil
+		}
 		return nil, fmt.Errorf("review %s is already finalized", reviewID)
 	}
-	txTime, err := ctx.GetStub().GetTxTimestamp()
+	txTime, err := ledgerNow(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("read transaction timestamp: %w", err)
 	}
@@ -521,10 +533,10 @@ func (c *Contract) FinalizeExpiredReview(ctx contractapi.TransactionContextInter
 	if preparation {
 		deadline, _ = time.Parse(time.RFC3339, review.PrepareBy)
 	}
-	if !txTime.AsTime().After(deadline) {
+	if !txTime.After(deadline) {
 		return nil, fmt.Errorf("review %s deadline is still active", reviewID)
 	}
-	now, err := timestamp(ctx)
+	now, err := ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -533,10 +545,6 @@ func (c *Contract) FinalizeExpiredReview(ctx contractapi.TransactionContextInter
 		review.Status = "ACCESS_FAILED"
 	}
 	review.ClosedAt = now
-	claim, err := c.ReadClaim(ctx, review.ClaimID)
-	if err != nil {
-		return nil, err
-	}
 	if review.MedicalVersion != 0 {
 		if claim.CurrentReviewID != review.ID || claim.Version != review.MedicalVersion {
 			return nil, fmt.Errorf("medical review is stale")
@@ -559,6 +567,9 @@ func (c *Contract) FinalizeExpiredReview(ctx contractapi.TransactionContextInter
 		}
 	}
 	claim.Status = "REJECTED"
+	if r1Medical && preparation {
+		review.Status, claim.Status = "PROCEDURAL_FAILURE", "MEDICAL_REVIEW_REQUIRED"
+	}
 	claim.UpdatedAt = now
 	if review.AppealID != "" && review.MedicalVersion == 0 {
 		appeal, readErr := c.ReadClaimAppeal(ctx, review.AppealID)
@@ -625,7 +636,7 @@ func (c *Contract) RecordFraudAssessment(
 		}
 		signals[index] = signal
 	}
-	now, err := timestamp(ctx)
+	now, err := ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}

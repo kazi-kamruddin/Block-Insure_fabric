@@ -50,7 +50,7 @@ func (c *Contract) openBankAccount(ctx contractapi.TransactionContextInterface, 
 	if err := validateHash("accountTokenHash", accountTokenHash); err != nil {
 		return nil, err
 	}
-	now, err := timestamp(ctx)
+	now, err := ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -118,7 +118,7 @@ func (c *Contract) AdjustBankAccountBalance(ctx contractapi.TransactionContextIn
 	} else if marker != nil {
 		return nil, fmt.Errorf("external bank transfer reference has already been recorded")
 	}
-	now, err := timestamp(ctx)
+	now, err := ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -236,7 +236,7 @@ func (c *Contract) writePremiumTransfer(ctx contractapi.TransactionContextInterf
 	} else if marker != nil {
 		return nil, fmt.Errorf("external payment reference has already been recorded")
 	}
-	now, err := timestamp(ctx)
+	now, err := ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -356,7 +356,7 @@ func (c *Contract) ExecuteManualPremiumPayment(ctx contractapi.TransactionContex
 	if err != nil {
 		return nil, err
 	}
-	now, err := timestamp(ctx)
+	now, err := ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -415,7 +415,7 @@ func (c *Contract) reconcileCollectedPremium(ctx contractapi.TransactionContextI
 	if matched == nil {
 		return nil, nil
 	}
-	now, err := timestamp(ctx)
+	now, err := ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -476,7 +476,7 @@ func (c *Contract) ProcessPremiumCollection(ctx contractapi.TransactionContextIn
 	if err != nil {
 		return nil, err
 	}
-	now, err := timestamp(ctx)
+	now, err := ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}

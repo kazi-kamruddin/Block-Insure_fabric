@@ -44,7 +44,7 @@ export async function GET(request: Request) {
       return reply({ quote: await ledger.quoteMedicalAppeal(claim.id, revision) });
     }
     const devLite = loadFabricConfig().channelName === medicalDevLiteChannel;
-    const [appeal, clarification, documents, grants, checks, decisions, facts, oracle, certificate, settlement, ledgerTime, revisionProof, issuedTerms, hospitalName] = await Promise.all([
+    const [appeal, clarification, documents, grants, checks, decisions, facts, oracle, certificate, settlement, ledgerTime, revisionProof, issuedTerms, hospitalName, oracleV2] = await Promise.all([
       claim.currentAppealId ? ledger.readClaimAppeal(claim.currentAppealId) : null,
       claim.medicalClarificationId ? ledger.readMedicalClarification(session.role === "policyholder" ? session.role : "insurerAdmin", claim.medicalClarificationId) : null,
       Promise.all(claim.evidenceIds.map(id => ledger.readEvidenceReference(id))),
@@ -59,6 +59,7 @@ export async function GET(request: Request) {
       session.role === "auditor" ? medicalRevisionProof(claim).catch(() => null) : null,
       issuedMedicalTerms(claim).catch(() => null),
       session.role === "auditor" ? medicalHospitalName(claim.hospitalId).catch(() => undefined) : undefined,
+      devLite ? ledger.supportsMedicalOracleV2?.() : false,
     ]);
     const readAt = Date.now();
     const timeline = devLite ? buildMedicalTimeline({ claim,
@@ -68,6 +69,7 @@ export async function GET(request: Request) {
       certificate, settlement: settlement?.approvalCertificateHash === certificate?.hash ? settlement : null,
     }) : undefined;
     return reply({ claim, review: review ? redactVoteTallies(review, session) : null, appeal, clarification, documents, facts, devLite, readAt, timeline, ledgerTime, revisionProof, issuedTerms, hospitalName,
+      oracleV2, oracle: oracle?.protocolVersion === "v2" && oracle.claimVersion === claim.version ? oracle : null,
       viewerHasVoted: session.role === "auditor" && decisions.some(decision => decision.reviewId === review?.id && decision.auditorId === session.subjectId),
       appealExplanation: appeal ? await ledger.readMedicalAppealExplanation(session.role === "policyholder" ? session.role : "insurerAdmin", appeal.id) : null,
       grants: grants.filter(grant => grant.medicalReviewId === review?.id && (session.role !== "auditor" || grant.granteeSubject === session.subjectId)),
@@ -84,6 +86,8 @@ const permissions = {
 } as const;
 
 function allowed(action: MedicalReviewCommand, role: ReviewRole) {
+  if (action.action === "oracleTimeout" || action.action === "expire") return true;
+  if (action.action === "recordReceiptSummary") return role === "policyholder";
   if (action.action === "respond") return role === (action.response === "EXPIRED" ? "insurerAdmin" : "policyholder");
   if (action.action === "recordOCR") return role === "policyholder" || role === "auditor";
   if (action.action === "release") return role === "policyholder" || role === "insurerAdmin"; // Chaincode checks ownership and finality.
@@ -101,6 +105,10 @@ export async function POST(request: Request) {
   if ((input.data.action === "escalate" || input.data.action === "release" || (input.data.action === "open" && session?.role === "auditor")) &&
       loadFabricConfig().channelName !== medicalDevLiteChannel) return reply({ message: "Action unavailable on this channel" }, 404);
   if (!session || !reviewRole(session.role) || !allowed(input.data, session.role)) return reply({ message: "This role cannot perform that action" }, 403);
+  if ((input.data.action === "oracleTimeout" || input.data.action === "recordReceiptSummary" ||
+      (input.data.action === "expire" && session.role !== "insurerAdmin")) && !await ledger.supportsMedicalOracleV2()) {
+    return reply({ message: "Action unavailable on this deployment" }, 404);
+  }
   try {
     const result = await ledger.medicalReviewAction(session.role, input.data, findDemoAccount(session.accountId)?.fabricUserName);
     if (input.data.action === "vote") return reply({ result: { id: input.data.decisionId, reviewId: input.data.reviewId } });

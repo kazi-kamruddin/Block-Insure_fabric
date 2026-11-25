@@ -26,14 +26,13 @@ Init ==
         sampledPeriod |-> FALSE, panelRequired |-> FALSE,
         modelHeld |-> FALSE, heldPanel |-> FALSE,
         recoveryUsed |-> FALSE, appealUsed |-> FALSE, rejection |-> "None", windowEnded |-> FALSE,
-        certificates |-> {}, settlement |-> "None", settlementCertificate |-> <<0, "None">> ]
+        certificates |-> {}, superseded |-> {}, settlement |-> "None",
+        bankExecuted |-> FALSE, postPaymentAudit |-> FALSE, settlementCertificate |-> <<0, "None">> ]
 
 Count(entries, tag) == Cardinality({entry \in entries : entry[2] = tag})
 
 EffectiveCertificates(version) ==
-  IF <<version, "HeldPanel">> \in s.certificates
-  THEN {<<version, "HeldPanel">>}
-  ELSE {cert \in s.certificates : cert[1] = version}
+  {cert \in s.certificates \ s.superseded : cert[1] = version}
 
 Submit ==
   /\ s.stage = "DRAFT"
@@ -60,12 +59,13 @@ Reveal ==
                            [] quorum -> "APPROVED"
                            [] Cardinality(revealed) = OracleCount -> "ORACLE_FAILED"
                            [] OTHER -> s.stage
-          IN s' = [s EXCEPT !.reveals = revealed, !.stage = outcome,
+          IN s' = [s EXCEPT !.reveals = IF outcome = "ORACLE_PENDING" THEN revealed ELSE {}, !.stage = outcome,
                    !.certificates = IF outcome = "APPROVED" THEN @ \cup {<<s.version, "Oracle">>} ELSE @]
 
 OracleTimeout ==
   /\ s.stage = "ORACLE_PENDING"
-  /\ s' = [s EXCEPT !.stage = "ORACLE_FAILED"]
+  /\ \E actor \in {"Claimant", "Insurer", "AssignedAuditor"} :
+       s' = [s EXCEPT !.stage = "ORACLE_FAILED", !.reveals = {}]
 
 ResolveAudit ==
   /\ s.stage = "MEDICAL_AUDIT_PENDING"
@@ -87,18 +87,22 @@ PreparePanel(held) ==
 
 InsurerPrepare ==
   /\ s.stage \in {"ORACLE_FAILED", "MEDICAL_REVIEW_REQUIRED"}
+  /\ s.rejection # "Procedural"
   /\ PreparePanel(s.modelHeld /\ s.requested)
 
 PrepareHeld ==
   /\ s.modelHeld /\ ~s.heldPanel
-  /\ s.stage \in SubmittedStages \cup {"ORACLE_PENDING", "APPROVED"}
-  /\ (s.stage = "APPROVED" => s.requested)
-  /\ PreparePanel(TRUE)
+  /\ s.stage \in SubmittedStages \cup {"ORACLE_PENDING", "APPROVED", "SETTLEMENT_AUTHORIZED"}
+  /\ (s.stage \in {"APPROVED", "SETTLEMENT_AUTHORIZED"} => <<s.version, "Oracle">> \in EffectiveCertificates(s.version))
+  /\ ~s.bankExecuted
+  /\ s' = [s EXCEPT !.stage = "MEDICAL_REVIEW_PREPARING", !.heldPanel = TRUE, !.reveals = {}, !.votes = {},
+                   !.settlement = IF s.stage = "SETTLEMENT_AUTHORIZED" THEN "RETIRED" ELSE @,
+                   !.settlementCertificate = <<0, "None">>]
 
 ClaimantEscalate ==
-  \* Existing 1.9.0 edges guided by the claimant and elapsed deadline.
-  \* TODO(U18): ORACLE_FAILED, MEDICAL_REVIEW_REQUIRED, and audit grace expiry.
-  /\ s.stage \in SubmittedStages \cup {"ORACLE_PENDING"}
+  \* Each action abstracts the ledger-time deadline for its source stage.
+  /\ s.stage \in SubmittedStages \cup {"ORACLE_PENDING", "ORACLE_FAILED", "MEDICAL_REVIEW_REQUIRED", "MEDICAL_AUDIT_PENDING"}
+  /\ s.rejection # "Procedural"
   /\ PreparePanel(FALSE)
 
 OpenReview ==
@@ -114,19 +118,22 @@ PanelVote ==
                            [] Count(voted, "Reject") >= 2 -> "REJECTED"
                            [] OTHER -> s.stage
               cert == <<s.version, IF s.heldPanel THEN "HeldPanel" ELSE "Panel">>
-          IN s' = [s EXCEPT !.votes = voted, !.stage = outcome,
+          IN s' = [s EXCEPT !.votes = IF outcome = "UNDER_REVIEW" THEN voted ELSE {}, !.stage = outcome,
                    !.rejection = IF outcome = "REJECTED" THEN "Merits" ELSE @,
-                   !.certificates = IF outcome = "APPROVED" THEN @ \cup {cert} ELSE @]
+                   !.certificates = IF outcome = "APPROVED" THEN @ \cup {cert} ELSE @,
+                   !.superseded = IF outcome = "APPROVED" /\ s.heldPanel
+                                  THEN @ \cup ({<<s.version, "Oracle">>} \cap s.certificates) ELSE @]
 
 ExpireReview ==
-  \* 1.9.0 maps procedural expiry to claim rejection and permits one recovery.
-  \* TODO(U18): any eligible party and a distinct procedural-failure status.
   /\ s.stage \in PanelStages
-  /\ s' = [s EXCEPT !.stage = "REJECTED", !.rejection = "Procedural"]
+  /\ \E actor \in {"Claimant", "Insurer", "AssignedAuditor"} :
+       s' = [s EXCEPT !.stage = IF s.stage = "MEDICAL_REVIEW_PREPARING" THEN "MEDICAL_REVIEW_REQUIRED" ELSE "REJECTED",
+                      !.votes = {}, !.rejection = "Procedural"]
 
 RecoverReview ==
-  /\ s.stage = "REJECTED" /\ s.rejection = "Procedural"
-  /\ ~s.windowEnded /\ ~s.recoveryUsed /\ s.reserved > 0
+  /\ s.rejection = "Procedural"
+  /\ s.stage = "MEDICAL_REVIEW_REQUIRED" \/ (s.stage = "REJECTED" /\ ~s.windowEnded /\ ~s.recoveryUsed)
+  /\ s.reserved > 0
   /\ s' = [s EXCEPT !.stage = "MEDICAL_REVIEW_PREPARING", !.votes = {},
                  !.recoveryUsed = TRUE, !.rejection = "None"]
 
@@ -136,11 +143,13 @@ AdvanceVersion(stage, amount, isAppeal) ==
                  !.requested = FALSE, !.reveals = {}, !.votes = {},
                  !.sampledPeriod = FALSE, !.panelRequired = TRUE, !.heldPanel = FALSE,
                  !.appealUsed = @ \/ isAppeal, !.rejection = "None", !.windowEnded = FALSE,
+                 !.superseded = @ \cup EffectiveCertificates(s.version),
                  !.settlement = IF @ \in {"AUTHORIZED", "PAYMENT_FAILED"} THEN "SUPERSEDED" ELSE @,
                  !.settlementCertificate = <<0, "None">> ]
 
 CorrectClaim ==
   /\ s.version < MaxVersion /\ s.reserved > 0 /\ s.stage \notin TerminalStages
+  /\ ~s.bankExecuted
   /\ \E amount \in 0..CoverLimit : AdvanceVersion(IF amount = 0 THEN "NO_PAYABLE_AMOUNT" ELSE "SUBMITTED", amount, FALSE)
 
 AppealClaim ==
@@ -166,18 +175,26 @@ Authorize ==
 
 PaymentFailed ==
   /\ s.stage = "SETTLEMENT_AUTHORIZED" /\ s.settlement = "AUTHORIZED"
+  /\ ~s.bankExecuted /\ (~s.modelHeld \/ s.settlementCertificate[2] # "Oracle")
   /\ s' = [s EXCEPT !.settlement = "PAYMENT_FAILED"]
+
+ExecuteBankTransfer ==
+  /\ s.stage = "SETTLEMENT_AUTHORIZED" /\ s.settlement = "AUTHORIZED" /\ ~s.bankExecuted
+  /\ s.settlementCertificate \in EffectiveCertificates(s.version)
+  /\ ~s.modelHeld \/ s.settlementCertificate[2] # "Oracle"
+  /\ s' = [s EXCEPT !.bankExecuted = TRUE]
 
 Confirm ==
   /\ s.stage = "SETTLEMENT_AUTHORIZED" /\ s.settlement \in {"AUTHORIZED", "PAYMENT_FAILED"}
   /\ s.settlementCertificate \in EffectiveCertificates(s.version)
-  \* 1.9.0 does not re-check release hold on confirmation after authorization (U20).
-  /\ s' = [s EXCEPT !.stage = "SETTLED", !.settlement = "CONFIRMED", !.paid = @ + s.reserved, !.reserved = 0]
+  /\ ~s.modelHeld \/ s.settlementCertificate[2] # "Oracle" \/ s.bankExecuted
+  /\ s' = [s EXCEPT !.stage = "SETTLED", !.settlement = "CONFIRMED", !.paid = @ + s.reserved, !.reserved = 0,
+                    !.postPaymentAudit = s.modelHeld /\ s.settlementCertificate[2] = "Oracle"]
 
 Next == Submit \/ RequestOracle \/ Reveal \/ OracleTimeout \/ ResolveAudit \/ HoldModel
         \/ InsurerPrepare \/ PrepareHeld \/ ClaimantEscalate \/ OpenReview \/ PanelVote \/ ExpireReview
         \/ RecoverReview \/ CorrectClaim \/ AppealClaim \/ CloseRejectionWindow \/ ReleaseCover
-        \/ Authorize \/ PaymentFailed \/ Confirm
+        \/ Authorize \/ PaymentFailed \/ ExecuteBankTransfer \/ Confirm
 
 Spec == Init /\ [][Next]_s
         /\ WF_s(ClaimantEscalate) /\ WF_s(OracleTimeout)
@@ -189,9 +206,10 @@ TypeOK ==
   /\ s.reserved \in 0..CoverLimit /\ s.paid \in 0..CoverLimit /\ s.available \in 0..CoverLimit
   /\ s.reveals \subseteq (Oracles \X ResultTags) /\ s.votes \subseteq (Auditors \X VoteTags)
   /\ {s.requested, s.sampledPeriod, s.panelRequired, s.modelHeld, s.heldPanel,
-      s.recoveryUsed, s.appealUsed, s.windowEnded} \subseteq BOOLEAN
+      s.recoveryUsed, s.appealUsed, s.windowEnded, s.bankExecuted, s.postPaymentAudit} \subseteq BOOLEAN
   /\ s.certificates \subseteq (Versions \X CertificateKinds)
-  /\ s.settlement \in {"None", "AUTHORIZED", "PAYMENT_FAILED", "SUPERSEDED", "CONFIRMED"}
+  /\ s.superseded \subseteq s.certificates
+  /\ s.settlement \in {"None", "AUTHORIZED", "PAYMENT_FAILED", "SUPERSEDED", "RETIRED", "CONFIRMED"}
   /\ s.rejection \in {"None", "Merits", "Procedural"}
   /\ s.settlementCertificate \in (Versions \X CertificateKinds) \cup {<<0, "None">>}
 
@@ -201,6 +219,9 @@ NoPayoutWithoutCertificate ==
   /\ (s.paid > 0) => (s.settlement = "CONFIRMED")
 
 CoverConservation == s.reserved + s.paid + s.available = CoverLimit
+
+HeldPaymentRequiresExecution ==
+  s.postPaymentAudit => s.bankExecuted /\ s.settlement = "CONFIRMED"
 
 OneResultPerAssignee ==
   /\ Cardinality(s.reveals) <= OracleCount
@@ -220,4 +241,36 @@ SubmittedProgress ==
 PayableSubmissionProgress ==
   ( [] (s.stage # "NO_PAYABLE_AMOUNT") ) =>
     ((s.stage \in SubmittedStages) ~> (s.stage \in ({"SETTLED", "REJECTED"} \cup PanelStages)))
+
+ReleaseApprovers == {"Insurer", "Auditor", "Oracle"}
+ReleaseInit ==
+  s = [stage |-> "REGISTERED", approved |-> {}, attesters |-> {}, delayed |-> FALSE]
+
+ReleaseNext ==
+  \/ /\ s.stage = "REGISTERED"
+     /\ s' = [s EXCEPT !.stage = "SHADOW"]
+  \/ /\ s.stage \in {"SHADOW", "RESUME_PENDING"}
+     /\ \E oracle \in Oracles \ s.attesters :
+          s' = [s EXCEPT !.attesters = @ \cup {oracle}]
+  \/ /\ s.stage \in {"SHADOW", "RESUME_PENDING"}
+     /\ \E org \in ReleaseApprovers \ s.approved :
+          /\ org = "Oracle" => Cardinality(s.attesters) >= 2
+          /\ LET approved == s.approved \cup {org} IN
+               s' = [s EXCEPT !.approved = approved,
+                              !.stage = IF approved = ReleaseApprovers THEN "APPROVED" ELSE @]
+  \/ /\ s.stage = "APPROVED" /\ ~s.delayed
+     /\ s' = [s EXCEPT !.delayed = TRUE]
+  \/ /\ s.stage = "APPROVED" /\ s.delayed
+     /\ s' = [s EXCEPT !.stage = "ACTIVE"]
+  \/ /\ s.stage \in {"SHADOW", "APPROVED", "ACTIVE", "RESUME_PENDING"}
+     /\ s' = [s EXCEPT !.stage = "HELD"]
+  \/ /\ s.stage = "HELD"
+     /\ s' = [s EXCEPT !.stage = "RESUME_PENDING", !.approved = {}, !.attesters = {}, !.delayed = FALSE]
+
+ReleaseSpec == ReleaseInit /\ [][ReleaseNext]_s
+
+ReleaseAuthority ==
+  /\ (s.stage \in {"APPROVED", "ACTIVE"}) => s.approved = ReleaseApprovers
+  /\ ("Oracle" \in s.approved) => Cardinality(s.attesters) >= 2
+  /\ s.stage = "ACTIVE" => s.delayed
 =============================================================================

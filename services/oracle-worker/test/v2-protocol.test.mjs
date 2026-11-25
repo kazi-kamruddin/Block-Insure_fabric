@@ -9,7 +9,13 @@ import { evaluateV2 } from "../src/v2/evaluator-v2.mjs";
 import { inferContext } from "../src/xgboost.mjs";
 import { context, pairedCases, prior, source } from "./fixtures/xgboost-inputs.mjs";
 
-const vectors = JSON.parse(await readFile(new URL("./vectors/v2/protocol.json", import.meta.url), "utf8"));
+const protocolVectorBytes = await readFile(new URL("./vectors/v2/protocol.json", import.meta.url));
+const vectors = JSON.parse(protocolVectorBytes);
+
+test("the Go module's protocol vectors are byte-identical to Node's vectors", async () => {
+  const goVectorBytes = await readFile(new URL("../../../chaincode/insurance-contract/src/testdata/oracle-v2-protocol.json", import.meta.url));
+  assert.deepEqual(goVectorBytes, protocolVectorBytes);
+});
 
 test("portable vectors pin canonical UTF-8, facts and subject-bound commitments", () => {
   assert.equal(canonical(vectors.portable), vectors.encoding);
@@ -34,6 +40,11 @@ test("decision, exact tariff fractions and inclusive score threshold match the p
     const vector = structuredClone(vectors.vector);
     vector.facts[field] = { status, evidence: [], ...(integrity && { integrity }) };
     assert.equal(decide(createFactVector(vector)), expected);
+  }
+  for (const { field, status, integrity } of vectors.rejectedIntegrity) {
+    const vector = structuredClone(vectors.vector);
+    vector.facts[field] = { status, evidence: ["record-1"], integrity };
+    assert.throws(() => createFactVector(vector), /Invalid fact integrity reason/);
   }
   const vector = { ...vectors.vector, receiptCheck: "ABSENT", facts: { ...vectors.vector.facts, receiptConsistent: { status: "INSUFFICIENT", evidence: [] } } };
   assert.equal(decide(vector), "PANEL_REVIEW");

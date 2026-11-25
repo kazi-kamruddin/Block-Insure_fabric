@@ -88,6 +88,19 @@ func (s *memoryStub) PutState(key string, value []byte) error {
 	return nil
 }
 
+func (s *memoryStub) DelState(key string) error {
+	delete(s.state, key)
+	return nil
+}
+
+func (s *memoryStub) SplitCompositeKey(key string) (string, []string, error) {
+	parts := strings.Split(key, string(rune(0)))
+	if len(parts) < 3 || parts[0] != "" || parts[len(parts)-1] != "" {
+		return "", nil, fmt.Errorf("invalid composite key")
+	}
+	return parts[1], parts[2 : len(parts)-1], nil
+}
+
 func (s *memoryStub) CreateCompositeKey(objectType string, attributes []string) (string, error) {
 	if objectType == "" || strings.ContainsRune(objectType, rune(0)) {
 		return "", fmt.Errorf("invalid object type")
@@ -152,10 +165,38 @@ func (i *testIdentity) AssertAttributeValue(name, expected string) error {
 type testContext struct {
 	stub     *memoryStub
 	identity cid.ClientIdentity
+	wallTime time.Time
 }
 
 func (c *testContext) GetStub() shim.ChaincodeStubInterface  { return c.stub }
 func (c *testContext) GetClientIdentity() cid.ClientIdentity { return c.identity }
+
+func (c *testContext) ledgerWallTime() time.Time {
+	if !c.wallTime.IsZero() {
+		return c.wallTime
+	}
+	return c.stub.timestamp.AsTime()
+}
+
+func TestLedgerTimeSkewAndDhakaDate(t *testing.T) {
+	wall := time.Date(2026, 11, 25, 18, 0, 0, 0, time.UTC)
+	ctx := &testContext{stub: &memoryStub{}, wallTime: wall}
+	for _, offset := range []time.Duration{-10 * time.Minute, -15 * time.Second, time.Second, 15 * time.Second, 10 * time.Minute} {
+		ctx.stub.timestamp = timestamppb.New(wall.Add(offset))
+		actual, err := ledgerNow(ctx)
+		if offset < -ledgerTimeTolerance || offset > ledgerTimeTolerance {
+			requireError(t, err, "transaction timestamp outside tolerance")
+		} else {
+			requireNoError(t, err)
+			if !actual.Equal(wall.Add(offset)) {
+				t.Fatalf("ledger time got %s for offset %s", actual, offset)
+			}
+		}
+	}
+	if dhakaDate(wall.Add(-time.Second)) != "2026-11-25" || dhakaDate(wall) != "2026-11-26" {
+		t.Fatal("expected business date to change at Dhaka midnight")
+	}
+}
 
 func setIdentity(ctx *testContext, id, mspID, role string, attrs map[string]string) {
 	values := map[string]string{"role": role}

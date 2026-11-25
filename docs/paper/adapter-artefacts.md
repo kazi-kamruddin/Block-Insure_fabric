@@ -14,7 +14,8 @@ scale 1, and pooled precision row `[0, 0, 0, 1000, 0, 0, 0]`. That term
 contributes about `31.6 × |lag days|` in quadrature when the group lag
 center is zero. The warning threshold is approximately 8.80. A one-day lag
 alone can dominate the distance. The claimant view labels above-threshold
-cases “Outside training range.”
+cases “Outside training range — diagnostic only; routing uses the model
+score and evidence rules.”
 
 The OOD warning flag never enters the mandatory review condition. The
 continuous distance enters two of the 57 frozen trees. The two split

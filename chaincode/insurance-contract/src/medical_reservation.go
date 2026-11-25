@@ -45,11 +45,11 @@ func requireOpenMedicalRejection(ctx contractapi.TransactionContextInterface, re
 	if err != nil {
 		return err
 	}
-	tx, err := ctx.GetStub().GetTxTimestamp()
+	tx, err := ledgerNow(ctx)
 	if err != nil {
 		return fmt.Errorf("read transaction timestamp: %w", err)
 	}
-	if tx.AsTime().After(until) {
+	if tx.After(until) {
 		return fmt.Errorf("the appeal and recovery window closed at %s", until.UTC().Format(time.RFC3339))
 	}
 	return nil
@@ -94,7 +94,7 @@ func (c *Contract) ReleaseMedicalReservation(ctx contractapi.TransactionContextI
 	if err != nil {
 		return nil, err
 	}
-	now, err := timestamp(ctx)
+	now, err := ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}

@@ -181,6 +181,18 @@ async function processRequest(requestId) {
   if ((!existingCommitment && Date.now() > Date.parse(request.commitDeadline)) || Date.now() > Date.parse(request.revealDeadline)) return;
   const currentClaim = await evaluate("ReadClaim", request.claimId);
   if (currentClaim.version !== request.claimVersion || currentClaim.currentOracleRequestId !== request.id) return;
+  if (request.protocolVersion === "v2") {
+    const { processV2Request } = await import("./v2/worker.mjs");
+    await processV2Request({ request, claim: currentClaim, config, runtime, evaluate, evaluateOrNull, submit, retry, waitForRevealPhase,
+      saltFor: () => protocol.buildDeterministicSalt(runtime.privateKey, request.id, config.oracleId),
+      log: code => log("warn", "Oracle v2 evaluation disposition", { requestId, code }),
+    }).catch(error => {
+      const code = /^[A-Z_]+$/.test(error?.code ?? "") ? error.code : "V2_REQUEST_FAILED";
+      log("error", "Oracle v2 request stopped", { requestId, code });
+      if (Date.now() < Date.parse(request.revealDeadline)) throw new Error(code);
+    });
+    return;
+  }
   let shadowPacket;
   const decision = await pinnedDecision({
     directory: path.join(config.stateRoot, config.oracleId, "decisions"),
@@ -407,6 +419,10 @@ async function main() {
     healthPort: config.healthPort,
     nodeVersion: process.version,
   });
+  if (process.env.FABRIC_DEMO_READ_ONLY === "true") {
+    await evaluate("GetSchemaVersion");
+    return;
+  }
   while (!stopping) {
     try {
       await consumeEvents();

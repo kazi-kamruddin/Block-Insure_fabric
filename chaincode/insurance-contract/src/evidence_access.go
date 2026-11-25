@@ -81,7 +81,7 @@ func (c *Contract) GrantEvidenceAccess(ctx contractapi.TransactionContextInterfa
 	if err != nil {
 		return nil, fmt.Errorf("expiresAt must be an RFC3339 timestamp")
 	}
-	now, err := timestamp(ctx)
+	now, err := ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -160,7 +160,7 @@ func (c *Contract) RevokeEvidenceAccess(ctx contractapi.TransactionContextInterf
 	if grant.Status == "REVOKED" {
 		return grant, nil
 	}
-	now, err := timestamp(ctx)
+	now, err := ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -224,7 +224,7 @@ func (c *Contract) recordEvidenceAccess(ctx contractapi.TransactionContextInterf
 	if err != nil {
 		return nil, err
 	}
-	now, err := timestamp(ctx)
+	now, err := ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -320,7 +320,7 @@ func (c *Contract) RecordGrantedEvidenceAccess(ctx contractapi.TransactionContex
 			}
 		}
 	}
-	now, err := timestamp(ctx)
+	now, err := ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}

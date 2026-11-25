@@ -3,7 +3,9 @@
 // Brevo transactional email API. Direct delivery requires explicit opt-in,
 // and synthetic recipient domains still require a mapping.
 import { createServer } from "node:http";
-import { timingSafeEqual } from "node:crypto";
+import { createHash, timingSafeEqual } from "node:crypto";
+import { readFileSync } from "node:fs";
+import { persistJsonFile } from "../../services/oracle-worker/src/state-file.mjs";
 
 const brevoEndpoint = "https://api.brevo.com/v3/smtp/email";
 const maxBodyBytes = 16 * 1024;
@@ -99,19 +101,59 @@ async function readBody(request) {
   catch { throw Object.assign(new Error("Request body must be JSON"), { status: 400 }); }
 }
 
-export function createGateway({ config, token, fetchImpl = fetch, log = () => {} }) {
+function readDeliveries(stateFile) {
+  if (!stateFile) return new Map();
+  try {
+    const state = JSON.parse(readFileSync(stateFile, "utf8"));
+    if (state.version !== 1 || !Array.isArray(state.deliveries) || state.deliveries.some(entry =>
+      !Array.isArray(entry) || entry.length !== 2 || !/^[a-f0-9]{64}$/.test(entry[0]) || typeof entry[1] !== "string")) {
+      throw new Error("Invalid email delivery state");
+    }
+    return new Map(state.deliveries);
+  } catch (error) {
+    if (error.code === "ENOENT") return new Map();
+    throw new Error("Could not read email delivery state");
+  }
+}
+
+export function createGateway({ config, token, fetchImpl = fetch, log = () => {}, stateFile }) {
   if (typeof token !== "string" || token.length < 32) throw new Error("EMAIL_GATEWAY_TOKEN must contain at least 32 characters");
   const settings = validateConfig(config);
-  // Idempotency keys make a retried delivery return the first message ID.
-  const delivered = new Map();
+  let deliveries = readDeliveries(stateFile);
+  let stateUpdate = Promise.resolve();
+
+  function updateDelivery(key, update) {
+    const operation = stateUpdate.then(async () => {
+      const previous = deliveries.get(key);
+      const nextValue = update(previous);
+      if (previous !== nextValue) {
+        const next = new Map(deliveries);
+        if (nextValue === undefined) next.delete(key);
+        else next.set(key, nextValue);
+        if (stateFile) await persistJsonFile(stateFile, { version: 1, deliveries: [...next] });
+        deliveries = next;
+      }
+      return previous;
+    });
+    stateUpdate = operation.catch(() => undefined);
+    return operation;
+  }
 
   async function send(body, idempotencyKey) {
-    if (idempotencyKey && delivered.has(idempotencyKey)) return delivered.get(idempotencyKey);
     if (!Object.hasOwn(templates, body?.template)) throw Object.assign(new Error("Unknown email template"), { status: 422 });
     const render = templates[body.template];
     const to = resolveRecipient(settings, body.to);
     if (!to) throw Object.assign(new Error("Recipient is not allowed by the email gateway policy"), { status: 422 });
     const message = render(body.variables && typeof body.variables === "object" ? body.variables : {});
+    const key = idempotencyKey && createHash("sha256")
+      .update(JSON.stringify([idempotencyKey, body.to.trim().toLowerCase()])).digest("hex");
+    if (key) {
+      // The empty string reserves this delivery before contacting the provider.
+      // A lost acknowledgement stays reserved across a crash or restart.
+      const previous = await updateDelivery(key, existing => existing ?? "");
+      if (previous) return { messageId: previous };
+      if (previous === "") throw Object.assign(new Error("Email delivery acknowledgement is unavailable"), { status: 502 });
+    }
     let response;
     try {
       response = await fetchImpl(brevoEndpoint, {
@@ -124,11 +166,12 @@ export function createGateway({ config, token, fetchImpl = fetch, log = () => {}
       throw Object.assign(new Error("Email provider unavailable"), { status: 502 });
     }
     const result = await response.json().catch(() => ({}));
-    if (!response.ok || typeof result.messageId !== "string") {
+    if (!response.ok || typeof result.messageId !== "string" || !result.messageId.trim()) {
+      if (key && response.status >= 400 && response.status < 500) await updateDelivery(key, () => undefined);
       throw Object.assign(new Error(`Brevo rejected the message (${response.status})`), { status: 502 });
     }
     const outcome = { messageId: result.messageId };
-    if (idempotencyKey) delivered.set(idempotencyKey, outcome);
+    if (key) await updateDelivery(key, () => outcome.messageId);
     log({ template: body.template, messageId: result.messageId });
     return outcome;
   }

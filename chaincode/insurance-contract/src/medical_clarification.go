@@ -93,7 +93,7 @@ func (c *Contract) RespondMedicalClarification(ctx contractapi.TransactionContex
 	if msp != "InsurerMSP" || note.Status != "PENDING" || review.Status != "PREPARING" || claim.MedicalClarificationID != id {
 		return nil, fmt.Errorf("clarification is unavailable")
 	}
-	now, err := timestamp(ctx)
+	now, err := ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}

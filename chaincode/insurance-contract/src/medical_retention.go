@@ -75,18 +75,18 @@ func (c *Contract) PurgeMedicalAppealNote(ctx contractapi.TransactionContextInte
 	if err != nil {
 		return nil, err
 	}
-	now, err := ctx.GetStub().GetTxTimestamp()
+	now, err := ledgerNow(ctx)
 	if err != nil {
 		return nil, err
 	}
 	eligible, err := time.Parse(time.RFC3339Nano, plan.EligibleAt)
-	if err != nil || now.AsTime().Before(eligible) {
+	if err != nil || now.Before(eligible) {
 		return nil, fmt.Errorf("appeal-note retention window has not elapsed")
 	}
 	if !strings.EqualFold(expectedHash, plan.PreviousHash) {
 		return nil, fmt.Errorf("disposal requires the exact current private-state hash")
 	}
-	plan.PurgedAt = now.AsTime().UTC().Format(time.RFC3339Nano)
+	plan.PurgedAt = now.UTC().Format(time.RFC3339Nano)
 	if err := putState(ctx, "medicalNoteDisposal", id, plan); err != nil {
 		return nil, err
 	}

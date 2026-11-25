@@ -110,11 +110,11 @@ export async function readDossierLedgerEvidence({ contract, qscc, channel, chain
   const requestIdsWithResults = new Set(oracleResults.map(({ requestId }) => requestId));
   for (const requestId of requestIdsWithResults) {
     const requestHistory = await evaluate("GetOracleRequestHistory", requestId);
-    let previous = 0;
     for (const item of requestHistory) {
       const count = item.value?.revealCount;
-      if (typeof count !== "number" || count <= previous) continue;
-      previous = count;
+      // Fabric's history may return newest first. Only the committed write
+      // set identifies which transaction added each result.
+      if (typeof count !== "number" || count <= 0) continue;
       const transaction = await getTransaction(item.txId);
       for (const record of transaction.records) {
         if (record.assetType !== "oracleResult" || record.value.requestId !== requestId) continue;
@@ -122,6 +122,15 @@ export async function readDossierLedgerEvidence({ contract, qscc, channel, chain
         if (!result) continue;
         const [name, id, verified, code, recordHash, resultHash, claimVersion, registryVersion, modelVersion, modelHash, salt] = record.args;
         const request = oracleRequests.find((row) => row.id === requestId);
+        if (request?.protocolVersion === "v2") {
+          const [action, reqId, facts, decision, saltV2, diagnostics] = record.args;
+          if (action !== "RevealOracleResultV2" || reqId !== requestId || facts !== result.factVectorJSON ||
+              decision !== result.decision || diagnostics !== result.workerDiagnosticsHash || !hex.test(saltV2)) {
+            throw new Error("Committed Oracle v2 reveal differs from its result");
+          }
+          oracleReveals.push({ resultId: result.id, requestId, oracleId: result.oracleId, txId: item.txId, salt: saltV2 });
+          continue;
+        }
         if (name !== "RevealOracleResult" || id !== requestId || verified !== String(result.verified) ||
             code.trim().toUpperCase() !== result.verificationCode || recordHash.toLowerCase() !== result.recordHash ||
             resultHash.toLowerCase() !== result.resultHash || Number(claimVersion) !== result.claimVersion ||
@@ -142,11 +151,11 @@ export async function readDossierLedgerEvidence({ contract, qscc, channel, chain
 
   let certificateWrite = null;
   const sampledVersions = new Map();
+  const pendingAuditVersions = new Set(history.filter(item => item.value?.status === "MEDICAL_AUDIT_PENDING").map(item => item.value.version));
   for (const item of history) {
     const version = item.value?.version;
-    const pending = item.value?.status === "MEDICAL_AUDIT_PENDING";
-    if (pending) sampledVersions.set(version, null);
-    const afterSampling = !pending && sampledVersions.get(version) === null;
+    const afterSampling = pendingAuditVersions.has(version) &&
+      item.value?.status !== "MEDICAL_AUDIT_PENDING" && !sampledVersions.has(version);
     const possibleWrite = approvalCertificate && version === approvalCertificate.claimVersion &&
       item.value?.status === "APPROVED" && !certificateWrite;
     if (!possibleWrite && !afterSampling) continue;
@@ -201,5 +210,14 @@ export async function readDossierLedgerEvidence({ contract, qscc, channel, chain
     }
     if (!payoutBreakdown) throw new Error("Payout breakdown does not reproduce the certificate commitment");
   }
-  return { oracleReveals: oracleResults.map(({ id }) => revealsById.get(id)), certificateWrite, auditSampling, payoutBreakdown };
+  const pins = oracleRequests.filter(request => request.protocolVersion === "v2").flatMap(request => request.manifest.pins);
+  async function readPinned(versionField, transaction) {
+    const keys = new Map(pins.map(pin => [`${pin.issuerId}:${pin[versionField]}`, pin]));
+    return Promise.all([...keys.values()].map(pin => evaluate(transaction, pin.issuerId, String(pin[versionField]))));
+  }
+  const sourceEvidence = pins.length ? {
+    oracleSourceIssuers: await readPinned("keyVersion", "ReadSourceIssuer"),
+    oracleSourceFeeds: await readPinned("feedVersion", "ReadSourceFeed"),
+  } : {};
+  return { oracleReveals: oracleResults.map(({ id }) => revealsById.get(id)), certificateWrite, auditSampling, payoutBreakdown, ...sourceEvidence };
 }

@@ -69,7 +69,7 @@ func (c *Contract) AttestMedicalRegistrySnapshot(ctx contractapi.TransactionCont
 			return nil, fmt.Errorf("cannot activate an older registry snapshot")
 		}
 	}
-	now, err := timestamp(ctx)
+	now, err := ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}

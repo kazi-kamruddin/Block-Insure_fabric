@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { ledgerIdSchema as id } from "./validation";
-import type { AuditorDecision, Claim, ClaimAppeal, ClaimReview, EvidenceAccessGrant, EvidenceReference } from "./types";
+import type { AuditorDecision, Claim, ClaimAppeal, ClaimReview, EvidenceAccessGrant, EvidenceReference, OracleRequest } from "./types";
 import type { MedicalQuote } from "./medical";
 import type { MedicalTimeline } from "./medical-timeline";
 import type { RevisionProof } from "./revision-proof";
@@ -16,6 +16,12 @@ export const medicalReviewCommand = z.discriminatedUnion("action", [
   z.strictObject({ action: z.literal("open"), reviewId: id, deadline: date }),
   z.strictObject({ action: z.literal("recover"), reviewId: id, newId: id, prepareBy: date }),
   z.strictObject({ action: z.literal("expire"), reviewId: id }),
+  z.strictObject({ action: z.literal("oracleTimeout"), requestId: id }),
+  z.strictObject({ action: z.literal("recordReceiptSummary"), claimId: id, summary: z.strictObject({
+    evidenceId: id, invoiceNumber: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9./_-]{0,63}$/),
+    amountMinor: z.number().int().positive().safe(), serviceDate: z.iso.date(), hospitalId: id,
+    derivedFrom: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/),
+  }) }),
   z.strictObject({ action: z.literal("ask"), reviewId: id, id, deadline: date, message }),
   z.strictObject({ action: z.literal("respond"), id, response: z.enum(["ANSWER", "UNAVAILABLE", "MATERIAL", "EXPIRED"]), evidenceHash: optionalHash, message: z.string().trim().max(2000) }),
   z.strictObject({ action: z.literal("share"), reviewId: id, expiresAt: date }),
@@ -60,6 +66,8 @@ export type MedicalClarification = {
 export type MedicalEvidenceCheck = { reviewId: string; evidenceId: string; grantId: string; auditorId: string; checkedAt: string };
 export type MedicalReviewFacts = { service: string; serviceDate: string; termsHash: string; quote: MedicalQuote };
 export type MedicalReviewView = {
+  oracleV2?: boolean;
+  oracle?: OracleRequest | null;
   devLite?: boolean;
   viewerHasVoted?: boolean;
   /** Server clock when the view was read, in epoch milliseconds. */

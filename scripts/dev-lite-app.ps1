@@ -5,10 +5,11 @@
 # -Onboarding enables LevelDB dev-lite customer accounts and starts its Insurer CA.
 param(
     [switch]$TwoOracles, [switch]$CouchDB, [switch]$Collections,
-    [switch]$Email, [switch]$Onboarding, [switch]$Production, [switch]$Stop
+    [switch]$Email, [switch]$Onboarding, [switch]$Production, [switch]$ReadOnly, [switch]$Stop
 )
 $ErrorActionPreference = 'Stop'
 if ($Onboarding -and $CouchDB) { throw '-Onboarding requires the LevelDB dev-lite profile.' }
+if ($ReadOnly -and ($Collections -or $Email)) { throw '-ReadOnly depends on local demo delivery and disables premium collection.' }
 $root = Split-Path -Parent $PSScriptRoot
 $definition = Get-Content -Raw -LiteralPath (Join-Path $PSScriptRoot 'profiles/dev-lite-190.json') | ConvertFrom-Json
 if ($definition.repoRoot) { $root = $definition.repoRoot }
@@ -77,7 +78,7 @@ if (-not (Test-Path -LiteralPath (Join-Path $state 'enrollment-complete'))) {
     throw "Enroll and deploy through network.sh --$profile before starting the app."
 }
 $onboardingCa = $null
-if ($Onboarding) {
+if ($Onboarding -and -not $ReadOnly) {
     $caContainers = @(& docker ps -a --no-trunc `
         --filter 'label=com.docker.compose.project=block-insure-dev-lite' `
         --filter 'label=com.docker.compose.service=ca-insurer' `
@@ -112,9 +113,26 @@ if ($missing.Count) {
     } finally { $rng.Dispose() }
     $secret | ConvertTo-Json | Set-Content -LiteralPath $secretPath -Encoding Ascii
 }
-foreach ($setting in $secret.GetEnumerator()) { Set-Item -LiteralPath "Env:$($setting.Key)" -Value $setting.Value }
+$adapterTokens = @{}
+foreach ($ordinal in 1,2,3) {
+    $name = "ORACLE_ADAPTER_TOKEN_ORACLE$ordinal"
+    $adapterTokens[$name] = if ($secret.Contains($name)) { $secret[$name] } else { [Environment]::GetEnvironmentVariable($name, 'Process') }
+    [Environment]::SetEnvironmentVariable($name, $null, 'Process')
+}
+foreach ($setting in $secret.GetEnumerator()) {
+    if (-not $adapterTokens.ContainsKey($setting.Key)) { Set-Item -LiteralPath "Env:$($setting.Key)" -Value $setting.Value }
+}
+$appState = $state
+if (-not $CouchDB) {
+    $instanceJson = & node (Join-Path $PSScriptRoot 'read-dev-lite-ledger-instance.mjs')
+    if ($LASTEXITCODE -ne 0) { throw 'Cannot bind dev-lite application state to the retained ledger.' }
+    $instance = $instanceJson | ConvertFrom-Json
+    $appState = $instance.appStateRoot
+    $env:FABRIC_LEDGER_INSTANCE_ID = $instance.provisioningId
+}
+$env:FABRIC_DEMO_READ_ONLY = if ($ReadOnly) { 'true' } else { 'false' }
 $env:DEV_LITE_ONBOARDING = if ($Onboarding) { 'true' } else { 'false' }
-if ($Onboarding) { $env:CUSTOMER_STATE_ROOT = $state }
+if ($Onboarding) { $env:CUSTOMER_STATE_ROOT = $appState }
 $env:FABRIC_CHANNEL_NAME = $definition.channel
 $env:FABRIC_CHAINCODE_NAME = $definition.chaincodeName
 $env:FABRIC_EXPECTED_SCHEMA_VERSION = "$($definition.schemaVersion)"
@@ -146,16 +164,22 @@ if ($Email) {
     $env:EMAIL_GATEWAY_URL = ' '
     $env:EMAIL_GATEWAY_TOKEN = ' '
 }
-$env:ORACLE_STATE_ROOT = Join-Path $state 'oracle'
-$env:MEDICAL_REVIEW_REASON_ROOT = Join-Path $state 'review-reasons'
-$env:EVIDENCE_STORAGE_ROOT = Join-Path $state 'evidence'
-$env:EVENT_PROJECTION_ROOT = Join-Path $state 'events'
-$env:OTP_STATE_ROOT = Join-Path $state 'otp'
-$env:WORKFLOW_OPERATION_ROOT = Join-Path $state 'journal'
+$env:ORACLE_STATE_ROOT = Join-Path $appState 'oracle'
+$env:EMAIL_GATEWAY_DELIVERY_STATE = Join-Path $appState 'email-delivery-state.json'
+$env:MEDICAL_REVIEW_REASON_ROOT = Join-Path $appState 'review-reasons'
+$env:EVIDENCE_STORAGE_ROOT = Join-Path $appState 'evidence'
+$env:EVENT_PROJECTION_ROOT = Join-Path $appState 'events'
+$env:OTP_STATE_ROOT = Join-Path $appState 'otp'
+$env:WORKFLOW_OPERATION_ROOT = Join-Path $appState 'journal'
 $env:MEDICAL_FINDINGS_INVESTIGATOR = 'insurer-admin'
-$env:MEDICAL_FINDINGS_ROOT = Join-Path $state 'research-findings'
+$env:MEDICAL_FINDINGS_ROOT = Join-Path $appState 'research-findings'
 $env:ORACLE_MODEL_VERSION = 'fabric-xgb-synthetic-v1'
 $env:ORACLE_MODEL_HASH = '4954e2d2c71422d415c1d50d32687412479fee5bf61a3a9e283760726e6120b4'
+$env:ORACLE_E2_HASH = $definition.e2EvaluatorHash
+$env:ORACLE_E2_NODE_VERSION = $definition.nodeVersion
+foreach ($ordinal in 1,2,3) {
+    Set-Item -LiteralPath "Env:ORACLE${ordinal}_HEALTH_URL" -Value "http://127.0.0.1:$(3310 + $ordinal)/health"
+}
 
 $stamp = [DateTime]::UtcNow.ToString('yyyyMMdd-HHmmss-ffff')
 $logs = Join-Path $state 'logs'
@@ -209,9 +233,15 @@ try {
         $env:ORACLE_LABEL = "Dev-lite Oracle $id"
         $env:ORACLE_HEALTH_PORT = "$workerPort"
         $env:ORACLE_REGISTRY_PATH = "registry/oracle$id-v1.json"
-        Launch "oracle$id" $workers @('src/index.mjs')
+        $adapterName = "ORACLE_ADAPTER_TOKEN_ORACLE$id"
+        try {
+            if ($adapterTokens[$adapterName]) { Set-Item -LiteralPath "Env:$adapterName" -Value $adapterTokens[$adapterName] }
+            Launch "oracle$id" $workers @('src/index.mjs')
+        } finally {
+            [Environment]::SetEnvironmentVariable($adapterName, $null, 'Process')
+        }
     }
-    Launch 'events' $web @('scripts/sync-events.mjs')
+    if (-not $ReadOnly) { Launch 'events' $web @('scripts/sync-events.mjs') }
     if ($Collections) { Launch 'collections' $web @('scripts/process-premium-collections.mjs') }
     $online = $false
     for ($attempt = 0; $attempt -lt 30; $attempt++) {

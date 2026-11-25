@@ -201,11 +201,11 @@ func parseOracleDeadlines(ctx contractapi.TransactionContextInterface, commitDea
 	if err != nil {
 		return "", "", fmt.Errorf("revealDeadline must use RFC3339")
 	}
-	tx, err := ctx.GetStub().GetTxTimestamp()
+	tx, err := ledgerNow(ctx)
 	if err != nil {
 		return "", "", fmt.Errorf("read transaction timestamp: %w", err)
 	}
-	if !commit.After(tx.AsTime()) {
+	if !commit.After(tx) {
 		return "", "", fmt.Errorf("commitDeadline must be after the transaction time")
 	}
 	if !reveal.After(commit) {
@@ -305,7 +305,7 @@ func (c *Contract) publishOracleRegistrySnapshot(ctx contractapi.TransactionCont
 	if recordCount < 1 {
 		return nil, fmt.Errorf("recordCount must be positive")
 	}
-	now, err := timestamp(ctx)
+	now, err := ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -327,6 +327,25 @@ func (c *Contract) publishOracleRegistrySnapshot(ctx contractapi.TransactionCont
 }
 
 func (c *Contract) RequestOracleVerification(
+	ctx contractapi.TransactionContextInterface,
+	requestID, claimID, snapshotID, modelVersion, modelHash, assignedOracleIDsJSON string,
+	requiredConfirmations int,
+	commitDeadline, revealDeadline string,
+) (*OracleRequest, error) {
+	if _, err := requireIdentity(ctx, "InsurerMSP", "insurerAdmin"); err != nil {
+		return nil, err
+	}
+	claim, err := c.ReadClaim(ctx, claimID)
+	if err != nil {
+		return nil, err
+	}
+	if claim.EpisodeID != "" && usesMedicalApprovalCertificates(ctx) {
+		return nil, fmt.Errorf("medical claims require RequestOracleVerificationV2")
+	}
+	return c.requestOracleVerificationV1(ctx, requestID, claimID, snapshotID, modelVersion, modelHash, assignedOracleIDsJSON, requiredConfirmations, commitDeadline, revealDeadline)
+}
+
+func (c *Contract) requestOracleVerificationV1(
 	ctx contractapi.TransactionContextInterface,
 	requestID, claimID, snapshotID, modelVersion, modelHash, assignedOracleIDsJSON string,
 	requiredConfirmations int,
@@ -426,7 +445,7 @@ func (c *Contract) RequestOracleVerification(
 	if err != nil {
 		return nil, err
 	}
-	if modelVersion == "fabric-xgb-synthetic-v1" && (len(assignments) != 3 || requiredConfirmations != 2) {
+	if claim.EpisodeID != "" && (len(assignments) != 3 || requiredConfirmations != 2) {
 		return nil, fmt.Errorf("Fabric XGBoost requires exactly three Oracles and two matching results")
 	}
 	if modelVersion == "fabric-xgb-synthetic-v1" {
@@ -438,7 +457,7 @@ func (c *Contract) RequestOracleVerification(
 	if err != nil {
 		return nil, err
 	}
-	now, err := timestamp(ctx)
+	now, err := ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -514,6 +533,9 @@ func (c *Contract) SubmitOracleCommitment(ctx contractapi.TransactionContextInte
 	if err != nil {
 		return nil, err
 	}
+	if request.ProtocolVersion == "v2" {
+		return nil, fmt.Errorf("use the Oracle v2 commitment transaction")
+	}
 	if err := c.requireUsableMedicalRelease(ctx, request); err != nil {
 		return nil, err
 	}
@@ -530,15 +552,15 @@ func (c *Contract) SubmitOracleCommitment(ctx contractapi.TransactionContextInte
 	if claim.Status != "ORACLE_PENDING" || claim.Version != request.ClaimVersion || claim.CurrentOracleRequestID != request.ID {
 		return nil, fmt.Errorf("Oracle request %s is stale for claim %s", requestID, claim.ID)
 	}
-	txTime, err := ctx.GetStub().GetTxTimestamp()
+	txTime, err := ledgerNow(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("read transaction timestamp: %w", err)
 	}
 	deadline, _ := time.Parse(time.RFC3339, request.CommitDeadline)
-	if txTime.AsTime().After(deadline) {
+	if txTime.After(deadline) {
 		return nil, fmt.Errorf("Oracle request %s commit phase has ended", requestID)
 	}
-	now, err := timestamp(ctx)
+	now, err := ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -575,6 +597,9 @@ func (c *Contract) RevealOracleResult(
 	request, err := c.ReadOracleRequest(ctx, requestID)
 	if err != nil {
 		return nil, err
+	}
+	if request.ProtocolVersion == "v2" {
+		return nil, fmt.Errorf("use the Oracle v2 reveal transaction")
 	}
 	if err := c.requireUsableMedicalRelease(ctx, request); err != nil {
 		return nil, err
@@ -618,16 +643,16 @@ func (c *Contract) RevealOracleResult(
 			return nil, err
 		}
 	}
-	txTime, err := ctx.GetStub().GetTxTimestamp()
+	txTime, err := ledgerNow(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("read transaction timestamp: %w", err)
 	}
 	commitDeadline, _ := time.Parse(time.RFC3339, request.CommitDeadline)
 	revealDeadline, _ := time.Parse(time.RFC3339, request.RevealDeadline)
-	if request.CommitmentCount < request.ExpectedResponses && !txTime.AsTime().After(commitDeadline) {
+	if request.CommitmentCount < request.ExpectedResponses && !txTime.After(commitDeadline) {
 		return nil, fmt.Errorf("Oracle request %s reveal phase has not started", requestID)
 	}
-	if txTime.AsTime().After(revealDeadline) {
+	if txTime.After(revealDeadline) {
 		return nil, fmt.Errorf("Oracle request %s reveal phase has ended", requestID)
 	}
 	if verified && request.RulesVersion == "hospital-invoice-rules-v2" {
@@ -650,7 +675,7 @@ func (c *Contract) RevealOracleResult(
 		if err != nil {
 			return nil, err
 		}
-		if err := c.validatePresentationCredentials(ctx, presentation, txTime.AsTime()); err != nil {
+		if err := c.validatePresentationCredentials(ctx, presentation, txTime); err != nil {
 			return nil, err
 		}
 	}
@@ -666,7 +691,7 @@ func (c *Contract) RevealOracleResult(
 	if commitment.CommitmentHash != expectedCommitment {
 		return nil, fmt.Errorf("Oracle reveal does not match its commitment")
 	}
-	now, err := timestamp(ctx)
+	now, err := ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -791,32 +816,46 @@ func (c *Contract) finalizeOracleRequest(ctx contractapi.TransactionContextInter
 }
 
 func (c *Contract) FinalizeOracleTimeout(ctx contractapi.TransactionContextInterface, requestID string) (*OracleRequest, error) {
-	if _, err := requireIdentity(ctx, "InsurerMSP", "insurerAdmin"); err != nil {
-		return nil, err
-	}
 	request, err := c.ReadOracleRequest(ctx, requestID)
 	if err != nil {
 		return nil, err
-	}
-	if request.Status != "PENDING" {
-		return nil, fmt.Errorf("Oracle request %s is already finalized", requestID)
-	}
-	txTime, err := ctx.GetStub().GetTxTimestamp()
-	if err != nil {
-		return nil, fmt.Errorf("read transaction timestamp: %w", err)
-	}
-	revealDeadline, _ := time.Parse(time.RFC3339, request.RevealDeadline)
-	if !txTime.AsTime().After(revealDeadline) {
-		return nil, fmt.Errorf("Oracle request %s has not timed out", requestID)
 	}
 	claim, err := c.ReadClaim(ctx, request.ClaimID)
 	if err != nil {
 		return nil, err
 	}
+	var assigned []string
+	if claim.EpisodeID != "" {
+		if claim.CurrentReviewID != "" {
+			review, err := c.ReadClaimReview(ctx, claim.CurrentReviewID)
+			if err != nil {
+				return nil, err
+			}
+			if review.MedicalVersion == claim.Version {
+				assigned = review.AssignedAuditorIDs
+			}
+		}
+		if err := requireEligibleClaimDeadlineActor(ctx, claim, assigned); err != nil {
+			return nil, err
+		}
+	} else if _, err := requireIdentity(ctx, "InsurerMSP", "insurerAdmin"); err != nil {
+		return nil, err
+	}
+	if request.Status != "PENDING" {
+		return request, nil
+	}
+	txTime, err := ledgerNow(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("read transaction timestamp: %w", err)
+	}
+	revealDeadline, _ := time.Parse(time.RFC3339, request.RevealDeadline)
+	if !txTime.After(revealDeadline) {
+		return nil, fmt.Errorf("Oracle request %s has not timed out", requestID)
+	}
 	if claim.Status != "ORACLE_PENDING" || claim.Version != request.ClaimVersion || claim.CurrentOracleRequestID != request.ID {
 		return nil, fmt.Errorf("Oracle request %s is stale for claim %s", requestID, claim.ID)
 	}
-	now, err := timestamp(ctx)
+	now, err := ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}

@@ -147,6 +147,9 @@ export async function executeWorkflowCommand(command: WorkflowCommand, session: 
       if (claim.episodeId && process.env.FABRIC_XGBOOST_ENABLED !== "true") throw new Error("The isolated medical channel requires the frozen Fabric evaluator");
       if (claim.status === "ORACLE_PENDING" && claim.currentOracleRequestId) return ledger.readOracleRequest(claim.currentOracleRequestId);
       if (!["SUBMITTED", "APPEAL_SUBMITTED", "HOSPITAL_VERIFIED"].includes(claim.status)) throw new Error("This claim is not awaiting processing.");
+      if (claim.episodeId && await ledger.supportsMedicalOracleV2()) {
+        return ledger.requestOracleVerificationV2(`oracle-${randomUUID()}`, claim.id);
+      }
       const snapshot = process.env.FABRIC_CHANNEL_NAME === medicalDevLiteChannel
         ? await currentAttestedMedicalSnapshot(claim.hospitalId, claim.hospitalInvoiceId ?? "")
         : await refreshHospitalRegistrySnapshot();
@@ -162,6 +165,7 @@ export async function executeWorkflowCommand(command: WorkflowCommand, session: 
     }
     case "requestOracleVerification": {
       const claim = await ledger.readClaim(command.claimId);
+      if (claim.episodeId && await ledger.supportsMedicalOracleV2()) return ledger.requestOracleVerificationV2(command.requestId, claim.id);
       const snapshot = process.env.FABRIC_CHANNEL_NAME === medicalDevLiteChannel
         ? await currentAttestedMedicalSnapshot(claim.hospitalId, claim.hospitalInvoiceId ?? "")
         : claim.hospitalInvoiceId ? await refreshHospitalRegistrySnapshot() : null;

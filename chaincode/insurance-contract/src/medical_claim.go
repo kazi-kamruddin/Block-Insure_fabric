@@ -117,7 +117,7 @@ func (c *Contract) medicalFacts(ctx contractapi.TransactionContextInterface, pol
 	}
 	deadline := service.AddDate(0, 0, rules.FilingDays).Format(time.DateOnly)
 	if filedAt == "" {
-		filedAt, err = timestamp(ctx)
+		filedAt, err = ledgerTimestamp(ctx)
 		if err != nil {
 			return nil, nil, nil, nil, err
 		}
@@ -127,7 +127,7 @@ func (c *Contract) medicalFacts(ctx contractapi.TransactionContextInterface, pol
 		return nil, nil, nil, nil, err
 	}
 	// Asia/Dhaka uses UTC+06:00 for contemporary policy dates.
-	filingDate := filingTime.In(time.FixedZone("Asia/Dhaka", 6*60*60)).Format(time.DateOnly)
+	filingDate := dhakaDate(filingTime)
 	if filingDate > deadline || filingDate < episode.ServiceDate {
 		return nil, nil, nil, nil, fmt.Errorf("service date or original filing deadline makes the claim ineligible")
 	}
@@ -212,7 +212,7 @@ func (c *Contract) PrepareMedicalClaim(ctx contractapi.TransactionContextInterfa
 	if err != nil {
 		return nil, err
 	}
-	now, err := timestamp(ctx)
+	now, err := ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -235,7 +235,7 @@ func (c *Contract) SubmitMedicalClaim(ctx contractapi.TransactionContextInterfac
 	if quote.PayableMinor <= 0 || acceptedStatementHash != quote.StatementHash {
 		return nil, fmt.Errorf("review the current reimbursement statement before submission")
 	}
-	now, err := timestamp(ctx)
+	now, err := ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -349,6 +349,9 @@ func (c *Contract) AcceptMedicalCorrection(ctx contractapi.TransactionContextInt
 		return nil, fmt.Errorf("review the corrected statement before reconfirming")
 	}
 	previous := claim.AmountMinor
+	if err := c.supersedeMedicalCertificateForCorrection(ctx, claim); err != nil {
+		return nil, err
+	}
 	if usesMedicalApprovalCertificates(ctx) && claim.MedicalSettlementID != "" {
 		if err := c.supersedeUnpaidMedicalSettlement(ctx, claim); err != nil {
 			return nil, err
@@ -388,7 +391,7 @@ func (c *Contract) AcceptMedicalCorrection(ctx contractapi.TransactionContextInt
 		return nil, err
 	}
 	claim.Version++
-	claim.UpdatedAt, err = timestamp(ctx)
+	claim.UpdatedAt, err = ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}

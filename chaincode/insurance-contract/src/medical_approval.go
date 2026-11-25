@@ -35,7 +35,7 @@ func (c *Contract) ActivateMedicalApprovalCertificates(ctx contractapi.Transacti
 	if len(key) != 32 {
 		return nil, fmt.Errorf("a 32-byte private duplicate index key is required")
 	}
-	now, err := timestamp(ctx)
+	now, err := ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -54,6 +54,11 @@ func usesMedicalApprovalCertificates(ctx contractapi.TransactionContextInterface
 }
 
 type ApprovalCertificate struct {
+	ManifestHash            string `json:"manifestHash,omitempty" metadata:",optional"`
+	FactVectorHash          string `json:"factVectorHash,omitempty" metadata:",optional"`
+	Decision                string `json:"decision,omitempty" metadata:",optional"`
+	PolicyVersion           string `json:"policyVersion,omitempty" metadata:",optional"`
+	SupersededBy            string `json:"supersededBy,omitempty" metadata:",optional"`
 	ID                      string `json:"id"`
 	ActivationTransactionID string `json:"activationTransactionId"`
 	ClaimID                 string `json:"claimId"`
@@ -157,6 +162,16 @@ func (c *Contract) deriveMedicalApproval(ctx contractapi.TransactionContextInter
 		domain += ":duplicate-rule"
 		values = append(values, strconv.Itoa(cert.DuplicateRuleVersion))
 	}
+	if request != nil && request.ProtocolVersion == "v2" && cert.Path == "ORACLE_AUTO" {
+		cert.ManifestHash, cert.FactVectorHash, cert.Decision, cert.PolicyVersion =
+			request.ManifestHash, request.FactVectorHash, request.Decision, request.PolicyVersion
+		if !oracleV2Hash.MatchString(cert.ManifestHash) || !oracleV2Hash.MatchString(cert.FactVectorHash) ||
+			cert.FactVectorHash != cert.OracleResultHash || cert.Decision != "AUTO_APPROVE" || cert.PolicyVersion != oracleV2Policy {
+			return nil, fmt.Errorf("certificate requires a valid Oracle v2 decision")
+		}
+		domain += ":oracle-v2"
+		values = append(values, cert.ManifestHash, cert.FactVectorHash, cert.Decision, cert.PolicyVersion)
+	}
 	cert.Hash = canonicalProtocolHash(domain, values...)
 	return cert, nil
 }
@@ -172,6 +187,23 @@ func (c *Contract) recordMedicalApproval(ctx contractapi.TransactionContextInter
 		return err
 	}
 	if claim.MedicalHeldReleaseID != "" {
+		key, err := stateKey(ctx, "medicalApprovalCertificate", cert.ID)
+		if err != nil {
+			return err
+		}
+		raw, err := ctx.GetStub().GetState(key)
+		if err != nil {
+			return err
+		}
+		if len(raw) != 0 {
+			prior, err := getState[ApprovalCertificate](ctx, "medicalApprovalCertificate", cert.ID)
+			if err != nil {
+				return err
+			}
+			if err := putState(ctx, "medicalCertificateSupersession", prior.Hash, cert.Hash); err != nil {
+				return err
+			}
+		}
 		return putState(ctx, "medicalHeldReplacementCertificate", cert.ID, cert)
 	}
 	return putState(ctx, "medicalApprovalCertificate", cert.ID, cert)
@@ -195,15 +227,81 @@ func (c *Contract) ReadMedicalApprovalCertificate(ctx contractapi.TransactionCon
 		return nil, err
 	}
 	if raw != nil {
-		return getState[ApprovalCertificate](ctx, "medicalHeldReplacementCertificate", id)
+		return medicalCertificateWithSupersession(ctx, "medicalHeldReplacementCertificate", id)
 	}
-	return getState[ApprovalCertificate](ctx, "medicalApprovalCertificate", id)
+	return medicalCertificateWithSupersession(ctx, "medicalApprovalCertificate", id)
+}
+
+func (c *Contract) ReadOriginalMedicalApprovalCertificate(ctx contractapi.TransactionContextInterface, claimID string, version int) (*ApprovalCertificate, error) {
+	cert, err := medicalCertificateWithSupersession(ctx, "medicalApprovalCertificate", medicalRevisionKey(claimID, version))
+	if err != nil {
+		return nil, err
+	}
+	if cert.SupersededBy == "" {
+		if replacement, err := getState[ApprovalCertificate](ctx, "medicalHeldReplacementCertificate", cert.ID); err == nil {
+			cert.SupersededBy = replacement.Hash
+		}
+	}
+	return cert, nil
+}
+
+func medicalCertificateWithSupersession(ctx contractapi.TransactionContextInterface, kind, id string) (*ApprovalCertificate, error) {
+	cert, err := getState[ApprovalCertificate](ctx, kind, id)
+	if err != nil {
+		return nil, err
+	}
+	key, err := stateKey(ctx, "medicalCertificateSupersession", cert.Hash)
+	if err != nil {
+		return nil, err
+	}
+	raw, err := ctx.GetStub().GetState(key)
+	if err != nil {
+		return nil, err
+	}
+	if len(raw) != 0 {
+		if err := json.Unmarshal(raw, &cert.SupersededBy); err != nil {
+			return nil, err
+		}
+	}
+	return cert, nil
+}
+
+func (c *Contract) supersedeMedicalCertificateForCorrection(ctx contractapi.TransactionContextInterface, claim *Claim) error {
+	if !usesMedicalApprovalCertificates(ctx) {
+		return nil
+	}
+	id := medicalRevisionKey(claim.ID, claim.Version)
+	for _, kind := range []string{"medicalHeldReplacementCertificate", "medicalApprovalCertificate"} {
+		key, err := stateKey(ctx, kind, id)
+		if err != nil {
+			return err
+		}
+		raw, err := ctx.GetStub().GetState(key)
+		if err != nil {
+			return err
+		}
+		if len(raw) == 0 {
+			continue
+		}
+		cert, err := medicalCertificateWithSupersession(ctx, kind, id)
+		if err != nil {
+			return err
+		}
+		if cert.SupersededBy != "" {
+			return nil
+		}
+		return putState(ctx, "medicalCertificateSupersession", cert.Hash, medicalRevisionKey(claim.ID, claim.Version+1))
+	}
+	return nil
 }
 
 func (c *Contract) verifyMedicalApproval(ctx contractapi.TransactionContextInterface, claim *Claim) (*ApprovalCertificate, error) {
 	stored, err := c.ReadMedicalApprovalCertificate(ctx, claim.ID, claim.Version)
 	if err != nil {
 		return nil, fmt.Errorf("current medical approval certificate is required: %w", err)
+	}
+	if stored.SupersededBy != "" {
+		return nil, fmt.Errorf("only an effective medical approval certificate can authorize settlement")
 	}
 	request, err := c.medicalApprovalRequest(ctx, claim)
 	if err != nil {
@@ -236,6 +334,9 @@ func (c *Contract) supersedeUnpaidMedicalSettlement(ctx contractapi.TransactionC
 	if err != nil {
 		return err
 	}
+	if execution, err := readMedicalBankExecution(ctx, settlement.ID); err != nil || execution != nil {
+		return fmt.Errorf("an executed Bank transfer must be confirmed")
+	}
 	liability, err := c.ReadLiability(ctx, "liability-claim-"+claim.ID)
 	if err != nil {
 		return err
@@ -244,11 +345,14 @@ func (c *Contract) supersedeUnpaidMedicalSettlement(ctx contractapi.TransactionC
 		liability.SourceID != claim.ID || liability.Status != "PAYMENT_READY" {
 		return fmt.Errorf("only an unpaid medical settlement can be superseded")
 	}
-	now, err := timestamp(ctx)
+	now, err := ledgerTimestamp(ctx)
 	if err != nil {
 		return err
 	}
 	settlement.Status, settlement.UpdatedAt = "SUPERSEDED", now
+	if claim.MedicalHeldReleaseID != "" {
+		settlement.Status = "RETIRED"
+	}
 	liability.Status, liability.UpdatedAt = "SUPERSEDED", now
 	if err := overwriteAsset(ctx, "settlement", settlement.ID, settlement); err != nil {
 		return err

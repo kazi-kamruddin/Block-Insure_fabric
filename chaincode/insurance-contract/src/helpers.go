@@ -65,14 +65,6 @@ func callerSubject(ctx contractapi.TransactionContextInterface) (string, error) 
 	return ctx.GetClientIdentity().GetID()
 }
 
-func timestamp(ctx contractapi.TransactionContextInterface) (string, error) {
-	ts, err := ctx.GetStub().GetTxTimestamp()
-	if err != nil {
-		return "", fmt.Errorf("read transaction timestamp: %w", err)
-	}
-	return time.Unix(ts.Seconds, int64(ts.Nanos)).UTC().Format(time.RFC3339Nano), nil
-}
-
 func stateKey(ctx contractapi.TransactionContextInterface, assetType, id string) (string, error) {
 	if !idPattern.MatchString(id) {
 		return "", fmt.Errorf("invalid %s id %q", assetType, id)

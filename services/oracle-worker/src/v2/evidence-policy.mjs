@@ -20,7 +20,7 @@ function latest(rows) {
 // All inputs here come from verified pinned feeds. S-C comparisons are
 // allowed to be derived. They never supply independent invoice evidence.
 export function factsFromSources({ claim, manifestHash, modelAdvice, records, issuers,
-  policy = diagnosticPolicy, sourceStatus = {}, verifiedAbsences = new Set() }) {
+  policy = diagnosticPolicy, sourceStatus = {}, verifiedAbsences = new Set(), privateReceipt }) {
   const rows = [...records.values()];
   const eligible = (name, kind, predicate) => rows.filter(row => row.payload?.kind === kind &&
     authorizedFor(issuers.get(row.issuerId), name) && predicate(row.payload));
@@ -37,7 +37,11 @@ export function factsFromSources({ claim, manifestHash, modelAdvice, records, is
   const invoices = eligible("invoiceIssued", "INVOICE", byClaim);
   const invoice = invoices.length === 1 ? invoices[0] : undefined;
   const goodInvoice = invoice && byService(invoice.payload) && invoice.payload.serviceDate === claim.serviceDate &&
-    Number.isSafeInteger(invoice.payload.billMinor) && invoice.payload.billMinor === claim.billMinor;
+    Number.isSafeInteger(invoice.payload.billMinor) && invoice.payload.billMinor === claim.billMinor &&
+    (!policy.requireReceiptNumber || (typeof invoice.payload.invoiceNumber === "string" && invoice.payload.invoiceNumber.length > 0 &&
+      invoice.payload.invoiceHash === claim.invoiceHash && invoice.payload.invoiceDate === claim.invoiceDate &&
+      invoice.payload.diagnosisCode === claim.diagnosisCode && invoice.payload.admissionDate === claim.admissionDate &&
+      invoice.payload.dischargeDate === claim.dischargeDate));
   const facts = {
     invoiceIssued: invoices.length ? fact(goodInvoice ? "PASS" : "CONTRADICTED", invoices) : failUnavailable("invoiceIssued"),
   };
@@ -75,7 +79,10 @@ export function factsFromSources({ claim, manifestHash, modelAdvice, records, is
     const [receipt] = receipts;
     const match = byHospital(receipt.payload) && receipt.payload.serviceDate === claim.serviceDate &&
       receipt.payload.billMinor === invoice.payload.billMinor && receipt.payload.invoiceRecordId === invoice.recordId &&
-      receipt.derivedFrom.includes(invoice.recordId);
+      receipt.derivedFrom.includes(invoice.recordId) && (!policy.requireReceiptNumber ||
+        (privateReceipt?.invoiceNumber === invoice.payload.invoiceNumber && receipt.payload.invoiceNumber === invoice.payload.invoiceNumber &&
+          privateReceipt?.derivedFrom === invoice.recordId && privateReceipt?.hospitalId === claim.hospitalId &&
+          privateReceipt?.serviceDate === claim.serviceDate && privateReceipt?.amountMinor === invoice.payload.billMinor));
     if (match) receiptCheck = "MATCH";
   }
   facts.receiptConsistent = receipts.length

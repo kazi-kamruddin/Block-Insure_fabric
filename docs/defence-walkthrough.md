@@ -33,9 +33,11 @@ rejection screenshot has not been located.
 - [Evening staging record](../data/dev-lite/demo-staging/20261121-132229/summary.json)
 
 Before the defence, run
-`node scripts/validate-dev-lite-seed.mjs --defence-date YYYY-MM-DD`
-for the agreed date. Sadik's waiting period ends 24 December 2026.
-Rakibul's EFT first-premium grace ends 9 December 2026. The seed registered
-four hospital/service benchmarks. Check the live status and both Bank
-account balances only with owner approval. The scheduled F06 signing drill
-uses a separate Windows operator. [Custody and F06](custody.md)
+`node scripts/validate-dev-lite-seed.mjs --defence-date 2026-12-06`.
+Sadik's waiting period ends 24 December 2026. The 25 November peer
+readback shows Rakibul pending his first EFT premium with zero confirmed
+payments. His grace remains open on 6 December and ends 9 December 2026.
+The retained ledger has four hospital/service benchmarks. As of the same read,
+the premium collection account ****7001 held BDT 5,550 and the reserve
+****7002 held BDT 2,436,000. The scheduled F06 signing drill uses a separate
+Windows operator. [Custody and F06](custody.md)

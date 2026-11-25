@@ -25,10 +25,11 @@ func (c *Contract) EscalateStalledMedicalClaim(ctx contractapi.TransactionContex
 		return nil, err
 	}
 	if claim.ClaimantID != owner || claim.EpisodeID == "" || claim.MedicalEscalatedAt != "" || claim.CurrentReviewID != "" ||
-		(claim.Status != "SUBMITTED" && claim.Status != "APPEAL_SUBMITTED" && claim.Status != "ORACLE_PENDING") {
+		(claim.Status != "SUBMITTED" && claim.Status != "APPEAL_SUBMITTED" && claim.Status != "ORACLE_PENDING" &&
+			claim.Status != "ORACLE_FAILED" && claim.Status != "MEDICAL_REVIEW_REQUIRED" && claim.Status != "MEDICAL_AUDIT_PENDING") {
 		return nil, fmt.Errorf("claim is not eligible for escalation")
 	}
-	now, err := timestamp(ctx)
+	now, err := ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -45,10 +46,10 @@ func (c *Contract) EscalateStalledMedicalClaim(ctx contractapi.TransactionContex
 	if err != nil {
 		return nil, err
 	}
-	if request != nil {
-		if request.Status != "PENDING" || request.ClaimVersion != claim.Version {
-			return nil, fmt.Errorf("current pending Oracle request required")
-		}
+	if request != nil && request.ClaimVersion != claim.Version {
+		return nil, fmt.Errorf("current Oracle request required")
+	}
+	if request != nil && request.Status == "PENDING" {
 		due, err = time.Parse(time.RFC3339Nano, request.RevealDeadline)
 		if err != nil {
 			return nil, err
@@ -65,7 +66,7 @@ func (c *Contract) EscalateStalledMedicalClaim(ctx contractapi.TransactionContex
 	if err != nil {
 		return nil, err
 	}
-	if request != nil {
+	if request != nil && request.Status == "PENDING" {
 		if err := c.finalizeOracleRequest(ctx, request, claim, false, "", "ESCALATED_TIMEOUT", now); err != nil {
 			return nil, err
 		}

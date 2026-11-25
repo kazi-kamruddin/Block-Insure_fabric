@@ -5,9 +5,11 @@ CONSTANTS OracleCount, Quorum
 ASSUME OracleCount = 3 /\ Quorum = 2
 
 Oracles == 1..OracleCount
-Vectors == {"ClearA", "ClearB", "Contradicted", "Insufficient", "Unverifiable",
+DeadlineActors == {"Claimant", "Insurer", "AssignedAuditor"}
+AllVectors == {"ClearA", "ClearB", "Contradicted", "Insufficient", "Unverifiable",
              "InvalidSignature", "InactiveLicence", "UnaccreditedService",
              "AboveTariff", "ReceiptMismatch", "ModelReview"}
+Vectors == {"ClearA", "ClearB", "Contradicted", "InvalidSignature"}
 
 \* ClearA and ClearB have distinct evidence references. Their decisions alone
 \* agree, so the exact vector must be counted as part of the quorum object.
@@ -30,7 +32,7 @@ DecisionOutcomes == {"AUTO_APPROVE", "PANEL_REVIEW", "INTEGRITY_FAIL"}
 VARIABLE s
 
 Init ==
-  s = [stage |-> "COMMIT", commits |-> {}, reveals |-> {},
+  s = [stage |-> "COMMIT", commits |-> {}, reveals |-> {}, revoked |-> {},
        outcome |-> "PENDING", selected |-> "None"]
 
 Subjects(rows) == {row[1] : row \in rows}
@@ -39,6 +41,7 @@ Count(rows, vector) == Cardinality({row \in rows : row[2] = vector})
 
 Commit(oracle, digest) ==
   /\ s.stage = "COMMIT"
+  /\ oracle \notin s.revoked
   /\ oracle \notin Subjects(s.commits)
   /\ digest \notin CommittedHashes
   /\ s' = [s EXCEPT !.commits = @ \cup {<<oracle, digest>>}]
@@ -55,10 +58,11 @@ CommitDeadline ==
 
 Reveal(oracle, vector) ==
   /\ s.stage = "REVEAL"
+  /\ oracle \notin s.revoked
   /\ oracle \notin Subjects(s.reveals)
   /\ <<oracle, <<oracle, vector>>>> \in s.commits
   /\ LET rows == s.reveals \cup {<<oracle, vector>>}
-         quorum == Count(rows, vector) >= Quorum
+         quorum == Count({row \in rows : row[1] \notin s.revoked}, vector) >= Quorum
      IN IF quorum
         THEN s' = [s EXCEPT !.stage = "FINAL", !.reveals = rows,
                           !.outcome = Decision(vector), !.selected = vector]
@@ -67,15 +71,24 @@ Reveal(oracle, vector) ==
                           !.outcome = "CONFLICT"]
         ELSE s' = [s EXCEPT !.reveals = rows]
 
-RevealDeadline ==
+Revoke ==
+  /\ s.stage # "FINAL"
+  /\ \E oracle \in Oracles \ s.revoked :
+       s' = [s EXCEPT !.revoked = @ \cup {oracle}]
+
+TimeoutAs(actor) ==
   /\ s.stage = "REVEAL"
+  /\ actor \in DeadlineActors
   /\ s' = [s EXCEPT !.stage = "FINAL", !.outcome = "TIMEOUT"]
+
+RevealDeadline == \E actor \in DeadlineActors : TimeoutAs(actor)
 
 Next ==
   \/ (\E oracle \in Oracles, digest \in Digests : Commit(oracle, digest))
   \/ OpenReveal
   \/ CommitDeadline
   \/ (\E oracle \in Oracles, vector \in Vectors : Reveal(oracle, vector))
+  \/ Revoke
   \/ RevealDeadline
 
 Spec == Init /\ [][Next]_s /\ WF_s(CommitDeadline) /\ WF_s(RevealDeadline)
@@ -84,6 +97,7 @@ TypeOK ==
   /\ s.stage \in {"COMMIT", "REVEAL", "FINAL"}
   /\ s.commits \subseteq CommitmentEntries
   /\ s.reveals \subseteq RevealEntries
+  /\ s.revoked \subseteq Oracles
   /\ s.outcome \in DecisionOutcomes \cup {"PENDING", "CONFLICT", "TIMEOUT"}
   /\ s.selected \in Vectors \cup {"None"}
 
@@ -105,10 +119,11 @@ DecisionBackedByExactQuorum ==
     /\ s.stage = "FINAL"
     /\ s.selected \in Vectors
     /\ s.outcome = Decision(s.selected)
-    /\ Count(s.reveals, s.selected) >= Quorum
+    /\ Count({row \in s.reveals : row[1] \notin s.revoked}, s.selected) >= Quorum
 
 NoAutoApprovalWithNonPassFact ==
-  s.outcome = "AUTO_APPROVE" => s.selected \notin NonPass \cup PolicyReview
+  /\ s.outcome = "AUTO_APPROVE" => s.selected \notin NonPass \cup PolicyReview
+  /\ \A vector \in AllVectors : (Decision(vector) = "INTEGRITY_FAIL") <=> (vector \in IntegrityFailure)
 
 DecisionOrPanel ==
   <> (s.stage = "FINAL" /\ s.outcome \in DecisionOutcomes \cup {"CONFLICT", "TIMEOUT"})

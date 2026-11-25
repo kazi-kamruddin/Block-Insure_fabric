@@ -25,7 +25,7 @@ func (c *Contract) bindOracleInvoice(ctx contractapi.TransactionContextInterface
 	if invoice.Status != "FINALIZED" {
 		return nil, fmt.Errorf("hospital invoice %s is not finalized", invoice.ID)
 	}
-	now, err := timestamp(ctx)
+	now, err := ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}

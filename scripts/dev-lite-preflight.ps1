@@ -16,10 +16,11 @@ try {
     Report 'Docker Desktop' 'PASS' 'Engine is reachable'
 } catch { Report 'Docker Desktop' 'FAIL' 'Start Docker Desktop and wait for "Engine running"' }
 
-$projects = @(& docker ps --filter 'label=com.docker.compose.service=orderer' --format '{{.Label "com.docker.compose.project"}}' 2>$null)
-$foreign = @($projects | Where-Object { $_ -and $_ -ne 'block-insure-dev-lite' })
+$orderers = @(& docker ps --filter 'label=com.docker.compose.service=orderer' --format '{{.Names}}' 2>$null)
+$devLiteOrderers = @(& docker ps --filter 'label=com.docker.compose.service=orderer' --filter 'label=com.docker.compose.project=block-insure-dev-lite' --format '{{.Names}}' 2>$null)
+$foreign = @($orderers | Where-Object { $_ -and $devLiteOrderers -notcontains $_ })
 if ($foreign.Count) { Report 'Other Fabric networks' 'FAIL' "Stop these first: $($foreign -join ', ')" }
-else { Report 'Other Fabric networks' 'PASS' $(if ($projects.Count) { 'Only dev-lite is running' } else { 'None running' }) }
+else { Report 'Other Fabric networks' 'PASS' $(if ($devLiteOrderers.Count) { 'Only dev-lite is running' } else { 'None running' }) }
 
 $volumes = @(& docker volume ls --format '{{.Name}}' 2>$null)
 $expected = 'orderer','peer-auditor','peer-bank','peer-hospital','peer-insurer','peer-oracle' | ForEach-Object { "block-insure-dev-lite_$_" }
@@ -48,7 +49,7 @@ foreach ($drive in @((Get-Item -LiteralPath $root).PSDrive.Name, $env:SystemDriv
 $emailConfig = Join-Path $state 'email-gateway.json'
 Report 'Brevo email (optional)' $(if (Test-Path -LiteralPath $emailConfig) { 'PASS' } else { 'INFO' }) $(if (Test-Path -LiteralPath $emailConfig) { 'Configured; start the app with -Email' } else { 'Not configured; OTP codes appear on screen' })
 
-if (($Ledger -or $projects -contains 'block-insure-dev-lite') -and -not $foreign.Count) {
+if (($Ledger -or $devLiteOrderers.Count) -and -not $foreign.Count) {
     $lines = @(& wsl.exe -d Ubuntu --cd $root --exec bash network/scripts/read-dev-lite-sequence.sh $definition.channel $definition.chaincodeName 2>$null)
     $gateway = & node (Join-Path $PSScriptRoot 'dev-lite-peer-preflight.mjs') | ConvertFrom-Json
     $expectedDefinition = "$($definition.channel) / $($definition.chaincodeVersion) / $($definition.expectedSequence)"

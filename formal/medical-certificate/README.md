@@ -1,6 +1,6 @@
 # Medical certificate model
 
-`MedicalCertificate.tla` models one medical claim under one dev-lite 1.9.0
+`MedicalCertificate.tla` models one medical claim under the R1 dev-lite
 policy. The configuration bounds the claim to two versions, three assigned
 Oracle subjects, four assigned auditors and two units of normalized cover.
 
@@ -13,19 +13,18 @@ supersedes an unpaid authorization and changes the reservation by the
 difference between the old and new payable amounts. Confirmed payment moves
 reserved cover to paid cover, and a final rejection permits release.
 
-The certificate invariant counts effective certificates. The original
-certificate and a same-version held-release panel replacement can coexist
-under different audit keys. `ReadMedicalApprovalCertificate` in
-`medical_approval.go` gives priority to the replacement. `ConfirmSettlement`
-still matches the effective certificate after authorization. Dev-lite 1.9.0
-checks the model hold at authorization and does not repeat the hold check at
-confirmation.
+The certificate invariant counts effective certificates. The historical
+certificate stays in the record and a supersession link records its
+replacement. Confirmation of a held Oracle certificate requires an already
+executed Bank transfer and records the post-payment audit flag. Otherwise
+the unpaid settlement can be retired for panel review.
 
-The model allows claimant escalation for a submitted claim, a submitted
-appeal or a pending Oracle request after the relevant deadline. It also models
-Insurer preparation after Oracle failure or a positive result requiring
-review, and the current rejection and single procedural recovery for an
-expired review. The future U18 edges are marked in the model.
+The model allows claimant escalation after the corresponding deadlines for
+submitted, pending Oracle, failed Oracle, review-required and audit-pending
+claims. An eligible claimant, insurer or assigned auditor can close a timed
+out round. Preparation expiry leads to procedural recovery. Open voting
+expiry retains the existing single recovery rule. The separate model
+release configuration checks the governance stages and re-attestation.
 
 ## Fairness and scope
 
@@ -60,3 +59,6 @@ this directory:
 ```powershell
 java -XX:+UseSerialGC -Xmx512m -cp ../insurance-workflow/.cache/tla2tools.jar tlc2.TLC -workers 1 -config MedicalCertificate.cfg MedicalCertificate.tla
 ```
+
+Use `-config MedicalModelRelease.cfg` to check the release transitions.
+[R1 run results](../../docs/results/r1-formal-2026-11-25.md)
