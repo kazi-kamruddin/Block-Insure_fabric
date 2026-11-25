@@ -499,7 +499,7 @@ func (c *Contract) requestOracleVerificationV1(
 		RevealDeadline: revealDeadline, RequestedAt: now,
 	}
 	if medicalReleaseID != "" {
-		request.AuditPeriodID, err = c.medicalAuditPeriodForRequest(ctx, now)
+		request.AuditPeriodID, err = c.medicalAuditPeriodForRequest(ctx, claim, now)
 		if err != nil {
 			return nil, err
 		}

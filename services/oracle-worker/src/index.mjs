@@ -182,8 +182,10 @@ async function processRequest(requestId) {
   const currentClaim = await evaluate("ReadClaim", request.claimId);
   if (currentClaim.version !== request.claimVersion || currentClaim.currentOracleRequestId !== request.id) return;
   if (request.protocolVersion === "v2") {
-    const { processV2Request } = await import("./v2/worker.mjs");
-    await processV2Request({ request, claim: currentClaim, config, runtime, evaluate, evaluateOrNull, submit, retry, waitForRevealPhase,
+    const processRequest = request.modelVersion === "fabric-xgb-synthetic-e3"
+      ? (await import("./e3-worker.mjs")).processE3Request
+      : (await import("./v2/worker.mjs")).processV2Request;
+    await processRequest({ request, claim: currentClaim, config, runtime, evaluate, evaluateOrNull, submit, retry, waitForRevealPhase,
       saltFor: () => protocol.buildDeterministicSalt(runtime.privateKey, request.id, config.oracleId),
       log: code => log("warn", "Oracle v2 evaluation disposition", { requestId, code }),
     }).catch(error => {

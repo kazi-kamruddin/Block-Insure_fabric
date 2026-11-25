@@ -11,6 +11,7 @@ import (
 )
 
 type MedicalOracleV2Source struct {
+	DigestVersion     int    `json:"digestVersion,omitempty" metadata:",optional"`
 	InvoiceID         string `json:"invoiceId"`
 	InvoiceHash       string `json:"invoiceHash"`
 	HospitalID        string `json:"hospitalId"`
@@ -82,13 +83,41 @@ func (c *Contract) RecordMedicalOCRSummary(ctx contractapi.TransactionContextInt
 }
 
 func (c *Contract) ReadMedicalOracleSourcesForRequest(ctx contractapi.TransactionContextInterface, requestID string) (*MedicalOracleV2Sources, error) {
+	return c.readMedicalOracleSources(ctx, requestID, false)
+}
+
+func (c *Contract) ReadMedicalOracleE3SourcesForRequest(ctx contractapi.TransactionContextInterface, requestID string) (*MedicalOracleV2Sources, error) {
+	return c.readMedicalOracleSources(ctx, requestID, true)
+}
+
+func (c *Contract) readMedicalOracleSources(ctx contractapi.TransactionContextInterface, requestID string, e3 bool) (*MedicalOracleV2Sources, error) {
 	_, subject, err := requireOracleIdentity(ctx)
 	if err != nil {
 		return nil, err
 	}
-	_, claim, err := c.currentOracleV2Request(ctx, requestID, subject)
+	request, claim, err := c.currentOracleV2Request(ctx, requestID, subject)
 	if err != nil {
 		return nil, err
+	}
+	if (request.ModelVersion == medicalModelE3) != e3 {
+		return nil, fmt.Errorf("source query does not match the pinned Oracle release")
+	}
+	project := medicalOracleV2Source
+	if e3 {
+		key, err := readMedicalPatientTokenKey(ctx, request.PatientTokenKeyVersion)
+		if err != nil {
+			return nil, err
+		}
+		project = func(head *MedicalEpisodeHead, episode *MedicalEpisode, association *MedicalAssociation) MedicalOracleV2Source {
+			source := medicalOracleV2Source(head, episode, association)
+			source.DigestVersion = head.DigestVersion
+			if association != nil && association.Verified {
+				source.PatientHash = medicalPatientToken(key, "fabric-medical-oracle-patient-v2", association.BeneficiaryID)
+			} else {
+				source.PatientHash = medicalPatientToken(key, "fabric-medical-oracle-unlinked-v2", head.HospitalID, episode.PatientReferenceHash)
+			}
+			return source
+		}
 	}
 	head, err := currentMedicalHead(ctx, claim)
 	if err != nil {
@@ -106,7 +135,7 @@ func (c *Contract) ReadMedicalOracleSourcesForRequest(ctx contractapi.Transactio
 	if err != nil {
 		return nil, err
 	}
-	current := medicalOracleV2Source(head, episode, association)
+	current := project(head, episode, association)
 	result := &MedicalOracleV2Sources{Current: current, Priors: []MedicalOracleV2Source{}}
 	start, end := cutoff.AddDate(0, 0, -90).Format(time.DateOnly), episode.InvoiceDate
 	appendPrior := func(prior MedicalEpisodeHead) error {
@@ -130,7 +159,7 @@ func (c *Contract) ReadMedicalOracleSourcesForRequest(ctx contractapi.Transactio
 		if err != nil && !isMissingPrivate(ctx, "medicalAssociation", medicalAssociationKey(row)) {
 			return err
 		}
-		result.Priors = append(result.Priors, medicalOracleV2Source(&prior, row, association))
+		result.Priors = append(result.Priors, project(&prior, row, association))
 		return nil
 	}
 	index, err := ctx.GetStub().GetStateByPartialCompositeKey("hospitalEpisodeByDate", []string{claim.HospitalID})

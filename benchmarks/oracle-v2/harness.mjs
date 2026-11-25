@@ -1,12 +1,14 @@
 import { buildResultDigest } from "../../services/oracle-worker/src/protocol.mjs";
+import { createHash } from "node:crypto";
 import { evaluateThreshold } from "../../services/oracle-worker/src/threshold-model.mjs";
 import { digest } from "../../services/oracle-worker/src/v2/canonical.mjs";
 import { commitmentHash } from "../../services/oracle-worker/src/v2/commitment-v2.mjs";
 import { decide, diagnosticPolicy } from "../../services/oracle-worker/src/v2/decision.mjs";
 import { createFactVector, factVectorHash, tariffBandFor } from "../../services/oracle-worker/src/v2/fact-vector.mjs";
+import { evaluateV2 } from "../../services/oracle-worker/src/v2/evaluator-v2.mjs";
 import { authorizedFor, independentEvidence, verifyFeed, verifyFeedMembership } from "../../services/oracle-worker/src/v2/sources.mjs";
 import { createFeed, recordProof, signRecord } from "../../services/integrations/source-adapters/feed.mjs";
-import { fixtureKeys, makeCase, scenarios } from "./fixtures.mjs";
+import { fixtureKeys, makeCase, phase3Scenarios, scenarios } from "./fixtures.mjs";
 
 export const configurations = Object.freeze([
   { id: "v1-shared", label: "v1 shared Insurer snapshot", sources: 0, dependencyCheck: false, overhead: 0 },
@@ -48,7 +50,8 @@ function signedEvidence(sample, issuers) {
       effectiveAt: feed.issuedAt, anchoredAt: "2026-11-25T00:01:00.000Z" };
     if (!verifyFeed(feed, checkpoint, issuer, REQUESTED_AT)) throw new Error("Invalid synthetic feed signature or checkpoint");
     feed.records.forEach((record, index) => {
-      if (!authorizedFor(issuer, record.payload.fact) || !verifyFeedMembership(record, recordProof(feed.records, index), checkpoint.root)) {
+      const offeredHospitalCopy = sample.scenario === "hospital-payment-copy" && issuer.issuerId === "s-a" && record.payload.fact === "paymentOccurred";
+      if ((!offeredHospitalCopy && !authorizedFor(issuer, record.payload.fact)) || !verifyFeedMembership(record, recordProof(feed.records, index), checkpoint.root)) {
         throw new Error("Invalid synthetic source record");
       }
       allRecords.set(record.recordId, record);
@@ -93,10 +96,15 @@ function assessV2(sample, mode, signed, observation) {
     facts.tariffBand = evidence(tariffPass ? (independent(tariff) ? "PASS" : "INSUFFICIENT") : "CONTRADICTED", tariff);
     facts.receiptConsistent = evidence(receiptCheck === "MATCH" ? "PASS" : "CONTRADICTED", receipt);
     if (sample.verifyPayment) {
-      const payment = byFact.get("paymentOccurred");
+      const copy = allRecords.get(sample.claimId + ".hospital-payment-confirmation");
+      const payment = copy
+        ? (mode.dependencyCheck ? [...allRecords.values()].find(record => record.payload.fact === "paymentOccurred" &&
+            authorizedFor(issuers.get(record.issuerId), record.payload.fact)) ?? copy : copy)
+        : byFact.get("paymentOccurred");
       const paid = payment.payload.amountMinor === invoice.payload.amountMinor;
       facts.paymentOccurred = evidence(paid ? (independent(payment) ? "PASS" : "INSUFFICIENT") : "CONTRADICTED", payment);
       if (!paid) evidenceReason = "PAYMENT_CONTRADICTION";
+      else if (copy === payment && mode.dependencyCheck) evidenceReason = "DEPENDENT_HOSPITAL_PAYMENT_COPY";
     }
     if (!tariffPass) evidenceReason = "OUTSIDE_REGULATOR_TARIFF";
     if (receiptCheck === "MISMATCH") evidenceReason = "RECEIPT_MISMATCH";
@@ -118,7 +126,7 @@ function assessV2(sample, mode, signed, observation) {
   const vector = createFactVector({
     claimId: sample.claimId, claimVersion: sample.claimVersion, policyVersion: policy.version,
     manifestHash: digest("oracle-v2-benchmark:pinned-manifest", multiSource ? checkpoints : checkpoints.slice(0, 1)),
-    facts, tariffBand, receiptCheck, modelAdvice: "AUTO",
+    facts, tariffBand, receiptCheck, modelAdvice: sample.modelAdvice,
   });
   const route = decide(vector, policy);
   return { route, hash: factVectorHash(vector), evidenceReason };
@@ -197,14 +205,34 @@ function evaluateReplicaGate(sample, mode, evidenceSet) {
   };
 }
 
-export function simulate({ seed = 42, perScenario = 24, panelBudgetPercent = 50 } = {}) {
+function frozenAdvice(sample) {
+  const claimantId = sample.claimId + "-member";
+  const patientReferenceHash = createHash("sha256").update(claimantId).digest("hex");
+  const invoiceHash = digest("oracle-v2-benchmark:frozen-observation", [sample.claimId, sample.billMinor]);
+  const hospitalId = "synthetic-hospital";
+  const amountMinor = sample.records.find(record => record.payload.fact === INVOICE_FACT).payload.amountMinor;
+  const current = {
+    invoiceId: sample.claimId + "-invoice", invoiceHash, hospitalId, hospitalMsp: "HospitalMSP",
+    patientIssuerMsp: "InsurerMSP", patientReferenceHash, associationStatus: "VERIFIED",
+    treatmentType: "DIAGNOSTIC", diagnosisCode: "Z01", amountMinor, expectedMinMinor: 215000, expectedMaxMinor: 500000,
+    admissionDate: "2026-11-23", dischargeDate: "2026-11-24", invoiceDate: "2026-11-24",
+    licenseStatus: "ACTIVE", recordStatus: "VALID", invoiceStatus: "VALID",
+  };
+  return evaluateV2({ records: [current], claim: { claimantId, claimantMsp: "InsurerMSP", hospitalId,
+    hospitalMsp: "HospitalMSP", hospitalInvoiceId: current.invoiceId, invoiceHash, amountMinor: sample.billMinor,
+    descriptionHash: invoiceHash, incidentDate: "2026-11-24", createdAt: REQUESTED_AT, treatmentType: "DIAGNOSTIC" },
+  snapshotTimestamp: REQUESTED_AT }).modelAdvice;
+}
+
+export function simulate({ seed = 42, perScenario = 24, panelBudgetPercent = 50, extended = false, advice = "fixed-auto" } = {}) {
   if (!Number.isSafeInteger(seed) || !Number.isSafeInteger(perScenario) || perScenario < 1 ||
-      !Number.isSafeInteger(panelBudgetPercent) || panelBudgetPercent < 0 || panelBudgetPercent > 100) {
+      !Number.isSafeInteger(panelBudgetPercent) || panelBudgetPercent < 0 || panelBudgetPercent > 100 || !["fixed-auto", "frozen"].includes(advice)) {
     throw new TypeError("Seed, sample size and panel budget must be valid integers");
   }
   const keys = fixtureKeys(seed);
-  const cases = scenarios.flatMap(scenario => Array.from({ length: perScenario }, (_, index) => {
+  const cases = (extended ? phase3Scenarios : scenarios).flatMap(scenario => Array.from({ length: perScenario }, (_, index) => {
     const sample = makeCase(scenario, index, seed);
+    sample.modelAdvice = advice === "frozen" ? frozenAdvice(sample) : "AUTO";
     return { sample, signed: signedEvidence(sample, keys) };
   }));
   const panelCapacity = Math.floor(cases.length * panelBudgetPercent / 100);
@@ -214,7 +242,7 @@ export function simulate({ seed = 42, perScenario = 24, panelBudgetPercent = 50 
       const { claimId, scenario, variant, eligible, billMinor, groundTruthInvoiceMinor } = sample;
       const judged = evaluateReplicaGate(sample, mode, signed);
       return {
-        mode: mode.id, claimId, scenario, variant, eligible, billMinor, groundTruthInvoiceMinor, ...judged,
+        mode: mode.id, claimId, scenario, variant, eligible, billMinor, groundTruthInvoiceMinor, modelAdvice: sample.modelAdvice, ...judged,
         panelStatus: judged.route === "AUTO_APPROVE" ? "NOT_NEEDED" : "WAITLISTED",
         decisionSeconds: judged.route === "AUTO_APPROVE" ? judged.routingSeconds : null,
       };

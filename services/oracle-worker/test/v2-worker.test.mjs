@@ -4,6 +4,8 @@ import { test } from "node:test";
 import { createFeed, signRecord } from "../../integrations/source-adapters/feed.mjs";
 import { digest } from "../src/v2/canonical.mjs";
 import { assessV2Request } from "../src/v2/worker.mjs";
+import { assessE3Request } from "../src/e3-worker.mjs";
+import { evaluatorE3Hash } from "../src/e3-release.mjs";
 import { parseFactVector } from "../src/v2/fact-vector.mjs";
 import { claim as fixtureClaim, source } from "./fixtures/xgboost-inputs.mjs";
 
@@ -61,6 +63,14 @@ test("E2 dispatch verifies signed pins and compares the restricted receipt acros
   assert.equal(direct.vectorHash, ownPeer.vectorHash);
   assert.equal(new Set([direct.diagnosticsHash, mirror.diagnosticsHash, ownPeer.diagnosticsHash]).size, 3);
   assert.equal(parseFactVector(direct.encoded).receiptCheck, "MATCH");
+  const token = digest("test:scoped-patient-token", ["test-claim", 1]);
+  const e3 = await assessE3Request({ request: { ...request, patientTokenKeyVersion: 1 }, claim, config, oracleId: "oracle1", log: () => {},
+    evaluate: (name, id) => name === "ReadMedicalOracleE3SourcesForRequest"
+      ? { current: { ...current, digestVersion: 2, patientReferenceHash: token }, priors: [], receipt }
+      : evaluate(name, id) });
+  assert.equal(e3.vectorHash, direct.vectorHash);
+  assert.equal(e3.diagnostics.evaluatorHash, evaluatorE3Hash);
+  assert.notEqual(e3.diagnosticsHash, direct.diagnosticsHash);
   receipt.invoiceNumber = "INVOICE-2";
   const mismatch = await verify("oracle3");
   assert.equal(parseFactVector(mismatch.encoded).receiptCheck, "MISMATCH");

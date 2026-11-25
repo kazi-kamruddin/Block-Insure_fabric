@@ -49,6 +49,20 @@ func (c *Contract) EscalateStalledMedicalClaim(ctx contractapi.TransactionContex
 	if request != nil && request.ClaimVersion != claim.Version {
 		return nil, fmt.Errorf("current Oracle request required")
 	}
+	var auditPeriod *MedicalAuditPeriod
+	if claim.Status == "MEDICAL_AUDIT_PENDING" && request != nil && request.AuditPeriodID != "" {
+		period, err := c.ReadMedicalAuditPeriod(ctx, request.AuditPeriodID)
+		if err != nil {
+			return nil, err
+		}
+		if period.GraceEndsAt != "" {
+			due, err = time.Parse(time.RFC3339Nano, period.GraceEndsAt)
+			if err != nil {
+				return nil, err
+			}
+			auditPeriod = period
+		}
+	}
 	if request != nil && request.Status == "PENDING" {
 		due, err = time.Parse(time.RFC3339Nano, request.RevealDeadline)
 		if err != nil {
@@ -58,6 +72,15 @@ func (c *Contract) EscalateStalledMedicalClaim(ctx contractapi.TransactionContex
 	}
 	if current.Before(due) {
 		return nil, fmt.Errorf("escalation deadline has not elapsed")
+	}
+	if auditPeriod != nil {
+		selection, err := c.resolveMedicalAuditSelectionV2(ctx, auditPeriod, claim)
+		if err != nil {
+			return nil, err
+		}
+		if err := putState(ctx, "medicalAuditSelection", medicalRevisionKey(claim.ID, claim.Version), selection); err != nil {
+			return nil, err
+		}
 	}
 	if _, err := c.requireXGBoostEvidence(ctx, claim); err != nil {
 		return nil, err
@@ -72,5 +95,5 @@ func (c *Contract) EscalateStalledMedicalClaim(ctx contractapi.TransactionContex
 		}
 	}
 	claim.MedicalEscalatedAt = now
-	return c.createMedicalPreparation(ctx, claim, medicalRevisionKey(claim.ID, claim.Version), current.Add(7*24*time.Hour).Format(time.RFC3339), panel)
+	return c.createMedicalPreparation(ctx, claim, medicalRevisionKey(claim.ID, claim.Version), current.Add(7*24*time.Hour).Format(time.RFC3339), panel, false, "")
 }

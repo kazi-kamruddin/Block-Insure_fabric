@@ -69,9 +69,9 @@ OracleTimeout ==
 
 ResolveAudit ==
   /\ s.stage = "MEDICAL_AUDIT_PENDING"
-  \* Action represents a revealed seed followed by a permissionless resolver.
-  /\ \E selected \in BOOLEAN :
-       IF selected \/ s.modelHeld
+  \* After grace, any of the three missing shares makes the period default.
+  /\ \E selected \in BOOLEAN, shares \in SUBSET {"Insurer", "Auditor", "Hospital"} :
+       IF selected \/ Cardinality(shares) < 3 \/ s.modelHeld
        THEN s' = [s EXCEPT !.stage = "MEDICAL_REVIEW_REQUIRED", !.heldPanel = s.modelHeld]
        ELSE s' = [s EXCEPT !.stage = "APPROVED", !.certificates = @ \cup {<<s.version, "Oracle">>}]
 
@@ -273,4 +273,55 @@ ReleaseAuthority ==
   /\ (s.stage \in {"APPROVED", "ACTIVE"}) => s.approved = ReleaseApprovers
   /\ ("Oracle" \in s.approved) => Cardinality(s.attesters) >= 2
   /\ s.stage = "ACTIVE" => s.delayed
+
+\* Refinement of PanelVote for reviews prepared under the activated R2 roster.
+\* Seats represent the four selected auditors. The mixed standby panel starts
+\* a separate round, so commitments from the first round cannot be opened there.
+SealedInit ==
+  s = [stage |-> "COMMIT", round |-> 1, commits |-> {}, reveals |-> {},
+       cutoff |-> FALSE, replaced |-> FALSE]
+
+SealBallot ==
+  /\ s.stage = "COMMIT"
+  /\ ~s.cutoff
+  /\ \E seat \in Auditors, vote \in VoteTags :
+       /\ \A prior \in s.commits : prior[1] # seat
+       /\ LET committed == s.commits \cup {<<seat, vote>>} IN
+            s' = [s EXCEPT !.commits = committed,
+                           !.stage = IF Cardinality(committed) = AuditorCount THEN "REVEAL" ELSE @]
+
+CloseCommitWindow ==
+  /\ s.stage = "COMMIT"
+  /\ s' = [s EXCEPT !.stage = "REVEAL", !.cutoff = TRUE]
+
+RevealBallot ==
+  /\ s.stage = "REVEAL"
+  /\ \E packet \in s.commits \ s.reveals :
+       LET opened == s.reveals \cup {packet}
+           decision == CASE Count(opened, "Approve") >= 3 -> "APPROVED"
+                         [] Count(opened, "Reject") >= 2 -> "REJECTED"
+                         [] OTHER -> "REVEAL"
+       IN s' = [s EXCEPT !.reveals = opened, !.stage = decision]
+
+CloseRevealWindow ==
+  /\ s.stage = "REVEAL"
+  /\ s' = [s EXCEPT !.stage = "PROCEDURAL_FAILURE"]
+
+StandbyRound ==
+  /\ s.stage = "PROCEDURAL_FAILURE" /\ s.round = 1
+  /\ s' = [s EXCEPT !.stage = "COMMIT", !.round = 2, !.commits = {}, !.reveals = {},
+                    !.cutoff = FALSE, !.replaced = TRUE]
+
+SealedNext == SealBallot \/ CloseCommitWindow \/ RevealBallot \/ CloseRevealWindow \/ StandbyRound
+SealedSpec == SealedInit /\ [][SealedNext]_s
+
+SealedAuthority ==
+  /\ s.reveals \subseteq s.commits
+  /\ \A seat \in Auditors : Cardinality({packet \in s.commits : packet[1] = seat}) <= 1
+  /\ s.stage = "COMMIT" => s.reveals = {}
+  /\ s.stage = "REVEAL" => (s.cutoff \/ Cardinality(s.commits) = AuditorCount)
+  /\ s.stage = "APPROVED" => Count(s.reveals, "Approve") >= 3
+  /\ s.stage = "REJECTED" => Count(s.reveals, "Reject") >= 2
+  /\ s.stage = "PROCEDURAL_FAILURE" => Count(s.reveals, "Approve") < 3 /\ Count(s.reveals, "Reject") < 2
+  /\ s.replaced = (s.round = 2)
 =============================================================================

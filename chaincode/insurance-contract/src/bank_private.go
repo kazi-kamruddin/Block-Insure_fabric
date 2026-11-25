@@ -150,6 +150,9 @@ func (c *Contract) MigrateBankAccountPrivateState(ctx contractapi.TransactionCon
 	if err != nil {
 		return nil, err
 	}
+	if err := c.requireBankSubject(ctx, public.BankID); err != nil {
+		return nil, err
+	}
 	if public.AccountTokenHash == "" {
 		return c.ReadBankAccountReference(ctx, id)
 	}

@@ -10,22 +10,31 @@ import (
 )
 
 type MedicalAuditPeriod struct {
-	ID         string `json:"id"`
-	StartsAt   string `json:"startsAt"`
-	EndsAt     string `json:"endsAt"`
-	RateBps    int    `json:"rateBps"`
-	Commitment string `json:"commitment"`
-	Seed       string `json:"seed"`
+	Status      string                  `json:"status,omitempty" metadata:",optional"`
+	GraceEndsAt string                  `json:"graceEndsAt,omitempty" metadata:",optional"`
+	Eligible    []MedicalAuditCandidate `json:"eligible,omitempty" metadata:",optional"`
+	Shares      []MedicalAuditShare     `json:"shares,omitempty" metadata:",optional"`
+	PanelLoad   int                     `json:"panelLoad,omitempty" metadata:",optional"`
+	ID          string                  `json:"id"`
+	StartsAt    string                  `json:"startsAt"`
+	EndsAt      string                  `json:"endsAt"`
+	RateBps     int                     `json:"rateBps"`
+	Commitment  string                  `json:"commitment"`
+	Seed        string                  `json:"seed"`
 }
 
 type MedicalAuditSelection struct {
-	PeriodID   string `json:"periodId"`
-	ClaimID    string `json:"claimId"`
-	Version    int    `json:"version"`
-	ResultHash string `json:"resultHash"`
-	Digest     string `json:"digest"`
-	RateBps    int    `json:"rateBps"`
-	Selected   bool   `json:"selected"`
+	Status              string `json:"status,omitempty" metadata:",optional"`
+	EpisodeRevisionHash string `json:"episodeRevisionHash,omitempty" metadata:",optional"`
+	ResolvedAt          string `json:"resolvedAt,omitempty" metadata:",optional"`
+	Hash                string `json:"hash,omitempty" metadata:",optional"`
+	PeriodID            string `json:"periodId"`
+	ClaimID             string `json:"claimId"`
+	Version             int    `json:"version"`
+	ResultHash          string `json:"resultHash"`
+	Digest              string `json:"digest"`
+	RateBps             int    `json:"rateBps"`
+	Selected            bool   `json:"selected"`
 }
 
 func (c *Contract) ReadMedicalAuditPeriod(ctx contractapi.TransactionContextInterface, id string) (*MedicalAuditPeriod, error) {
@@ -38,6 +47,13 @@ func (c *Contract) CommitMedicalAuditPeriod(ctx contractapi.TransactionContextIn
 	}
 	if _, err := requireIdentity(ctx, "AuditorMSP", "auditor"); err != nil {
 		return nil, err
+	}
+	roster, err := c.activeAuditorRoster(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if roster != nil {
+		return nil, fmt.Errorf("create a three-party medical audit period")
 	}
 	if err := validateHash("seedCommitment", commitment); err != nil {
 		return nil, err
@@ -94,6 +110,9 @@ func (c *Contract) RevealMedicalAuditSeed(ctx contractapi.TransactionContextInte
 	if err != nil {
 		return nil, err
 	}
+	if period.Status != "" {
+		return nil, fmt.Errorf("this audit period requires three seed shares")
+	}
 	now, err := ledgerNow(ctx)
 	if err != nil {
 		return nil, err
@@ -110,7 +129,15 @@ func (c *Contract) RevealMedicalAuditSeed(ctx contractapi.TransactionContextInte
 	return period, overwriteAsset(ctx, "medicalAuditPeriod", id, period)
 }
 
-func (c *Contract) medicalAuditPeriodForRequest(ctx contractapi.TransactionContextInterface, now string) (string, error) {
+func (c *Contract) medicalAuditPeriodForRequest(ctx contractapi.TransactionContextInterface, claim *Claim, now string) (string, error) {
+	pin, err := stateKey(ctx, "medicalAuditFrozenPeriod", medicalRevisionKey(claim.ID, claim.Version))
+	if err != nil {
+		return "", err
+	}
+	frozen, err := ctx.GetStub().GetState(pin)
+	if err != nil || len(frozen) != 0 {
+		return string(frozen), err
+	}
 	key, err := stateKey(ctx, "medicalAuditActive", "period")
 	if err != nil {
 		return "", err
@@ -136,6 +163,9 @@ func (c *Contract) medicalAuditPeriodForRequest(ctx contractapi.TransactionConte
 		return "", err
 	}
 	if at.Before(start) || !at.Before(end) {
+		return "", nil
+	}
+	if period.Status != "" {
 		return "", nil
 	}
 	return period.ID, nil
@@ -172,10 +202,17 @@ func (c *Contract) ResolveMedicalAuditSelection(ctx contractapi.TransactionConte
 	if err != nil {
 		return nil, err
 	}
-	if period.Seed == "" {
+	if period.Status == "" && period.Seed == "" {
 		return nil, fmt.Errorf("audit seed has not been revealed")
 	}
 	selection := medicalAuditSelection(period, request)
+	if period.Status != "" {
+		resolved, err := c.resolveMedicalAuditSelectionV2(ctx, period, claim)
+		if err != nil {
+			return nil, err
+		}
+		selection = *resolved
+	}
 	if err := putState(ctx, "medicalAuditSelection", medicalRevisionKey(claim.ID, claim.Version), &selection); err != nil {
 		return nil, err
 	}
@@ -189,7 +226,7 @@ func (c *Contract) ResolveMedicalAuditSelection(ctx contractapi.TransactionConte
 		if held {
 			claim.MedicalHeldReleaseID = effectiveMedicalModelReleaseID(request)
 		}
-	} else if err := c.recordMedicalApproval(ctx, claim, request, nil); err != nil {
+	} else if err := c.recordMedicalApprovalWithEvidence(ctx, claim, request, nil, nil, &selection); err != nil {
 		return nil, err
 	}
 	claim.UpdatedAt, err = ledgerTimestamp(ctx)

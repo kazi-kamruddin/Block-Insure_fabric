@@ -19,6 +19,7 @@ import { isMedicalChannel, medicalDevLiteChannel } from "@/lib/fabric/medical-ch
 import { MedicalRegistryControls } from "./medical-registry-controls";
 import { MedicalIntake } from "@/components/medical-intake";
 import { MedicalReview } from "@/components/medical-review";
+import { MedicalAuditPeriod } from "@/components/medical-audit-period";
 import { MedicalSettlementTimeline } from "@/components/medical-timeline";
 import { MedicalOCR } from "@/components/medical-ocr";
 import { ReceiptReview, type ReceiptEpisodeFacts } from "@/components/receipt-review";
@@ -208,6 +209,9 @@ export function WorkspaceClient({
   const [retrieving, setRetrieving] = useState(false);
   const [decryptedEvidence, setDecryptedEvidence] = useState<{ url: string; name: string; blob: Blob; id: string; accessId: string; reviewId: string; digest: string } | null>(null);
   const medicalReview = medicalReviewEnabled && isMedicalChannel(deployment.split("/")[0]);
+  const auditPeriodCard = account && medicalReview && deployment.split("/")[0] === "insurance-dev-lite-190" &&
+    ["insurerAdmin", "auditor", "hospitalOfficer"].includes(account.role) ?
+    <MedicalAuditPeriod organization={account.organization} canCreate={account.role === "insurerAdmin"} /> : null;
   const [auditClaimId, setAuditClaimId] = useState("");
   const [proofEvidenceId, setProofEvidenceId] = useState("");
   const [proofBatchId, setProofBatchId] = useState("");
@@ -1181,9 +1185,9 @@ export function WorkspaceClient({
     case "insurerAdmin:overview": case "auditor:overview": case "hospitalOfficer:overview": case "bankOfficer:overview":
       content = dashboardBlock; break;
     case "insurerAdmin:claims":
-      content = <div className="workGrid">{reviewCard}{guidedForm}{dossierCard}</div>; break;
+      content = <div className="workGrid">{reviewCard}{auditPeriodCard}{guidedForm}{dossierCard}</div>; break;
     case "auditor:reviews":
-      content = <div className="workGrid">{reviewCard}{retrieveCard}{guidedForm}{dossierCard}</div>; break;
+      content = <div className="workGrid">{reviewCard}{auditPeriodCard}{retrieveCard}{guidedForm}{dossierCard}</div>; break;
     case "insurerAdmin:customers":
       content = <div className="workGrid">{onboardingEnabled && <CustomerOnboardingQueue />}{intakeCard}{guidedForm}</div>; break;
     case "insurerAdmin:products":
@@ -1213,7 +1217,7 @@ export function WorkspaceClient({
         window.setTimeout(() => document.getElementById("manual-premium")?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
       }} />{manualPremiumCard}{guidedForm}</div>; break;
     case "policyholder:claims":
-      content = <div className="workGrid">{intakeCard}{reviewCard}{guidedForm}</div>; break;
+      content = <div className="workGrid">{intakeCard}{reviewCard}{auditPeriodCard}{guidedForm}</div>; break;
     case "policyholder:profile":
       content = customerAccount ? <CustomerPortal key={account.id} memberId={customerAccount} view="profile" />
         : <p className="emptyState">A profile is available to registered customers.</p>; break;

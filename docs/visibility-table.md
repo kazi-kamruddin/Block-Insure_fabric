@@ -11,9 +11,10 @@ to private values even when their Gateway accounts cannot request them.
 | Public | All five business MSPs on the channel | Values can appear in public world state, blocks and history. |
 | Oracle PDC | HospitalMSP, InsurerMSP and OracleMSP | `oracleProofPrivateData` uses two eligible endorsers and requires dissemination to two peers. BankMSP and AuditorMSP have no collection values. |
 | Bank PDC | BankMSP and InsurerMSP | `bankInsurerPrivateData` requires both Bank and Insurer endorsers and dissemination to one peer. |
+| Auditor PDC (R2 candidate) | AuditorMSP and InsurerMSP | `auditorReviewPrivateData` requires both endorsements and dissemination to one peer. Exact transient facts are checked against the original Oracle PDC hash. |
 | Gateway or client | Role-controlled server response, restricted local storage or a user's browser | Access depends on the route and the local custody configuration. |
 
-Both collections have member-only read and write enabled. Private writes still
+Each collection has member-only read and write enabled. Private writes still
 leave public hashes. Hospital identities share one HospitalMSP, so a
 hospital-scoped Gateway response does not provide cryptographic separation
 between facilities. Moving fields in a later release leaves historical

@@ -22,6 +22,7 @@ func (c *Contract) advanceMedicalVersion(ctx contractapi.TransactionContextInter
 		return err
 	}
 	claim.Version++
+	claim.MedicalDuplicateExplanationHash = ""
 	claim.MedicalEscalatedAt = ""
 	claim.MedicalHeldReleaseID = ""
 	claim.MedicalRevisionKind = kind
@@ -122,6 +123,7 @@ func (c *Contract) SubmitMedicalAppeal(ctx contractapi.TransactionContextInterfa
 		claim.AmountMinor, claim.IncidentDate, claim.EpisodeRevision = quote.PayableMinor, episode.ServiceDate, revision
 		claim.HospitalInvoiceID = medicalRevisionKey(episode.ID, revision)
 		claim.Version++
+		claim.MedicalDuplicateExplanationHash = ""
 		claim.MedicalEscalatedAt = ""
 		claim.MedicalHeldReleaseID = ""
 		if err := c.screenMedicalDuplicate(ctx, claim, episode); err != nil {

@@ -1,8 +1,9 @@
 # Defence walkthrough for the retained LevelDB ledger
 
-The fresh 24 November seed uses `insurance-dev-lite-190`, chaincode 1.9.0,
-sequence 1. The package is the sequence-7 build. Verify the definition and
-five peers before the meeting. Use one network and the three-worker roster.
+The retained 24 November seed uses `insurance-dev-lite-190` and chaincode
+1.9.0. Verify the committed sequence and exact package against the
+[dev-lite profile](../scripts/profiles/dev-lite-190.json) and five-peer
+readback. Use one network and three Oracle subjects.
 The web app opens at `http://127.0.0.1:3219/workspace`. The runbook covers
 the standalone production launch and the one-worker fault segment.
 
@@ -13,11 +14,11 @@ the standalone production launch and the one-worker fault segment.
 | Onboarded customer, premium and coverage | Seeded policies `POL-2026-000101` through `POL-2026-000105` | Open the customer workspace and point to the BI member card, issued terms and premium history. |
 | End-to-end automatic approval | `CLM-2026-000201` · BDT 64,000 · SETTLED | Its claim timeline binds the Oracle release and snapshot, certificate and Bank payout. Export the dossier and compare it with a separately obtained peer readback. |
 | Bank handoff | `CLM-2026-000202` · `STL-2026-000202` · BDT 47,600 · SETTLEMENT_AUTHORIZED | Show the authorization and prepared signing request. A payout confirmation is a separate owner-approved ledger write. |
-| Diagnostic intake | `CLM-2026-000203` · SUBMITTED | Show the submitted statement. Its hospital has no attestation in the seed evidence. Attestation and claim processing require separately approved transactions. |
-| Oracle timeout to panel | Historical `oracle-claim-timeout-1790443078388-651364` on the September CouchDB experiment | Explain the timeout, panel fallback and settled result using the dated evidence. For a closer medical-panel example, show the sequence-7 duplicate referral below. |
-| Panel approval | Historical `medical-328c1075-969c-4726-a454-28127ba8f4be` on the replaced LevelDB ledger | The same stay entered the panel under the duplicate-screening rule. Three approvals authorized `med-settlement-cca3c736-52c`. |
-| Corrected appeal | Historical `medical-c8310aca-ca07-4913-98ff-c3895cc6eab0` on the replaced LevelDB ledger | The version-3 review obtained fresh evidence checks and three approval votes. Show the archived appeal report's `settled-workspace` screenshot. |
-| Final rejection | Historical `medical-580007c9-2b0c-467f-9d4f-5c5fa5810a6b` on the replaced LevelDB ledger | The procedural window expired, the permitted recovery was used and the later review also expired. The staging report records the reserved-cover state. |
+| R1 diagnostic AUTO | `CLM-2026-000204` · BDT 3,024 | Show the manifest, exact fact vector quorum and automatic certificate. |
+| Oracle timeout | `CLM-2026-000206`, request `r1-206-1` | One worker committed and the claimant finalized TIMEOUT. Escalation requires its ledger deadline. |
+| R1 governed panel | `CLM-2026-000203` · BDT 13,920 | Two matching Oracle reveals required panel review. Three of four then approved. |
+| Corrected appeal | Historical `medical-c8310aca-ca07-4913-98ff-c3895cc6eab0` on the prior LevelDB ledger | The archived review has three approval votes and a recorded payout. The live carry-over candidate `CLM-2026-000207` starts with an R1 rejection. |
+| R1 final rejection | `CLM-2026-000208` | Show the receipt discrepancy and two panel rejections. |
 
 [Historical sequence-7 records](submission-walkthrough.md) · [September timeout ledger export](results/phase2-live-ledger.json) · [Medical rehearsal index](results/FINDINGS.md)
 
@@ -33,11 +34,14 @@ rejection screenshot has not been located.
 - [Evening staging record](../data/dev-lite/demo-staging/20261121-132229/summary.json)
 
 Before the defence, run
-`node scripts/validate-dev-lite-seed.mjs --defence-date 2026-12-06`.
-Sadik's waiting period ends 24 December 2026. The 25 November peer
-readback shows Rakibul pending his first EFT premium with zero confirmed
-payments. His grace remains open on 6 December and ends 9 December 2026.
-The retained ledger has four hospital/service benchmarks. As of the same read,
-the premium collection account ****7001 held BDT 5,550 and the reserve
-****7002 held BDT 2,436,000. The scheduled F06 signing drill uses a separate
-Windows operator. [Custody and F06](custody.md)
+`node scripts/validate-dev-lite-seed.mjs --defence-date 2027-01-15 --live`.
+Sadik's waiting period ends 24 December 2026. Rakibul's first EFT payment of
+BDT 950 committed VALID on 25 November. His policy is ACTIVE, with the next
+premium due 24 December 2026. Use the current balance readback for premium
+account ****7001 and reserve account ****7002.
+
+The R1 case evidence is recorded in the [live journey table](results/r1-journeys-2026-11-25.md).
+The R2 production build passed offline. [R2 journey state](results/r2-journeys-2026-11-25.md)
+records the commit block and why live R2 screenshots are still pending.
+F06 requires the separate Windows Bank operator and has no recorded result.
+[Custody and F06](custody.md)

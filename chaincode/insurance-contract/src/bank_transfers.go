@@ -30,6 +30,9 @@ func (c *Contract) openBankAccount(ctx contractapi.TransactionContextInterface, 
 	if _, err := requireIdentity(ctx, "BankMSP", "bankOfficer"); err != nil {
 		return nil, err
 	}
+	if err := c.requireBankSubject(ctx, bankID); err != nil {
+		return nil, err
+	}
 	if _, err := c.requireActivePartner(ctx, "BANK", bankID); err != nil {
 		return nil, err
 	}
@@ -102,6 +105,9 @@ func (c *Contract) AdjustBankAccountBalance(ctx contractapi.TransactionContextIn
 	}
 	if account.BankID == "" || account.Status != "VERIFIED" {
 		return nil, fmt.Errorf("bank account %s is not a Phase 2 verified account", accountID)
+	}
+	if err := c.requireBankSubject(ctx, account.BankID); err != nil {
+		return nil, err
 	}
 	if _, err := c.requireActivePartner(ctx, "BANK", account.BankID); err != nil {
 		return nil, err
@@ -356,6 +362,9 @@ func (c *Contract) ExecuteManualPremiumPayment(ctx contractapi.TransactionContex
 	if err != nil {
 		return nil, err
 	}
+	if err := c.requireBankSubject(ctx, source.BankID); err != nil {
+		return nil, err
+	}
 	now, err := ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
@@ -458,6 +467,9 @@ func (c *Contract) ProcessPremiumCollection(ctx contractapi.TransactionContextIn
 	}
 	if mandate.Status != "ACTIVE" || mandate.PolicyID != collection.PolicyID || mandate.AmountMinor != collection.AmountMinor {
 		return nil, fmt.Errorf("mandate %s is not active for collection %s", mandate.ID, collection.ID)
+	}
+	if err := c.requireBankAccountSubject(ctx, mandate.AccountReferenceID); err != nil {
+		return nil, err
 	}
 	policy, err := c.ReadPolicy(ctx, collection.PolicyID)
 	if err != nil {

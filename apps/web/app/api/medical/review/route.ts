@@ -44,22 +44,26 @@ export async function GET(request: Request) {
       return reply({ quote: await ledger.quoteMedicalAppeal(claim.id, revision) });
     }
     const devLite = loadFabricConfig().channelName === medicalDevLiteChannel;
-    const [appeal, clarification, documents, grants, checks, decisions, facts, oracle, certificate, settlement, ledgerTime, revisionProof, issuedTerms, hospitalName, oracleV2] = await Promise.all([
+    const sealedAuditor = session.role === "auditor" && review?.ballotVersion === "panel-vote-v1";
+    const [appeal, clarification, documents, grants, checks, decisions, facts, oracle, certificate, settlement, ledgerTime, revisionProof, issuedTerms, hospitalName, oracleV2, commitments, r2] = await Promise.all([
       claim.currentAppealId ? ledger.readClaimAppeal(claim.currentAppealId) : null,
       claim.medicalClarificationId ? ledger.readMedicalClarification(session.role === "policyholder" ? session.role : "insurerAdmin", claim.medicalClarificationId) : null,
       Promise.all(claim.evidenceIds.map(id => ledger.readEvidenceReference(id))),
       review ? ledger.listEvidenceAccessGrants() : [],
       review ? ledger.listMedicalEvidenceChecks(review.id) : [],
       review ? ledger.listAuditorDecisions() : [],
-      ledger.readMedicalReviewFacts(claim.id),
+      sealedAuditor ? (review.disclosureIssuedAt ? ledger.readMedicalReviewDisclosure(review.id, findDemoAccount(session.accountId)?.fabricUserName) : null)
+        : ledger.readMedicalReviewFacts(claim.id),
       devLite && claim.currentOracleRequestId ? ledger.readOracleRequest(claim.currentOracleRequestId) : null,
       devLite && hasFinalMedicalApproval(claim) ? ledger.readMedicalApprovalCertificate(claim.id, claim.version) : null,
       devLite && claim.medicalSettlementId ? ledger.readSettlement(claim.medicalSettlementId) : null,
       devLite && session.role === "policyholder" && review?.status === "REJECTED" ? latestLedgerTimestamp().catch(() => null) : null,
-      session.role === "auditor" ? medicalRevisionProof(claim).catch(() => null) : null,
+      session.role === "auditor" && !sealedAuditor ? medicalRevisionProof(claim).catch(() => null) : null,
       issuedMedicalTerms(claim).catch(() => null),
       session.role === "auditor" ? medicalHospitalName(claim.hospitalId).catch(() => undefined) : undefined,
       devLite ? ledger.supportsMedicalOracleV2?.() : false,
+      sealedAuditor ? ledger.listAuditorVoteCommitments(review.id) : [],
+      devLite ? ledger.supportsMedicalR2?.() : false,
     ]);
     const readAt = Date.now();
     const timeline = devLite ? buildMedicalTimeline({ claim,
@@ -68,7 +72,9 @@ export async function GET(request: Request) {
       oracle: oracle?.claimVersion === claim.version ? oracle : null,
       certificate, settlement: settlement?.approvalCertificateHash === certificate?.hash ? settlement : null,
     }) : undefined;
-    return reply({ claim, review: review ? redactVoteTallies(review, session) : null, appeal, clarification, documents, facts, devLite, readAt, timeline, ledgerTime, revisionProof, issuedTerms, hospitalName,
+    return reply({ claim, review: review ? redactVoteTallies(review, session) : null, appeal, clarification, documents, facts, devLite, readAt, timeline, ledgerTime, revisionProof, issuedTerms, hospitalName, certificate,
+      viewerSubjectId: session.role === "auditor" ? session.subjectId : undefined, r2,
+      viewerCommitment: commitments.find(record => record.auditorId === session.subjectId)?.commitment,
       oracleV2, oracle: oracle?.protocolVersion === "v2" && oracle.claimVersion === claim.version ? oracle : null,
       viewerHasVoted: session.role === "auditor" && decisions.some(decision => decision.reviewId === review?.id && decision.auditorId === session.subjectId),
       appealExplanation: appeal ? await ledger.readMedicalAppealExplanation(session.role === "policyholder" ? session.role : "insurerAdmin", appeal.id) : null,
@@ -83,6 +89,7 @@ export async function GET(request: Request) {
 const permissions = {
   prepare: "insurerAdmin", open: "insurerAdmin", recover: "insurerAdmin", expire: "insurerAdmin", ask: "insurerAdmin",
   share: "policyholder", appeal: "policyholder", escalate: "policyholder", confirm: "auditor", vote: "auditor",
+  disclose: "insurerAdmin", acknowledge: "auditor", commitVote: "auditor", revealVote: "auditor", explainDuplicate: "policyholder",
 } as const;
 
 function allowed(action: MedicalReviewCommand, role: ReviewRole) {
@@ -91,6 +98,8 @@ function allowed(action: MedicalReviewCommand, role: ReviewRole) {
   if (action.action === "respond") return role === (action.response === "EXPIRED" ? "insurerAdmin" : "policyholder");
   if (action.action === "recordOCR") return role === "policyholder" || role === "auditor";
   if (action.action === "release") return role === "policyholder" || role === "insurerAdmin"; // Chaincode checks ownership and finality.
+  if (action.action === "retire") return role === "policyholder" || role === "insurerAdmin";
+  if (action.action === "replace") return true;
   if (action.action === "open" && role === "auditor") return true; // Chaincode checks escalation and assignment.
   return permissions[action.action] === role;
 }
@@ -111,7 +120,7 @@ export async function POST(request: Request) {
   }
   try {
     const result = await ledger.medicalReviewAction(session.role, input.data, findDemoAccount(session.accountId)?.fabricUserName);
-    if (input.data.action === "vote") return reply({ result: { id: input.data.decisionId, reviewId: input.data.reviewId } });
+    if (input.data.action === "vote" || input.data.action === "revealVote") return reply({ result: { id: input.data.decisionId, reviewId: input.data.reviewId } });
     if (result && typeof result === "object" && "assetType" in result && result.assetType === "claimReview" && "status" in result && typeof result.status === "string") {
       return reply({ result: redactVoteTallies({ ...result, status: result.status }, session) });
     }

@@ -9,6 +9,15 @@
   "packageSha256": "50d2dfd84ee5083e589d165c1e5c2d40853a3da433f8b1dd9f9f8d514e5262a2",
   "packagePath": "data/dev-lite/channel-artifacts/insurance-contract_1.9.0-r1.tar.gz",
   "goBuilderImage": "block-insure/fabric-ccenv:2.5.16-go1.26.11",
+  "r2CandidateRuntime": {
+    "type": "ccaas",
+    "targetSequence": 3,
+    "composeService": "insurance-chaincode",
+    "packageDirectory": "data/dev-lite/channel-artifacts/r2",
+    "packageSha256": "cd97ee4e93a191227b52146a9fa33e952cf4e33d50298eb2b8dcede7b0a41100",
+    "binarySha256": "c68b39de08074506b93fe56a674b72ff16748e20827e05579348a863cfc005a4",
+    "e3EvaluatorHash": "cbef844f9c31fb6678c21b08334ef76be0b4bab27d893e2c02cf808cff108fd9"
+  },
   "nodeVersion": "v24.16.0",
   "e2EvaluatorHash": "6b0b1df713f9b28da89052bf748886d4d15d743ecd4adde30f3f15a9596f6166",
   "repoRoot": null

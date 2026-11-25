@@ -45,6 +45,17 @@ x-peer: &peer
   command: peer node start
 
 services:
+  insurance-chaincode:
+    image: hyperledger/fabric-peer:2.5.16
+    pull_policy: never
+    profiles: [ccaas]
+    entrypoint: [/opt/insurance/insurance-contract]
+    environment:
+      CHAINCODE_SERVER_ADDRESS: 0.0.0.0:9999
+      CHAINCODE_ID: ${DEV_LITE_CCAAS_PACKAGE_ID:-}
+    volumes:
+      - ../../data/${DEV_LITE_DATA_DIR:-dev-lite}/channel-artifacts/r2/insurance-contract:/opt/insurance/insurance-contract:ro
+
   orderer:
     image: hyperledger/fabric-orderer:2.5.16
     labels:

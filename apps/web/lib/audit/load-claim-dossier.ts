@@ -7,7 +7,7 @@ import { medicalDevLiteChannel } from "@/lib/fabric/medical-channel";
 import { hasFinalMedicalApproval } from "@/lib/fabric/medical-timeline";
 import { isVoteVisible, redactVoteTallies, visibleDecisions } from "@/lib/fabric/vote-visibility";
 import { buildEvidenceMerkleTree, evidenceLeafHash } from "@/lib/evidence/merkle";
-import { readDossierLedgerEvidence } from "./dossier-ledger-evidence.mjs";
+import { readDossierLedgerEvidence, readDossierR2Evidence } from "./dossier-ledger-evidence.mjs";
 import type {
   AuditorDecision,
   Claim,
@@ -30,7 +30,10 @@ import type {
 } from "@/lib/fabric/types";
 
 export type ClaimAuditDossier = Partial<Awaited<ReturnType<typeof readDossierLedgerEvidence>>> & {
-  schemaVersion: 6 | 7 | 8;
+  schemaVersion: 6 | 7 | 8 | 9;
+  panelVoteCommitments?: unknown[];
+  auditorRosters?: unknown[];
+  revisionProof?: unknown;
   channel?: string;
   chaincode?: string;
   exportedAt: string;
@@ -103,6 +106,10 @@ export async function loadClaimAuditDossier(claimId: string, auditorSubject?: st
   const exportRoundIds = new Set(reviewRounds.map(review => review.id));
   const oracleRequests = allOracleRequests.filter((item) => item.claimId === claimId);
   const oracleResults = allOracleResults.filter((item) => item.claimId === claimId);
+  const r2 = devLiteMedical ? await withFabricContract("insurerAdmin", (contract) => readDossierR2Evidence(
+    async (name, ...args) => JSON.parse(Buffer.from(await contract.evaluateTransaction(name, ...args)).toString("utf8")),
+    claim, reviewRounds, oracleRequests, approvalCertificate, { includeRevision: !auditorMedicalExport },
+  )) : {};
   const proof = devLiteMedical ? await withFabricContract("insurerAdmin", (contract, gateway) =>
     readDossierLedgerEvidence({
       contract, qscc: gateway.getNetwork(config.channelName).getContract("qscc"),
@@ -110,7 +117,7 @@ export async function loadClaimAuditDossier(claimId: string, auditorSubject?: st
     }, { claim, history, oracleRequests, oracleResults, approvalCertificate }),
   ) : {};
   return {
-    schemaVersion: devLiteMedical ? (oracleRequests.some(request => request.protocolVersion === "v2") ? 8 : 7) : 6,
+    schemaVersion: r2.panelVoteCommitments ? 9 : devLiteMedical ? (oracleRequests.some(request => request.protocolVersion === "v2") ? 8 : 7) : 6,
     exportedAt: new Date().toISOString(),
     claim,
     history,
@@ -131,6 +138,6 @@ export async function loadClaimAuditDossier(claimId: string, auditorSubject?: st
     fraudAssessments: allFraudAssessments.filter((item) => item.claimId === claimId),
     settlement: allSettlements.find(item => item.claimId === claimId &&
       (!devLiteMedical || item.id === claim.medicalSettlementId)) ?? null,
-    ...(devLiteMedical ? { channel: config.channelName, chaincode: config.chaincodeName, approvalCertificate, ...proof } : {}),
+    ...(devLiteMedical ? { channel: config.channelName, chaincode: config.chaincodeName, approvalCertificate, ...proof, ...r2 } : {}),
   };
 }

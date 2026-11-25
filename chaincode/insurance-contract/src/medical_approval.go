@@ -54,6 +54,11 @@ func usesMedicalApprovalCertificates(ctx contractapi.TransactionContextInterface
 }
 
 type ApprovalCertificate struct {
+	CertificateVersion      int    `json:"certificateVersion,omitempty" metadata:",optional"`
+	ReviewTranscriptHash    string `json:"reviewTranscriptHash,omitempty" metadata:",optional"`
+	SamplingRecordHash      string `json:"samplingRecordHash,omitempty" metadata:",optional"`
+	DecidedAt               string `json:"decidedAt,omitempty" metadata:",optional"`
+	IssuedAt                string `json:"issuedAt,omitempty" metadata:",optional"`
 	ManifestHash            string `json:"manifestHash,omitempty" metadata:",optional"`
 	FactVectorHash          string `json:"factVectorHash,omitempty" metadata:",optional"`
 	Decision                string `json:"decision,omitempty" metadata:",optional"`
@@ -181,10 +186,31 @@ func requiresMedicalPanel(claim *Claim) bool {
 		claim.MedicalDuplicateReview || claim.MedicalEscalatedAt != "" || claim.MedicalHeldReleaseID != ""
 }
 
-func (c *Contract) recordMedicalApproval(ctx contractapi.TransactionContextInterface, claim *Claim, request *OracleRequest, review *ClaimReview) error {
+func (c *Contract) recordMedicalApproval(ctx contractapi.TransactionContextInterface, claim *Claim, request *OracleRequest, review *ClaimReview, pending ...*AuditorDecision) error {
+	var vote *AuditorDecision
+	if len(pending) > 0 {
+		vote = pending[0]
+	}
+	return c.recordMedicalApprovalWithEvidence(ctx, claim, request, review, vote, nil)
+}
+
+func (c *Contract) recordMedicalApprovalWithEvidence(ctx contractapi.TransactionContextInterface, claim *Claim, request *OracleRequest, review *ClaimReview, vote *AuditorDecision, selection *MedicalAuditSelection) error {
 	cert, err := c.deriveMedicalApproval(ctx, claim, request, review)
 	if err != nil {
 		return err
+	}
+	roster, err := c.activeAuditorRoster(ctx)
+	if err != nil {
+		return err
+	}
+	if roster != nil && (review == nil || review.BallotVersion == sealedPanelBallot) {
+		issuedAt, err := ledgerTimestamp(ctx)
+		if err != nil {
+			return err
+		}
+		if err := c.deriveMedicalApprovalV3(ctx, cert, request, review, vote, selection, issuedAt); err != nil {
+			return err
+		}
 	}
 	if claim.MedicalHeldReleaseID != "" {
 		key, err := stateKey(ctx, "medicalApprovalCertificate", cert.ID)
@@ -323,6 +349,11 @@ func (c *Contract) verifyMedicalApproval(ctx contractapi.TransactionContextInter
 	if err != nil {
 		return nil, err
 	}
+	if stored.CertificateVersion == 3 {
+		if err := c.deriveMedicalApprovalV3(ctx, expected, request, review, nil, nil, stored.IssuedAt); err != nil {
+			return nil, err
+		}
+	}
 	if *expected != *stored {
 		return nil, fmt.Errorf("approval certificate no longer matches current ledger state")
 	}
@@ -334,7 +365,7 @@ func (c *Contract) supersedeUnpaidMedicalSettlement(ctx contractapi.TransactionC
 	if err != nil {
 		return err
 	}
-	if execution, err := readMedicalBankExecution(ctx, settlement.ID); err != nil || execution != nil {
+	if executed, err := medicalBankExecutionExists(ctx, settlement.ID); err != nil || executed {
 		return fmt.Errorf("an executed Bank transfer must be confirmed")
 	}
 	liability, err := c.ReadLiability(ctx, "liability-claim-"+claim.ID)
@@ -358,6 +389,15 @@ func (c *Contract) supersedeUnpaidMedicalSettlement(ctx contractapi.TransactionC
 		return err
 	}
 	return overwriteAsset(ctx, "liability", liability.ID, liability)
+}
+
+func medicalBankExecutionExists(ctx contractapi.TransactionContextInterface, settlementID string) (bool, error) {
+	key, err := stateKey(ctx, "medicalBankExecution", settlementID)
+	if err != nil {
+		return false, err
+	}
+	hash, err := ctx.GetStub().GetPrivateDataHash(bankInsurerPrivateCollection, key)
+	return len(hash) != 0, err
 }
 
 func (c *Contract) createClaimLiability(ctx contractapi.TransactionContextInterface, claim *Claim, liability *Liability) error {

@@ -293,6 +293,9 @@ export type ClaimStatus =
   | "SETTLED";
 
 export type Claim = {
+  medicalDuplicateReason?: "CROSS_HOSPITAL_OVERLAP";
+  medicalDuplicateExplanationHash?: string;
+  medicalRetirementHash?: string;
   medicalDuplicateReview?: boolean;
   medicalEvidenceRequired?: boolean;
   medicalRevisionKind?: "CORRECTION" | "APPEAL" | "CLARIFICATION" | "";
@@ -389,6 +392,7 @@ export type OracleRegistrySnapshot = {
 };
 
 export type OracleRequest = {
+  patientTokenKeyVersion?: number;
   protocolVersion?: "v2";
   manifest?: { schema: string; requestedAt: string; pins: Array<{ issuerId: string; keyVersion: number; feedVersion: number; root: string; effectiveAt: string; anchoredAt: string }> };
   manifestHash?: string;
@@ -564,6 +568,8 @@ export type HospitalVerification = {
 };
 
 export type AuditorDecision = {
+  ballotVersion?: "panel-vote-v1";
+  ballotSalt?: string;
   reasonCode?: string;
   assetType: "auditorDecision";
   schemaVersion: number;
@@ -579,6 +585,15 @@ export type AuditorDecision = {
 };
 
 export type ClaimReview = {
+  ballotVersion?: "panel-vote-v1";
+  commitDeadline?: LedgerTimestamp;
+  commitmentsCast?: number;
+  rosterVersion?: string;
+  standbyAuditorIds?: string[];
+  acknowledgedAuditorIds?: string[];
+  replacements?: Array<{ absentAuditorId: string; newAuditorId: string; replacedAt: LedgerTimestamp }>;
+  disclosureIssuedAt?: LedgerTimestamp;
+  standbyForReviewId?: string;
   medicalVersion?: number;
   prepareBy?: string;
   assetType: "claimReview";
@@ -666,6 +681,11 @@ export type Settlement = {
 };
 
 export type MedicalApprovalCertificate = {
+  certificateVersion?: 3;
+  reviewTranscriptHash?: string;
+  samplingRecordHash?: string;
+  decidedAt?: LedgerTimestamp;
+  issuedAt?: LedgerTimestamp;
   manifestHash?: string;
   factVectorHash?: string;
   decision?: string;
@@ -680,6 +700,15 @@ export type MedicalApprovalCertificate = {
   modelHash: string;
   hash: string;
   approvedAt: LedgerTimestamp;
+};
+
+export type PanelVoteCommitment = {
+  reviewId: string;
+  round: number;
+  claimVersion: number;
+  auditorId: string;
+  commitment: string;
+  committedAt: LedgerTimestamp;
 };
 
 export type ClaimHistoryRecord = {

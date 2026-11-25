@@ -688,3 +688,11 @@ On 25 November 2026 the write-once `RecordLedgerInstance` marker on
 (tx `4d9818e7…6aed`, block 92). This is by design: the digest was recomputed
 from the peer immediately before submission. Any future rebuild must write a
 fresh random marker from the seed script instead.
+
+## Phase 3 pre-R2 backup
+
+Backup `data/dev-lite/backups/2026-11-25-pre-r2/SHA256SUMS` covers the six LevelDB ledger volumes and the scoped application state, including both signed feed trees, evidence and Oracle state. All seven manifest entries and tar listings were verified. The archive represents sequence 2 after the Rakibul collection and before the sequence-3 approvals. Existing CA state, organization and customer credentials, app secrets and source signing keys stay in their original stores.
+
+Apply the manifest verification and displaced-state procedure from the pre-R1 section using this archive and the sequence-2 profile. Compare the sequence and channel in `app-state-inventory.json` before touching any state. Stash and replace only its `localPaths` entries and the six listed volume roots. Never move the excluded credential stores. Verify the archive again before extracting it, then read back the committed R1 package, ledger marker, channel tip and Rakibul's collection. Track any peer catch-up from the retained orderer.
+
+Under J.5.4, restore `pre-r2` only if the committed R2 definition makes the retained channel unusable and a tested fix-forward has failed. The sequence-3 commit never reached submission in this session. A restore would discard valid later approvals and was not performed.

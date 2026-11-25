@@ -7,7 +7,8 @@ import { MedicalRevisionProof } from "@/components/medical-revision-proof";
 import type { ReceiptEpisodeFacts } from "@/components/receipt-review";
 import { bindReviewReason, ReviewReasonReceipts, saveReviewReason, type ReasonAttempt } from "@/components/review-reason-receipts";
 import { sha256Hex } from "@/lib/evidence/browser-crypto";
-import { medicalReasonLabels, medicalReleaseAvailableAt, readMedicalAppealWindow, type MedicalReviewCommand, type MedicalReviewView } from "@/lib/fabric/medical-review";
+import { medicalReasonLabels, medicalReleaseAvailableAt, medicalReviewCommand, readMedicalAppealWindow, type MedicalReviewCommand, type MedicalReviewView } from "@/lib/fabric/medical-review";
+import { canonicalProtocolInput } from "@/lib/fabric/canonical-protocol";
 import { MedicalOracleV2 } from "./medical-oracle-v2";
 import type { MedicalQuote } from "@/lib/fabric/medical";
 import { formatBdt } from "@/lib/money";
@@ -40,6 +41,11 @@ export function MedicalReview({ role, onEvidence, investigationEnabled = false }
   const [finding, setFinding] = useState<keyof typeof researchFindings>("INCONCLUSIVE");
   const [findingBasis, setFindingBasis] = useState("");
   const review = view?.review;
+  const facts = view?.facts;
+  const sealed = review?.ballotVersion === "panel-vote-v1";
+  const revealReady = sealed && ((review.commitmentsCast ?? 0) === review.assignedAuditorIds.length ||
+    (view?.readAt ?? 0) >= Date.parse(review.commitDeadline ?? ""));
+  const ballotKey = `block-insure:panel-vote-v1:${view?.viewerSubjectId}:${review?.id}:${review?.round}`;
   const clarification = view?.clarification;
   const preparing = review?.status === "PREPARING";
   const approveVotes = view?.decisions.filter(decision => decision.outcome === "APPROVE").length ?? 0;
@@ -80,6 +86,15 @@ export function MedicalReview({ role, onEvidence, investigationEnabled = false }
     if (!view.devLite) return send(vote);
     const attempt = { reviewId: review.id, round: review.round, attemptId: decisionId, decisionId };
     await saveReviewReason({ reviewId: attempt.reviewId, round: attempt.round, attemptId: attempt.attemptId, text, evidenceRefs: reasonEvidence });
+    if (sealed && view.viewerSubjectId) {
+      const salt = Array.from(crypto.getRandomValues(new Uint8Array(32)), byte => byte.toString(16).padStart(2, "0")).join("");
+      const boundReason = await textHash(canonicalProtocolInput("medical-reason-v1", vote.reasonCode, vote.reasonHash));
+      const commitment = await textHash(canonicalProtocolInput("panel-vote-v1", review.id, review.round,
+        view.claim.version, view.viewerSubjectId, vote.outcome, boundReason, salt));
+      const reveal = { ...vote, action: "revealVote", round: review.round, salt } as const;
+      localStorage.setItem(ballotKey, JSON.stringify({ reveal, commitment }));
+      return send({ action: "commitVote", reviewId: review.id, round: review.round, commitment });
+    }
     setReasonAttempt(attempt);
     await send(vote, async () => {
       try {
@@ -87,6 +102,24 @@ export function MedicalReview({ role, onEvidence, investigationEnabled = false }
       } catch {
         throw new Error("Vote confirmed. Retry attaching the saved reason.");
       }
+      setReasonAttempt(undefined);
+      setReasonEvidence([]);
+    });
+  }
+
+  async function revealBallot() {
+    const packet = JSON.parse(localStorage.getItem(ballotKey) ?? "null");
+    const parsed = medicalReviewCommand.safeParse(packet?.reveal);
+    if (!view?.viewerCommitment || packet?.commitment !== view.viewerCommitment || !parsed.success || parsed.data.action !== "revealVote") {
+      throw new Error("This browser has no matching sealed ballot.");
+    }
+    const ballot = parsed.data;
+    const attempt = { reviewId: ballot.reviewId, round: ballot.round, attemptId: ballot.decisionId, decisionId: ballot.decisionId };
+    await send(ballot, async () => {
+      localStorage.removeItem(ballotKey);
+      setReasonAttempt(attempt);
+      try { await bindReviewReason(attempt); }
+      catch { throw new Error("Vote revealed. Retry attaching the saved reason."); }
       setReasonAttempt(undefined);
       setReasonEvidence([]);
     });
@@ -146,7 +179,30 @@ export function MedicalReview({ role, onEvidence, investigationEnabled = false }
         <strong>Claim version {view.claim.version} · {view.claim.status}</strong>
         <StatusBadge status={view.claim.status} />
       </div>
-      <p>Recorded service {view.facts.service} on {view.facts.serviceDate} · episode revision {view.claim.episodeRevision}</p>
+      {facts ? <p>Recorded service {facts.service} on {facts.serviceDate} · episode revision {view.claim.episodeRevision}</p>
+        : <p>Review disclosure is awaiting preparation.</p>}
+      {facts?.duplicateExplanation && <p>Claimant explanation: {facts.duplicateExplanation}</p>}
+      {view.r2 && role !== "auditor" && ["APPROVED", "SETTLEMENT_AUTHORIZED"].includes(view.claim.status) && !view.claim.medicalRetirementHash &&
+        <details><summary>Retire an invalidated approval</summary>
+          <p>Use this when the hospital revision or patient association has changed and no money was transferred.</p>
+          <label>Retirement reason<input value={message} onChange={event => setMessage(event.target.value)} maxLength={500} /></label>
+          <button type="button" className="secondary button" disabled={busy || !message.trim()} onClick={() => work(async () =>
+            send({ action: "retire", claimId: view.claim.id, reasonHash: await textHash(message.trim()) }))}>Retire approval and release cover</button>
+        </details>}
+      {role === "policyholder" && view.claim.medicalDuplicateReason === "CROSS_HOSPITAL_OVERLAP" &&
+        !view.claim.medicalDuplicateExplanationHash && ["SUBMITTED", "ORACLE_FAILED", "MEDICAL_REVIEW_REQUIRED"].includes(view.claim.status) &&
+        <details><summary>Explain overlapping care at different hospitals</summary>
+          <label>Private explanation<textarea value={message} onChange={event => setMessage(event.target.value)} maxLength={1000} /></label>
+          <button type="button" className="secondary button" disabled={busy || !message.trim()} onClick={() => work(() =>
+            send({ action: "explainDuplicate", claimId: view.claim.id, message: message.trim() }))}>Send explanation to reviewers</button>
+        </details>}
+      {view.certificate?.certificateVersion === 3 && <dl className="planFacts">
+        <div><dt>Certificate</dt><dd>Version 3</dd></div>
+        <div><dt>Decided</dt><dd>{view.certificate.decidedAt}</dd></div>
+        <div><dt>Issued</dt><dd>{view.certificate.issuedAt}</dd></div>
+        <div><dt>Review transcript</dt><dd><code>{view.certificate.reviewTranscriptHash}</code></dd></div>
+        {view.certificate.samplingRecordHash && <div><dt>Sampling record</dt><dd><code>{view.certificate.samplingRecordHash}</code></dd></div>}
+      </dl>}
       {view.timeline && <MedicalTimeline timeline={view.timeline} />}
       <MedicalOracleV2 view={view} isClaimant={role === "policyholder"} busy={busy} onAction={command => work(() => send(command))} />
       {view.devLite && role === "policyholder" && !review && !view.claim.medicalEscalatedAt &&
@@ -157,15 +213,15 @@ export function MedicalReview({ role, onEvidence, investigationEnabled = false }
         </button>}
       {role === "auditor" && preparing && review && view.claim.medicalEscalatedAt &&
         <button type="button" className="primary button" disabled={busy} onClick={() => work(() => send({ action: "open", reviewId: review.id, deadline: later(24) }))}>Open escalated voting</button>}
-      <dl className="planFacts">
-        <div><dt>Billed</dt><dd>{formatBdt(view.facts.quote.billedMinor)}</dd></div>
-        <div><dt>Eligible</dt><dd>{formatBdt(view.facts.quote.eligibleMinor)}</dd></div>
-        <div><dt>Deductible</dt><dd>{formatBdt(view.facts.quote.deductibleMinor)}</dd></div>
-        <div><dt>Insurer share</dt><dd>{formatBdt(view.facts.quote.insurerShareMinor)}{view.issuedTerms && ` (${view.issuedTerms.insurerShareBps / 100}%)`}</dd></div>
+      {facts && <dl className="planFacts">
+        <div><dt>Billed</dt><dd>{formatBdt(facts.quote.billedMinor)}</dd></div>
+        <div><dt>Eligible</dt><dd>{formatBdt(facts.quote.eligibleMinor)}</dd></div>
+        <div><dt>Deductible</dt><dd>{formatBdt(facts.quote.deductibleMinor)}</dd></div>
+        <div><dt>Insurer share</dt><dd>{formatBdt(facts.quote.insurerShareMinor)}{view.issuedTerms && ` (${view.issuedTerms.insurerShareBps / 100}%)`}</dd></div>
         {view.issuedTerms && <div><dt>Service sublimit</dt><dd>{formatBdt(view.issuedTerms.sublimitMinor)}</dd></div>}
-        <div><dt>Remaining cover at submission</dt><dd>{formatBdt(view.facts.quote.remainingCoverMinor)}</dd></div>
-        <div><dt>Payable</dt><dd>{formatBdt(view.facts.quote.payableMinor)}</dd></div>
-      </dl>
+        <div><dt>Remaining cover at submission</dt><dd>{formatBdt(facts.quote.remainingCoverMinor)}</dd></div>
+        <div><dt>Payable</dt><dd>{formatBdt(facts.quote.payableMinor)}</dd></div>
+      </dl>}
       {role === "auditor" && <MedicalRevisionProof proof={view.revisionProof} />}
       {view.appeal && <p>Appeal {view.appeal.status} · Disputed decision {view.appeal.disputedDecisionId}</p>}
       {view.appealExplanation && <p>Appeal explanation: {view.appealExplanation}</p>}
@@ -175,10 +231,18 @@ export function MedicalReview({ role, onEvidence, investigationEnabled = false }
           <StatusBadge status={review.status} />
         </div>
         <p className="cardNote">{review.status} · {preparing ? "Prepare by " + review.prepareBy : review.deadline ? "Voting deadline " + review.deadline : "Voting has not opened"}</p>
+        {sealed && preparing && role === "insurerAdmin" && !review.disclosureIssuedAt &&
+          <button type="button" className="secondary button" disabled={busy} onClick={() => work(() => send({ action: "disclose", reviewId: review.id }))}>Disclose facts to the audit panel</button>}
+        {sealed && preparing && role === "auditor" && facts && view.viewerSubjectId && !review.acknowledgedAuditorIds?.includes(view.viewerSubjectId) &&
+          <button type="button" className="secondary button" disabled={busy} onClick={() => work(() => send({ action: "acknowledge", reviewId: review.id }))}>Acknowledge review facts</button>}
+        {sealed && preparing && (view.readAt ?? 0) >= Date.parse(review.prepareBy ?? "") && Boolean(review.standbyAuditorIds?.length) &&
+          review.assignedAuditorIds.filter(auditor => !review.acknowledgedAuditorIds?.includes(auditor) &&
+            !review.replacements?.some(change => change.newAuditorId === auditor)).map(auditor =>
+            <button key={auditor} type="button" className="secondary button" disabled={busy} onClick={() => work(() => send({ action: "replace", reviewId: review.id, auditorId: auditor }))}>Replace absent {auditor}</button>)}
         {view.oracleV2 && role !== "insurerAdmin" && ["PREPARING", "OPEN"].includes(review.status) &&
           (view.readAt ?? 0) > Date.parse((preparing ? review.prepareBy : review.deadline) ?? "") &&
           <button type="button" className="secondary button" disabled={busy} onClick={() => work(() => send({ action: "expire", reviewId: review.id }))}>Close expired review</button>}
-        {review.status === "OPEN" ? <p>Votes sealed until the round closes</p> : <div className="quorumMeters">
+        {review.status === "OPEN" ? <p>{sealed ? `Commitments ${review.commitmentsCast ?? 0} of 4. ${revealReady ? "Reveal your ballot before the voting deadline." : `Reveal opens at ${review.commitDeadline} or after all four commitments.`}` : "Votes shown after the round closes"}</p> : <div className="quorumMeters">
           <div className="quorumMeterRow">
             <div className="quorumMeterRowHeader"><span>Approvals</span><span>{approveVotes} / 3</span></div>
             <div className="quorumTrack" aria-hidden="true">
@@ -195,9 +259,9 @@ export function MedicalReview({ role, onEvidence, investigationEnabled = false }
         {view.documents.length > 0 ? <ul style={{ marginTop: 14 }}>{view.documents.map(doc => <li key={doc.id}>
           {doc.documentType} · <code>{doc.id}</code>
           {preparing && role !== "auditor" && <span> · {view.checks.filter(check => check.evidenceId === doc.id).length} of 4 reviewers confirmed decryption</span>}
-          {role === "auditor" && view.grants.filter(grant => grant.evidenceId === doc.id && grant.status === "ACTIVE").map(grant =>
+          {role === "auditor" && facts && view.grants.filter(grant => grant.evidenceId === doc.id && grant.status === "ACTIVE").map(grant =>
             <button key={grant.id} type="button" className="secondary button" style={{ marginLeft: 10 }}
-              onClick={() => onEvidence(doc.id, grant.id, { billedMinor: view.facts.quote.billedMinor, serviceDate: view.facts.serviceDate, hospital: view.hospitalName })}>Open granted evidence</button>)}
+              onClick={() => onEvidence(doc.id, grant.id, { billedMinor: facts.quote.billedMinor, serviceDate: facts.serviceDate, hospital: view.hospitalName })}>Open granted evidence</button>)}
         </li>)}</ul> : <p className="cardNote" style={{ marginTop: 12 }}>No attachments. Review the structured episode and issued terms.</p>}
         {view.decisions.length > 0 && <ul>{view.decisions.map(decision => <li key={decision.id}>
           <StatusBadge status={decision.outcome} /> · {medicalReasonLabels[decision.reasonCode as ReasonCode] ?? "Reason recorded"} · <code>{decision.id}</code>
@@ -296,7 +360,9 @@ export function MedicalReview({ role, onEvidence, investigationEnabled = false }
           setStatus("Reason attached to the vote.");
         })}>Retry attaching the saved reason</button>
       </div>}
-      {role === "auditor" && review?.status === "OPEN" && !view.viewerHasVoted && <div className="medicalSubpanel">
+      {role === "auditor" && review?.status === "OPEN" && sealed && view.viewerCommitment && !view.viewerHasVoted &&
+        <button type="button" className="primary button" disabled={busy || !revealReady} onClick={() => work(revealBallot)}>Reveal sealed ballot</button>}
+      {role === "auditor" && review?.status === "OPEN" && !view.viewerHasVoted && (!sealed || (!view.viewerCommitment && !revealReady)) && <div className="medicalSubpanel">
         <label>Decision reason<select value={reason} onChange={event => setReason(event.target.value as ReasonCode)}>
           {(Object.keys(medicalReasonLabels) as ReasonCode[]).map(code => <option key={code} value={code}>{medicalReasonLabels[code]}</option>)}
         </select></label>
@@ -313,8 +379,9 @@ export function MedicalReview({ role, onEvidence, investigationEnabled = false }
           </fieldset>}
         </>}
         <div className="medicalButtonGroup">
-          <button type="button" className="primary button" disabled={busy || !message.trim()} onClick={() => work(castReasonedVote)}>Record reasoned vote</button>
+          <button type="button" className="primary button" disabled={busy || !message.trim()} onClick={() => work(castReasonedVote)}>{sealed ? "Commit sealed ballot" : "Record reasoned vote"}</button>
         </div>
+        {sealed && <p>Return to this browser to reveal the ballot. An unrevealed vote counts as an abstention.</p>}
       </div>}
     </div>}
     <p role="status">{status}</p>

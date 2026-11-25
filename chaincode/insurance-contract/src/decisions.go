@@ -134,6 +134,9 @@ func (c *Contract) ConfirmSettlement(ctx contractapi.TransactionContextInterface
 	if settlement.Status != "AUTHORIZED" && settlement.Status != "PAYMENT_FAILED" {
 		return nil, fmt.Errorf("settlement %s must be AUTHORIZED or PAYMENT_FAILED to confirm", settlementID)
 	}
+	if err := c.requireBankAccountSubject(ctx, settlement.SourceAccountID); err != nil {
+		return nil, err
+	}
 	claim, err := c.ReadClaim(ctx, settlement.ClaimID)
 	if err != nil {
 		return nil, err
@@ -258,6 +261,9 @@ func (c *Contract) ConfirmSettlement(ctx contractapi.TransactionContextInterface
 func (c *Contract) executeSettlementTransfer(ctx contractapi.TransactionContextInterface, claim *Claim, settlement *Settlement, transferID, referenceHash, now string) (*BankTransfer, error) {
 	source, destination, err := c.validateSettlementAccounts(ctx, claim, settlement.SourceAccountID, settlement.DestinationAccountID)
 	if err != nil {
+		return nil, err
+	}
+	if err := c.requireBankSubject(ctx, source.BankID); err != nil {
 		return nil, err
 	}
 	transfer := &BankTransfer{

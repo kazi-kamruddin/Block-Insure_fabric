@@ -180,7 +180,7 @@ export async function readDossierLedgerEvidence({ contract, qscc, channel, chain
     const period = await evaluate("ReadMedicalAuditPeriod", request.auditPeriodId);
     const selection = sampledVersions.get(request.claimVersion);
     auditSampling.push({ requestId: request.id, period,
-      selection: selection && selection.resultHash === request.resultHash && selection.periodId === period.id ? selection : null });
+      selection: selection && (selection.status || selection.resultHash === request.resultHash) && selection.periodId === period.id ? selection : null });
   }
 
   let payoutBreakdown = null;
@@ -220,4 +220,16 @@ export async function readDossierLedgerEvidence({ contract, qscc, channel, chain
     oracleSourceFeeds: await readPinned("feedVersion", "ReadSourceFeed"),
   } : {};
   return { oracleReveals: oracleResults.map(({ id }) => revealsById.get(id)), certificateWrite, auditSampling, payoutBreakdown, ...sourceEvidence };
+}
+
+export async function readDossierR2Evidence(evaluate, claim, rounds, requests, certificate, { includeRevision = true } = {}) {
+  const sealed = rounds.filter(round => round.ballotVersion === "panel-vote-v1");
+  if (!sealed.length && certificate?.certificateVersion !== 3 && !requests.some(request => request.patientTokenKeyVersion)) return {};
+  const rosterVersions = [...new Set(sealed.map(round => round.rosterVersion))].sort();
+  const [commits, auditorRosters, revision] = await Promise.all([
+    Promise.all(sealed.map(round => evaluate("ListAuditorVoteCommitments", round.id))),
+    Promise.all(rosterVersions.map(version => evaluate("ReadAuditorRoster", version))),
+    includeRevision ? evaluate("ReadMedicalRevisionDossierProof", claim.id) : null,
+  ]);
+  return { panelVoteCommitments: commits.flat(), auditorRosters, revisionProof: revision?.digestVersion === 2 ? revision : null };
 }

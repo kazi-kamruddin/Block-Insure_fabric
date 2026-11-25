@@ -39,6 +39,16 @@ if ! command -v docker >/dev/null || ! docker info >/dev/null 2>&1; then
   done
 fi
 compose() { "$docker_cli" compose --project-name "$project" "${compose_files[@]}" "$@"; }
+ccaas_start() {
+  [[ "$profile" == --dev-lite ]] || die 'The chaincode service is scoped to LevelDB dev-lite.'
+  local directory="$state/channel-artifacts/r2"
+  [[ -s "$directory/insurance-contract" && -s "$directory/package-id.txt" && -s "$directory/SHA256SUMS" ]] || die 'Build and verify the dev-lite ccaas package first.'
+  (cd "$directory" && sha256sum --check --status SHA256SUMS) || die 'R2 chaincode service files do not match the verified package manifest.'
+  DEV_LITE_CCAAS_PACKAGE_ID="$(tr -d '\r\n' < "$directory/package-id.txt")"
+  [[ "$DEV_LITE_CCAAS_PACKAGE_ID" =~ ^insurance-contract_1\.9\.0-r2:[a-f0-9]{64}$ ]] || die 'Invalid R2 package ID.'
+  export DEV_LITE_CCAAS_PACKAGE_ID
+  compose up -d --no-deps --pull never insurance-chaincode
+}
 compose_start() {
   if [[ "$profile" == --dev-lite ]]; then
     # Retain existing containers and their mounts even when rendered settings differ.
@@ -179,6 +189,7 @@ up() {
     if ! peer channel getinfo -c "$channel" >/dev/null 2>&1; then peer channel join -b "$block"; fi
   done
   drain
+  if [[ "$profile" == --dev-lite && "${DEV_LITE_START_CCAAS:-false}" == true ]]; then ccaas_start; fi
   verify
 }
 case "${1:-}" in
@@ -187,7 +198,8 @@ case "${1:-}" in
   verify) verify ;;
   ca-start) compose_start "${cas[@]}" ;;
   ca-stop) compose stop "${cas[@]}" ;;
-  stop) compose stop; drain -CoreOnly ;;
+  ccaas-start) ccaas_start ;;
+  stop) compose --profile ccaas stop; drain -CoreOnly ;;
   teardown)
     if [[ "$profile" == --dev-lite-couchdb ]]; then
       [[ "${2:-}" == --confirm-dev-lite-couchdb ]] || die "Explicit --confirm-dev-lite-couchdb required for the isolated CouchDB volumes."
@@ -214,5 +226,5 @@ case "${1:-}" in
     compose rm -f "${volume_keys[@]}" "${cas[@]}"
     if (( ${#volumes[@]} )); then "$docker_cli" volume rm "${volumes[@]}"; fi
     ;;
-  *) die "Use $profile {up|deploy|verify|ca-start|ca-stop|stop|teardown}";;
+  *) die "Use $profile {up|deploy|verify|ca-start|ca-stop|ccaas-start|stop|teardown}";;
 esac

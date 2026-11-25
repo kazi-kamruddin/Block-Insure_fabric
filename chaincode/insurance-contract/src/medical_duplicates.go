@@ -77,6 +77,20 @@ func (c *Contract) screenMedicalDuplicate(ctx contractapi.TransactionContextInte
 		claim.MedicalDuplicateRuleVersion = 1
 	}
 	claim.MedicalDuplicateReview = claim.MedicalDuplicateReview || matched
+	roster, err := c.activeAuditorRoster(ctx)
+	if err != nil {
+		return err
+	}
+	if roster != nil {
+		crossHospital, err := c.indexCrossHospitalOverlap(ctx, key, claim.ClaimantID, episode)
+		if err != nil {
+			return err
+		}
+		if crossHospital {
+			claim.MedicalDuplicateReview = true
+			claim.MedicalDuplicateReason = "CROSS_HOSPITAL_OVERLAP"
+		}
+	}
 	return nil
 }
 

@@ -102,11 +102,18 @@ func (c *Contract) PrepareMedicalReview(ctx contractapi.TransactionContextInterf
 	if err != nil {
 		return nil, err
 	}
-	return c.createMedicalPreparation(ctx, claim, reviewID, prepareBy, panel)
+	return c.createMedicalPreparation(ctx, claim, reviewID, prepareBy, panel, true, "")
 }
 
 func (c *Contract) medicalReviewPanel(ctx contractapi.TransactionContextInterface, claim *Claim) ([]string, error) {
+	roster, err := c.activeAuditorRoster(ctx)
+	if err != nil {
+		return nil, err
+	}
 	panel := medicalPanel
+	if roster != nil {
+		panel = drawAuditors(claim, roster.Subjects)[:4]
+	}
 	if claim.CurrentAppealID != "" {
 		appeal, err := c.ReadClaimAppeal(ctx, claim.CurrentAppealID)
 		if err != nil {
@@ -117,11 +124,26 @@ func (c *Contract) medicalReviewPanel(ctx contractapi.TransactionContextInterfac
 			return nil, err
 		}
 		panel = prior.AssignedAuditorIDs
+		if roster != nil {
+			standbys := make([]string, 0, 2)
+			originals := make([]string, 0, 4)
+			for _, subject := range roster.Subjects {
+				if slices.Contains(panel, subject) {
+					originals = append(originals, subject)
+				} else {
+					standbys = append(standbys, subject)
+				}
+			}
+			if len(standbys) != 2 || len(originals) != 4 {
+				return nil, fmt.Errorf("current roster does not support a two-overlap appeal panel")
+			}
+			panel = append(drawAuditors(claim, standbys), drawAuditors(claim, originals)[:2]...)
+		}
 	}
 	return panel, nil
 }
 
-func (c *Contract) createMedicalPreparation(ctx contractapi.TransactionContextInterface, claim *Claim, reviewID, prepareBy string, panel []string) (*ClaimReview, error) {
+func (c *Contract) createMedicalPreparation(ctx contractapi.TransactionContextInterface, claim *Claim, reviewID, prepareBy string, panel []string, disclose bool, standbyFor string) (*ClaimReview, error) {
 	if !isMedicalCandidate(ctx) {
 		return nil, fmt.Errorf("isolated medical channel required")
 	}
@@ -146,6 +168,24 @@ func (c *Contract) createMedicalPreparation(ctx contractapi.TransactionContextIn
 	review := &ClaimReview{AssetType: "claimReview", SchemaVersion: SchemaVersion, ID: reviewID, ClaimID: claim.ID, AppealID: claim.CurrentAppealID,
 		Round: claim.ReviewRound + 1, Kind: kind, AssignedAuditorIDs: slices.Clone(panel), ApprovalThreshold: 3, RejectionThreshold: 2,
 		Status: "PREPARING", MedicalVersion: claim.Version, PrepareBy: end.UTC().Format(time.RFC3339)}
+	roster, err := c.activeAuditorRoster(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if roster != nil {
+		review.RosterVersion, review.BallotVersion, review.StandbyForReviewID = roster.Version, sealedPanelBallot, standbyFor
+		review.InitialPrepareBy = review.PrepareBy
+		for _, auditor := range drawAuditors(claim, roster.Subjects) {
+			if !slices.Contains(panel, auditor) {
+				review.StandbyAuditorIDs = append(review.StandbyAuditorIDs, auditor)
+			}
+		}
+		if disclose {
+			if err := bindReviewDisclosure(ctx, review, claim); err != nil {
+				return nil, err
+			}
+		}
+	}
 	if err := putState(ctx, "claimReview", reviewID, review); err != nil {
 		return nil, err
 	}
@@ -191,6 +231,10 @@ func (c *Contract) OpenMedicalVoting(ctx contractapi.TransactionContextInterface
 	if review.Status != "PREPARING" {
 		return nil, fmt.Errorf("review is not in access preparation")
 	}
+	if review.BallotVersion == sealedPanelBallot &&
+		(review.DisclosureIssuedAt == "" || len(review.AcknowledgedAuditors) != len(review.AssignedAuditorIDs)) {
+		return nil, fmt.Errorf("all assigned auditors must acknowledge the review disclosure before voting")
+	}
 	if _, err := currentMedicalHead(ctx, claim); err != nil {
 		return nil, err
 	}
@@ -230,6 +274,13 @@ func (c *Contract) OpenMedicalVoting(ctx contractapi.TransactionContextInterface
 		return nil, err
 	}
 	review.Status, review.OpenedAt, review.Deadline = "OPEN", now, end.UTC().Format(time.RFC3339)
+	if review.BallotVersion == sealedPanelBallot {
+		start, err := time.Parse(time.RFC3339Nano, now)
+		if err != nil {
+			return nil, err
+		}
+		review.CommitDeadline = start.Add(end.Sub(start) / 2).Format(time.RFC3339Nano)
+	}
 	claim.Status, claim.UpdatedAt = "UNDER_REVIEW", now
 	if review.AppealID != "" {
 		appeal, err := c.ReadClaimAppeal(ctx, review.AppealID)
@@ -269,7 +320,29 @@ func (c *Contract) RecoverMedicalReview(ctx contractapi.TransactionContextInterf
 		}
 	}
 	claim.MedicalRecoveryUsed = true
-	return c.createMedicalPreparation(ctx, claim, newID, prepareBy, prior.AssignedAuditorIDs)
+	panel := prior.AssignedAuditorIDs
+	standbyFor := ""
+	if prior.BallotVersion == sealedPanelBallot {
+		if prior.StandbyForReviewID != "" {
+			return nil, fmt.Errorf("standby round already used")
+		}
+		roster, err := c.ReadAuditorRoster(ctx, prior.RosterVersion)
+		if err != nil {
+			return nil, err
+		}
+		panel = make([]string, 0, 4)
+		originals := make([]string, 0, 4)
+		for _, subject := range roster.Subjects {
+			if slices.Contains(prior.AssignedAuditorIDs, subject) {
+				originals = append(originals, subject)
+			} else {
+				panel = append(panel, subject)
+			}
+		}
+		panel = append(drawAuditors(claim, panel), drawAuditors(claim, originals)[:2]...)
+		standbyFor = prior.ID
+	}
+	return c.createMedicalPreparation(ctx, claim, newID, prepareBy, panel, true, standbyFor)
 }
 
 func medicalReviewDocumentKey(reviewID, evidenceID, auditorID string) string {

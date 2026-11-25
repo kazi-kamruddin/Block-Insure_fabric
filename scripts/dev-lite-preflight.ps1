@@ -72,6 +72,15 @@ foreach ($file in 'enrollment-complete','app-secrets.json') {
 }
 $backups = @(Get-ChildItem -LiteralPath (Join-Path $state 'backups') -Directory -ErrorAction SilentlyContinue | Sort-Object Name)
 if ($backups.Count) { Report 'Volume backup' 'PASS' "Latest: $($backups[-1].Name)" } else { Report 'Volume backup' 'WARN' 'No backup under data/dev-lite/backups' }
+if ($definition.r2CandidateRuntime) {
+    $r2Directory = Join-Path $root $definition.r2CandidateRuntime.packageDirectory
+    $r2Files = @('insurance-contract', 'SHA256SUMS', 'package-id.txt')
+    $missingR2 = @($r2Files | Where-Object { -not (Test-Path -LiteralPath (Join-Path $r2Directory $_) -PathType Leaf) })
+    if ($missingR2.Count -eq 0) { Report 'R2 external runtime files' 'PASS' 'Present in the dev-lite package directory' }
+    elseif ([int]$definition.expectedSequence -ge [int]$definition.r2CandidateRuntime.targetSequence) {
+        Report 'R2 external runtime files' 'FAIL' 'The active runtime package is incomplete'
+    } else { Report 'R2 external runtime files' 'INFO' 'Candidate runtime has not been packaged' }
+}
 
 $ports = @($definition.webPort, 3311, 3312, 3313, 3330)
 $busy = @(Get-NetTCPConnection -LocalPort $ports -State Listen -ErrorAction SilentlyContinue | Select-Object -ExpandProperty LocalPort -Unique)

@@ -13,6 +13,7 @@ const genesisMedicalModelID = "frozen-medical-v1"
 const frozenMedicalModelVersion = "fabric-xgb-synthetic-v1"
 const frozenMedicalModelHash = "4954e2d2c71422d415c1d50d32687412479fee5bf61a3a9e283760726e6120b4"
 const medicalModelE2 = "fabric-xgb-synthetic-e2"
+const medicalModelE3 = "fabric-xgb-synthetic-e3"
 const medicalReleaseActivationDelay = 10 * time.Minute
 
 type MedicalModelRelease struct {
@@ -304,8 +305,8 @@ func (c *Contract) ListMedicalModelReleases(ctx contractapi.TransactionContextIn
 
 func (c *Contract) requireActiveMedicalV2Release(ctx contractapi.TransactionContextInterface) (*MedicalModelRelease, error) {
 	release, err := c.ReadActiveMedicalModelRelease(ctx)
-	if err != nil || release.Status != "ACTIVE" || release.ModelVersion != medicalModelE2 || release.GovernanceVersion < 2 {
-		return nil, fmt.Errorf("active E2 routing release is unavailable")
+	if err != nil || release.Status != "ACTIVE" || (release.ModelVersion != medicalModelE2 && release.ModelVersion != medicalModelE3) || release.GovernanceVersion < 2 {
+		return nil, fmt.Errorf("active Oracle v2 routing release is unavailable")
 	}
 	return release, nil
 }

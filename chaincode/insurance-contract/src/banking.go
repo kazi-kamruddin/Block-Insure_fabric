@@ -122,6 +122,9 @@ func (c *Contract) ReviewBankMandate(ctx contractapi.TransactionContextInterface
 	if mandate.Status != "PENDING" {
 		return nil, fmt.Errorf("bank mandate %s must be PENDING for review", id)
 	}
+	if err := c.requireBankAccountSubject(ctx, mandate.AccountReferenceID); err != nil {
+		return nil, err
+	}
 	if outcome == "APPROVE" {
 		mandate.Status = "ACTIVE"
 	} else {
@@ -192,6 +195,9 @@ func (c *Contract) ExpireBankMandate(ctx contractapi.TransactionContextInterface
 	if !asOf.After(expiry) || mandate.Status != "ACTIVE" {
 		return nil, fmt.Errorf("bank mandate %s is not eligible for expiry", id)
 	}
+	if err := c.requireBankAccountSubject(ctx, mandate.AccountReferenceID); err != nil {
+		return nil, err
+	}
 	mandate.Status = "EXPIRED"
 	mandate.UpdatedAt, err = ledgerTimestamp(ctx)
 	if err != nil {
@@ -232,6 +238,9 @@ func (c *Contract) RecordPremiumAdjustment(ctx contractapi.TransactionContextInt
 	}
 	payment, err := c.ReadPremiumPayment(ctx, paymentID)
 	if err != nil {
+		return nil, err
+	}
+	if err := c.requireBankAccountSubject(ctx, payment.SourceAccountID); err != nil {
 		return nil, err
 	}
 	adjustments, err := c.ListPremiumAdjustments(ctx)

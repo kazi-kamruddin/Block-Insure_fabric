@@ -17,3 +17,14 @@ Fabric 1.9.0 keeps submitted votes in public peer state, including votes
 from open rounds. Channel members with direct ledger access can read them.
 Phase 2 retains this chaincode behavior. The Phase 3 design introduces
 committed votes with a separate reveal period for newly opened rounds.
+
+## R2 sealed review
+
+For a review prepared under the active R2 roster, public state carries
+only a ballot hash until its reveal transaction. Reveals begin after the
+commitment deadline or after all four seats commit. Each revealed decision
+becomes part of the public ledger history. The Gateway displays decisions
+and tallies after close and checks the auditor's assignment. Three approvals
+or two rejections decide the merits. Unrevealed votes abstain, and a round
+below both thresholds closes as procedural failure. The same four-seat
+thresholds apply to a standby round. [R2 design](oracle-v2/R2-DESIGN.md)

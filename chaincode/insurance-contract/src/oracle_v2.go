@@ -93,6 +93,16 @@ func (c *Contract) RequestOracleVerificationV2(ctx contractapi.TransactionContex
 		AssignedOracleIDs: assignments, RequiredConfirmations: 2, ExpectedResponses: 3, Status: "PENDING", RequestedAt: manifest.RequestedAt,
 		CommitDeadline: now.Add(oracleV2CommitWindow).Format(time.RFC3339Nano), RevealDeadline: now.Add(oracleV2CommitWindow + oracleV2RevealWindow).Format(time.RFC3339Nano),
 	}
+	if release.ModelVersion == medicalModelE3 {
+		if episode.DigestVersion != 2 {
+			return nil, fmt.Errorf("E3 requires a nonce-bound current medical episode revision")
+		}
+		key, err := getState[MedicalPatientTokenEpoch](ctx, "medicalPatientTokenKeyVersion", patientTokenEpoch)
+		if err != nil || key.Version < 1 {
+			return nil, fmt.Errorf("E3 requires an initialized patient token key")
+		}
+		request.PatientTokenKeyVersion = key.Version
+	}
 	if claim.Status == "APPEAL_SUBMITTED" {
 		appeal, err := c.ReadClaimAppeal(ctx, claim.CurrentAppealID)
 		if err != nil {
@@ -107,7 +117,7 @@ func (c *Contract) RequestOracleVerificationV2(ctx contractapi.TransactionContex
 			return nil, err
 		}
 	}
-	request.AuditPeriodID, err = c.medicalAuditPeriodForRequest(ctx, request.RequestedAt)
+	request.AuditPeriodID, err = c.medicalAuditPeriodForRequest(ctx, claim, request.RequestedAt)
 	if err != nil {
 		return nil, err
 	}

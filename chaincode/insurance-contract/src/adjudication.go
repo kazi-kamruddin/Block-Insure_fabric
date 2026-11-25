@@ -351,25 +351,32 @@ func containsAssignment(assignments []string, auditorID string) bool {
 }
 
 func (c *Contract) RecordAuditorDecision(ctx contractapi.TransactionContextInterface, reviewID, decisionID, outcome, reasonHash string) (*AuditorDecision, error) {
-	return c.recordAuditorDecision(ctx, reviewID, decisionID, outcome, reasonHash, "")
+	return c.recordAuditorDecision(ctx, reviewID, decisionID, outcome, reasonHash, "", "")
 }
 
 func (c *Contract) RecordMedicalAuditorDecision(ctx contractapi.TransactionContextInterface, reviewID, decisionID, outcome, reasonCode, reasonHash string) (*AuditorDecision, error) {
 	if err := validateHash("reasonHash", reasonHash); err != nil {
 		return nil, err
 	}
+	if err := validateMedicalVoteReason(reasonCode, outcome); err != nil {
+		return nil, err
+	}
+	return c.recordAuditorDecision(ctx, reviewID, decisionID, outcome, canonicalProtocolHash("medical-reason-v1", reasonCode, reasonHash), reasonCode, "")
+}
+
+func validateMedicalVoteReason(reasonCode, outcome string) error {
 	switch reasonCode {
 	case "TERMS_AND_EVIDENCE_SUPPORT", "EVIDENCE_DOES_NOT_SUPPORT_SERVICE", "INSUFFICIENT_REQUIRED_EVIDENCE", "EPISODE_FACTS_CONFLICT":
 	default:
-		return nil, fmt.Errorf("select a review reason")
+		return fmt.Errorf("select a review reason")
 	}
 	if (outcome == "APPROVE") != (reasonCode == "TERMS_AND_EVIDENCE_SUPPORT") {
-		return nil, fmt.Errorf("review reason does not match the decision")
+		return fmt.Errorf("review reason does not match the decision")
 	}
-	return c.recordAuditorDecision(ctx, reviewID, decisionID, outcome, canonicalProtocolHash("medical-reason-v1", reasonCode, reasonHash), reasonCode)
+	return nil
 }
 
-func (c *Contract) recordAuditorDecision(ctx contractapi.TransactionContextInterface, reviewID, decisionID, outcome, reasonHash, reasonCode string) (*AuditorDecision, error) {
+func (c *Contract) recordAuditorDecision(ctx contractapi.TransactionContextInterface, reviewID, decisionID, outcome, reasonHash, reasonCode, ballotSalt string) (*AuditorDecision, error) {
 	auditorIdentity, err := requireIdentity(ctx, "AuditorMSP", "auditor")
 	if err != nil {
 		return nil, err
@@ -384,6 +391,9 @@ func (c *Contract) recordAuditorDecision(ctx contractapi.TransactionContextInter
 	}
 	if review.Status != "OPEN" {
 		return nil, fmt.Errorf("review %s is already finalized", reviewID)
+	}
+	if (review.BallotVersion == sealedPanelBallot) != (ballotSalt != "") {
+		return nil, fmt.Errorf("sealed panel votes must be committed and revealed")
 	}
 	claim, err := c.ReadClaim(ctx, review.ClaimID)
 	if err != nil {
@@ -437,6 +447,7 @@ func (c *Contract) recordAuditorDecision(ctx contractapi.TransactionContextInter
 		ClaimID: review.ClaimID, ReviewID: reviewID, ReviewRound: review.Round,
 		AuditorID: auditorID, AuditorIdentity: auditorIdentity, Outcome: outcome,
 		ReasonHash: strings.ToLower(reasonHash), CreatedAt: now, ReasonCode: reasonCode,
+		BallotVersion: review.BallotVersion, BallotSalt: ballotSalt,
 	}
 	if err := putState(ctx, "auditorDecision", decisionID, decision); err != nil {
 		return nil, err
@@ -468,7 +479,7 @@ func (c *Contract) recordAuditorDecision(ctx contractapi.TransactionContextInter
 			if err != nil {
 				return nil, err
 			}
-			if err := c.recordMedicalApproval(ctx, claim, request, review); err != nil {
+			if err := c.recordMedicalApproval(ctx, claim, request, review, decision); err != nil {
 				return nil, err
 			}
 		}
@@ -567,7 +578,7 @@ func (c *Contract) FinalizeExpiredReview(ctx contractapi.TransactionContextInter
 		}
 	}
 	claim.Status = "REJECTED"
-	if r1Medical && preparation {
+	if r1Medical && (preparation || review.BallotVersion == sealedPanelBallot) {
 		review.Status, claim.Status = "PROCEDURAL_FAILURE", "MEDICAL_REVIEW_REQUIRED"
 	}
 	claim.UpdatedAt = now

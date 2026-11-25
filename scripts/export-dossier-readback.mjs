@@ -2,7 +2,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { devLiteProfile, withDevLitePeer } from "./dev-lite-gateway.mjs";
-import { readDossierLedgerEvidence } from "../apps/web/lib/audit/dossier-ledger-evidence.mjs";
+import { readDossierLedgerEvidence, readDossierR2Evidence } from "../apps/web/lib/audit/dossier-ledger-evidence.mjs";
 import { buildEvidenceMerkleTree, evidenceLeafHash } from "../apps/web/lib/evidence/merkle.ts";
 import { redactVoteTallies, visibleDecisions } from "../apps/web/lib/fabric/vote-visibility.ts";
 import { createRequire } from "node:module";
@@ -70,6 +70,8 @@ export async function readClaimDossierAnchor({ network, contract }, claimId) {
   const oracleResults = allResults.filter(inClaim);
   const proof = await readDossierLedgerEvidence({ contract, qscc, channel, chaincode },
     { claim, history, oracleRequests, oracleResults, approvalCertificate });
+  const reviewRounds = allReviews.filter(inClaim);
+  const r2 = await readDossierR2Evidence(evaluate, claim, reviewRounds, oracleRequests, approvalCertificate);
   const viewer = { role: "insurerAdmin" };
   const end = await readTip();
   if (end.blockHeight !== tip.blockHeight || end.blockHash !== tip.blockHash) {
@@ -86,10 +88,11 @@ export async function readClaimDossierAnchor({ network, contract }, claimId) {
       oracleCommitments: allCommitments.filter(inClaim),
       oracleRegistrySnapshots: allSnapshots.filter((row) => oracleRequests.some((request) => request.registrySnapshotId === row.id)),
       auditorDecisions: visibleDecisions(allDecisions.filter(inClaim), allReviews, viewer),
-      reviewRounds: allReviews.filter(inClaim).map((row) => redactVoteTallies(row, viewer)),
+      reviewRounds: reviewRounds.map((row) => redactVoteTallies(row, viewer)),
       appeals: allAppeals.filter(inClaim),
       fraudAssessments: allFraud.filter(inClaim),
       ...proof,
+      ...r2,
     },
   };
 }

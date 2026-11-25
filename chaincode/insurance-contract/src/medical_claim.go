@@ -391,6 +391,7 @@ func (c *Contract) AcceptMedicalCorrection(ctx contractapi.TransactionContextInt
 		return nil, err
 	}
 	claim.Version++
+	claim.MedicalDuplicateExplanationHash = ""
 	claim.UpdatedAt, err = ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err

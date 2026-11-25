@@ -8,6 +8,7 @@ import json
 import math
 import re
 import sys
+from datetime import datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
 import oracle_v2
@@ -31,6 +32,7 @@ READBACK_SECTIONS = (
     "oracleRegistrySnapshots", "oracleReveals", "auditorDecisions", "reviewRounds", "appeals",
     "fraudAssessments", "settlement", "approvalCertificate", "certificateWrite", "auditSampling", "payoutBreakdown",
 )
+R2_SECTIONS = ("panelVoteCommitments", "auditorRosters", "revisionProof")
 
 
 def require(condition, reason):
@@ -38,13 +40,17 @@ def require(condition, reason):
         raise ValueError(reason)
 
 
-def canonical_digest(domain, values):
+def canonical_bytes(domain, values):
     payload = bytearray(domain.encode("ascii"))
     for value in values:
         encoded = value.encode("utf-8")
         payload.extend(f"|{len(encoded)}:".encode("ascii"))
         payload.extend(encoded)
-    return hashlib.sha256(payload).hexdigest()
+    return payload
+
+
+def canonical_digest(domain, values):
+    return hashlib.sha256(canonical_bytes(domain, values)).hexdigest()
 
 
 def encoded_field(record, name):
@@ -239,6 +245,142 @@ def verify_panel(dossier, claim, certificate):
     return decisions
 
 
+def time_value(value, label):
+    require(isinstance(value, str) and "T" in value, f"Missing {label} timestamp")
+    stamp = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    require(stamp.tzinfo is not None, f"Invalid {label} timestamp")
+    return stamp
+
+
+def draw_panel(review, subjects):
+    seed = canonical_digest("medical-panel-draw-v1", (review["claimId"], str(review["medicalVersion"]), str(review["round"])))
+    return sorted(subjects, key=lambda subject: (canonical_digest("medical-panel-seat-v1", (seed, subject)), subject))
+
+
+def verify_sealed_panels(dossier, decisions):
+    reviews = unique(records(dossier, "reviewRounds"), "id", "review")
+    rosters = unique(records(dossier, "auditorRosters"), "version", "auditor roster")
+    appeals = unique(records(dossier, "appeals"), "id", "appeal")
+    commitments = {}
+    for record in records(dossier, "panelVoteCommitments"):
+        review_id, auditor = record.get("reviewId"), record.get("auditorId")
+        require((review_id, auditor) not in commitments and valid_hash(record.get("commitment")), "Duplicate or invalid panel commitment")
+        review = reviews.get(review_id)
+        require(review and review.get("ballotVersion") == "panel-vote-v1" and auditor in review["assignedAuditorIds"] and
+                record.get("round") == review["round"] and record.get("claimVersion") == review["medicalVersion"],
+                "Panel commitment belongs to another seat, round or version")
+        require(time_value(review["openedAt"], "opening") <= time_value(record["committedAt"], "commitment") <
+                time_value(review["commitDeadline"], "commit deadline"), "Commitment is outside its window")
+        commitments[review_id, auditor] = record
+    votes = {(vote["reviewId"], vote["auditorId"]): vote for vote in decisions.values()}
+    for review in reviews.values():
+        if review.get("ballotVersion") != "panel-vote-v1":
+            continue
+        roster = rosters.get(review.get("rosterVersion"))
+        require(roster and set(roster.get("approvedMsps", [])) == {"InsurerMSP", "AuditorMSP", "OracleMSP"}, "Missing approved roster for sealed review")
+        subjects = roster.get("subjects", [])
+        require(isinstance(subjects, list) and all(isinstance(subject, str) for subject in subjects) and
+                len(subjects) == len(set(subjects)) == 6, "Sealed review roster must have six distinct subjects")
+        prior_id = review.get("standbyForReviewId")
+        if not prior_id and review.get("appealId"):
+            prior_id = appeals.get(review["appealId"], {}).get("medicalPriorReviewId")
+            require(prior_id, "Appeal lacks its original panel")
+        if prior_id:
+            prior = reviews.get(prior_id)
+            require(prior and prior["round"] < review["round"], "Mixed panel lacks its original round")
+            if review.get("standbyForReviewId"):
+                require(prior["status"] == "PROCEDURAL_FAILURE", "Standby round did not follow a procedural failure")
+            originals = set(prior["assignedAuditorIds"])
+            require(len(originals) == 4 and originals <= set(subjects), "Original panel differs from the six-subject roster")
+            panel = draw_panel(review, set(subjects) - originals) + draw_panel(review, originals)[:2]
+        else:
+            panel = draw_panel(review, subjects)[:4]
+        standby = draw_panel(review, set(subjects) - set(panel))
+        replacements = review.get("replacements", [])
+        prepare_end = time_value(review["initialPrepareBy"], "initial preparation")
+        replaced = set()
+        for index, replacement in enumerate(replacements):
+            absent, new = replacement.get("absentAuditorId"), replacement.get("newAuditorId")
+            when = time_value(replacement["replacedAt"], "replacement")
+            require(absent in panel and absent not in replaced and standby and new == standby[0] and when >= prepare_end,
+                    "Invalid standby replacement")
+            if review.get("openedAt"):
+                require(when <= time_value(review["openedAt"], "opening"), "Replacement followed the opening of voting")
+            panel[panel.index(absent)] = standby.pop(0)
+            replaced.add(new)
+            if index == 0:
+                prepare_end = when + timedelta(minutes=5)
+        require(review["assignedAuditorIds"] == panel and review.get("standbyAuditorIds", []) == standby and
+                time_value(review["prepareBy"], "preparation") == prepare_end, "Panel assignments or preparation extension differ")
+        records_in_round = [record for (round_id, _), record in commitments.items() if round_id == review["id"]]
+        require(review.get("commitmentsCast", 0) == len(records_in_round), "Panel commitment tally differs")
+        for auditor in panel:
+            record = commitments.get((review["id"], auditor))
+            vote = votes.get((review["id"], auditor))
+            if not vote:
+                continue
+            require(record and vote.get("ballotVersion") == "panel-vote-v1" and valid_hash(vote.get("ballotSalt")) and
+                    valid_hash(vote.get("reasonHash")), "Revealed vote has no sealed commitment")
+            opened = time_value(vote["createdAt"], "reveal")
+            require(opened >= time_value(record["committedAt"], "commitment") and
+                    opened <= time_value(review["deadline"], "reveal deadline"), "Reveal is outside its window")
+            if opened < time_value(review["commitDeadline"], "commit deadline"):
+                require(len(records_in_round) == 4 and all(time_value(item["committedAt"], "commitment") <= opened for item in records_in_round),
+                        "Panel reveal preceded the close of commitments")
+            expected = canonical_digest("panel-vote-v1", (review["id"], str(review["round"]), str(review["medicalVersion"]),
+                auditor, vote["outcome"], vote["reasonHash"], vote["ballotSalt"]))
+            require(expected == record["commitment"], "Panel ballot does not open its commitment")
+        if review["status"] == "PROCEDURAL_FAILURE":
+            require(review["approvals"] < 3 and review["rejections"] < 2, "Procedural failure reached a merits threshold")
+            deadline = review.get("deadline") or review["prepareBy"]
+            require(time_value(review["closedAt"], "closing") > time_value(deadline, "close deadline"), "Procedural failure closed too early")
+    return commitments, votes
+
+
+def verify_review_transcript(dossier, certificate, commitments, votes):
+    claim_id = certificate["claimId"]
+    transcript = [claim_id]
+    if certificate["path"] == "PANEL":
+        reviews = records(dossier, "reviewRounds")
+        final = next(row for row in reviews if row["id"] == certificate["reviewId"])
+        for review in sorted(reviews, key=lambda row: (row["round"], row["id"])):
+            if review["round"] > final["round"]:
+                break
+            fields = [review["id"], str(review["round"]), str(review["medicalVersion"])]
+            fields.extend(review.get(field, "") for field in ("kind", "status", "ballotVersion", "rosterVersion",
+                "standbyForReviewId", "initialPrepareBy", "prepareBy", "openedAt", "commitDeadline", "deadline", "closedAt"))
+            for change in review.get("replacements", []):
+                fields.append(canonical_digest("medical-auditor-replacement-v1", (change["absentAuditorId"], change["newAuditorId"], change["replacedAt"])))
+            for auditor in review["assignedAuditorIds"]:
+                record = commitments.get((review["id"], auditor), {})
+                vote = votes.get((review["id"], auditor))
+                seat = [auditor, record.get("commitment", ""), record.get("committedAt", "")]
+                if vote:
+                    seat.extend(vote.get(field, "") for field in ("id", "outcome", "reasonCode", "reasonHash", "createdAt", "ballotSalt"))
+                fields.append(canonical_digest("medical-review-seat-v1", seat))
+            transcript.append(canonical_digest("medical-review-round-v1", fields))
+    require(canonical_digest("medical-review-transcript-v1", transcript) == certificate["reviewTranscriptHash"], "Review transcript hash differs")
+
+
+def verify_revision_proof(dossier, claim, certificate, requests):
+    proof = dossier.get("revisionProof")
+    e3 = any(row.get("patientTokenKeyVersion") and row["claimVersion"] == claim["version"] for row in requests.values())
+    if not proof:
+        require(not e3, "Missing nonce-bound E3 revision proof")
+        return
+    require(proof.get("id") == claim.get("episodeId") and proof.get("revision") == claim.get("episodeRevision"),
+            "Revision proof is not bound to the current episode")
+    keys = ("id", "patientReferenceHash", "service", "serviceDate", "admissionDate", "dischargeDate", "billMinor", "invoiceDate", "diagnosisCode")
+    values = [str(proof[key]) for key in keys]
+    version = proof.get("digestVersion", 1)
+    require(version in (1, 2) and (not e3 or version == 2), "Unknown or unexpected revision proof version")
+    if version == 2:
+        require(valid_hash(proof.get("revisionNonce")) and proof["revisionNonce"] != "0" * 64, "Invalid revision nonce")
+        values.insert(0, proof["revisionNonce"])
+    expected = canonical_digest(f"fabric-medical-intake-v{version}", values)
+    require(proof.get("publicHash") == expected and (not certificate or certificate["episodeRevisionHash"] == expected), "Revision digest proof differs")
+
+
 def verify_merkle(dossier, claim, missing):
     evidence = unique(records(dossier, "evidence"), "id", "evidence")
     proven = set()
@@ -283,6 +425,8 @@ def verify_certificate(claim, certificate, settlement, expected_hash):
     require(isinstance(certificate, dict), "Dossier requires an approval certificate")
     fields = FIELDS + TERMS if any(field in certificate for field in TERMS) else FIELDS
     version = 2 if fields[-1] == "breakdownHash" else 1
+    v3 = certificate.get("certificateVersion") == 3
+    require(v3 or "certificateVersion" not in certificate, "Unknown approval certificate version")
     canonical = [encoded_field(certificate, field) for field in fields]
     if version == 2:
         require(bool(certificate["packageId"]), "Missing certificate package ID")
@@ -295,7 +439,7 @@ def verify_certificate(claim, certificate, settlement, expected_hash):
         domain += ":duplicate-rule"
         canonical.append(encoded_field(certificate, "duplicateRuleVersion"))
         require(certificate["duplicateRuleVersion"] in (1, 2), "Unknown duplicate rule version")
-    if any(field in certificate for field in oracle_v2.V2_CERTIFICATE_FIELDS):
+    if (not v3 or certificate.get("path") == "ORACLE_AUTO") and any(field in certificate for field in oracle_v2.V2_CERTIFICATE_FIELDS):
         require(certificate.get("path") == "ORACLE_AUTO" and certificate.get("decision") == "AUTO_APPROVE" and
                 certificate.get("policyVersion") == "diagnostic-v1" and valid_hash(certificate.get("manifestHash")) and
                 valid_hash(certificate.get("factVectorHash")), "Invalid Oracle v2 certificate binding")
@@ -303,6 +447,15 @@ def verify_certificate(claim, certificate, settlement, expected_hash):
         canonical.extend(certificate[field] for field in oracle_v2.V2_CERTIFICATE_FIELDS)
     require(not certificate.get("supersededBy"), "Certificate is superseded")
     derived = canonical_digest(domain, canonical)
+    if v3:
+        require(valid_hash(certificate.get("reviewTranscriptHash")) and
+                (not certificate.get("samplingRecordHash") or valid_hash(certificate["samplingRecordHash"])), "Invalid certificate v3 evidence hash")
+        require(time_value(certificate.get("decidedAt"), "decision") <= time_value(certificate.get("issuedAt"), "issuance"),
+                "Certificate issuance preceded the decision")
+        derived = canonical_digest("fabric-medical-approval-v3", (derived, certificate["reviewTranscriptHash"], certificate.get("samplingRecordHash", ""),
+            *(certificate.get(field, "") for field in oracle_v2.V2_CERTIFICATE_FIELDS), certificate.get("breakdownHash", ""),
+            certificate["decidedAt"], certificate["issuedAt"]))
+        version = 3
     require(hmac.compare_digest(derived, observed), "Certificate hash mismatch")
     if expected_hash is not None:
         require(hmac.compare_digest(derived, expected_hash), "Certificate does not match the supplied ledger hash")
@@ -373,6 +526,7 @@ def verify_payout(dossier, certificate, strict, missing):
 
 
 def verify_sampling(dossier, requests, strict, missing):
+    selection_hashes = {}
     rows = unique(records(dossier, "auditSampling"), "requestId", "audit sampling")
     for request in requests.values():
         period_id = request.get("auditPeriodId")
@@ -385,6 +539,12 @@ def verify_sampling(dossier, requests, strict, missing):
             missing.append(f"auditSampling:{request['id']}")
             continue
         period, selection = row.get("period"), row.get("selection")
+        if isinstance(period, dict) and period.get("status"):
+            require(period["id"] == period_id, "Audit sampling period differs")
+            selection_hashes[request["id"]] = verify_r2_sampling(period, selection, request)
+            if not selection:
+                missing.append(f"Audit selection unavailable:{request['id']}")
+            continue
         require(isinstance(period, dict) and period.get("id") == period_id and
                 valid_hash(period.get("commitment")), "Audit sampling period differs")
         seed = period.get("seed")
@@ -404,7 +564,54 @@ def verify_sampling(dossier, requests, strict, missing):
                     "resultHash": request["resultHash"], "digest": digest, "rateBps": rate,
                     "selected": int(digest[:8], 16) * 10_000 < rate * 2**32}
         require(selection == expected, "Audit selection proof differs")
+        selection_hashes[request["id"]] = canonical_digest("fabric-medical-audit-record-v1", (
+            period_id, selection["claimId"], str(selection["version"]), selection["resultHash"],
+            digest, str(rate), str(selection["selected"]).lower(),
+        ))
     require(rows.keys() <= requests.keys(), "Audit sampling has no Oracle request")
+    return selection_hashes
+
+
+def verify_r2_sampling(period, selection, request):
+    shares = period.get("shares", [])
+    revealed = []
+    expected_order = ["AuditorMSP", "HospitalMSP", "InsurerMSP"]
+    require([share.get("msp") for share in shares] == expected_order, "Audit period lacks the three governed commitments")
+    for share in shares:
+        require(valid_hash(share.get("commitment")), "Invalid audit share commitment")
+        if share.get("share"):
+            require(valid_hash(share["share"]) and canonical_digest("fabric-medical-audit-share-v2",
+                    (period["id"], share["msp"], share["share"])) == share["commitment"], "Audit share commitment differs")
+            revealed.append(share["share"])
+    candidate = next((item for item in period.get("eligible", [])
+        if item["claimId"] == request["claimId"] and item["version"] == request["claimVersion"]), None)
+    require(candidate and valid_hash(candidate.get("episodeRevisionHash")), "Oracle request has no frozen audit inputs")
+    if not selection:
+        return ""
+    status = period["status"]
+    rate = period.get("rateBps")
+    require(type(rate) is int and 0 < rate <= 10000, "Invalid sampling rate")
+    require(status in ("AUDIT_SEED_DEFAULTED", "FINALIZED") and status == selection.get("status"), "Sampling record period is unresolved")
+    resolved = time_value(selection["resolvedAt"], "audit resolution")
+    digest = ""
+    if status == "AUDIT_SEED_DEFAULTED":
+        require(len(revealed) < 3 and not period.get("seed") and period.get("panelLoad") == len(period.get("eligible", [])) and
+                resolved >= time_value(period["graceEndsAt"], "audit grace"), "Audit seed could not have defaulted yet")
+        selected = True
+    else:
+        seed = canonical_digest("fabric-medical-audit-combined-seed-v2", revealed)
+        require(len(revealed) == 3 and period["seed"] == seed and resolved >= time_value(period["endsAt"], "audit end"), "Combined audit seed differs")
+        digest = hmac.new(bytes.fromhex(seed), canonical_bytes("fabric-medical-audit-selection-v2",
+            (candidate["claimId"], str(candidate["version"]), candidate["episodeRevisionHash"])), hashlib.sha256).hexdigest()
+        selected = int(digest[:8], 16) * 10000 < rate * 2**32
+    require(selection.get("digest") == digest and selection.get("selected") is selected and
+            selection.get("periodId") == period["id"] and selection.get("claimId") == candidate["claimId"] and
+            selection.get("version") == candidate["version"] and selection.get("episodeRevisionHash") == candidate["episodeRevisionHash"] and
+            selection.get("rateBps") == rate, "Frozen audit selection differs")
+    derived = canonical_digest("fabric-medical-audit-record-v2", (period["id"], candidate["claimId"], str(candidate["version"]),
+        candidate["episodeRevisionHash"], digest, str(rate), str(selected).lower(), status, selection["resolvedAt"]))
+    require(selection.get("hash") == derived, "Audit selection record hash differs")
+    return derived
 
 
 def js_canonical(value):
@@ -454,8 +661,10 @@ def verify(dossier, expected_hash=None, readback=None, require_readback=False):
     claim, certificate, settlement = (dossier.get(key) for key in ("claim", "approvalCertificate", "settlement"))
     require(isinstance(claim, dict) and isinstance(claim.get("id"), str) and claim["id"] and
             type(claim.get("version")) is int and claim["version"] > 0, "Dossier requires a valid claim")
-    strict = dossier.get("schemaVersion", 0) in (7, 8)
-    missing = [section for section in READBACK_SECTIONS if section not in dossier]
+    schema = dossier.get("schemaVersion", 0)
+    strict = schema in (7, 8, 9)
+    required_sections = READBACK_SECTIONS + (R2_SECTIONS if schema == 9 else ())
+    missing = [section for section in required_sections if section not in dossier]
     require(not strict or not missing, "Missing dossier sections: " + ", ".join(missing))
     status = claim.get("status")
     digest = version = None
@@ -476,6 +685,11 @@ def verify(dossier, expected_hash=None, readback=None, require_readback=False):
     decisions = {}
     if strict or "reviewRounds" in dossier or "auditorDecisions" in dossier or status == "REJECTED":
         decisions = verify_panel(dossier, claim, certificate)
+    if schema == 9 or version == 3:
+        commitments, votes = verify_sealed_panels(dossier, decisions)
+        verify_revision_proof(dossier, claim, certificate, requests)
+        if version == 3:
+            verify_review_transcript(dossier, certificate, commitments, votes)
     if certificate and (strict or (requests and certificate["path"] == "ORACLE_AUTO")):
         oracle_id = certificate["oracleRequestId"]
         if oracle_id:
@@ -493,6 +707,9 @@ def verify(dossier, expected_hash=None, readback=None, require_readback=False):
                     expected_code = f"V2:AUTO_APPROVE:{request['factVectorHash']}"
                 require(request.get("finalizationCode") == certificate["oracleOutcome"] == expected_code and
                         request.get("finalizedAt") == certificate["approvedAt"], "Oracle approval finalization differs from the certificate")
+            if version == 3 and request.get("protocolVersion") == "v2":
+                require(all(request.get(field, "") == certificate.get(field, "") for field in oracle_v2.V2_CERTIFICATE_FIELDS),
+                        "Certificate v3 Oracle evidence differs")
         else:
             require(certificate["path"] == "PANEL", "Oracle approval is missing its Oracle request")
     if strict and certificate:
@@ -500,8 +717,13 @@ def verify(dossier, expected_hash=None, readback=None, require_readback=False):
         require(isinstance(write, dict) and isinstance(write.get("transactionId"), str) and
                 isinstance(write.get("issuedAt"), str) and type(write.get("blockNumber")) is int and
                 write["blockNumber"] > 0 and valid_hash(write.get("blockHash")), "Missing certificate write transaction")
+        if version == 3:
+            require(time_value(write["issuedAt"], "ledger issuance") == time_value(certificate["issuedAt"], "certificate issuance"),
+                    "Certificate issuance timestamp differs from its transaction")
     verify_payout(dossier, certificate, strict, missing)
-    verify_sampling(dossier, requests, strict, missing)
+    samples = verify_sampling(dossier, requests, strict, missing)
+    if version == 3:
+        require(certificate.get("samplingRecordHash", "") == samples.get(certificate["oracleRequestId"], ""), "Certificate sampling link differs")
     verify_merkle(dossier, claim, missing)
     verify_receipts(dossier, requests, results, decisions)
 
@@ -517,7 +739,7 @@ def verify(dossier, expected_hash=None, readback=None, require_readback=False):
         sections = readback.get("sections")
         require(isinstance(sections, dict), "Peer readback has no sections")
         v2_sections = ("oracleSourceIssuers", "oracleSourceFeeds") if any(row.get("protocolVersion") == "v2" for row in requests.values()) else ()
-        for section in READBACK_SECTIONS + v2_sections:
+        for section in required_sections + v2_sections:
             require(section in sections and section in dossier, f"Missing peer readback section: {section}")
             require(sections[section] == dossier[section], f"Peer readback differs: {section}")
     return {"claimId": claim["id"], "claimVersion": claim["version"], "claimStatus": status,

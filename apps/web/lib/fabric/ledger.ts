@@ -36,6 +36,7 @@ import type {
   OracleRegistrySnapshot,
   OracleRequest,
   OracleRequestHistoryRecord,
+  PanelVoteCommitment,
   OracleResult,
   Policy,
   PolicyPackage,
@@ -87,10 +88,11 @@ async function submitWithTransient<T>(
   args: Array<string | number>,
   transientData: Record<string, string | Uint8Array>,
   profileUserName?: string,
+  endorsingOrganizations?: string[],
 ) {
   requireWritableLedger();
   return withFabricContract(role, async (contract) => decodeJson<T>(
-    await contract.submit(transactionName, { arguments: stringifyArguments(args), transientData }),
+    await contract.submit(transactionName, { arguments: stringifyArguments(args), transientData, endorsingOrganizations }),
   ), profileUserName);
 }
 
@@ -144,6 +146,34 @@ export const ledger = {
   readMedicalReviewFacts(claimId: string) {
     return evaluate<MedicalReviewFacts>("insurerAdmin", "ReadMedicalReviewFacts", claimId);
   },
+  readMedicalReviewDisclosure(reviewId: string, userName: string | undefined) {
+    if (!userName) throw new Error("This auditor has no Fabric identity");
+    return withFabricContract("auditor", async contract =>
+      decodeJson<MedicalReviewFacts>(await contract.evaluateTransaction("ReadMedicalReviewDisclosure", reviewId)), userName);
+  },
+  listAuditorVoteCommitments(reviewId: string) {
+    return evaluate<PanelVoteCommitment[]>("insurerAdmin", "ListAuditorVoteCommitments", reviewId);
+  },
+  readMedicalAuditPeriod(id: string) {
+    return evaluate<{ id: string; status?: string; startsAt: string; endsAt: string; graceEndsAt?: string; rateBps: number; panelLoad?: number;
+      shares?: Array<{ msp: string; commitment: string; share?: string }> }>("insurerAdmin", "ReadMedicalAuditPeriod", id);
+  },
+  medicalAuditAction(role: "insurerAdmin" | "auditor" | "hospitalOfficer", user: string | undefined, transaction: string, args: Array<string | number>) {
+    if (role === "hospitalOfficer") return submitAsHospital(user, transaction, ...args);
+    if (role === "auditor") return submitAsAuditor(user, transaction, ...args);
+    return submit(role, transaction, ...args);
+  },
+  resolveMedicalAuditSelection(role: "policyholder" | "insurerAdmin", claimId: string) {
+    return submit(role, "ResolveMedicalAuditSelection", claimId);
+  },
+  async supportsMedicalR2() {
+    if (process.env.FABRIC_CHANNEL_NAME !== "insurance-dev-lite-190") return false;
+    try {
+      return (await evaluate<{ status: string }>("insurerAdmin", "ReadActiveAuditorRoster")).status === "ACTIVE";
+    } catch {
+      return false;
+    }
+  },
   async readMedicalClarification(role: "insurerAdmin" | "policyholder", id: string) {
     const note = await evaluate<MedicalClarification>(role, "ReadMedicalClarification", id);
     return { ...note, question: openMedicalReviewNote("question", id, note.question),
@@ -160,15 +190,34 @@ export const ledger = {
   quoteMedicalAppeal(claimId: string, revision: string) {
     return evaluate<MedicalQuote>("policyholder", "QuoteMedicalAppeal", claimId, revision);
   },
-  medicalReviewAction(role: "insurerAdmin" | "policyholder" | "auditor", input: MedicalReviewCommand, userName?: string) {
+  async medicalReviewAction(role: "insurerAdmin" | "policyholder" | "auditor", input: MedicalReviewCommand, userName?: string) {
     const write = (name: string, ...args: Array<string | number>) => role === "auditor" ? submitAsAuditor(userName, name, ...args) : submit(role, name, ...args);
     const message = (name: string, text: string, ...args: Array<string | number>) => submitWithTransient(role, name, args, { medicalMessage: text }, userName);
+    const disclosure = async (name: string, claimId: string, ...args: string[]) => {
+      const source = await evaluate<{ episodeBytes: string; statementBytes: string; duplicateExplanationBytes?: string }>(
+        "insurerAdmin", "ReadMedicalReviewDisclosureSource", claimId);
+      const transient: Record<string, Uint8Array> = {
+        medicalEpisodeFacts: Buffer.from(source.episodeBytes, "base64"),
+        medicalStatementFacts: Buffer.from(source.statementBytes, "base64"),
+      };
+      if (source.duplicateExplanationBytes) transient.medicalDuplicateExplanation = Buffer.from(source.duplicateExplanationBytes, "base64");
+      return submitWithTransient(role, name, args, transient, userName, ["InsurerMSP", "AuditorMSP"]);
+    };
     switch (input.action) {
-      case "prepare": return write("PrepareMedicalReview", input.claimId, input.reviewId, input.prepareBy);
+      case "prepare": return await this.supportsMedicalR2()
+        ? disclosure("PrepareMedicalReview", input.claimId, input.claimId, input.reviewId, input.prepareBy)
+        : write("PrepareMedicalReview", input.claimId, input.reviewId, input.prepareBy);
       case "escalate": return write("EscalateStalledMedicalClaim", input.claimId);
       case "release": return write("ReleaseMedicalReservation", input.claimId);
+      case "retire": return write("RetireInvalidatedApproval", input.claimId, input.reasonHash);
+      case "replace": return write("ReplaceAbsentAuditor", input.reviewId, input.auditorId);
+      case "acknowledge": return write("AcknowledgeMedicalReview", input.reviewId);
+      case "disclose": return disclosure("DiscloseMedicalReviewFacts", (await this.readClaimReview(input.reviewId)).claimId, input.reviewId);
+      case "explainDuplicate": return submitWithTransient(role, "ExplainMedicalDuplicate", [input.claimId], { medicalDuplicateExplanation: input.message });
       case "open": return write("OpenMedicalVoting", input.reviewId, input.deadline);
-      case "recover": return write("RecoverMedicalReview", input.reviewId, input.newId, input.prepareBy);
+      case "recover": return await this.supportsMedicalR2()
+        ? disclosure("RecoverMedicalReview", (await this.readClaimReview(input.reviewId)).claimId, input.reviewId, input.newId, input.prepareBy)
+        : write("RecoverMedicalReview", input.reviewId, input.newId, input.prepareBy);
       case "expire": return write("FinalizeExpiredReview", input.reviewId);
       case "oracleTimeout": return write("FinalizeOracleTimeout", input.requestId);
       case "recordReceiptSummary": return this.recordPrivateMedicalReceipt(input.claimId, input.summary);
@@ -177,6 +226,8 @@ export const ledger = {
       case "share": return write("ShareMedicalReviewEvidence", input.reviewId, input.expiresAt);
       case "confirm": return write("ConfirmMedicalEvidence", input.reviewId, input.evidenceId, input.accessId, input.contentHash);
       case "vote": return write("RecordMedicalAuditorDecision", input.reviewId, input.decisionId, input.outcome, input.reasonCode, input.reasonHash);
+      case "commitVote": return write("CommitAuditorVote", input.reviewId, input.round, input.commitment);
+      case "revealVote": return write("RevealAuditorVote", input.reviewId, input.round, input.decisionId, input.outcome, input.reasonCode, input.reasonHash, input.salt);
       case "appeal": return message("SubmitMedicalAppeal", sealMedicalReviewNote("appeal", input.id, input.message), input.id, input.claimId, input.decisionId, input.evidenceHash, input.revision, input.acceptedStatementHash);
       case "recordOCR": return write("RecordMedicalOCR", input.id, input.evidenceId, input.engineVersion, input.sourceHash,
         input.suggestionsHash, input.confirmedHash, String(input.lowConfidence), input.accessId);
@@ -216,7 +267,9 @@ export const ledger = {
     service: string; serviceDate: string; admissionDate: string; dischargeDate: string; billMinor: number; invoiceDate: string; diagnosisCode: string }, userName?: string) {
     if (!userName) throw new Error("No Fabric Hospital identity for this account");
     const { episodeReferenceHash, expectedRevision, ...facts } = input;
-    return submitWithTransient("hospitalOfficer", "SaveMedicalEpisode", [episodeReferenceHash, expectedRevision], { medicalEpisode: JSON.stringify(facts) }, userName);
+    return submitWithTransient("hospitalOfficer", "SaveMedicalEpisode", [episodeReferenceHash, expectedRevision], {
+      medicalEpisode: JSON.stringify(facts), revisionNonce: randomBytes(32),
+    }, userName);
   },
   configureMedicalRules(input: { packageId: string; service: string; sublimit: number; deductibleBps: number; deductibleCap: number;
     shareBps: number; waitingDays: number; filingDays: number; evidenceRequired: boolean }) {

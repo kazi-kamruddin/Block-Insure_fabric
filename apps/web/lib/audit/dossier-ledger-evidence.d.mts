@@ -21,3 +21,11 @@ export function readDossierLedgerEvidence(connection: {
   claim: Claim; history: ClaimHistoryRecord[]; oracleRequests: OracleRequest[]; oracleResults: OracleResult[];
   approvalCertificate: MedicalApprovalCertificate | null;
 }): Promise<DossierLedgerEvidence>;
+export function readDossierR2Evidence(
+  evaluate: (transaction: string, ...args: string[]) => Promise<unknown>,
+  claim: { id: string },
+  rounds: Array<{ id: string; ballotVersion?: string; rosterVersion?: string }>,
+  requests: Array<{ patientTokenKeyVersion?: number }>,
+  certificate: { certificateVersion?: number } | null,
+  options?: { includeRevision?: boolean },
+): Promise<{ panelVoteCommitments?: unknown[]; auditorRosters?: unknown[]; revisionProof?: unknown }>;

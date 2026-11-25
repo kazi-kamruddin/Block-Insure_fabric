@@ -89,6 +89,9 @@ func (c *Contract) ReviewBankAccountLink(ctx contractapi.TransactionContextInter
 	if request.Status != "PENDING" {
 		return nil, fmt.Errorf("bank account link %s must be PENDING for review", id)
 	}
+	if err := c.requireBankSubject(ctx, request.BankID); err != nil {
+		return nil, err
+	}
 	if outcome == "APPROVE" {
 		input, err := parsePrivateOpeningInput(ctx)
 		if err != nil {

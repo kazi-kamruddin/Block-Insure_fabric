@@ -109,6 +109,8 @@ export const demoAccounts = {
     role: "bankOfficer",
     subjectId: "bank-demo",
   },
+  "auditor-5": { id: "auditor-5", displayName: "Independent Auditor Five", organization: "AuditorMSP", role: "auditor", subjectId: "auditor5", fabricUserName: "auditor5" },
+  "auditor-6": { id: "auditor-6", displayName: "Independent Auditor Six", organization: "AuditorMSP", role: "auditor", subjectId: "auditor6", fabricUserName: "auditor6" },
 } as const satisfies Record<string, Omit<DemoAccount, "id"> & { id: string }>;
 
 export function findDemoAccount(id: string): DemoAccount | undefined {

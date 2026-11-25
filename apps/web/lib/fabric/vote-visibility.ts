@@ -5,7 +5,7 @@ type Viewer = Pick<Session, "role" | "subjectId">;
 type Review = Pick<ClaimReview, "id" | "status" | "assignedAuditorIds">;
 type ReviewState = { status: string; assignedAuditorIds?: readonly string[] };
 
-const closedStatuses = new Set(["APPROVED", "REJECTED", "TIMED_OUT", "ACCESS_FAILED", "SUPERSEDED"]);
+const closedStatuses = new Set(["APPROVED", "REJECTED", "TIMED_OUT", "ACCESS_FAILED", "SUPERSEDED", "PROCEDURAL_FAILURE"]);
 
 export function isVoteVisible(review: ReviewState | null | undefined, viewer: Viewer) {
   if (!review || !closedStatuses.has(review.status)) return false;

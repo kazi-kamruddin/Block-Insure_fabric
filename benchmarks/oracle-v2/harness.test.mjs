@@ -68,3 +68,18 @@ test("a stale mirror plus a different concurrent fault exercises conflict and ti
     assert.equal(timeout.routingSeconds, 120);
   }
 });
+
+test("the signed Hospital payment copy adds no independent authority", () => {
+  const { rows } = simulate({ seed, extended: true, perScenario: 2 });
+  const strict = rows.filter(row => row.mode === "v2-provenance-aware" && row.scenario === "hospital-payment-copy");
+  assert.deepEqual(strict.map(row => [row.evidenceReason, row.route]), [
+    ["DEPENDENT_HOSPITAL_PAYMENT_COPY", "PANEL_REVIEW"],
+    ["PAYMENT_CONTRADICTION", "PANEL_REVIEW"],
+  ]);
+});
+
+test("the expanded cohort accepts advice from the unchanged frozen evaluator", () => {
+  const { rows } = simulate({ seed, extended: true, advice: "frozen", perScenario: 2 });
+  assert.equal(rows.length, 4 * 12 * 2);
+  assert.ok(rows.every(row => ["AUTO", "REVIEW"].includes(row.modelAdvice)));
+});

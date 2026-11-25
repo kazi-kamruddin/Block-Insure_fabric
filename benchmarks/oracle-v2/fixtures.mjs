@@ -14,6 +14,9 @@ export const scenarios = Object.freeze([
   { id: "contradictory-payment", label: "Independent payment evidence contradicts the request", eligible: false },
   { id: "clean", label: "Clean claim", eligible: true },
 ]);
+export const phase3Scenarios = Object.freeze([...scenarios, {
+  id: "hospital-payment-copy", label: "Hospital confirmation derived from the invoice, with or without a signed Bank event", eligible: false,
+}]);
 
 export const issuerMetadata = Object.freeze([
   { issuerId: "s-a", keyVersion: 1, kind: "HOSPITAL_HIS", controlDomain: "hospital",
@@ -52,9 +55,12 @@ export function makeCase(scenario, index, seed) {
   const reportedReceiptMinor = id === "altered-receipt" ? hisInvoiceMinor - 70_000 : hisInvoiceMinor;
   const activeLicence = id !== "licence-or-accreditation" || index % 2 === 1;
   const accredited = id !== "licence-or-accreditation" || index % 2 === 0;
-  const verifyPayment = id === "contradictory-payment" || (id === "clean" && index % 2 === 0);
+  const hospitalPaymentCopy = id === "hospital-payment-copy";
+  const bankEvent = hospitalPaymentCopy && index % 2 === 1;
+  const verifyPayment = hospitalPaymentCopy || id === "contradictory-payment" || (id === "clean" && index % 2 === 0);
   const benignMismatch = id === "altered-receipt" && index % 2 === 1;
-  const variant = benignMismatch ? "BENIGN_TRANSCRIPTION" :
+  const variant = hospitalPaymentCopy ? (bankEvent ? "HOSPITAL_COPY_AND_BANK_CONTRADICTION" : "HOSPITAL_COPY_ONLY") :
+    benignMismatch ? "BENIGN_TRANSCRIPTION" :
     id === "altered-receipt" ? "INELIGIBLE_RECEIPT" :
       id === "stale-mirror" && index % 6 === 4 ? "STALE_AND_LATE_REVEAL" :
         id === "stale-mirror" && index % 6 === 5 ? "STALE_AND_THIRD_DISTINCT_RESULT" : "STANDARD";
@@ -70,10 +76,13 @@ export function makeCase(scenario, index, seed) {
     id === "agreeing-copies" ? [invoice.recordId] : []);
   const tariff = record("s-b", "tariffBand", { minimumMinor: 215_000, maximumMinor: 500_000 });
   const receipt = record("s-c", "receiptConsistent", { amountMinor: reportedReceiptMinor }, [invoice.recordId]);
-  const payment = record("s-d", "paymentOccurred", { amountMinor: id === "contradictory-payment" ? 0 : reportedReceiptMinor });
+  const payment = record("s-d", "paymentOccurred", { amountMinor: id === "contradictory-payment" || bankEvent ? 0 : reportedReceiptMinor });
+  const paymentCopy = { ...record("s-a", "paymentOccurred", { amountMinor: reportedReceiptMinor }, [invoice.recordId]),
+    recordId: claimId + ".hospital-payment-confirmation" };
   return {
     claimId, claimVersion: 1, billMinor, groundTruthInvoiceMinor, scenario: id, variant,
     eligible: eligible || benignMismatch, verifyPayment, entropy,
-    records: [invoice, licence, accreditation, tariff, receipt, ...(verifyPayment ? [payment] : [])],
+    records: [invoice, licence, accreditation, tariff, receipt, ...(verifyPayment && (!hospitalPaymentCopy || bankEvent) ? [payment] : []),
+      ...(hospitalPaymentCopy ? [paymentCopy] : [])],
   };
 }

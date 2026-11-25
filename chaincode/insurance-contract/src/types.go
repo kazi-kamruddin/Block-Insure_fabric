@@ -286,46 +286,49 @@ type Liability struct {
 }
 
 type Claim struct {
-	MedicalDuplicateRuleVersion int      `json:"medicalDuplicateRuleVersion,omitempty" metadata:",optional"`
-	MedicalHeldReleaseID        string   `json:"medicalHeldReleaseId,omitempty" metadata:",optional"`
-	MedicalDuplicateReview      bool     `json:"medicalDuplicateReview,omitempty" metadata:",optional"`
-	MedicalEscalatedAt          string   `json:"medicalEscalatedAt,omitempty" metadata:",optional"`
-	MedicalReserveReleasedAt    string   `json:"medicalReservationReleasedAt,omitempty" metadata:",optional"`
-	MedicalClarificationID      string   `json:"medicalClarificationId"`
-	MedicalRecoveryUsed         bool     `json:"medicalRecoveryUsed"`
-	MedicalRevisionKind         string   `json:"medicalRevisionKind"`
-	MedicalSupplementHash       string   `json:"medicalSupplementHash"`
-	EpisodeID                   string   `json:"episodeId"`
-	EpisodeRevision             int      `json:"episodeRevision"`
-	MedicalEvidenceRequired     bool     `json:"medicalEvidenceRequired"`
-	MedicalSettlementID         string   `json:"medicalSettlementId"`
-	MedicalAssociationKey       string   `json:"medicalAssociationKey"`
-	MedicalAssociationVersion   int      `json:"medicalAssociationVersion"`
-	AssetType                   string   `json:"assetType"`
-	SchemaVersion               int      `json:"schemaVersion"`
-	ID                          string   `json:"id"`
-	PolicyID                    string   `json:"policyId"`
-	ClaimantID                  string   `json:"claimantId"`
-	HospitalID                  string   `json:"hospitalId"`
-	HospitalInvoiceID           string   `json:"hospitalInvoiceId"`
-	AmountMinor                 int64    `json:"amountMinor"`
-	IncidentDate                string   `json:"incidentDate"`
-	DescriptionHash             string   `json:"descriptionHash"`
-	EvidenceIDs                 []string `json:"evidenceIds"`
-	HospitalVerificationID      string   `json:"hospitalVerificationId"`
-	AuditorDecisionID           string   `json:"auditorDecisionId"`
-	CurrentReviewID             string   `json:"currentReviewId"`
-	CurrentAppealID             string   `json:"currentAppealId"`
-	CurrentOracleRequestID      string   `json:"currentOracleRequestId"`
-	PrivacyPresentationID       string   `json:"privacyPresentationId"`
-	OracleOutcome               string   `json:"oracleOutcome"`
-	OracleResultHash            string   `json:"oracleResultHash"`
-	Version                     int      `json:"version"`
-	ReviewRound                 int      `json:"reviewRound"`
-	AppealCount                 int      `json:"appealCount"`
-	Status                      string   `json:"status"`
-	CreatedAt                   string   `json:"createdAt"`
-	UpdatedAt                   string   `json:"updatedAt"`
+	MedicalDuplicateReason          string   `json:"medicalDuplicateReason,omitempty" metadata:",optional"`
+	MedicalDuplicateExplanationHash string   `json:"medicalDuplicateExplanationHash,omitempty" metadata:",optional"`
+	MedicalRetirementHash           string   `json:"medicalRetirementHash,omitempty" metadata:",optional"`
+	MedicalDuplicateRuleVersion     int      `json:"medicalDuplicateRuleVersion,omitempty" metadata:",optional"`
+	MedicalHeldReleaseID            string   `json:"medicalHeldReleaseId,omitempty" metadata:",optional"`
+	MedicalDuplicateReview          bool     `json:"medicalDuplicateReview,omitempty" metadata:",optional"`
+	MedicalEscalatedAt              string   `json:"medicalEscalatedAt,omitempty" metadata:",optional"`
+	MedicalReserveReleasedAt        string   `json:"medicalReservationReleasedAt,omitempty" metadata:",optional"`
+	MedicalClarificationID          string   `json:"medicalClarificationId"`
+	MedicalRecoveryUsed             bool     `json:"medicalRecoveryUsed"`
+	MedicalRevisionKind             string   `json:"medicalRevisionKind"`
+	MedicalSupplementHash           string   `json:"medicalSupplementHash"`
+	EpisodeID                       string   `json:"episodeId"`
+	EpisodeRevision                 int      `json:"episodeRevision"`
+	MedicalEvidenceRequired         bool     `json:"medicalEvidenceRequired"`
+	MedicalSettlementID             string   `json:"medicalSettlementId"`
+	MedicalAssociationKey           string   `json:"medicalAssociationKey"`
+	MedicalAssociationVersion       int      `json:"medicalAssociationVersion"`
+	AssetType                       string   `json:"assetType"`
+	SchemaVersion                   int      `json:"schemaVersion"`
+	ID                              string   `json:"id"`
+	PolicyID                        string   `json:"policyId"`
+	ClaimantID                      string   `json:"claimantId"`
+	HospitalID                      string   `json:"hospitalId"`
+	HospitalInvoiceID               string   `json:"hospitalInvoiceId"`
+	AmountMinor                     int64    `json:"amountMinor"`
+	IncidentDate                    string   `json:"incidentDate"`
+	DescriptionHash                 string   `json:"descriptionHash"`
+	EvidenceIDs                     []string `json:"evidenceIds"`
+	HospitalVerificationID          string   `json:"hospitalVerificationId"`
+	AuditorDecisionID               string   `json:"auditorDecisionId"`
+	CurrentReviewID                 string   `json:"currentReviewId"`
+	CurrentAppealID                 string   `json:"currentAppealId"`
+	CurrentOracleRequestID          string   `json:"currentOracleRequestId"`
+	PrivacyPresentationID           string   `json:"privacyPresentationId"`
+	OracleOutcome                   string   `json:"oracleOutcome"`
+	OracleResultHash                string   `json:"oracleResultHash"`
+	Version                         int      `json:"version"`
+	ReviewRound                     int      `json:"reviewRound"`
+	AppealCount                     int      `json:"appealCount"`
+	Status                          string   `json:"status"`
+	CreatedAt                       string   `json:"createdAt"`
+	UpdatedAt                       string   `json:"updatedAt"`
 }
 
 // PrivacyCredential is the public, Fabric-signed anchor for a credential whose
@@ -426,6 +429,7 @@ type OracleRegistrySnapshot struct {
 }
 
 type OracleRequest struct {
+	PatientTokenKeyVersion  int               `json:"patientTokenKeyVersion,omitempty" metadata:",optional"`
 	ProtocolVersion         string            `json:"protocolVersion,omitempty" metadata:",optional"`
 	Manifest                *OracleV2Manifest `json:"manifest,omitempty" metadata:",optional"`
 	ManifestHash            string            `json:"manifestHash,omitempty" metadata:",optional"`
@@ -616,6 +620,8 @@ type HospitalVerification struct {
 }
 
 type AuditorDecision struct {
+	BallotSalt      string `json:"ballotSalt,omitempty" metadata:",optional"`
+	BallotVersion   string `json:"ballotVersion,omitempty" metadata:",optional"`
 	ReasonCode      string `json:"reasonCode"`
 	AssetType       string `json:"assetType"`
 	SchemaVersion   int    `json:"schemaVersion"`
@@ -631,25 +637,35 @@ type AuditorDecision struct {
 }
 
 type ClaimReview struct {
-	MedicalVersion     int      `json:"medicalVersion"`
-	PrepareBy          string   `json:"prepareBy"`
-	AssetType          string   `json:"assetType"`
-	SchemaVersion      int      `json:"schemaVersion"`
-	ID                 string   `json:"id"`
-	ClaimID            string   `json:"claimId"`
-	AppealID           string   `json:"appealId"`
-	Round              int      `json:"round"`
-	Kind               string   `json:"kind"`
-	AssignedAuditorIDs []string `json:"assignedAuditorIds"`
-	ApprovalThreshold  int      `json:"approvalThreshold"`
-	RejectionThreshold int      `json:"rejectionThreshold"`
-	Approvals          int      `json:"approvals"`
-	Rejections         int      `json:"rejections"`
-	VotesCast          int      `json:"votesCast"`
-	Status             string   `json:"status"`
-	Deadline           string   `json:"deadline"`
-	OpenedAt           string   `json:"openedAt"`
-	ClosedAt           string   `json:"closedAt"`
+	InitialPrepareBy     string               `json:"initialPrepareBy,omitempty" metadata:",optional"`
+	BallotVersion        string               `json:"ballotVersion,omitempty" metadata:",optional"`
+	CommitDeadline       string               `json:"commitDeadline,omitempty" metadata:",optional"`
+	CommitmentsCast      int                  `json:"commitmentsCast,omitempty" metadata:",optional"`
+	RosterVersion        string               `json:"rosterVersion,omitempty" metadata:",optional"`
+	StandbyAuditorIDs    []string             `json:"standbyAuditorIds,omitempty" metadata:",optional"`
+	AcknowledgedAuditors []string             `json:"acknowledgedAuditorIds,omitempty" metadata:",optional"`
+	Replacements         []AuditorReplacement `json:"replacements,omitempty" metadata:",optional"`
+	DisclosureIssuedAt   string               `json:"disclosureIssuedAt,omitempty" metadata:",optional"`
+	StandbyForReviewID   string               `json:"standbyForReviewId,omitempty" metadata:",optional"`
+	MedicalVersion       int                  `json:"medicalVersion"`
+	PrepareBy            string               `json:"prepareBy"`
+	AssetType            string               `json:"assetType"`
+	SchemaVersion        int                  `json:"schemaVersion"`
+	ID                   string               `json:"id"`
+	ClaimID              string               `json:"claimId"`
+	AppealID             string               `json:"appealId"`
+	Round                int                  `json:"round"`
+	Kind                 string               `json:"kind"`
+	AssignedAuditorIDs   []string             `json:"assignedAuditorIds"`
+	ApprovalThreshold    int                  `json:"approvalThreshold"`
+	RejectionThreshold   int                  `json:"rejectionThreshold"`
+	Approvals            int                  `json:"approvals"`
+	Rejections           int                  `json:"rejections"`
+	VotesCast            int                  `json:"votesCast"`
+	Status               string               `json:"status"`
+	Deadline             string               `json:"deadline"`
+	OpenedAt             string               `json:"openedAt"`
+	ClosedAt             string               `json:"closedAt"`
 }
 
 type ClaimAppeal struct {

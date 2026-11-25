@@ -21,6 +21,7 @@ export function MedicalOracleV2({ view, isClaimant, busy, onAction }: {
   }
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (!view.facts) return;
     const fields = new FormData(event.currentTarget);
     onAction({ action: "recordReceiptSummary", claimId: view.claim.id, summary: {
       evidenceId: String(fields.get("evidenceId")), invoiceNumber: String(fields.get("invoiceNumber")).trim(),
@@ -28,7 +29,7 @@ export function MedicalOracleV2({ view, isClaimant, busy, onAction }: {
       derivedFrom: String(fields.get("derivedFrom")).trim(),
     } });
   };
-  const waitingForReceipt = !request && isClaimant && view.documents.length > 0 && view.facts.service === "DIAGNOSTIC" &&
+  const waitingForReceipt = !request && isClaimant && view.documents.length > 0 && view.facts?.service === "DIAGNOSTIC" &&
     ["SUBMITTED", "APPEAL_SUBMITTED"].includes(view.claim.status);
   return <>
     {request && <section className="medicalSubpanel" aria-label="Oracle v2 evidence decision">
