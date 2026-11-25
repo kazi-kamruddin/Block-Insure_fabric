@@ -1,7 +1,12 @@
 [CmdletBinding()]
-param([switch]$Ledger)
+param(
+    [switch]$Ledger,
+    [switch]$ClockOnly,
+    [ValidateSet('insurer', 'hospital', 'auditor', 'bank', 'oracle')][string]$ClockPeer = 'insurer'
+)
 # Read-only checks before a dev-lite demo. Changes nothing.
 # -Ledger requires ledger checks even when the dev-lite orderer is stopped.
+# -ClockOnly checks the peer clock without evaluating chaincode.
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 $definition = Get-Content -Raw -LiteralPath (Join-Path $PSScriptRoot 'profiles/dev-lite-190.json') | ConvertFrom-Json
@@ -9,6 +14,38 @@ if ($definition.repoRoot) { $root = $definition.repoRoot }
 $state = Join-Path $root 'data/dev-lite'
 $results = [Collections.Generic.List[object]]::new()
 function Report([string]$Check, [string]$Status, [string]$Detail) { $results.Add([pscustomobject]@{ Check = $Check; Status = $Status; Detail = $Detail }) }
+
+function Test-PeerClock([bool]$Required) {
+    try {
+        $peers = @(& docker ps --filter 'label=com.docker.compose.project=block-insure-dev-lite' --filter "label=com.docker.compose.service=peer-$ClockPeer" --format '{{.Names}}' 2>$null)
+        if ($LASTEXITCODE -ne 0) { throw "Could not inspect the dev-lite $ClockPeer peer." }
+        if ($peers.Count -eq 0 -and -not $Required) {
+            Report 'Peer clock skew' 'INFO' 'Dev-lite peer is stopped; run -ClockOnly before live work.'
+            return $true
+        }
+        if ($peers.Count -ne 1) { throw "Expected one running dev-lite $ClockPeer peer." }
+
+        $before = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+        $value = & docker exec $peers[0] date '+%s%3N' 2>$null
+        $after = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+        if ($LASTEXITCODE -ne 0 -or "$value" -notmatch '^\d{13}$') { throw 'Could not read the peer UTC clock in milliseconds.' }
+        $skewMs = [long]$value - ($before + ($after - $before) / 2)
+        $withinLimit = [math]::Abs($skewMs) -le 5000
+        $detail = 'Peer minus Windows UTC: {0:+0.000;-0.000;0.000} s (limit 5 s, sample round trip {1} ms)' -f ($skewMs / 1000), ($after - $before)
+        Report 'Peer clock skew' $(if ($withinLimit) { 'PASS' } else { 'FAIL' }) $detail
+        return $withinLimit
+    } catch {
+        Report 'Peer clock skew' 'FAIL' $_.Exception.Message
+        return $false
+    }
+}
+
+if ($ClockOnly) {
+    $clockOk = Test-PeerClock $true
+    $results | Format-Table -AutoSize | Out-String -Width 200 | Write-Output
+    if (-not $clockOk) { exit 1 }
+    exit 0
+}
 
 try {
     $null = & docker info --format '{{.ServerVersion}}' 2>$null
@@ -21,6 +58,7 @@ $devLiteOrderers = @(& docker ps --filter 'label=com.docker.compose.service=orde
 $foreign = @($orderers | Where-Object { $_ -and $devLiteOrderers -notcontains $_ })
 if ($foreign.Count) { Report 'Other Fabric networks' 'FAIL' "Stop these first: $($foreign -join ', ')" }
 else { Report 'Other Fabric networks' 'PASS' $(if ($devLiteOrderers.Count) { 'Only dev-lite is running' } else { 'None running' }) }
+$clockOk = Test-PeerClock ($Ledger -or $devLiteOrderers.Count -gt 0)
 
 $volumes = @(& docker volume ls --format '{{.Name}}' 2>$null)
 $expected = 'orderer','peer-auditor','peer-bank','peer-hospital','peer-insurer','peer-oracle' | ForEach-Object { "block-insure-dev-lite_$_" }
@@ -49,7 +87,7 @@ foreach ($drive in @((Get-Item -LiteralPath $root).PSDrive.Name, $env:SystemDriv
 $emailConfig = Join-Path $state 'email-gateway.json'
 Report 'Brevo email (optional)' $(if (Test-Path -LiteralPath $emailConfig) { 'PASS' } else { 'INFO' }) $(if (Test-Path -LiteralPath $emailConfig) { 'Configured; start the app with -Email' } else { 'Not configured; OTP codes appear on screen' })
 
-if (($Ledger -or $devLiteOrderers.Count) -and -not $foreign.Count) {
+if (($Ledger -or $devLiteOrderers.Count) -and -not $foreign.Count -and $clockOk) {
     $lines = @(& wsl.exe -d Ubuntu --cd $root --exec bash network/scripts/read-dev-lite-sequence.sh $definition.channel $definition.chaincodeName 2>$null)
     $gateway = & node (Join-Path $PSScriptRoot 'dev-lite-peer-preflight.mjs') | ConvertFrom-Json
     $expectedDefinition = "$($definition.channel) / $($definition.chaincodeVersion) / $($definition.expectedSequence)"

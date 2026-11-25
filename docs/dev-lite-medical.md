@@ -59,6 +59,90 @@ projection/sender are disabled. Read-only startup also verifies the
 Insurer peer's provisioning block before choosing local application state.
 See the [R1 design](oracle-v2/R1-DESIGN.md) for the separately approved upgrade.
 
+Run `.\scripts\dev-lite-preflight.ps1 -ClockOnly` after dev-lite starts,
+before the R1 lifecycle upgrade and at the start of each later live session.
+The check compares Windows UTC with the Insurer peer and fails when the
+absolute difference exceeds five seconds. If it fails, stop the session.
+The owner can restart Docker Desktop with Fabric stopped and repeat the check.
+
+## Restore the pre-R1 ledger
+
+This recovery procedure requires the owner's separate approval after an
+upgrade failure. The pre-R1 backup contains all six ledger volumes and
+the selected app state. Use the exact pre-R1 profile and verify every
+archive before moving any state. The commands retain the displaced volume
+and app data in named recovery directories. Run them only while the
+LevelDB dev-lite stack is the selected network.
+
+```powershell
+$ErrorActionPreference = 'Stop'
+$repo = (Resolve-Path -LiteralPath '.').Path
+$state = (Resolve-Path -LiteralPath 'data/dev-lite').Path
+$backup = Join-Path $state 'backups/2026-11-25-pre-r1'
+$units = 'orderer','peer-insurer','peer-hospital','peer-auditor','peer-bank','peer-oracle'
+$archives = @($units | ForEach-Object { "$_.tar.gz" }) + 'app-state.tar.gz'
+$seen = @()
+foreach ($line in Get-Content -LiteralPath (Join-Path $backup 'SHA256SUMS')) {
+    if ($line -notmatch '^([a-f0-9]{64})  ([a-z-]+\.tar\.gz)$') { throw 'Invalid manifest line' }
+    $expected, $file = $Matches[1], $Matches[2]
+    if ($file -notin $archives -or $file -in $seen) { throw "Unexpected archive: $file" }
+    $seen += $file
+    $archive = Join-Path $backup $file
+    if ((Get-FileHash -Algorithm SHA256 -LiteralPath $archive).Hash.ToLowerInvariant() -cne $expected) { throw "Checksum failed: $file" }
+    tar.exe -tzf $archive | Out-Null
+    if ($LASTEXITCODE) { throw "Invalid archive: $file" }
+}
+if ($seen.Count -ne $archives.Count) { throw 'The backup manifest is incomplete' }
+$inventory = Get-Content -Raw -LiteralPath (Join-Path $backup 'app-state-inventory.json') | ConvertFrom-Json
+if ($inventory.channel -ne 'insurance-dev-lite-190' -or $inventory.sequence -ne 1) { throw 'Wrong backup identity' }
+
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/dev-lite-app.ps1 -Stop
+if ($LASTEXITCODE) { throw 'App stop failed' }
+wsl.exe -d Ubuntu --cd $repo --exec bash network/scripts/network.sh --dev-lite stop
+if ($LASTEXITCODE) { throw 'Network stop failed' }
+$running = @(docker ps --format '{{.Names}}')
+if ($LASTEXITCODE -or $running.Count) { throw 'Expected Docker services to be stopped' }
+if (@(Get-NetTCPConnection -LocalPort 3219,3311,3312,3313,3330 -State Listen -ErrorAction SilentlyContinue).Count) { throw 'Expected app services to be stopped' }
+foreach ($unit in $units) {
+    $volume = "block-insure-dev-lite_$unit"
+    $owner = docker volume inspect $volume --format '{{index .Labels "com.docker.compose.project"}}/{{index .Labels "com.docker.compose.volume"}}'
+    if ($LASTEXITCODE -or $owner -cne "block-insure-dev-lite/$unit") { throw "Unexpected volume identity: $volume" }
+}
+
+$stamp = [DateTime]::UtcNow.ToString('yyyyMMddHHmmssfff')
+$stashName = "displaced-before-pre-r1-restore-$stamp"
+$appStash = Join-Path $state $stashName
+New-Item -ItemType Directory -Path $appStash | Out-Null
+$appPaths = 'oracle','evidence','events','journal','otp','research-findings','customers.json','customer-wallet','customer-email-codes.json','ledger-insurance-dev-lite-190.json','ledger-insurance-dev-lite-190.legacy.json','registry-archive'
+foreach ($name in $appPaths) {
+    $item = Join-Path $state $name
+    if (Test-Path -LiteralPath $item) {
+        $resolved = (Resolve-Path -LiteralPath $item).Path
+        if ((Split-Path -Parent $resolved) -ne $state) { throw "Unexpected app-state location: $name" }
+        Move-Item -LiteralPath $resolved -Destination $appStash
+    }
+}
+tar.exe -xzf (Join-Path $backup 'app-state.tar.gz') -C $state
+if ($LASTEXITCODE) { throw 'App-state restore failed' }
+foreach ($unit in $units) {
+    $volume = "block-insure-dev-lite_$unit"
+    docker run --pull never --rm --network none --mount "type=volume,source=$volume,target=/ledger" --mount "type=bind,source=$backup,target=/backup,readonly" block-insure/fabric-ccenv:2.5.16-go1.26.11 bash -c 'set -e; shopt -s dotglob nullglob; stash="/ledger/$1"; mkdir -m 700 "$stash"; for item in /ledger/*; do if [[ "$item" != "$stash" ]]; then mv -- "$item" "$stash/"; fi; done; tar -xzpf "$2" -C /ledger' -- $stashName "/backup/$unit.tar.gz"
+    if ($LASTEXITCODE) { throw "Volume restore failed: $volume" }
+}
+wsl.exe -d Ubuntu --cd $repo --exec bash network/scripts/network.sh --dev-lite up
+if ($LASTEXITCODE) { throw 'Network start failed' }
+& .\scripts\dev-lite-preflight.ps1 -ClockOnly
+if ($LASTEXITCODE) { throw 'Peer clock check failed' }
+$definitions = @(wsl.exe -d Ubuntu --cd $repo --exec bash network/scripts/read-dev-lite-sequence.sh insurance-dev-lite-190 insurance-contract)
+if ($LASTEXITCODE -or $definitions.Count -ne 5 -or @($definitions | Where-Object { $_ -notmatch '^(insurer|hospital|auditor|bank|oracle) Version: 1\.9\.0, Sequence: 1$' }).Count -or @($definitions | Sort-Object -Unique).Count -ne 5) { throw 'Expected 1.9.0 sequence 1 on all five peers' }
+$definitions
+```
+
+Resolve any failed restore check before restarting the app. Verify the
+block-1 binding and the historical medical claims with a read-only readback.
+Before a later post-2B backup, include `data/dev-lite/source-adapters/` so
+the restored issuer keys and signed feeds match the public keys on the ledger.
+
 The historical teardown uses Compose down for the entire dev-lite project,
 including its CA containers. If an earlier approved rebuild removed those
 containers, `network.sh --dev-lite ca-start` recreates the CA services from
@@ -595,3 +679,12 @@ Limits:
 - The Bank's display name still contains "Demo", and the identity
   attributes `bank-demo` and `hospital-demo` are unchanged because they are
   bound to enrolled certificates.
+
+## R1 ledger-instance marker (sequence 2)
+
+On 25 November 2026 the write-once `RecordLedgerInstance` marker on
+`insurance-dev-lite-190` was set to this ledger's block-1 digest
+`85f5bae841c2c1826db6f898f27954d26ff85c0f43e15f84b0e92e110a7bd71b`
+(tx `4d9818e7…6aed`, block 92). This is by design: the digest was recomputed
+from the peer immediately before submission. Any future rebuild must write a
+fresh random marker from the seed script instead.

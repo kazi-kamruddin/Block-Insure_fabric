@@ -1,8 +1,8 @@
 # R1 implementation and Phase 2B handoff
 
 Date 2026-11-25 (Asia/Dhaka). Target `insurance-dev-lite-190`, LevelDB,
-`insurance-contract` 1.9.0, schema 15. R1 is packaged offline in Phase 2A
-and reviewed before a separately approved in-place upgrade. The last peer
+`insurance-contract` 1.9.0, schema 15. The Phase 2B offline R1 package
+includes the default 192 MiB Go soft memory limit. The last peer
 readback shows sequence 1 on all five peers, package SHA-256
 `d6da2d7759681c5c50c895187844f3d6bd0e1b8a3caa31949c58e89000843ec9`.
 
@@ -70,9 +70,11 @@ atomic `ConfirmSettlement` continues serving existing Bank clients.
 ## Phase 2B command sequence, for separate approval
 
 The expected target is sequence **2**. Use the sequence readback and
-package SHA-256 from the Phase 2A report as conditions of the approval.
-Expected path `data/dev-lite/channel-artifacts/insurance-contract_1.9.0-r1.tar.gz`,
-label `insurance-contract_1.9.0`. The reserved backup destination is
+the verified R1 package SHA-256 as conditions of the approval.
+Package path `data/dev-lite/channel-artifacts/insurance-contract_1.9.0-r1.tar.gz`,
+label `insurance-contract_1.9.0`, type `golang`, SHA-256
+`50d2dfd84ee5083e589d165c1e5c2d40853a3da433f8b1dd9f9f8d514e5262a2`.
+The reserved backup destination is
 `data/dev-lite/backups/2026-11-25-pre-r1/`. Refuse to overwrite it if it
 exists. These commands and operations are a handoff for 2B.
 
@@ -123,3 +125,18 @@ inventory.
    - U20: v2 approval → `AuthorizeSettlement` → `HoldMedicalModelRelease` → check the refusal of a new confirmation → `PrepareMedicalReview` retires the unpaid instruction → panel vote sequence above → new `AuthorizeSettlement` → `ConfirmSettlement`. Record the specific release hold and resume operations in the signed approval.
    - U42 corrected appeal and final rejection: panel reject fixture by two distinct votes, corrected `SaveMedicalEpisode` and verified association → `SubmitMedicalAppeal` → version-bound evidence and receipt → fresh v2 request and panel review as above. Use a separate case for the final rejection by two votes and record its appeal-window status.
 8. Record the actual transaction, request and claim IDs in the 2B run evidence. Update the deployed build profile after the five-peer readback and successful journeys, then run the maintained context sync checks.
+
+## Live source data paths (25 November 2026)
+
+- **S-A (hospital-2 invoices).** Facts are read only by the HospitalMSP
+  `hospital2` identity from the Hospital peer (qscc scan of valid
+  HospitalMSP-created `MedicalEpisodeSaved` events, revision hash checked
+  against the Hospital's own admit inputs). No Insurer identity or Insurer
+  Gateway is used. The S-A signing key stays in the adapter process under the
+  ignored `data/dev-lite/source-adapters/keys/`, and `hospital2` approves the
+  issuer and anchors every S-A feed version.
+- **S-B (regulator).** Licence, accreditation and tariff records are
+  simulated regulator data authored for the demonstration.
+- **S-C (receipts).** Simulated claimant-receipt records derived from the S-A
+  invoice record. The matching private receipt summary is recorded by the
+  claimant against an encrypted receipt document.
