@@ -8,29 +8,24 @@ const transientReplaceErrors = new Set(["EACCES", "EBUSY", "EEXIST", "ENOTEMPTY"
 export async function persistJsonFile(filePath: string, value: unknown) {
   await fs.mkdir(path.dirname(filePath), { recursive: true });
   const temporary = `${filePath}.${process.pid}.${randomUUID()}.tmp`;
-  await fs.writeFile(temporary, `${JSON.stringify(value, null, 2)}\n`, { encoding: "utf8", mode: 0o600 });
-  let lastError: unknown;
   try {
+    const handle = await fs.open(temporary, "wx", 0o600);
+    try {
+      await handle.writeFile(`${JSON.stringify(value, null, 2)}\n`, "utf8");
+      await handle.sync();
+    } finally {
+      await handle.close();
+    }
     for (let attempt = 0; attempt < 6; attempt += 1) {
       try {
         await fs.rename(temporary, filePath);
         return;
       } catch (error) {
         const code = (error as NodeJS.ErrnoException).code ?? "";
-        if (!transientReplaceErrors.has(code)) throw error;
-        lastError = error;
-        if (attempt >= 2) {
-          try {
-            await fs.rm(filePath, { force: true });
-          } catch (removeError) {
-            const removeCode = (removeError as NodeJS.ErrnoException).code ?? "";
-            if (!transientReplaceErrors.has(removeCode) && removeCode !== "ENOENT") throw removeError;
-          }
-        }
+        if (attempt === 5 || !transientReplaceErrors.has(code)) throw error;
         await delay(25 * (attempt + 1));
       }
     }
-    throw lastError;
   } finally {
     await fs.rm(temporary, { force: true }).catch(() => undefined);
   }

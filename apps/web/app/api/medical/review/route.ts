@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { EndorseError } from "@hyperledger/fabric-gateway";
+import { withPeerReasons } from "@/lib/fabric/peer-reasons";
 import { currentSession } from "@/lib/auth/current-session";
 import type { Session } from "@/lib/auth/session-token";
 import { findDemoAccount } from "@/lib/auth/accounts";
@@ -9,8 +9,10 @@ import { ledgerIdSchema } from "@/lib/fabric/validation";
 import { medicalReviewCommand, type MedicalReviewCommand } from "@/lib/fabric/medical-review";
 import { isMedicalChannel, medicalDevLiteChannel } from "@/lib/fabric/medical-channel";
 import { buildMedicalTimeline, hasFinalMedicalApproval } from "@/lib/fabric/medical-timeline";
+import { latestLedgerTimestamp } from "@/lib/fabric/ledger-time";
+import { issuedMedicalTerms, medicalHospitalName, medicalRevisionProof } from "@/lib/fabric/medical-review-disclosure";
 import { checkMutationOrigin } from "@/lib/security/request-origin";
-import { visibleDecisions } from "@/lib/fabric/vote-visibility";
+import { redactVoteTallies, visibleDecisions } from "@/lib/fabric/vote-visibility";
 
 export const dynamic = "force-dynamic";
 const reply = (body: unknown, status = 200) => NextResponse.json(body, { status, headers: { "Cache-Control": "private, no-store" } });
@@ -42,7 +44,7 @@ export async function GET(request: Request) {
       return reply({ quote: await ledger.quoteMedicalAppeal(claim.id, revision) });
     }
     const devLite = loadFabricConfig().channelName === medicalDevLiteChannel;
-    const [appeal, clarification, documents, grants, checks, decisions, facts, oracle, certificate, settlement] = await Promise.all([
+    const [appeal, clarification, documents, grants, checks, decisions, facts, oracle, certificate, settlement, ledgerTime, revisionProof, issuedTerms, hospitalName] = await Promise.all([
       claim.currentAppealId ? ledger.readClaimAppeal(claim.currentAppealId) : null,
       claim.medicalClarificationId ? ledger.readMedicalClarification(session.role === "policyholder" ? session.role : "insurerAdmin", claim.medicalClarificationId) : null,
       Promise.all(claim.evidenceIds.map(id => ledger.readEvidenceReference(id))),
@@ -53,6 +55,10 @@ export async function GET(request: Request) {
       devLite && claim.currentOracleRequestId ? ledger.readOracleRequest(claim.currentOracleRequestId) : null,
       devLite && hasFinalMedicalApproval(claim) ? ledger.readMedicalApprovalCertificate(claim.id, claim.version) : null,
       devLite && claim.medicalSettlementId ? ledger.readSettlement(claim.medicalSettlementId) : null,
+      devLite && session.role === "policyholder" && review?.status === "REJECTED" ? latestLedgerTimestamp().catch(() => null) : null,
+      session.role === "auditor" ? medicalRevisionProof(claim).catch(() => null) : null,
+      issuedMedicalTerms(claim).catch(() => null),
+      session.role === "auditor" ? medicalHospitalName(claim.hospitalId).catch(() => undefined) : undefined,
     ]);
     const readAt = Date.now();
     const timeline = devLite ? buildMedicalTimeline({ claim,
@@ -61,7 +67,8 @@ export async function GET(request: Request) {
       oracle: oracle?.claimVersion === claim.version ? oracle : null,
       certificate, settlement: settlement?.approvalCertificateHash === certificate?.hash ? settlement : null,
     }) : undefined;
-    return reply({ claim, review, appeal, clarification, documents, facts, devLite, readAt, timeline,
+    return reply({ claim, review: review ? redactVoteTallies(review, session) : null, appeal, clarification, documents, facts, devLite, readAt, timeline, ledgerTime, revisionProof, issuedTerms, hospitalName,
+      viewerHasVoted: session.role === "auditor" && decisions.some(decision => decision.reviewId === review?.id && decision.auditorId === session.subjectId),
       appealExplanation: appeal ? await ledger.readMedicalAppealExplanation(session.role === "policyholder" ? session.role : "insurerAdmin", appeal.id) : null,
       grants: grants.filter(grant => grant.medicalReviewId === review?.id && (session.role !== "auditor" || grant.granteeSubject === session.subjectId)),
       checks: checks.filter(check => session.role !== "auditor" || check.auditorId === session.subjectId),
@@ -95,14 +102,14 @@ export async function POST(request: Request) {
       loadFabricConfig().channelName !== medicalDevLiteChannel) return reply({ message: "Action unavailable on this channel" }, 404);
   if (!session || !reviewRole(session.role) || !allowed(input.data, session.role)) return reply({ message: "This role cannot perform that action" }, 403);
   try {
-    return reply({ result: await ledger.medicalReviewAction(session.role, input.data, findDemoAccount(session.accountId)?.fabricUserName) });
-  } catch (error) {
-    if (input.data.action === "open" && error instanceof EndorseError) {
-      const missing = error.details.map(detail =>
-        /\bauditor[1-4] must confirm decryption of [A-Za-z0-9._-]+\b/.exec(detail.message)?.[0],
-      ).find(Boolean);
-      if (missing) return reply({ message: missing }, 409);
+    const result = await ledger.medicalReviewAction(session.role, input.data, findDemoAccount(session.accountId)?.fabricUserName);
+    if (input.data.action === "vote") return reply({ result: { id: input.data.decisionId, reviewId: input.data.reviewId } });
+    if (result && typeof result === "object" && "assetType" in result && result.assetType === "claimReview" && "status" in result && typeof result.status === "string") {
+      return reply({ result: redactVoteTallies({ ...result, status: result.status }, session) });
     }
+    return reply({ result });
+  } catch (error) {
+    withPeerReasons(error);
     const hasPrivateMessage = "message" in input.data && Boolean(input.data.message);
     return reply({ message: error instanceof Error && !hasPrivateMessage
       ? error.message.slice(0, 300) : "The action was not confirmed. Refresh the case before retrying." }, 409);

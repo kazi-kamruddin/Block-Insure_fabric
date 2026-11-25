@@ -18,6 +18,7 @@ $ErrorActionPreference = "Stop"
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $composeCa = Join-Path $projectRoot "network/compose/compose-ca.yaml"
 $composeNetwork = Join-Path $projectRoot "network/compose/compose-network.yaml"
+$composeEnv = Join-Path $projectRoot "network/compose/.env"
 $organizations = @("insurer", "hospital", "auditor", "bank", "oracle")
 $coreContainers = @(
     "orderer.blockinsure.test",
@@ -36,7 +37,9 @@ function Invoke-ComposeUp {
         [Parameter(Mandatory)][string[]]$Services,
         [switch]$NoDependencies
     )
-    $arguments = @("-f", $composeCa, "-f", $composeNetwork, "up", "-d")
+    $arguments = @()
+    if (Test-Path -LiteralPath $composeEnv -PathType Leaf) { $arguments += @("--env-file", $composeEnv) }
+    $arguments += @("-f", $composeCa, "-f", $composeNetwork, "up", "-d")
     if ($NoDependencies) { $arguments += "--no-deps" }
     $arguments += $Services
     Invoke-FabricDocker -Arguments (@('compose') + $arguments) | Out-Null

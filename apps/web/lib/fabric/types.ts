@@ -416,7 +416,7 @@ export type OracleRequest = {
   status: "PENDING" | "CONSENSUS" | "FAILED";
   verifiedResult: boolean;
   resultHash: string;
-  finalizationCode: "" | "EXACT_CONSENSUS" | "NEGATIVE_RESULT" | "CONFLICT" | "TIMEOUT" | "ESCALATED_TIMEOUT";
+  finalizationCode: "" | "EXACT_CONSENSUS" | "NEGATIVE_RESULT" | "CONFLICT" | "TIMEOUT" | "ESCALATED_TIMEOUT" | "MODEL_HELD";
   commitDeadline: LedgerTimestamp;
   revealDeadline: LedgerTimestamp;
   requestedAt: LedgerTimestamp;

@@ -1,16 +1,59 @@
 import { EndorseError } from "@hyperledger/fabric-gateway";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, expect, it, vi } from "vitest";
+import { MedicalTimeline } from "@/components/medical-timeline";
+import { StatusBadge } from "@/components/status-badge";
+import { currentSession } from "@/lib/auth/current-session";
 import { ledger } from "@/lib/fabric/ledger";
-import { POST } from "./route";
+import type { Claim, OracleRequest } from "@/lib/fabric/types";
+import { GET, POST } from "./route";
 
+vi.mock("server-only", () => ({}));
+vi.mock("@/lib/fabric/ledger-time", () => ({ latestLedgerTimestamp: vi.fn(async () => null) }));
 vi.mock("@/lib/auth/current-session", () => ({
   currentSession: vi.fn(async () => ({ role: "insurerAdmin", accountId: "insurer-admin" })),
 }));
-vi.mock("@/lib/fabric/ledger", () => ({ ledger: { medicalReviewAction: vi.fn() } }));
+vi.mock("@/lib/fabric/ledger", () => ({ ledger: {
+  medicalReviewAction: vi.fn(), readClaim: vi.fn(), readOracleRequest: vi.fn(), readMedicalReviewFacts: vi.fn(),
+} }));
 
 afterEach(() => {
   vi.unstubAllEnvs();
   vi.resetAllMocks();
+});
+
+it("shows a held model returned by the ledger in the claim timeline and status badge", async () => {
+  vi.stubEnv("FABRIC_CHANNEL_NAME", "insurance-dev-lite-190");
+  vi.stubEnv("FABRIC_MEDICAL_REVIEW_ENABLED", "true");
+  vi.mocked(currentSession).mockResolvedValue({ role: "insurerAdmin", accountId: "insurer-admin", issuedAt: 0, expiresAt: 1 });
+  const claim: Claim = {
+    assetType: "claim", schemaVersion: 15, hospitalId: "hospital-test", policyId: "policy-test",
+    id: "claim-test", episodeId: "episode-test", version: 1, status: "MEDICAL_REVIEW_REQUIRED",
+    claimantId: "holder", currentOracleRequestId: "request-test", evidenceIds: [],
+    createdAt: "2026-11-25T09:00:00Z", updatedAt: "2026-11-25T09:02:00Z",
+    amountMinor: 10_000, incidentDate: "2026-11-23", descriptionHash: "d".repeat(64),
+    hospitalVerificationId: "verify-test", auditorDecisionId: "", currentReviewId: "", currentAppealId: "",
+    oracleOutcome: "", oracleResultHash: "", reviewRound: 0, appealCount: 0,
+  };
+  const oracle: OracleRequest = {
+    assetType: "oracleRequest", schemaVersion: 15, id: "request-test", claimId: claim.id, claimVersion: 1,
+    hospitalVerificationId: claim.hospitalVerificationId, appealId: "", appealCommitmentHash: "",
+    queryHash: "q".repeat(64), registrySnapshotId: "snapshot-test", registryVersion: 1, registryRootHash: "c".repeat(64),
+    rulesVersion: "rules-v1", rulesHash: "b".repeat(64), modelVersion: "model-v1", modelHash: "a".repeat(64),
+    assignedOracleIds: ["oracle1", "oracle2", "oracle3"], requiredConfirmations: 2, expectedResponses: 3,
+    commitmentCount: 0, revealCount: 0, status: "FAILED", finalizationCode: "MODEL_HELD", verifiedResult: false,
+    resultHash: "", requestedAt: "2026-11-25T09:00:00Z", commitDeadline: "2026-11-25T09:01:00Z",
+    revealDeadline: "2026-11-25T09:02:00Z",
+    finalizedAt: "2026-11-25T09:02:00Z",
+  };
+  vi.mocked(ledger.readClaim).mockResolvedValue(claim);
+  vi.mocked(ledger.readOracleRequest).mockResolvedValue(oracle);
+  const response = await GET(new Request("http://127.0.0.1:3219/api/medical/review?claim=claim-test"));
+  expect(response.status).toBe(200);
+  const { timeline } = await response.json();
+  expect(renderToStaticMarkup(createElement(MedicalTimeline, { timeline }))).toContain("Model on hold");
+  expect(renderToStaticMarkup(createElement(StatusBadge, { status: "MODEL_HELD" }))).toContain("Model on hold");
 });
 
 it("shows the missing decryption acknowledgment without exposing peer details", async () => {

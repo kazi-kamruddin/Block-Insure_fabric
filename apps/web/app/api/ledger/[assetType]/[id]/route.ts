@@ -4,7 +4,8 @@ import { ledgerIdSchema } from "@/lib/fabric/validation";
 import { currentSession } from "@/lib/auth/current-session";
 import { findDemoAccount } from "@/lib/auth/accounts";
 import { ledger } from "@/lib/fabric/ledger";
-import { canSeeDecision } from "@/lib/fabric/vote-visibility";
+import { canSeeDecision, redactVoteTallies } from "@/lib/fabric/vote-visibility";
+import { auditorAssetScope, isAuditorReviewAsset } from "@/lib/fabric/auditor-scope";
 
 const routeSchema = z.object({
   assetType: z.enum(["partner-agreement", "hospital-invoice", "package", "policy", "claim", "evidence", "evidence-batch", "evidence-grant", "verification", "decision", "review", "appeal", "fraud-assessment", "settlement", "claim-history", "account", "bank-link", "bank-transfer", "mandate", "premium-payment", "premium-adjustment", "collection", "benefit-plan", "beneficiaries", "benefit-request", "liability", "oracle-snapshot", "oracle-request", "oracle-commitment", "oracle-result", "oracle-history", "privacy-credential", "privacy-presentation"]),
@@ -23,6 +24,9 @@ export async function GET(_request: Request, context: RouteContext) {
 
   const parsed = routeSchema.safeParse(await context.params);
   if (!parsed.success) return NextResponse.json({ message: "Invalid asset query" }, { status: 400 });
+  if (session.role === "auditor" && (!session.subjectId || !isAuditorReviewAsset(parsed.data.assetType))) {
+    return NextResponse.json({ message: "Auditor access requires an assigned review" }, { status: 403 });
+  }
   if (session.role === "hospitalOfficer" && !["partner-agreement", "hospital-invoice", "package", "privacy-credential", "privacy-presentation"].includes(parsed.data.assetType)) {
     return NextResponse.json({ message: "The independent Hospital portal exposes only its agreement, invoices, and public package network" }, { status: 403 });
   }
@@ -32,6 +36,7 @@ export async function GET(_request: Request, context: RouteContext) {
 
   try {
     const { assetType, id } = parsed.data;
+    let scopeId = id;
     const hospitalOwnsClaim = async (claimId: string) => session.role !== "hospitalOfficer"
       || (await ledger.readClaim(claimId)).hospitalId === session.subjectId;
     let result: unknown;
@@ -106,6 +111,7 @@ export async function GET(_request: Request, context: RouteContext) {
       }
       case "oracle-history": {
         const item = await ledger.readOracleRequest(id);
+        scopeId = item.claimId;
         if (session.role === "policyholder" && (await ledger.readClaim(item.claimId)).claimantId !== session.subjectId) return NextResponse.json({ message: "Asset is not owned by this account" }, { status: 403 });
         if (!(await hospitalOwnsClaim(item.claimId))) return NextResponse.json({ message: "Claim is assigned to another hospital" }, { status: 403 });
         result = await ledger.oracleRequestHistory(id);
@@ -206,7 +212,7 @@ export async function GET(_request: Request, context: RouteContext) {
         if (session.role === "auditor" && !review.assignedAuditorIds.includes(session.subjectId ?? "")) return NextResponse.json({ message: "Review is not assigned to this auditor" }, { status: 403 });
         if (session.role === "policyholder" && (await ledger.readClaim(review.claimId)).claimantId !== session.subjectId) return NextResponse.json({ message: "Asset is not owned by this account" }, { status: 403 });
         if (!(await hospitalOwnsClaim(review.claimId))) return NextResponse.json({ message: "Claim is assigned to another hospital" }, { status: 403 });
-        result = review;
+        result = redactVoteTallies(review, session);
         break;
       }
       case "appeal": {
@@ -317,6 +323,10 @@ export async function GET(_request: Request, context: RouteContext) {
       }
     }
 
+    if (session.role === "auditor" && session.subjectId) {
+      result = (await auditorAssetScope(assetType, session.subjectId))(result, scopeId);
+      if (result === undefined) return NextResponse.json({ message: "Auditor access requires an assigned review" }, { status: 403 });
+    }
     return NextResponse.json({ result });
   } catch (error) {
     console.error("Ledger query failed", error);

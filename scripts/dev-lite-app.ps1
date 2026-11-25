@@ -3,17 +3,72 @@
 # -Email sends OTPs and Bank notices through the local Brevo connector, which
 # needs data/<profile>/email-gateway.json (see tools/email-gateway/README.md).
 # -Onboarding enables LevelDB dev-lite customer accounts and starts its Insurer CA.
-param([switch]$TwoOracles, [switch]$CouchDB, [switch]$Collections, [switch]$Email, [switch]$Onboarding)
+param(
+    [switch]$TwoOracles, [switch]$CouchDB, [switch]$Collections,
+    [switch]$Email, [switch]$Onboarding, [switch]$Production, [switch]$Stop
+)
 $ErrorActionPreference = 'Stop'
 if ($Onboarding -and $CouchDB) { throw '-Onboarding requires the LevelDB dev-lite profile.' }
 $root = Split-Path -Parent $PSScriptRoot
+$definition = Get-Content -Raw -LiteralPath (Join-Path $PSScriptRoot 'profiles/dev-lite-190.json') | ConvertFrom-Json
+if ($definition.repoRoot) { $root = $definition.repoRoot }
 $profile = if ($CouchDB) { 'dev-lite-couchdb' } else { 'dev-lite' }
 $state = Join-Path $root "data/$profile"
 $web = Join-Path $root 'apps/web'
 $workers = Join-Path $root 'services/oracle-worker'
-$port = 3219
+$port = $definition.webPort
 $oraclePorts = if ($TwoOracles) { @(3311,3312) } else { @(3311,3312,3313) }
 $emailPort = 3330
+$pidDirectory = Join-Path $state 'logs/pids'
+
+function Stop-RecordedChild($Child) {
+    $process = Get-Process -Id $Child.Id -ErrorAction SilentlyContinue
+    if ($process -and $process.ProcessName -eq 'node' -and
+        $process.StartTime.ToUniversalTime().Ticks -eq [long]$Child.Started) {
+        # Next dev may have a child server. Only stop the verified PID tree.
+        & taskkill.exe /PID $Child.Id /T /F 2>$null | Out-Null
+        if ($LASTEXITCODE -ne 0 -and -not $process.HasExited) {
+            throw "Could not stop dev-lite Node process $($Child.Id)."
+        }
+    }
+}
+
+if ($Stop) {
+    $failed = 0
+    foreach ($file in @(Get-ChildItem -LiteralPath $pidDirectory -Filter '*.pid.json' -File -ErrorAction SilentlyContinue)) {
+        try {
+            $child = Get-Content -Raw -LiteralPath $file.FullName | ConvertFrom-Json
+            if ($child.Id -notmatch '^\d+$' -or $child.Id -le 0 -or $child.Started -notmatch '^\d+$') {
+                throw 'Invalid dev-lite PID receipt.'
+            }
+            Stop-RecordedChild $child
+            Remove-Item -LiteralPath $file.FullName -ErrorAction SilentlyContinue
+        } catch {
+            $failed++
+            Write-Warning "Could not clean up receipt $($file.Name)."
+        }
+    }
+    if ($failed) { throw "Could not clean up $failed dev-lite PID receipt(s)." }
+    return
+}
+
+$webArguments = @('node_modules/next/dist/bin/next','dev','--port',"$port",'--hostname','127.0.0.1')
+if ($Production) {
+    $server = Join-Path $web '.next/standalone/server.js'
+    if (-not (Test-Path -LiteralPath $server -PathType Leaf)) {
+        throw 'Standalone web build is missing. Stop Fabric and run npm --prefix apps/web run build before starting with -Production.'
+    }
+    $sourceDirectories = @('app', 'components', 'lib' | ForEach-Object { Join-Path $web $_ })
+    $buildTime = (Get-Item -LiteralPath $server).LastWriteTimeUtc
+    $newerSource = Get-ChildItem -LiteralPath $sourceDirectories -Recurse -File |
+        Where-Object LastWriteTimeUtc -gt $buildTime | Select-Object -First 1
+    if ($newerSource) {
+        throw "Standalone web build is older than $($newerSource.Name). Stop Fabric and rebuild before starting with -Production."
+    }
+    $env:PORT = "$port"
+    $env:HOSTNAME = '127.0.0.1'
+    $webArguments = @('scripts/start-standalone.mjs')
+}
 $ownedPorts = @($port) + $oraclePorts + $(if ($Email) { @($emailPort) } else { @() })
 if (@(Get-NetTCPConnection -LocalPort $ownedPorts -State Listen -ErrorAction SilentlyContinue).Count) {
     throw 'A dev-lite app or worker port already has an owner.'
@@ -35,7 +90,7 @@ if ($Onboarding) {
     $onboardingCa = $ca.Groups['id'].Value
 }
 $secretPath = Join-Path $state 'app-secrets.json'
-$secretNames = 'AUTH_SECRET','OTP_SECRET','ORACLE_REGISTRY_API_TOKEN','EVENT_WORKER_SECRET','FABRIC_MEDICAL_REVIEW_NOTE_KEY','BANKING_WORKER_SECRET','EMAIL_GATEWAY_TOKEN'
+$secretNames = 'AUTH_SECRET','OTP_SECRET','ORACLE_REGISTRY_API_TOKEN','EVENT_WORKER_SECRET','FABRIC_MEDICAL_REVIEW_NOTE_KEY','FABRIC_MEDICAL_REVIEW_REASON_KEY','BANKING_WORKER_SECRET','EMAIL_GATEWAY_TOKEN'
 if ($Onboarding) { $secretNames += 'CUSTOMER_WALLET_KEY','CUSTOMER_PII_KEY' }
 $secret = [ordered]@{}
 if (Test-Path -LiteralPath $secretPath) {
@@ -60,9 +115,9 @@ if ($missing.Count) {
 foreach ($setting in $secret.GetEnumerator()) { Set-Item -LiteralPath "Env:$($setting.Key)" -Value $setting.Value }
 $env:DEV_LITE_ONBOARDING = if ($Onboarding) { 'true' } else { 'false' }
 if ($Onboarding) { $env:CUSTOMER_STATE_ROOT = $state }
-$env:FABRIC_CHANNEL_NAME = 'insurance-dev-lite-190'
-$env:FABRIC_CHAINCODE_NAME = 'insurance-contract'
-$env:FABRIC_EXPECTED_SCHEMA_VERSION = '15'
+$env:FABRIC_CHANNEL_NAME = $definition.channel
+$env:FABRIC_CHAINCODE_NAME = $definition.chaincodeName
+$env:FABRIC_EXPECTED_SCHEMA_VERSION = "$($definition.schemaVersion)"
 $env:FABRIC_NETWORK_ROOT = $state
 $env:FABRIC_MEDICAL_REVIEW_ENABLED = 'true'
 $env:FABRIC_XGBOOST_ENABLED = 'true'
@@ -92,6 +147,7 @@ if ($Email) {
     $env:EMAIL_GATEWAY_TOKEN = ' '
 }
 $env:ORACLE_STATE_ROOT = Join-Path $state 'oracle'
+$env:MEDICAL_REVIEW_REASON_ROOT = Join-Path $state 'review-reasons'
 $env:EVIDENCE_STORAGE_ROOT = Join-Path $state 'evidence'
 $env:EVENT_PROJECTION_ROOT = Join-Path $state 'events'
 $env:OTP_STATE_ROOT = Join-Path $state 'otp'
@@ -104,13 +160,21 @@ $env:ORACLE_MODEL_HASH = '4954e2d2c71422d415c1d50d32687412479fee5bf61a3a9e283760
 $stamp = [DateTime]::UtcNow.ToString('yyyyMMdd-HHmmss-ffff')
 $logs = Join-Path $state 'logs'
 New-Item -ItemType Directory -Path $logs -Force | Out-Null
+New-Item -ItemType Directory -Path $pidDirectory -Force | Out-Null
 $children = [Collections.Generic.List[object]]::new()
 $startedOnboardingCA = $false
 function Launch([string]$Name, [string]$Directory, [string[]]$Arguments) {
     $receipt = & node (Join-Path $PSScriptRoot 'start-background-node.mjs') --directory $Directory --stdout (Join-Path $logs "$stamp-$Name.out.log") --stderr (Join-Path $logs "$stamp-$Name.err.log") -- @Arguments
     if ($LASTEXITCODE -ne 0) { throw "Could not start dev-lite $Name" }
     $process = Get-Process -Id (($receipt | ConvertFrom-Json).id)
-    $children.Add(@{ Id = $process.Id; Started = $process.StartTime.ToUniversalTime().Ticks })
+    $child = @{
+        Id = $process.Id
+        Started = $process.StartTime.ToUniversalTime().Ticks.ToString()
+        PidPath = Join-Path $pidDirectory "$stamp-$Name.pid.json"
+    }
+    $children.Add($child)
+    @{ Id = $child.Id; Started = $child.Started } | ConvertTo-Json -Compress |
+        Set-Content -LiteralPath $child.PidPath -Encoding Ascii
 }
 
 try {
@@ -128,12 +192,13 @@ try {
         }
         if (-not $emailReady) { throw 'The local email connector did not report ONLINE. Check its log under data/<profile>/logs.' }
     }
-    Launch 'web' $web @('node_modules/next/dist/bin/next','dev','--port',"$port",'--hostname','127.0.0.1')
+    Launch 'web' $web $webArguments
+    $webPidPath = $children[$children.Count - 1].PidPath
     $healthy = $false
     for ($attempt = 0; $attempt -lt 30; $attempt++) {
         try {
             $health = Invoke-RestMethod "$env:APP_ORIGIN/api/fabric/health" -TimeoutSec 5
-            if ($health.channel -eq $env:FABRIC_CHANNEL_NAME -and $health.schemaVersion -eq 15) { $healthy = $true; break }
+            if ($health.channel -eq $definition.channel -and $health.schemaVersion -eq $definition.schemaVersion) { $healthy = $true; break }
         } catch {}
         Start-Sleep -Seconds 2
     }
@@ -161,13 +226,15 @@ try {
     $extras = @($(if ($Collections) { 'automatic premium collection' }), $(if ($Email) { 'email delivery through Brevo' }), $(if ($Onboarding) { 'customer onboarding' })) | Where-Object { $_ }
     if ($extras.Count) { Write-Host "Also running: $($extras -join ', ')." }
     Write-Host "Dev-lite application is available at $env:APP_ORIGIN. Stop this controller to stop its processes."
-    while ($true) { Start-Sleep -Seconds 2 }
+    while (Test-Path -LiteralPath $webPidPath) { Start-Sleep -Seconds 2 }
 } finally {
     try {
         foreach ($child in $children) {
-            $process = Get-Process -Id $child.Id -ErrorAction SilentlyContinue
-            if ($process -and $process.ProcessName -eq 'node' -and $process.StartTime.ToUniversalTime().Ticks -eq $child.Started) {
-                Stop-Process -Id $child.Id -ErrorAction Continue
+            try {
+                Stop-RecordedChild $child
+                if (Test-Path -LiteralPath $child.PidPath) { Remove-Item -LiteralPath $child.PidPath -ErrorAction SilentlyContinue }
+            } catch {
+                Write-Warning "Could not clean up tracked dev-lite process $($child.Id). Use -Stop to retry."
             }
         }
     } finally {

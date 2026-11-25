@@ -1,4 +1,5 @@
 import type { FabricRole } from "@/lib/fabric/config";
+import { visibleDecisions } from "@/lib/fabric/vote-visibility";
 import type {
   BankMandate,
   BankAccountReference,
@@ -196,7 +197,7 @@ export function buildRoleDashboard(
 
   if (role === "auditor") {
     const decidedReviewIds = new Set(decisions.filter((decision) => decision.auditorId === subjectId).map((decision) => decision.reviewId));
-    const ownDecisions = decisions.filter((decision) => decision.auditorId === subjectId);
+    const ownDecisions = visibleDecisions(decisions.filter((decision) => decision.auditorId === subjectId), reviews, { role, subjectId });
     const finalizedById = new Map(reviews.filter((review) => ["APPROVED", "REJECTED"].includes(review.status)).map((review) => [review.id, review.status]));
     const alignedDecisions = ownDecisions.filter((decision) =>
       (decision.outcome === "APPROVE" && finalizedById.get(decision.reviewId) === "APPROVED")
@@ -218,7 +219,7 @@ export function buildRoleDashboard(
       queue: queue.map((review) => ({
         id: review.id,
         title: review.claimId,
-        detail: `Round ${review.round} · ${review.approvals}/${review.approvalThreshold} approve · ${review.rejections}/${review.rejectionThreshold} reject`,
+        detail: `Round ${review.round} · Votes sealed until the round closes`,
         status: review.status,
         commandLabel: "Prepare decision",
         command: {

@@ -1,4 +1,4 @@
-import { extractInvoiceFields } from "./ocr-fields";
+import { extractReceiptFields, type ReceiptFields } from "./ocr-fields";
 
 export const medicalOcrEngine = "tesseract-7.0.0:eng-4.0.0-best-int";
 const prefix = "/ocr-assets";
@@ -43,10 +43,24 @@ async function raster(file: Blob, pageNumber: number) {
   return canvas;
 }
 
-export async function extractMedicalInvoice(file: Blob, pageNumber: number) {
+function checkPage(file: Blob, pageNumber: number) {
   if (file.size < 1 || file.size > 10_485_760 || !Number.isInteger(pageNumber) || pageNumber < 1 || pageNumber > 10) {
     throw new Error("Use a file up to 10 MB and a page number from 1 to 10.");
   }
+}
+
+function preview(canvas: HTMLCanvasElement) {
+  return new Promise<Blob>((resolve, reject) =>
+    canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error("Source preview failed.")), "image/png"));
+}
+
+export async function previewMedicalInvoice(file: Blob, pageNumber: number) {
+  checkPage(file, pageNumber);
+  return preview(await raster(file, pageNumber));
+}
+
+export async function extractMedicalInvoice(file: Blob, pageNumber: number) {
+  checkPage(file, pageNumber);
   const canvas = await raster(file, pageNumber);
   const { createWorker } = await import("tesseract.js");
   const assets = new URL(prefix + "/", location.origin).href.replace(/\/$/, "");
@@ -55,11 +69,17 @@ export async function extractMedicalInvoice(file: Blob, pageNumber: number) {
     workerBlobURL: false, cacheMethod: "none",
   });
   try {
-    const { data } = await worker.recognize(canvas);
-    const fields = extractInvoiceFields(data.text);
-    const lowConfidence = data.confidence < 80 || Object.values(fields).some(field => !field);
-    const preview = await new Promise<Blob>((resolve, reject) =>
-      canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error("Source preview failed.")), "image/png"));
-    return { fields, confidence: data.confidence, lowConfidence, preview };
+    const { data } = await worker.recognize(canvas, {}, { blocks: true });
+    const fields = extractReceiptFields(data.text);
+    const lines = (data.blocks ?? []).flatMap(block => block.paragraphs.flatMap(paragraph => paragraph.lines));
+    const fieldConfidence: Partial<Record<keyof ReceiptFields, number>> = {};
+    for (const field of Object.keys(fields) as (keyof ReceiptFields)[]) {
+      if (!fields[field]) continue;
+      const scores = lines.filter(line => extractReceiptFields(line.text)[field] === fields[field]).map(line => line.confidence);
+      if (scores.length) fieldConfidence[field] = Math.min(...scores);
+    }
+    const lowConfidence = data.confidence < 80 || !fields.invoiceNumber || !fields.serviceDate || !fields.totalBdt ||
+      Object.values(fieldConfidence).some(score => score < 80);
+    return { fields, confidence: data.confidence, fieldConfidence, lowConfidence, preview: await preview(canvas) };
   } finally { await worker.terminate(); }
 }

@@ -4,6 +4,8 @@ export type ReadinessPayload = {
   status: "ready" | "not_ready";
   service: "block-insure-web";
   timestamp: string;
+  oracleQuorumAvailable: boolean;
+  oracleRosterReady: boolean;
   dependencies: {
     fabric: DependencyState;
     chaincode: DependencyState;
@@ -16,6 +18,13 @@ export type ReadinessPayload = {
 };
 
 type Probe = () => Promise<{ ok: boolean; schemaVersion?: number }>;
+
+export function summarizeOracleReadiness(healthyWorkers: number) {
+  return {
+    oracleQuorumAvailable: healthyWorkers >= 2,
+    oracleRosterReady: healthyWorkers === 3,
+  };
+}
 
 export async function buildReadinessPayload({
   fabricProbe,
@@ -44,11 +53,13 @@ export async function buildReadinessPayload({
   ]);
   const schemaVersion = Number.isInteger(fabric.schemaVersion) ? fabric.schemaVersion! : null;
   const compatible = fabric.ok && schemaVersion === expectedSchemaVersion;
-  const ready = compatible && oracle1.ok && oracle2.ok && oracle3.ok;
+  const oracleReadiness = summarizeOracleReadiness([oracle1, oracle2, oracle3].filter(probe => probe.ok).length);
+  const ready = compatible && oracleReadiness.oracleRosterReady;
   return {
     status: ready ? "ready" : "not_ready",
     service: "block-insure-web",
     timestamp: now(),
+    ...oracleReadiness,
     dependencies: {
       fabric: fabric.ok ? "connected" : "unavailable",
       chaincode: compatible ? "connected" : fabric.ok ? "incompatible" : "unavailable",

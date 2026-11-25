@@ -6,6 +6,7 @@ import { securityCases } from "./cases.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(here, "../..");
+const { goBuilderImage } = JSON.parse(await fs.readFile(path.join(projectRoot, "scripts/profiles/dev-lite-190.json"), "utf8"));
 const outputArgument = process.argv.slice(2).find((value) => value.startsWith("--output="));
 const outputDirectory = path.resolve(outputArgument?.slice("--output=".length) ?? path.join(here, "reports"));
 const model = JSON.parse(await fs.readFile(path.join(here, "threat-model.json"), "utf8"));
@@ -21,7 +22,8 @@ function runGoTest(testName) {
   const dockerArguments = [
     "run", "--rm", "-v", "block-insure-go-cache:/go/pkg/mod",
     "-v", `${contractRoot}:/workspace`, "-w", "/workspace",
-    "golang:1.25", "go", ...directArguments,
+    "--memory", "512m", "--cpus", "1", "-e", "GOTOOLCHAIN=local", "-e", "GOMAXPROCS=1", "-e", "GOFLAGS=-p=1",
+    goBuilderImage, "/usr/local/go/bin/go", ...directArguments,
   ];
   const result = spawnSync(goBackend === "local" ? "go" : "docker", goBackend === "local" ? directArguments : dockerArguments, {
     cwd: contractRoot,
@@ -32,7 +34,7 @@ function runGoTest(testName) {
     kind: "chaincode-test",
     test: testName,
     backend: goBackend,
-    command: goBackend === "local" ? `go test ./src -run ^${testName}$ -count=1` : `docker run ... golang:1.25 go test ./src -run ^${testName}$ -count=1`,
+    command: goBackend === "local" ? `go test ./src -run ^${testName}$ -count=1` : `docker run ... ${goBuilderImage} /usr/local/go/bin/go test ./src -run ^${testName}$ -count=1`,
     passed: !result.error && result.status === 0,
     durationMs: Number((performance.now() - started).toFixed(3)),
     output: `${result.error ? `${result.error}\n` : ""}${result.stdout ?? ""}${result.stderr ?? ""}`.trim().slice(-2_000),

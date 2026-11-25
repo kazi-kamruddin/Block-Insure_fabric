@@ -4,6 +4,8 @@ Generated 2026-09-26T18:18:54.680Z. All values below are derived from the hashed
 
 ## Protocol computation
 
+Phase-2 lineage, single-evaluator in-process computation. Each modeled threshold reuses one registry assessment.
+
 | Profile | Mean latency (µs) | Trial-mean 95% CI (µs) | P95 (µs) | Mean ops/s |
 | --- | ---: | ---: | ---: | ---: |
 | centralized | 5.056 | 3.964–6.148 | 9.3 | 223276.475 |
@@ -13,6 +15,8 @@ Generated 2026-09-26T18:18:54.680Z. All values below are derived from the hashed
 | oracle-2-of-3-private | 548.221 | 471.181–625.26 | 1210.7 | 2041.323 |
 
 ## Live browser fault profiles
+
+Phase-2 lineage, CouchDB, full browser fault journeys, including application and worker startup.
 
 | Profile | Passed | Mean whole-test time (s) | Range (s) |
 | --- | ---: | ---: | ---: |
@@ -24,6 +28,8 @@ Generated 2026-09-26T18:18:54.680Z. All values below are derived from the hashed
 
 ## Ledger-derived decision intervals
 
+Phase-2 lineage, CouchDB, full browser fault journeys, measured from committed records.
+
 | Profile | Oracle request-to-finalization mean (range), s | Claim creation-to-observed-final-state mean (range), s | Review open-to-close mean (range), s |
 | --- | ---: | ---: | ---: |
 | baseline | 13.08 (13.01–13.15) | 27.59 (27.32–27.73) | — |
@@ -33,6 +39,8 @@ Generated 2026-09-26T18:18:54.680Z. All values below are derived from the hashed
 | timeout | 16.51 (16.5–16.51) | 39.97 (38.47–41.82) | 6.78 (6.49–7.02) |
 
 ## Fabric Gateway and ledger
+
+The claim rows use the historical scope (phase-2 lineage, CouchDB, `SubmitInvoiceClaim`, ascending sweep). Mixed rows add `ReadPolicy` in a 1:1 request mix. Schema, threshold, and anchored-write rows are separate transaction families on the same Phase 2 CouchDB deployment.
 
 | Round | Success | Fail | Observed send TPS | Achieved TPS, mean (range) | Caliper mean latency, s | Workload P95 range, ms |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -57,6 +65,8 @@ Generated 2026-09-26T18:18:54.680Z. All values below are derived from the hashed
 | mixed-policy-claim-160-tps | 300 | 0 | 151.13 | 48.77 (44.5–53.1) | 0.63 (0.56–0.73) | 1348.583–1652.11 |
 
 ## Docker resource samples during Caliper
+
+The samples aggregate whole Phase 2 CouchDB Caliper runs, including the ascending `SubmitInvoiceClaim` sweep.
 
 | Container | Samples | Mean CPU % | Max CPU % | Mean memory MiB | Max memory MiB |
 | --- | ---: | ---: | ---: | ---: | ---: |

@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { currentSession } from "@/lib/auth/current-session";
 import { readEventProjection } from "@/lib/events/store";
+import { ledger } from "@/lib/fabric/ledger";
+import { isVoteVisible, redactVoteTallies } from "@/lib/fabric/vote-visibility";
 
 export const runtime = "nodejs";
 
@@ -20,13 +22,23 @@ export async function GET(request: Request) {
   const parsed = querySchema.safeParse(Object.fromEntries(url.searchParams));
   if (!parsed.success) return NextResponse.json({ message: "Invalid event query" }, { status: 400 });
   const projection = await readEventProjection();
+  const voteEvent = "AuditorDecisionRecorded";
+  const reviews = projection.events.some(event => event.eventName === voteEvent)
+    ? await ledger.listClaimReviews().catch(() => []) : [];
+  const reviewsById = new Map(reviews.map(review => [review.id, review]));
+  const countsByName = { ...projection.countsByName };
+  delete countsByName[voteEvent];
   const afterBlock = BigInt(parsed.data.afterBlock ?? "0");
   const matchesAsset = (payload: Record<string, unknown>, expected: string) => ["id", "claimId", "policyId", "evidenceId", "reviewId", "appealId"].some((key) => payload[key] === expected);
   const events = projection.events
     .filter((event) => BigInt(event.blockNumber) > afterBlock)
     .filter((event) => !parsed.data.eventName || event.eventName === parsed.data.eventName)
     .filter((event) => !parsed.data.assetId || matchesAsset(event.payload, parsed.data.assetId))
+    .filter(event => event.eventName !== voteEvent || isVoteVisible(reviewsById.get(String(event.payload.reviewId ?? "")), session))
     .slice(-parsed.data.limit)
-    .reverse();
-  return NextResponse.json({ checkpoint: projection.checkpoint, countsByName: projection.countsByName, events });
+    .reverse()
+    .map(event => event.payload.assetType === "claimReview" && typeof event.payload.status === "string"
+      ? { ...event, payload: redactVoteTallies({ ...event.payload, status: event.payload.status }, session) }
+      : event);
+  return NextResponse.json({ checkpoint: projection.checkpoint, countsByName, events });
 }

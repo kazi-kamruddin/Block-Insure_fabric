@@ -205,6 +205,8 @@ test(journey, async ({ page }, info) => {
     const entry = registry.getByRole("listitem").filter({ hasText: proposed.id + " ·" });
     await expect(entry).toBeVisible({ timeout: 60_000 });
     if (!(await entry.innerText()).includes("ACTIVE")) {
+      await entry.getByRole("button", { name: "Check proposed records" }).click();
+      await expect(entry.getByRole("button", { name: "Attest this snapshot" })).toBeEnabled();
       await postFromButton(entry.getByRole("button", { name: "Attest this snapshot" }), "/api/medical/registry");
     }
     await login("insurer");

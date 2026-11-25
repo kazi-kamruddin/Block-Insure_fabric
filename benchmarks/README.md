@@ -15,7 +15,7 @@ records and should use the experiment channel:
 ./benchmarks/oracle-faults/run-matrix.ps1
 ```
 
-`comparative/run-experiment.mjs` is a controlled protocol microbenchmark. It compares centralized verification, 1-of-1, 2-of-2, 2-of-3, and privacy-bound 2-of-3 verification over 30 balanced repetitions. It reports mean, median, P95, 95% confidence intervals, throughput, CPU time, and memory deltas as JSON, CSV, and Markdown. It deliberately excludes Fabric network/storage latency; use Caliper for that layer.
+`comparative/run-experiment.mjs` is a single-evaluator protocol microbenchmark. It compares centralized verification, 1-of-1, 2-of-2, 2-of-3, and privacy-bound 2-of-3 threshold computations over 30 balanced repetitions. Each operation assesses the registry once. The threshold computations reuse that result while generating per-subject commitments. The privacy profile runs three proof checks. It reports mean, median, P95, 95% confidence intervals, throughput, CPU time, and memory deltas as JSON, CSV, and Markdown. The measurements cover in-process computation. Caliper separately measures Fabric Gateway and ledger costs.
 
 `security-evaluation/run-evaluation.mjs` executes the structured STRIDE-informed threat model. Every threat is linked to an attack simulation, an exact chaincode enforcement test, or both, and produces machine-readable coverage and safe-outcome metrics.
 

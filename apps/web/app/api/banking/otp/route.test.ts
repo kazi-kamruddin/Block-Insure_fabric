@@ -1,10 +1,12 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/auth/current-session", () => ({ currentSession: vi.fn(async () => ({ role: "policyholder", subjectId: "holder1", accountId: "holder1" })), sessionSecret: () => "synthetic-session-secret-at-least-32-characters" }));
 vi.mock("@/lib/auth/accounts", () => ({ findDemoAccount: () => ({ email: "holder@example.invalid" }) }));
 vi.mock("@/lib/security/request-origin", () => ({ checkMutationOrigin: () => ({ trusted: true }) }));
 vi.mock("@/lib/fabric/ledger", () => ({ ledger: { readPolicy: vi.fn(), readBankAccountReference: vi.fn() } }));
-vi.mock("@/lib/banking/otp", () => ({ otpChallenges: { issue: vi.fn(), revoke: vi.fn() } }));
+vi.mock("@/lib/banking/otp", async importOriginal => ({
+  ...await importOriginal<typeof import("@/lib/banking/otp")>(), otpChallenges: { issue: vi.fn(), revoke: vi.fn() },
+}));
 vi.mock("@/lib/banking/email-gateway", () => ({ deliverBankOtp: vi.fn() }));
 import { ledger } from "@/lib/fabric/ledger";
 import { otpChallenges } from "@/lib/banking/otp";
@@ -14,6 +16,7 @@ const intent = { policyId: "policy-test", sourceAccountId: "customer-test", dest
   periodStartDate: "2026-01-01", periodEndDate: "2026-01-30", amountMinor: 1000, externalReferenceHash: "a".repeat(64) };
 const request = (data = intent) => new Request("http://localhost/api/banking/otp", { method: "POST", body: JSON.stringify(data), headers: { "content-type": "application/json" } });
 describe("recipient-bound OTP delivery", () => {
+  afterEach(() => vi.unstubAllEnvs());
   beforeEach(() => {
     vi.resetAllMocks();
     vi.mocked(ledger.readPolicy).mockResolvedValue({ policyholderId: "holder1", premiumMinor: 1000, bankIds: ["bank-test"] } as never);
@@ -31,5 +34,17 @@ describe("recipient-bound OTP delivery", () => {
     expect((await POST(request({ ...intent, amountMinor: 2000 }))).status).toBe(403);
     expect(otpChallenges.issue).not.toHaveBeenCalled();
     expect(deliverBankOtp).not.toHaveBeenCalled();
+  });
+  it("exposes demo codes only when explicitly enabled and requested from loopback", async () => {
+    vi.stubEnv("APP_ORIGIN", "http://localhost");
+    vi.stubEnv("ENABLE_DEMO_AUTH", "true");
+    vi.mocked(deliverBankOtp).mockResolvedValue({ adapter: "demo" } as never);
+    expect(await (await POST(request())).json()).toHaveProperty("demoCode", "123456");
+    const remote = new Request("http://localhost/api/banking/otp", {
+      method: "POST", body: JSON.stringify(intent), headers: { "x-forwarded-for": "192.0.2.1" },
+    });
+    expect(await (await POST(remote)).json()).not.toHaveProperty("demoCode");
+    vi.stubEnv("ENABLE_DEMO_AUTH", "false");
+    expect(await (await POST(request())).json()).not.toHaveProperty("demoCode");
   });
 });

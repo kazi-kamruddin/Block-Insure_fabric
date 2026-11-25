@@ -1,0 +1,12 @@
+[
+  {
+    "value": { "b": 1, "a": [3, { "z": true, "a": "Bangla" }] },
+    "canonical": "{\"a\":[3,{\"a\":\"Bangla\",\"z\":true}],\"b\":1}",
+    "sha256": "c739a676faf5d79bbf8ca2a11472c5cc53fa61061d5b5043c8157ea30c166620"
+  },
+  {
+    "value": { "z": null, "a": { "amount": 64000, "weight": -0.125 } },
+    "canonical": "{\"a\":{\"amount\":64000,\"weight\":-0.125},\"z\":null}",
+    "sha256": "cf2642e00b298759d382f271bdfb983ebdaf109fd9c4260fcebfe841c357af99"
+  }
+]

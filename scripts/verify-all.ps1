@@ -2,11 +2,16 @@
 param(
     [switch]$SkipNetwork,
     [switch]$SkipBrowser,
-    [switch]$SkipAudit
+    [switch]$SkipAudit,
+    [ValidateRange(1, 65535)][int]$LegacyWebPort
 )
 
 $ErrorActionPreference = "Stop"
 $projectRoot = Split-Path -Parent $PSScriptRoot
+$definition = Get-Content -Raw -LiteralPath (Join-Path $PSScriptRoot 'profiles/dev-lite-190.json') | ConvertFrom-Json
+if ($definition.repoRoot) { $projectRoot = $definition.repoRoot }
+$webPort = $definition.webPort
+$includeBrowser = -not ($SkipBrowser -or $SkipNetwork)
 $gitSafeRoot = $projectRoot.Replace("\", "/")
 $webRoot = Join-Path $projectRoot "apps/web"
 $oracleRoot = Join-Path $projectRoot "services/oracle-worker"
@@ -61,7 +66,7 @@ function Save-VerificationReport {
         gitDirty = $gitStatus.Count -gt 0
         options = [pscustomobject]@{
             networkIncluded = -not $SkipNetwork
-            browserIncluded = -not $SkipBrowser
+            browserIncluded = $includeBrowser
             auditIncluded = -not $SkipAudit
         }
         runtime = [pscustomobject]@{
@@ -80,7 +85,8 @@ function Get-OracleHealth {
 }
 
 function Get-WebHealth {
-    try { return Invoke-RestMethod -Uri "http://127.0.0.1:3000/api/health" -TimeoutSec 3 }
+    param([int]$Port)
+    try { return Invoke-RestMethod -Uri "http://127.0.0.1:$Port/api/health" -TimeoutSec 3 }
     catch { return $null }
 }
 
@@ -145,9 +151,12 @@ function Stop-StartedOracleWorkers {
 }
 
 function Assert-IsolatedBrowserRuntime {
-    if ($SkipBrowser) { return }
+    if (-not $includeBrowser) { return }
     $occupied = @()
-    if (Get-WebHealth) { $occupied += "web:3000" }
+    if (Get-WebHealth $webPort) { $occupied += "web:$webPort" }
+    if ($LegacyWebPort -and $LegacyWebPort -ne $webPort -and (Get-WebHealth $LegacyWebPort)) {
+        $occupied += "legacy web:$LegacyWebPort"
+    }
     if (Get-OracleHealth 3301) { $occupied += "oracle1:3301" }
     if (Get-OracleHealth 3302) { $occupied += "oracle2:3302" }
     if (Get-OracleHealth 3303) { $occupied += "oracle3:3303" }
@@ -196,17 +205,17 @@ try {
                 if (-not $health -or $health.status -notin "ONLINE", "PROCESSING") { throw "Oracle health on port $port is not operational." }
             }
         }
-        if (-not $SkipBrowser) { Stop-StartedOracleWorkers }
+        if ($includeBrowser) { Stop-StartedOracleWorkers }
     }
 
-    if (-not $SkipBrowser) {
+    if ($includeBrowser) {
         Push-Location $webRoot
-        Invoke-VerificationStep "Browser and live workflow suite" { npm run test:e2e }
+        Invoke-VerificationStep "Browser and live workflow suite" { npm run test:e2e -- --workers=1 }
         Invoke-VerificationStep "Live Oracle conflict fallback" {
             $previousScenario = $env:ORACLE_E2E_SCENARIO
             try {
                 $env:ORACLE_E2E_SCENARIO = "conflict"
-                npx playwright test --grep "@oracle-conflict"
+                npx playwright test --workers=1 --grep "@oracle-conflict"
             }
             finally { $env:ORACLE_E2E_SCENARIO = $previousScenario }
         }
@@ -214,7 +223,7 @@ try {
             $previousScenario = $env:ORACLE_E2E_SCENARIO
             try {
                 $env:ORACLE_E2E_SCENARIO = "majority-wrong"
-                npx playwright test --grep "@oracle-majority-wrong"
+                npx playwright test --workers=1 --grep "@oracle-majority-wrong"
             }
             finally { $env:ORACLE_E2E_SCENARIO = $previousScenario }
         }
@@ -222,7 +231,7 @@ try {
             $previousScenario = $env:ORACLE_E2E_SCENARIO
             try {
                 $env:ORACLE_E2E_SCENARIO = "common-source"
-                npx playwright test --grep "@oracle-common-source"
+                npx playwright test --workers=1 --grep "@oracle-common-source"
             }
             finally { $env:ORACLE_E2E_SCENARIO = $previousScenario }
         }
@@ -230,7 +239,7 @@ try {
             $previousScenario = $env:ORACLE_E2E_SCENARIO
             try {
                 $env:ORACLE_E2E_SCENARIO = "one-unavailable"
-                npx playwright test --grep "@oracle-one-unavailable"
+                npx playwright test --workers=1 --grep "@oracle-one-unavailable"
             }
             finally { $env:ORACLE_E2E_SCENARIO = $previousScenario }
         }
@@ -238,7 +247,7 @@ try {
             $previousScenario = $env:ORACLE_E2E_SCENARIO
             try {
                 $env:ORACLE_E2E_SCENARIO = "timeout"
-                npx playwright test --grep "@oracle-timeout"
+                npx playwright test --workers=1 --grep "@oracle-timeout"
             }
             finally { $env:ORACLE_E2E_SCENARIO = $previousScenario }
         }

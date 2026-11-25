@@ -31,8 +31,8 @@ x-peer-environment: &peer-environment
   CORE_VM_ENDPOINT: unix:///host/var/run/docker.sock
   CORE_VM_DOCKER_HOSTCONFIG_NETWORKMODE: block-insure
   CORE_LEDGER_STATE_STATEDATABASE: CouchDB
-  CORE_LEDGER_STATE_COUCHDBCONFIG_USERNAME: admin
-  CORE_LEDGER_STATE_COUCHDBCONFIG_PASSWORD: adminpw
+  CORE_LEDGER_STATE_COUCHDBCONFIG_USERNAME: "${FABRIC_COUCHDB_USERNAME:?Set FABRIC_COUCHDB_USERNAME in network/compose/.env}"
+  CORE_LEDGER_STATE_COUCHDBCONFIG_PASSWORD: "${FABRIC_COUCHDB_PASSWORD:?Set FABRIC_COUCHDB_PASSWORD in network/compose/.env}"
 
 x-peer-defaults: &peer-defaults
   image: hyperledger/fabric-peer:2.5.16
@@ -48,8 +48,8 @@ x-couchdb-defaults: &couchdb-defaults
   labels:
     service: hyperledger-fabric
   environment:
-    COUCHDB_USER: admin
-    COUCHDB_PASSWORD: adminpw
+    COUCHDB_USER: "${FABRIC_COUCHDB_USERNAME:?Set FABRIC_COUCHDB_USERNAME in network/compose/.env}"
+    COUCHDB_PASSWORD: "${FABRIC_COUCHDB_PASSWORD:?Set FABRIC_COUCHDB_PASSWORD in network/compose/.env}"
   networks: [block-insure]
 
 services:
@@ -85,30 +85,30 @@ services:
       - ../organizations/ordererOrganizations/blockinsure.test/orderers/orderer.blockinsure.test/msp:/var/hyperledger/orderer/msp
       - ../organizations/ordererOrganizations/blockinsure.test/orderers/orderer.blockinsure.test/tls:/var/hyperledger/orderer/tls
       - orderer.blockinsure.test:/var/hyperledger/production/orderer
-    ports: ["7050:7050", "7053:7053", "9443:9443"]
+    ports: ["127.0.0.1:7050:7050", "127.0.0.1:7053:7053", "127.0.0.1:9443:9443"]
     command: orderer
     networks: [block-insure]
 
   couchdb-insurer:
     <<: *couchdb-defaults
     container_name: couchdb.insurer.blockinsure.test
-    ports: ["5984:5984"]
+    ports: ["127.0.0.1:5984:5984"]
   couchdb-hospital:
     <<: *couchdb-defaults
     container_name: couchdb.hospital.blockinsure.test
-    ports: ["6984:5984"]
+    ports: ["127.0.0.1:6984:5984"]
   couchdb-auditor:
     <<: *couchdb-defaults
     container_name: couchdb.auditor.blockinsure.test
-    ports: ["7984:5984"]
+    ports: ["127.0.0.1:7984:5984"]
   couchdb-bank:
     <<: *couchdb-defaults
     container_name: couchdb.bank.blockinsure.test
-    ports: ["8984:5984"]
+    ports: ["127.0.0.1:8984:5984"]
   couchdb-oracle:
     <<: *couchdb-defaults
     container_name: couchdb.oracle.blockinsure.test
-    ports: ["10084:5984"]
+    ports: ["127.0.0.1:10084:5984"]
 
   peer-insurer:
     <<: *peer-defaults
@@ -126,7 +126,7 @@ services:
       - ../.fabric/fabric-samples/config/core.yaml:/etc/hyperledger/peercfg/core.yaml:ro
       - /var/run:/host/var/run
       - peer0.insurer.blockinsure.test:/var/hyperledger/production
-    ports: ["7051:7051", "9444:9444"]
+    ports: ["127.0.0.1:7051:7051", "127.0.0.1:9444:9444"]
     depends_on: [couchdb-insurer]
 
   peer-hospital:
@@ -145,7 +145,7 @@ services:
       - ../.fabric/fabric-samples/config/core.yaml:/etc/hyperledger/peercfg/core.yaml:ro
       - /var/run:/host/var/run
       - peer0.hospital.blockinsure.test:/var/hyperledger/production
-    ports: ["8051:7051", "9445:9444"]
+    ports: ["127.0.0.1:8051:7051", "127.0.0.1:9445:9444"]
     depends_on: [couchdb-hospital]
 
   peer-auditor:
@@ -164,7 +164,7 @@ services:
       - ../.fabric/fabric-samples/config/core.yaml:/etc/hyperledger/peercfg/core.yaml:ro
       - /var/run:/host/var/run
       - peer0.auditor.blockinsure.test:/var/hyperledger/production
-    ports: ["9051:7051", "9446:9444"]
+    ports: ["127.0.0.1:9051:7051", "127.0.0.1:9446:9444"]
     depends_on: [couchdb-auditor]
 
   peer-bank:
@@ -183,7 +183,7 @@ services:
       - ../.fabric/fabric-samples/config/core.yaml:/etc/hyperledger/peercfg/core.yaml:ro
       - /var/run:/host/var/run
       - peer0.bank.blockinsure.test:/var/hyperledger/production
-    ports: ["12051:7051", "9447:9444"]
+    ports: ["127.0.0.1:12051:7051", "127.0.0.1:9447:9444"]
     depends_on: [couchdb-bank]
 
   peer-oracle:
@@ -202,5 +202,5 @@ services:
       - ../.fabric/fabric-samples/config/core.yaml:/etc/hyperledger/peercfg/core.yaml:ro
       - /var/run:/host/var/run
       - peer0.oracle.blockinsure.test:/var/hyperledger/production
-    ports: ["${FABRIC_ORACLE_HOST_PORT:-13051}:7051", "9448:9444"]
+    ports: ["127.0.0.1:${FABRIC_ORACLE_HOST_PORT:-13051}:7051", "127.0.0.1:9448:9444"]
     depends_on: [couchdb-oracle]

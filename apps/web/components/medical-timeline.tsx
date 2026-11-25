@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { StatusBadge } from "@/components/status-badge";
+import { OracleExplanation } from "@/components/oracle-explanation";
 import type { MedicalTimeline as Timeline } from "@/lib/fabric/medical-timeline";
 import { formatBdt } from "@/lib/money";
 
@@ -32,9 +33,13 @@ export function MedicalTimeline({ timeline }: { timeline: Timeline }) {
     </div>}
     {timeline.oracle && <div>
       <strong>Pinned Oracle inputs</strong>
+      {timeline.oracle.finalizationCode && <> <StatusBadge status={timeline.oracle.finalizationCode} /></>}
       <p>Registry <code className="medicalTimelineId">{timeline.oracle.snapshotId}</code></p>
       <p>Model <code className="medicalTimelineId">{timeline.oracle.modelVersion}</code></p>
       <code className="medicalTimelineId">{timeline.oracle.modelHash}</code>
+      {timeline.oracle.modelVersion === "fabric-xgb-synthetic-v1" &&
+        ["EXACT_CONSENSUS", "NEGATIVE_RESULT"].includes(timeline.oracle.finalizationCode) &&
+        <OracleExplanation key={timeline.oracle.requestId} requestId={timeline.oracle.requestId} />}
     </div>}
     {timeline.approval && <Approval approval={timeline.approval} />}
     {timeline.payout && <Payout payout={timeline.payout} />}

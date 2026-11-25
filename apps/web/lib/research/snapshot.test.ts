@@ -18,7 +18,7 @@ describe("research snapshot", () => {
     expect(snapshot.evidenceGovernance.grantState.EXHAUSTED).toBe(1);
   });
 
-  it("reports 2-of-3 fault tolerance without hiding safety violations", () => {
+  it("counts a healthy early 2-of-3 quorum separately from fault survival", () => {
     const request: ResearchInput["oracleRequests"][number] = {
       assetType: "oracleRequest", schemaVersion: 13, id: "request-1", claimId: "claim-1", claimVersion: 1,
       hospitalVerificationId: "verification-1", appealId: "", appealCommitmentHash: "", queryHash: "a".repeat(64),
@@ -34,6 +34,7 @@ describe("research snapshot", () => {
       recordHash: "f".repeat(64), resultHash: "e".repeat(64), createdAt: "2026-09-06T12:01:00Z",
     });
     const snapshot = buildResearchSnapshot({ ...empty, oracleRequests: [request], oracleResults: [result("oracle1"), result("oracle2")] }, provenance);
-    expect(snapshot.oracleConsensus).toMatchObject({ meanRevealParticipationBps: 6667, observedFaultTolerantFinalizations: 1, safetyViolations: 0 });
+    expect(snapshot.oracleConsensus).toMatchObject({ meanRevealParticipationBps: 6667,
+      quorumReachedWithTwoReveals: 1, competingResultFinalizations: 0, faultSurvival: 0, safetyViolations: 0 });
   });
 });

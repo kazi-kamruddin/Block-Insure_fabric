@@ -21,6 +21,7 @@ import { MedicalIntake } from "@/components/medical-intake";
 import { MedicalReview } from "@/components/medical-review";
 import { MedicalSettlementTimeline } from "@/components/medical-timeline";
 import { MedicalOCR } from "@/components/medical-ocr";
+import { ReceiptReview, type ReceiptEpisodeFacts } from "@/components/receipt-review";
 import { WorkspaceIconGlyph } from "@/components/workspace-icon";
 import { findSection, overviewSection, sectionForOperation, sectionHref, sectionsFor } from "@/lib/workspace/sections";
 import { StatusBadge } from "@/components/status-badge";
@@ -32,7 +33,7 @@ import { bdtToMinor, workflowFormDefinitions } from "@/lib/workflows/forms";
 import { decryptEvidenceBytes, encryptEvidenceBytes, sha256Hex } from "@/lib/evidence/browser-crypto";
 import { createEvidenceRecovery, restoreEvidenceRecovery } from "@/lib/evidence/recovery";
 import { recoverableTransactions } from "@/lib/workflows/recoverable";
-import { readSavedAction, parseSavedAction, saveAction, savedActionKey, type SavedWorkflowAction } from "@/lib/workflows/saved-action";
+import { pendingPremiumKey, readSavedAction, parseSavedAction, saveAction, savedActionKey, type SavedWorkflowAction } from "@/lib/workflows/saved-action";
 
 type AssetType = "partner-agreement" | "hospital-invoice" | "package" | "policy" | "claim" | "evidence" | "evidence-batch" | "evidence-grant" | "verification" | "decision" | "review" | "appeal" | "fraud-assessment" | "settlement" | "access" | "claim-history" | "account" | "bank-transfer" | "mandate" | "premium-payment" | "premium-adjustment" | "collection" | "benefit-plan" | "beneficiaries" | "benefit-request" | "liability" | "oracle-snapshot" | "oracle-request" | "oracle-commitment" | "oracle-result" | "oracle-history" | "privacy-credential" | "privacy-presentation";
 type NotificationItem = { id: string; title: string; message: string; assetId: string; blockNumber: string };
@@ -47,6 +48,8 @@ type ResearchSnapshotView = {
   privacyPreservingVerification: { credentials: number; presentations: number; privacyBoundOracleRequests: number };
 };
 type OracleOperationsView = {
+  oracleQuorumAvailable: boolean;
+  oracleRosterReady: boolean;
   workers: Array<{ oracleId: string; label: string; status: string; registrySource: string; registrySnapshotId: string; registryVersion: number; registryDatasetId?: string | null; registryDatasetVersion?: string | null; registryInputSha256?: string | null; registryTransformationVersion?: string | null; modelVersion: string; updatedAt: string; lastProcessedBlock: string | number | null; lastProcessedRequestId: string | null; lastError: string | null; counts: { requests: number; commitments: number; reveals: number; verified: number; failed: number }; lastProcessingLatencyMs: number | null }>;
   metrics: { requests: number; pending: number; agreements: number; conflicts: number; timeouts: number; finalized: number };
 };
@@ -157,6 +160,7 @@ export function WorkspaceClient({
   initialAccount,
   initialDashboard,
   deployment,
+  ledgerProvisioningId,
   medicalReviewEnabled = false,
   investigationEnabled = false,
   onboardingEnabled = false,
@@ -168,6 +172,7 @@ export function WorkspaceClient({
   initialAccount: WorkspaceAccount | null;
   initialDashboard: RoleDashboard | null;
   deployment: string;
+  ledgerProvisioningId?: string;
   medicalReviewEnabled?: boolean;
   investigationEnabled?: boolean;
   onboardingEnabled?: boolean;
@@ -197,6 +202,7 @@ export function WorkspaceClient({
   const [restorePassword, setRestorePassword] = useState("");
   const [encrypting, setEncrypting] = useState(false);
   const [retrievalEvidenceId, setRetrievalEvidenceId] = useState("");
+  const [receiptEpisode, setReceiptEpisode] = useState<{ id: string; facts: ReceiptEpisodeFacts }>();
   const [retrievalGrantId, setRetrievalGrantId] = useState("");
   const [retrievalPassphrase, setRetrievalPassphrase] = useState("");
   const [retrieving, setRetrieving] = useState(false);
@@ -213,7 +219,7 @@ export function WorkspaceClient({
   const gatewaySummary = useMemo(() => parseGatewaySummary(output), [output]);
   const savedSnapshot = useSyncExternalStore(subscribeSavedAction, () => {
     if (!account) return null;
-    try { return localStorage.getItem(savedActionKey(deployment, account.id)); } catch { return "unavailable"; }
+    try { return localStorage.getItem(savedActionKey(deployment, account.id, ledgerProvisioningId)); } catch { return "unavailable"; }
   }, () => null);
   const savedAction = useMemo(() => {
     if (!savedSnapshot) return null;
@@ -432,7 +438,7 @@ export function WorkspaceClient({
     setBusy(true);
     try {
       let action: SavedWorkflowAction | null = null;
-      const storageKey = account ? savedActionKey(deployment, account.id) : "";
+      const storageKey = account ? savedActionKey(deployment, account.id, ledgerProvisioningId) : "";
       if (recoverableTransactions[payload.operation]) {
         if (!account) throw new Error("Sign in before submitting this action");
         action = readSavedAction(localStorage, storageKey);
@@ -442,7 +448,11 @@ export function WorkspaceClient({
       }
       const response = await fetch("/api/workflows", {
         method: "POST",
-        headers: { "content-type": "application/json", ...(action ? { "idempotency-key": action.requestId, "x-workflow-deployment": deployment, "x-workflow-recovery": String(recoverOnly) } : {}) },
+        headers: {
+          "content-type": "application/json",
+          ...(action ? { "idempotency-key": action.requestId, "x-workflow-deployment": deployment, "x-workflow-recovery": String(recoverOnly) } : {}),
+          ...(action && ledgerProvisioningId ? { "x-workflow-ledger-instance": ledgerProvisioningId } : {}),
+        },
         body: JSON.stringify(payload),
       });
       const body = await response.json();
@@ -540,7 +550,7 @@ export function WorkspaceClient({
         periodStartDate: manualPayment.periodStartDate, periodEndDate: manualPayment.periodEndDate,
         amountMinor: bdtToMinor(manualPayment.amountBdt), externalReferenceHash,
       };
-      const pendingKey = `block-insure:premium-intent:${account.id}`;
+      const pendingKey = pendingPremiumKey(deployment, account.id, ledgerProvisioningId);
       const previous = localStorage.getItem(pendingKey);
       if (previous && previous !== JSON.stringify(intent)) throw new Error("Recover the saved payment outcome before authorizing a different payment.");
       localStorage.setItem(pendingKey, JSON.stringify(intent));
@@ -568,7 +578,7 @@ export function WorkspaceClient({
     setBusy(true);
     try {
       if (!account) throw new Error("Sign in before recovering a payment.");
-      const key = `block-insure:premium-intent:${account.id}`;
+      const key = pendingPremiumKey(deployment, account.id, ledgerProvisioningId);
       const saved = localStorage.getItem(key);
       if (!saved) throw new Error("No saved payment intent is available in this browser.");
       const outcome = await responseJson(await fetch("/api/banking/premium-payment", {
@@ -902,6 +912,7 @@ export function WorkspaceClient({
     </div>
     <p className="cardNote">Three independent Oracle workers check each claim against the Hospital record. Two matching results are required; anything else goes to auditor review.</p>
     {oracleOperations && <>
+      <p className="cardNote">Oracle quorum {oracleOperations.oracleQuorumAvailable ? "available" : "unavailable"} · Full roster {oracleOperations.oracleRosterReady ? "ready" : "incomplete"}</p>
       <div className="metricGrid" style={{ marginTop: 16 }}>
         <div className="metricCard"><span>Requests / pending</span><strong>{oracleOperations.metrics.requests} / {oracleOperations.metrics.pending}</strong><small>Verification requests</small></div>
         <div className="metricCard"><span>Agreements</span><strong>{oracleOperations.metrics.agreements}</strong><small>Matching results</small></div>
@@ -939,7 +950,7 @@ export function WorkspaceClient({
         <button type="button" className="primary button" disabled={busy} onClick={() => submitWorkflow(savedAction.command, true)}>Check saved action</button>
         {["INVALID", "REJECTED", "NOT_SUBMITTED"].includes(savedAction.state ?? "") && <button type="button" className="secondary button" disabled={busy} onClick={() => {
           if (!account) return;
-          localStorage.removeItem(savedActionKey(deployment, account.id)); notifySavedAction();
+          localStorage.removeItem(savedActionKey(deployment, account.id, ledgerProvisioningId)); notifySavedAction();
           prepare({ command: savedAction.command, revision: Date.now() });
           setOutput("The failed action was cleared. Review it before trying again.");
         }}>Review failed action for a new attempt</button>}
@@ -1123,6 +1134,9 @@ export function WorkspaceClient({
     </div>
     {medicalReview && decryptedEvidence && (account.role === "policyholder" || account.role === "auditor") &&
       <MedicalOCR key={decryptedEvidence.accessId} file={decryptedEvidence.blob} evidenceId={decryptedEvidence.id} accessId={decryptedEvidence.accessId} />}
+    {medicalReview && decryptedEvidence && account.role === "auditor" && <ReceiptReview key={decryptedEvidence.accessId}
+      file={decryptedEvidence.blob} evidenceId={decryptedEvidence.id}
+      facts={receiptEpisode?.id === decryptedEvidence.id ? receiptEpisode.facts : undefined} />}
   </article>;
 
   const dossierCard = <article className="workCard evidenceCard">
@@ -1151,7 +1165,8 @@ export function WorkspaceClient({
     </div>
   </article>;
 
-  const reviewCard = medicalReview && account.role !== "hospitalOfficer" && account.role !== "bankOfficer" ? <MedicalReview role={account.role} investigationEnabled={investigationEnabled} onEvidence={(id, grant) => {
+  const reviewCard = medicalReview && account.role !== "hospitalOfficer" && account.role !== "bankOfficer" ? <MedicalReview role={account.role} investigationEnabled={investigationEnabled} onEvidence={(id, grant, facts) => {
+    setReceiptEpisode({ id, facts });
     setRetrievalEvidenceId(id); setRetrievalGrantId(grant); setDecryptedEvidence(null);
     goTo(account.role === "policyholder" ? "documents" : account.role === "auditor" ? "reviews" : "evidence", "retrieve-evidence");
   }} /> : null;

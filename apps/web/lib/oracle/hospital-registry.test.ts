@@ -3,6 +3,7 @@ import type { HospitalInvoice, OracleRegistrySnapshot } from "@/lib/fabric/types
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/events/state-file", () => ({ persistJsonFile: vi.fn().mockResolvedValue(undefined) }));
+vi.mock("./registry-archive.mjs", () => ({ archiveRegistrySnapshot: vi.fn().mockResolvedValue(undefined) }));
 vi.mock("@/lib/fabric/ledger", () => ({ ledger: {
   listMedicalOracleSources: vi.fn(),
   listHospitalInvoices: vi.fn(), listOracleRegistrySnapshots: vi.fn(), publishOracleRegistrySnapshot: vi.fn(), readHospitalModelFacts: vi.fn(),
@@ -89,5 +90,19 @@ describe("Hospital registry publication", () => {
     expect(result?.records.map(record => record.invoiceId)).toEqual([invoices[0].id]);
     expect(result?.modelContext?.incompleteInvoiceIds).toEqual(["unlinked-revision"]);
     expect(result?.modelContext?.records[0]).toMatchObject({ benchmarkHash, invoiceHash: invoices[0].invoiceReferenceHash });
+  });
+
+  it("refuses 10,001 model records before writing the snapshot or proposing it", async () => {
+    vi.stubEnv("FABRIC_CHANNEL_NAME", "insurance-medical-reimbursement");
+    vi.stubEnv("FABRIC_XGBOOST_ENABLED", "true");
+    vi.stubEnv("ORACLE_REGISTRY_API_TOKEN", "test-token-never-deploy-000000000000000000");
+    vi.mocked(ledger.listMedicalOracleSources).mockResolvedValue(Array.from({ length: 10_001 }, (_, index) => {
+      const invoice = { ...invoices[0], id: `invoice-${index}`, invoiceReferenceHash: index.toString(16).padStart(64, "0") };
+      return { invoice, facts: { invoiceId: invoice.id, treatmentType: "SURGERY", diagnosisCode: "", invoiceDate: "2026-01-02",
+        expectedMinMinor: 100, expectedMaxMinor: 20000, licenseStatus: "ACTIVE" }, benchmarkHash: "d".repeat(64), complete: true };
+    }));
+    await expect(refreshHospitalRegistrySnapshot()).rejects.toThrow("exceeds the 10,000-record limit");
+    expect(persistJsonFile).not.toHaveBeenCalled();
+    expect(ledger.publishOracleRegistrySnapshot).not.toHaveBeenCalled();
   });
 });

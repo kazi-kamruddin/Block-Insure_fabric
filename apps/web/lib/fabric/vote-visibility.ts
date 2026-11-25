@@ -2,21 +2,27 @@ import type { Session } from "@/lib/auth/session-token";
 import type { AuditorDecision, ClaimReview } from "@/lib/fabric/types";
 
 type Viewer = Pick<Session, "role" | "subjectId">;
+type Review = Pick<ClaimReview, "id" | "status" | "assignedAuditorIds">;
+type ReviewState = { status: string; assignedAuditorIds?: readonly string[] };
 
-/**
- * Individual auditor votes stay sealed in browser responses while their
- * review round is still OPEN. The insurer operator keeps the live tally and
- * each auditor sees only their own vote. Closed, superseded or expired rounds
- * are unaffected. This is a Gateway disclosure boundary only: channel members
- * with direct peer access can still read the public decision records (F01).
- */
-export function canSeeDecision(decision: AuditorDecision, review: Pick<ClaimReview, "id" | "status"> | undefined, viewer: Viewer) {
-  if (!review || review.id !== decision.reviewId || review.status !== "OPEN") return true;
-  if (viewer.role === "insurerAdmin") return true;
-  return viewer.role === "auditor" && Boolean(viewer.subjectId) && decision.auditorId === viewer.subjectId;
+const closedStatuses = new Set(["APPROVED", "REJECTED", "TIMED_OUT", "ACCESS_FAILED", "SUPERSEDED"]);
+
+export function isVoteVisible(review: ReviewState | null | undefined, viewer: Viewer) {
+  if (!review || !closedStatuses.has(review.status)) return false;
+  if (viewer.role !== "auditor") return true;
+  return Boolean(viewer.subjectId && review.assignedAuditorIds?.includes(viewer.subjectId));
 }
 
-export function visibleDecisions(decisions: AuditorDecision[], reviews: Pick<ClaimReview, "id" | "status">[], viewer: Viewer) {
+export function redactVoteTallies<T extends ReviewState>(review: T, viewer: Viewer): T {
+  if (isVoteVisible(review, viewer)) return review;
+  return { ...review, votesCast: 0, approvals: 0, rejections: 0 };
+}
+
+export function canSeeDecision(decision: AuditorDecision, review: Review | undefined, viewer: Viewer) {
+  return review?.id === decision.reviewId && isVoteVisible(review, viewer);
+}
+
+export function visibleDecisions(decisions: AuditorDecision[], reviews: Review[], viewer: Viewer) {
   const byId = new Map(reviews.map(review => [review.id, review]));
   return decisions.filter(decision => canSeeDecision(decision, byId.get(decision.reviewId), viewer));
 }

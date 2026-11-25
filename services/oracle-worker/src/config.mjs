@@ -1,8 +1,16 @@
 import path from "node:path";
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 const serviceRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const projectRoot = path.resolve(serviceRoot, "../..");
+const devLiteProfile = JSON.parse(readFileSync(new URL("../../../scripts/profiles/dev-lite-190.json", import.meta.url), "utf8"));
+
+export function checkOracleNodeVersion(environment = process.env, version = process.version) {
+  if (version.split(".")[0] !== devLiteProfile.nodeVersion.split(".")[0] && environment.ORACLE_ALLOW_NODE_MISMATCH !== "1") {
+    throw new Error(`Oracle worker Node ${version} differs from pinned major ${devLiteProfile.nodeVersion}. Set ORACLE_ALLOW_NODE_MISMATCH=1 to override explicitly.`);
+  }
+}
 
 function required(environment, name) {
   const value = String(environment[name] ?? "").trim();

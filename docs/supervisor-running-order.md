@@ -47,7 +47,7 @@ cd "E:\4-1\4100 thesis\project\Block-Insure_fabric"
 ```
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\dev-lite-app.ps1 -TwoOracles -Onboarding
+powershell -ExecutionPolicy Bypass -File .\scripts\dev-lite-app.ps1 -Onboarding
 ```
 
 - Without `-Email`, every sign-in and payment code appears on screen as a
@@ -56,8 +56,9 @@ powershell -ExecutionPolicy Bypass -File .\scripts\dev-lite-app.ps1 -TwoOracles 
   screen. No recipient is mapped, so synthetic `.demo` addresses receive
   nothing. Use `-Email` only with a real address that you can open, and add
   it to `recipients` in `data/dev-lite/email-gateway.json` first.
-- `-TwoOracles` leaves the third Oracle worker offline on purpose. Two
-  matching results out of three still decide the outcome (2-of-3 quorum).
+- The normal run starts all three Oracle workers. In the fault-tolerance
+  segment, restart the app with `-TwoOracles`. The two available workers
+  wait about 60 seconds for the commit deadline before revealing.
 
 Open `http://127.0.0.1:3219/workspace` once the window prints "Dev-lite
 application is available".
@@ -72,7 +73,7 @@ sign-in uses the demo identity cards and needs no code.
 
 ## 3. Running order
 
-Allow about 25 minutes. The Oracle step waits about one minute. Use a new
+Allow about 25 minutes. Use a new
 customer for each run. The same patient's stays on one day are screened as
 possible duplicates, so a second same-day INPATIENT claim for one customer
 goes to review instead of paying automatically.
@@ -91,14 +92,18 @@ Each workspace has a sidebar of pages. The **page** named first in each action i
 | 8 | Staff · Insurer | **Customers** page → Episode association queue → **Refresh episodes** → **Resolve association** → check the suggested match → **Submit verified transaction**. | Only the Insurer links a hospital episode to a customer. |
 | 9 | Customer | **Claims** page → Your medical episodes → **Refresh episodes** → pick the policy and episode → **Prepare claim and calculate reimbursement** → **Accept statement and submit claim**. | (85,000 − 5,000 deductible cap) × 80% = BDT 64,000 payable. |
 | 10 | Staff · Insurer | **Partners** page → Medical registry approvals → **Propose registry snapshot** (Hospital ID `hospital-demo`). | The registry pins the Hospital records that the Oracles may check. |
-| 11 | Staff · Hospital | **Registry** page → **Refresh registry proposals** → **Attest this snapshot**. | The Hospital co-signs its own records. |
-| 12 | Staff · Insurer | **Overview** → Insurer action queue → **Start claim processing** (opens the **Claims** page with the form filled) → **Submit verified transaction**. Wait about one minute, then **Refresh**. | Two Oracle workers commit and reveal; the frozen XGBoost evaluator only routes. The claim becomes APPROVED. |
-| 13 | Staff · Insurer | **Overview** → Insurer action queue → **Prepare settlement** (opens **Claims**) (the payout accounts fill in automatically; otherwise use **Find payout accounts**) → **Submit verified transaction**. | The source is the Insurer claims reserve (`**** 7001`); the destination is the customer's linked account. |
+| 11 | Staff · Hospital | **Registry** page → **Refresh registry proposals** → **Check proposed records** → **Attest this snapshot** once the root matches. | The Hospital checks its scoped records and attests the recomputed root. |
+| 12 | Staff · Insurer | **Overview** → Insurer action queue → **Start claim processing** (opens the **Claims** page with the form filled) → **Submit verified transaction**. Refresh after Oracle finalization. | Two matching reveals from the three-worker roster reach quorum. The frozen XGBoost evaluator routes the claim to approval or review. |
+| 13 | Staff · Insurer | **Overview** → Insurer action queue → **Prepare settlement** (opens **Claims**) (the payout accounts fill in automatically; otherwise use **Find payout accounts**) → **Submit verified transaction**. | The source is the Insurer claims reserve (`**** 7002`); the destination is the customer's linked account. |
 | 14 | Staff · Bank | **Payouts** page → **Execute payout** on this settlement → enter an EFT reference → **Submit bank instruction**. | Payment is final only after the Bank commits it. |
 | 15 | Customer | Refresh: the claim is SETTLED and the balance has risen by BDT 64,000 (BDT 25,000 − 2,450 + 64,000 = BDT 86,550). | End-to-end, every step was a Fabric transaction from the right organization. |
 
 Order that saves customer codes: steps 7–8 and 10–11 need no customer, so
 the customer can sign in once for steps 6 and 9 together.
+
+The seed opened premium collection account `**** 7001` at BDT 0 and claims
+reserve account `**** 7002` at BDT 25,00,000. The preflight ledger check reports
+the current balances after recorded premiums and payouts.
 
 ## 4. If something stalls
 

@@ -3,14 +3,14 @@
 import { useEffect, useState } from "react";
 import { extractMedicalInvoice, medicalOcrEngine } from "@/lib/evidence/browser-ocr";
 import { sha256Hex } from "@/lib/evidence/browser-crypto";
-import type { InvoiceFields } from "@/lib/evidence/ocr-fields";
+import type { ReceiptFields } from "@/lib/evidence/ocr-fields";
 
-const labels = { invoiceNumber: "Invoice number", serviceDate: "Documented service date", totalBdt: "Invoice total in BDT" } as const;
+const labels = { invoiceNumber: "Invoice number", serviceDate: "Documented service date", totalBdt: "Invoice total in BDT", hospital: "Hospital on receipt" } as const;
 
 export function MedicalOCR({ file, evidenceId, accessId = "" }: { file: Blob; evidenceId: string; accessId?: string }) {
   const [page, setPage] = useState("1");
   const [result, setResult] = useState<Awaited<ReturnType<typeof extractMedicalInvoice>> | null>(null);
-  const [confirmed, setConfirmed] = useState<InvoiceFields | null>(null);
+  const [confirmed, setConfirmed] = useState<ReceiptFields | null>(null);
   const [source, setSource] = useState("");
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
@@ -42,7 +42,7 @@ export function MedicalOCR({ file, evidenceId, accessId = "" }: { file: Blob; ev
       const sourceHash = await sha256Hex(new Uint8Array(await file.arrayBuffer()));
       const nonce = crypto.randomUUID();
       const receipt = { engineVersion: medicalOcrEngine, evidenceId, page: Number(page), sourceHash, nonce,
-        lowConfidence: result.lowConfidence, suggestions: result.fields, confirmed };
+        lowConfidence: result.lowConfidence, fieldConfidence: result.fieldConfidence, suggestions: result.fields, confirmed };
       const response = await fetch("/api/medical/review", { method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "recordOCR", id: "ocr-" + crypto.randomUUID(), evidenceId, engineVersion: medicalOcrEngine, sourceHash,
           lowConfidence: result.lowConfidence, accessId,
@@ -77,8 +77,8 @@ export function MedicalOCR({ file, evidenceId, accessId = "" }: { file: Blob; ev
       </div>
       {confirmed && result && <div>
         <p className="cardNote">OCR confidence <strong>{Math.round(result.confidence)}%</strong></p>
-        {(Object.keys(labels) as (keyof InvoiceFields)[]).map(field => <label key={field}>{labels[field]}
-          <input value={confirmed[field]} maxLength={80} disabled={busy} spellCheck={false} onChange={event => setConfirmed({ ...confirmed, [field]: event.target.value })} />
+        {(Object.keys(labels) as (keyof ReceiptFields)[]).map(field => <label key={field}>{labels[field]}
+          <input value={confirmed[field] ?? ""} maxLength={80} disabled={busy} spellCheck={false} onChange={event => setConfirmed({ ...confirmed, [field]: event.target.value })} />
         </label>)}
         <div className="medicalButtonGroup">
           <button type="button" className="primary button" disabled={busy || !evidenceId} onClick={save}>Confirm fields and download private receipt</button>

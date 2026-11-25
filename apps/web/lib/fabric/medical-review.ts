@@ -3,6 +3,7 @@ import { ledgerIdSchema as id } from "./validation";
 import type { AuditorDecision, Claim, ClaimAppeal, ClaimReview, EvidenceAccessGrant, EvidenceReference } from "./types";
 import type { MedicalQuote } from "./medical";
 import type { MedicalTimeline } from "./medical-timeline";
+import type { RevisionProof } from "./revision-proof";
 
 const date = z.string().datetime({ offset: true });
 const hash = z.string().regex(/^[a-f0-9]{64}$/);
@@ -31,6 +32,12 @@ export type MedicalReviewCommand = z.infer<typeof medicalReviewCommand>;
 /** Mirrors the chaincode `medicalAppealWindow` on the certificate channel. */
 export const medicalAppealWindowDays = 30;
 
+export function readMedicalAppealWindow(ledgerTime: number | null | undefined, closedAt: string) {
+  const endsAt = Date.parse(closedAt) + medicalAppealWindowDays * 86_400_000;
+  return { endsAt: Number.isFinite(endsAt) ? endsAt : null,
+    canAppeal: typeof ledgerTime === "number" && Number.isFinite(ledgerTime) && endsAt > ledgerTime };
+}
+
 /**
  * When a rejected claim's coverage reservation may be released: now (null)
  * once no appeal or recovery remains, otherwise when the window closes. The
@@ -54,8 +61,13 @@ export type MedicalEvidenceCheck = { reviewId: string; evidenceId: string; grant
 export type MedicalReviewFacts = { service: string; serviceDate: string; termsHash: string; quote: MedicalQuote };
 export type MedicalReviewView = {
   devLite?: boolean;
+  viewerHasVoted?: boolean;
   /** Server clock when the view was read, in epoch milliseconds. */
   readAt?: number;
+  ledgerTime?: number | null;
+  revisionProof?: RevisionProof | null;
+  issuedTerms?: { sublimitMinor: number; insurerShareBps: number } | null;
+  hospitalName?: string;
   timeline?: MedicalTimeline;
   claim: Claim; review: ClaimReview | null; appeal: ClaimAppeal | null; clarification: MedicalClarification | null;
   appealExplanation: string | null;

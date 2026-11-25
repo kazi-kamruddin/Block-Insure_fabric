@@ -38,7 +38,7 @@ type HealthReadOptions = {
   fetcher?: typeof fetch;
 };
 
-function stateRoot(environment: NodeJS.ProcessEnv = process.env, startDirectory = process.cwd()) {
+export function oracleWorkerStateRoot(environment: NodeJS.ProcessEnv = process.env, startDirectory = process.cwd()) {
   if (environment.ORACLE_STATE_ROOT?.trim()) return path.resolve(startDirectory, environment.ORACLE_STATE_ROOT);
   let current = path.resolve(startDirectory);
   for (let depth = 0; depth < 8; depth += 1) {
@@ -73,7 +73,7 @@ export async function readOracleWorkerHealth(oracleId: OracleId, options: Health
     return live;
   } catch {
     try {
-      const stored = JSON.parse(await fs.readFile(path.join(stateRoot(environment, options.startDirectory), oracleId, "health.json"), "utf8")) as OracleWorkerHealth;
+      const stored = JSON.parse(await fs.readFile(path.join(oracleWorkerStateRoot(environment, options.startDirectory), oracleId, "health.json"), "utf8")) as OracleWorkerHealth;
       return {
         ...stored,
         status: stored.status === "STOPPED" ? "STOPPED" : "OFFLINE",

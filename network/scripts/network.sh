@@ -28,6 +28,7 @@ expected_chaincode_version="${EXPECTED_CHAINCODE_VERSION:-1.4.0}"
 expected_schema_version="${EXPECTED_SCHEMA_VERSION:-14}"
 compose_ca="${network_root}/compose/compose-ca.yaml"
 compose_network="${network_root}/compose/compose-network.yaml"
+compose_env="${network_root}/compose/.env"
 organizations="${network_root}/organizations"
 artifacts="${network_root}/channel-artifacts"
 
@@ -57,10 +58,13 @@ select_docker() {
 
 docker_cli() { "${docker_command}" "$@"; }
 compose() {
+  local env_args=()
   if [ "${docker_command}" = "docker.exe" ]; then
-    docker_cli compose -f "$(wslpath -w "${compose_ca}")" -f "$(wslpath -w "${compose_network}")" "$@"
+    if [ -f "${compose_env}" ]; then env_args=(--env-file "$(wslpath -w "${compose_env}")"); fi
+    docker_cli compose "${env_args[@]}" -f "$(wslpath -w "${compose_ca}")" -f "$(wslpath -w "${compose_network}")" "$@"
   else
-    docker_cli compose -f "${compose_ca}" -f "${compose_network}" "$@"
+    if [ -f "${compose_env}" ]; then env_args=(--env-file "${compose_env}"); fi
+    docker_cli compose "${env_args[@]}" -f "${compose_ca}" -f "${compose_network}" "$@"
   fi
 }
 
@@ -255,7 +259,7 @@ orderer 14054 ca-orderer
 EOF
 
   for port in 5984 6984 7984 8984 10084; do
-    curl --fail --silent --show-error --user admin:adminpw "http://localhost:${port}/_up" | grep -q '"status":"ok"'
+    curl --fail --silent --show-error "http://localhost:${port}/_up" | grep -q '"status":"ok"'
   done
 
   osnadmin channel list -o localhost:7053 \

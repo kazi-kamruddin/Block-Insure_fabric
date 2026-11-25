@@ -8,57 +8,11 @@ import type { HospitalInvoice } from "@/lib/fabric/types";
 import { persistJsonFile } from "@/lib/events/state-file";
 import { loadFabricConfig } from "@/lib/fabric/config";
 import { isMedicalChannel, medicalDevLiteChannel } from "@/lib/fabric/medical-channel";
+import { archiveRegistrySnapshot } from "./registry-archive.mjs";
+import { canonicalRegistryJson, computeHospitalRegistryRoot, registryRulesVersion as rulesVersion,
+  type HospitalRegistryRecord, type HospitalRegistrySnapshotFile } from "./registry-manifest";
 
-const protocolVersion = "block-insure-oracle-v1";
-const rulesVersion = "hospital-invoice-rules-v2";
-
-export type HospitalRegistryRecord = {
-  invoiceId: string;
-  patientReferenceHash: string;
-  lookupHash: string;
-  hospitalId: string;
-  treatmentCode: string;
-  minimumAmountMinor: number;
-  maximumAmountMinor: number;
-  validFrom: string;
-  validThrough: string;
-  descriptionHash: string;
-  status: "VALID" | "INVALID";
-};
-
-export type HospitalRegistrySnapshotFile = {
-  modelContext?: { records: unknown[]; snapshotTimestamp: string; incompleteInvoiceIds: string[] };
-  sourceId: "fabric-hospital-invoice-register";
-  snapshotId: string;
-  version: number;
-  rulesVersion: typeof rulesVersion;
-  rulesHash: string;
-  rootHash: string;
-  records: HospitalRegistryRecord[];
-};
-
-function canonicalHash(domain: string, ...values: Array<string | number | boolean>) {
-  const parts = [domain, ...values.map((raw) => {
-    const value = String(raw);
-    return `${Buffer.byteLength(value, "utf8")}:${value}`;
-  })];
-  return createHash("sha256").update(parts.join("|"), "utf8").digest("hex");
-}
-
-function canonicalJson(value: unknown): string {
-  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
-  if (value && typeof value === "object") return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonicalJson((value as Record<string, unknown>)[key])}`).join(",")}}`;
-  return JSON.stringify(value);
-}
-
-function recordHash(record: HospitalRegistryRecord) {
-  return canonicalHash(
-    `${protocolVersion}:registry-record-v2`, record.lookupHash, record.hospitalId,
-    record.treatmentCode, record.minimumAmountMinor, record.maximumAmountMinor,
-    record.validFrom, record.validThrough, record.descriptionHash, record.status,
-    record.invoiceId, record.patientReferenceHash,
-  );
-}
+export const registryDigest = (value: string) => createHash("sha256").update(value, "utf8").digest("hex");
 
 function oracleStateRoot() {
   return path.resolve(/* turbopackIgnore: true */ process.cwd(), process.env.ORACLE_STATE_ROOT?.trim() || "../../data/oracle");
@@ -66,6 +20,15 @@ function oracleStateRoot() {
 
 function snapshotPath(id: string) {
   return path.join(oracleStateRoot(), "registries", `${id}.json`);
+}
+
+const maxModelContextRecords = 10_000;
+
+async function saveSnapshot(snapshot: HospitalRegistrySnapshotFile, channel: string) {
+  const registryRoot = oracleStateRoot();
+  const profileRoot = channel === medicalDevLiteChannel ? path.dirname(registryRoot) : registryRoot;
+  await archiveRegistrySnapshot(path.join(profileRoot, "registry-archive"), snapshot);
+  await persistJsonFile(snapshotPath(snapshot.snapshotId), snapshot);
 }
 
 function recordsFromInvoices(invoices: HospitalInvoice[]) {
@@ -143,35 +106,36 @@ async function publishHospitalRegistrySnapshot(hospitalScope?: string) {
         if (!String(error).includes("does not exist")) throw error;
         incompleteInvoiceIds.push(invoice.id);
       }
+      if (modelRecords.length > maxModelContextRecords) {
+        throw new Error("The model context exceeds the 10,000-record limit. Use medical review for this claim.");
+      }
     }
     modelContext = { records: modelRecords, incompleteInvoiceIds, snapshotTimestamp: new Date().toISOString() };
     if (latest) {
       const previous = await readHospitalRegistrySnapshot(latest.id).catch((error: NodeJS.ErrnoException) => { if (error.code !== "ENOENT") throw error; return null; });
-      if (previous?.modelContext && canonicalJson(previous.modelContext.records) === canonicalJson(modelRecords) &&
-          canonicalJson(previous.modelContext.incompleteInvoiceIds) === canonicalJson(incompleteInvoiceIds)) modelContext.snapshotTimestamp = previous.modelContext.snapshotTimestamp;
+      if (previous?.modelContext && canonicalRegistryJson(previous.modelContext.records) === canonicalRegistryJson(modelRecords) &&
+          canonicalRegistryJson(previous.modelContext.incompleteInvoiceIds) === canonicalRegistryJson(incompleteInvoiceIds)) modelContext.snapshotTimestamp = previous.modelContext.snapshotTimestamp;
     }
   }
-  const rootForVersion = (value: number) => canonicalHash(
-    `${protocolVersion}:registry`, value, rulesVersion, rulesHash,
-    ...records.map(recordHash).sort((left, right) => left.localeCompare(right)),
-    ...(modelContext ? [createHash("sha256").update(canonicalJson(modelContext)).digest("hex")] : []),
-  );
+  const rootForVersion = (value: number) => computeHospitalRegistryRoot({
+    version: value, rulesVersion, rulesHash, records, modelContext,
+  }, registryDigest);
   // Reuse unchanged facts instead of adding a ledger transaction for every
   // processing click. Recreate the local file if it was lost on restart.
-  if (latest && latest.rootHash === rootForVersion(latest.version)) {
+  if (latest && latest.rootHash === await rootForVersion(latest.version)) {
     const snapshot: HospitalRegistrySnapshotFile = {
       sourceId: "fabric-hospital-invoice-register", snapshotId: latest.id,
       version: latest.version, rulesVersion, rulesHash, rootHash: latest.rootHash, records, ...(modelContext ? { modelContext } : {}),
     };
-    await persistJsonFile(snapshotPath(snapshot.snapshotId), snapshot);
+    await saveSnapshot(snapshot, channel);
     return snapshot;
   }
-  const rootHash = rootForVersion(version);
+  const rootHash = await rootForVersion(version);
   const snapshot: HospitalRegistrySnapshotFile = {
     sourceId: "fabric-hospital-invoice-register", snapshotId, version,
     rulesVersion, rulesHash, rootHash, records, ...(modelContext ? { modelContext } : {}),
   };
-  await persistJsonFile(snapshotPath(snapshotId), snapshot);
+  await saveSnapshot(snapshot, channel);
   const proposal = { id: snapshotId, version, rootHash, rulesVersion, rulesHash, recordCount: records.length };
   if (hospitalScope) await ledger.proposeMedicalRegistrySnapshot({ ...proposal, hospitalId: hospitalScope });
   else await ledger.publishOracleRegistrySnapshot(proposal);

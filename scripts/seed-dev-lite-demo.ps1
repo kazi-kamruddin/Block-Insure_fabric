@@ -4,7 +4,7 @@ param()
 # demonstration set in apps/web/e2e/demo-seed.spec.ts: four partners, five
 # health plans, five customers with accounts and policies, and three claims.
 # Start the app first, without -Email, so codes stay on screen:
-#   .\scripts\dev-lite-app.ps1 -TwoOracles -Onboarding
+#   .\scripts\dev-lite-app.ps1 -Onboarding
 # The spec refuses a ledger that already has packages; it never resets anything.
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot

@@ -5,6 +5,7 @@ import { workspaceAccountForSession, workspaceForAccount } from "@/lib/auth/acco
 import { currentSession } from "@/lib/auth/current-session";
 import { loadRoleDashboard } from "@/lib/dashboard/load-dashboard";
 import { loadFabricConfig } from "@/lib/fabric/config";
+import { configuredLedgerProvisioningId } from "@/lib/fabric/ledger-instance";
 import { onboardingEnabled } from "@/lib/customers/settings";
 import { CustomerStore } from "@/lib/customers/store";
 
@@ -53,6 +54,7 @@ export default async function RoleWorkspaceLayout({ children, params }: { childr
       />
       <main id="main-content" tabIndex={-1} className={`workspacePage workspacePage-${canonicalWorkspace}`}>
         <WorkspaceClient initialAccount={shownAccount} initialDashboard={dashboard} deployment={`${config.channelName}/${config.chaincodeName}`}
+          ledgerProvisioningId={configuredLedgerProvisioningId()}
           workspace={canonicalWorkspace}
           onboardingEnabled={onboardingEnabled()}
           medicalReviewEnabled={process.env.FABRIC_MEDICAL_REVIEW_ENABLED === "true"}

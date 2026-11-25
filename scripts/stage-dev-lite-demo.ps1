@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param([switch]$SkipPremium, [switch]$SkipDeadline, [switch]$SkipBankPayout)
 # Run the evening before a demo, with the network and app running
-# (.\scripts\dev-lite-app.ps1 -TwoOracles). It adds new synthetic records only:
+# (.\scripts\dev-lite-app.ps1). It adds new synthetic records only:
 #  - Premium: policies starting tomorrow whose first premiums are EFT mandates,
 #    approved and due on demo day, one well funded and one under-funded (live
 #    collection, bounce and retry), plus one already paid by OTP.

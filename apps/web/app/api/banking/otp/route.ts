@@ -4,7 +4,7 @@ import { currentSession, sessionSecret } from "@/lib/auth/current-session";
 import { policyholderRecipient } from "@/lib/auth/customer-recipient";
 import { localCustomerCodes } from "@/lib/customers/settings";
 import { ledger } from "@/lib/fabric/ledger";
-import { otpChallenges } from "@/lib/banking/otp";
+import { OtpRateLimitError, otpChallenges, otpRequestContext } from "@/lib/banking/otp";
 import { deliverBankOtp } from "@/lib/banking/email-gateway";
 import { checkMutationOrigin } from "@/lib/security/request-origin";
 
@@ -40,15 +40,17 @@ export async function POST(request: Request) {
     const ttl = Number(process.env.OTP_TTL_SECONDS ?? 300);
     const recipient = await policyholderRecipient(session);
     if (!recipient) throw new Error("No OTP email address is configured for this policyholder");
-    const challenge = otpChallenges.issue(premiumOtpBinding(parsed.data, session.subjectId, recipient), otpSecret(), ttl);
+    const { ip, loopback } = otpRequestContext(request);
+    const challenge = otpChallenges.issue(premiumOtpBinding(parsed.data, session.subjectId, recipient), otpSecret(), ttl, undefined, undefined, ip);
     let delivery;
     try { delivery = await deliverBankOtp({ recipient, code: challenge.code, expiresAt: challenge.expiresAt, policyId: policy.id }); }
     catch (error) { otpChallenges.revoke(challenge.challengeId, otpSecret()); throw error; }
-    const showCode = session.accountId.startsWith("customer:")
-      ? localCustomerCodes() : process.env.ENABLE_DEMO_AUTH === "true";
+    const showCode = process.env.ENABLE_DEMO_AUTH === "true" && loopback
+      && (!session.accountId.startsWith("customer:") || localCustomerCodes());
     const demoDelivery = showCode ? { demoCode: challenge.code } : {};
-    return NextResponse.json({ challengeId: challenge.challengeId, expiresAt: new Date(challenge.expiresAt).toISOString(), delivery, ...demoDelivery });
+    return NextResponse.json({ challengeId: challenge.challengeId, expiresAt: new Date(challenge.expiresAt).toISOString(), delivery, ...demoDelivery }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
+    if (error instanceof OtpRateLimitError) return NextResponse.json({ message: error.message }, { status: 429, headers: { "Retry-After": String(error.retryAfter) } });
     return NextResponse.json({ message: error instanceof Error ? error.message : "OTP request failed" }, { status: 409 });
   }
 }

@@ -1,4 +1,10 @@
 export type InvoiceFields = { invoiceNumber: string; serviceDate: string; totalBdt: string };
+export type ReceiptFields = InvoiceFields & { hospital?: string };
+
+export function extractReceiptFields(text: string): ReceiptFields {
+  const hospital = /^\s*(?:hospital|provider|facility)\s*:\s*([^\r\n]{2,100})\s*$/im.exec(text)?.[1]?.trim() ?? "";
+  return { ...extractInvoiceFields(text), hospital };
+}
 
 export function extractInvoiceFields(text: string): InvoiceFields {
   // Only explicit invoice labels yield suggestions. Ignore subtotals and

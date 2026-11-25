@@ -1,0 +1,13 @@
+{
+  "channel": "insurance-dev-lite-190",
+  "chaincodeName": "insurance-contract",
+  "chaincodeVersion": "1.9.0",
+  "expectedSequence": 1,
+  "schemaVersion": 15,
+  "database": "LevelDB",
+  "webPort": 3219,
+  "packageSha256": "d6da2d7759681c5c50c895187844f3d6bd0e1b8a3caa31949c58e89000843ec9",
+  "goBuilderImage": "block-insure/fabric-ccenv:2.5.16-go1.26.11",
+  "nodeVersion": "v24.16.0",
+  "repoRoot": null
+}

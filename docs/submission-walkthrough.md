@@ -73,7 +73,7 @@ wsl.exe -d Ubuntu -- bash -lc "cd '/mnt/e/4-1/4100 thesis/project/Block-Insure_f
 TLS handshake errors may appear while the peers boot. The last line must say `insurance-dev-lite-190 ready on five dev-lite peers`.
 
 ```powershell
-.\scripts\dev-lite-app.ps1 -TwoOracles -Onboarding
+.\scripts\dev-lite-app.ps1 -Onboarding
 ```
 
 Leave this window open until the message `Dev-lite application is available` appears. Open
@@ -216,75 +216,10 @@ The output shows `"anchor": "caller-supplied hash"` and exit code 0. Change one 
 
 ## Part 5 — Optional: Bank key under a separate Windows account (F06)
 
-This part checks that the web Gateway's account cannot read the Bank
-signing key, and that a separate operator approves the payout. You create
-the Windows account and change file permissions yourself. Do this part
-last, because the normal Bank workspace cannot confirm payouts while the
-key is moved.
-
-1. Stop the app (Ctrl+C in its window). In **PowerShell run as administrator**:
-
-   ```powershell
-   New-LocalUser -Name bankop -Description "Block-Insure synthetic Bank operator"
-   ```
-
-   ```powershell
-   New-Item -ItemType Directory C:\BankCustody
-   ```
-
-   ```powershell
-   $bank = 'E:\4-1\4100 thesis\project\Block-Insure_fabric\data\dev-lite\organizations\peerOrganizations\bank.blockinsure.test'
-   Copy-Item "$bank\users\bankOfficer@bank.blockinsure.test\msp\signcerts\cert.pem" C:\BankCustody\bank-officer-cert.pem
-   Copy-Item "$bank\peers\peer0.bank.blockinsure.test\tls\ca.crt" C:\BankCustody\bank-peer-tls-ca.crt
-   Move-Item "$bank\users\bankOfficer@bank.blockinsure.test\msp\keystore\3fc3840da919cf96b180f674e3698d3370eeb57984530db9866c9a3dfd7e4a95_sk" C:\BankCustody\bank-officer.key
-   ```
-
-   ```powershell
-   icacls C:\BankCustody /inheritance:r /grant:r "bankop:(OI)(CI)R" "SYSTEM:(OI)(CI)F"
-   ```
-
-   ```powershell
-   icacls C:\BankCustody\bank-officer.key /setowner bankop
-   ```
-
-2. In a normal (not administrator) PowerShell, run `Get-Content C:\BankCustody\bank-officer.key`. It must fail with *Access to the path is denied*. Note this result.
-3. Restart the app in external custody mode:
-
-   ```powershell
-   $env:FABRIC_DEV_LITE_BANK_CUSTODY = 'external'; .\scripts\dev-lite-app.ps1 -TwoOracles
-   ```
-
-4. Open a shell as the operator with `runas /user:bankop powershell`, then run:
-
-   ```powershell
-   cd 'E:\4-1\4100 thesis\project\Block-Insure_fabric'
-   node tools/bank-signer/confirm-dev-lite.mjs data\dev-lite\demo-seed\bank-signing-request-STL-2026-000202.json C:\BankCustody\bank-officer-cert.pem C:\BankCustody\bank-officer.key C:\BankCustody\bank-peer-tls-ca.crt
-   ```
-
-   If `bankop` cannot read the repository, an administrator can grant read access with `icacls "E:\4-1\4100 thesis\project\Block-Insure_fabric" /grant "bankop:(OI)(CI)RX"`. Compare what the CLI displays with claim `CLM-2026-000202`, settlement `STL-2026-000202`, BDT 47,600.00 and transfer `TRF-CLM-2026-000202`. Then type `APPROVE STL-2026-000202`.
-5. Check the payout with `read-dev-lite-certificate.sh CLM-2026-000202`. Its `status` must be `SETTLED`.
-6. **Put the key back.** In an administrator PowerShell:
-
-   ```powershell
-   $bank = 'E:\4-1\4100 thesis\project\Block-Insure_fabric\data\dev-lite\organizations\peerOrganizations\bank.blockinsure.test'
-   takeown /f C:\BankCustody\bank-officer.key
-   icacls C:\BankCustody\bank-officer.key /grant "${env:USERNAME}:F"
-   Move-Item C:\BankCustody\bank-officer.key "$bank\users\bankOfficer@bank.blockinsure.test\msp\keystore\3fc3840da919cf96b180f674e3698d3370eeb57984530db9866c9a3dfd7e4a95_sk"
-   ```
-
-   Then delete the folder with `Remove-Item -Recurse C:\BankCustody`, optionally remove the account with `Remove-LocalUser bankop`, and restart the app without `FABRIC_DEV_LITE_BANK_CUSTODY`.
-
-Limit: an administrator can always take ownership of the key. This
-drill shows that the Gateway's ordinary account is denied and that a
-different account signs. It is not hardware-backed custody.
-
-To stage another authorized payout for the drill, run the duplicate
-journey with `MEDICAL_STOP_BEFORE_BANK=true`. Use the environment of
-`scripts/test-dev-lite-medical.ps1`'s duplicate step and set
-`MEDICAL_PRIOR_CLAIM_ID` to a settled claim. The run writes
-`authorized-result.json`. With the app in external mode, generate the
-signing request as the Bank with a POST of the `confirmSettlement`
-command to `/api/medical/bank-signing-request`.
+The owner-run [F06 custody drill](custody.md#f06-bank-key-access-drill)
+checks that the ordinary Gateway account is denied a Bank key read handle
+and that a separate operator can approve an explicitly authorized synthetic
+payout. The drill remains BLOCKED-OWNER.
 
 ## Part 6 — Optional automated rehearsal, then stop
 

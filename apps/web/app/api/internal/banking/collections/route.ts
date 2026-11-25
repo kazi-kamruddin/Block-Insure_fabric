@@ -3,6 +3,7 @@ import { z } from "zod";
 import { ledgerDateSchema, ledgerIdSchema } from "@/lib/fabric/validation";
 import { ledger } from "@/lib/fabric/ledger";
 import { verifyBearerToken } from "@/lib/security/bearer-token";
+import { checkMutationOrigin } from "@/lib/security/request-origin";
 import { processDueCollection } from "@/lib/banking/collections";
 
 const commandSchema = z.discriminatedUnion("action", [
@@ -23,6 +24,8 @@ function authorized(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const trust = checkMutationOrigin(request);
+  if (!trust.trusted) return NextResponse.json({ message: trust.reason }, { status: 403 });
   if (!authorized(request)) return NextResponse.json({ message: "Worker authentication failed" }, { status: 401 });
   const parsed = commandSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ message: "Invalid collection worker command" }, { status: 400 });

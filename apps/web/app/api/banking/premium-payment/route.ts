@@ -5,7 +5,7 @@ import { premiumIntentSchema, premiumOtpBinding } from "@/lib/banking/premium-in
 import { policyholderRecipient } from "@/lib/auth/customer-recipient";
 import { currentSession, sessionSecret } from "@/lib/auth/current-session";
 import { ledger } from "@/lib/fabric/ledger";
-import { otpChallenges } from "@/lib/banking/otp";
+import { OtpRateLimitError, otpChallenges, otpRequestContext } from "@/lib/banking/otp";
 import { checkMutationOrigin } from "@/lib/security/request-origin";
 import { reconcilePremiumOutcome } from "@/lib/banking/premium-outcome";
 
@@ -44,10 +44,11 @@ export async function POST(request: Request) {
     if (!challengeId || !otp) throw new Error("A valid OTP challenge is required for a new payment");
     const recipient = await policyholderRecipient(session);
     if (!recipient) throw new Error("No OTP recipient is configured");
-    otpChallenges.consume(challengeId, otp, premiumOtpBinding(payment, session.subjectId, recipient), otpSecret());
+    otpChallenges.consume(challengeId, otp, premiumOtpBinding(payment, session.subjectId, recipient), otpSecret(), undefined, otpRequestContext(request).ip);
     const authorizationHash = createHmac("sha256", otpSecret()).update(`${challengeId}:${session.subjectId}:consumed`).digest("hex");
     return NextResponse.json({ result: await ledger.executeManualPremiumPayment({ ...payment, authorizationHash }) });
   } catch (error) {
+    if (error instanceof OtpRateLimitError) return NextResponse.json({ message: error.message }, { status: 429, headers: { "Retry-After": String(error.retryAfter) } });
     return NextResponse.json({ message: error instanceof Error ? error.message : "Premium payment failed" }, { status: 409 });
   }
 }

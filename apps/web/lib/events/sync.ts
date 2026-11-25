@@ -3,11 +3,13 @@ import "server-only";
 import { status } from "@grpc/grpc-js";
 import { loadFabricConfig } from "@/lib/fabric/config";
 import { withFabricContract } from "@/lib/fabric/gateway";
-import { appendProjectedEvent, readEventProjection } from "./store";
+import { appendProjectedEvents, readEventProjection } from "./store";
+import type { IndexedFabricEvent } from "./projection";
 import { deliverPendingBankCommunications } from "./deliver-communications";
 
 const decoder = new TextDecoder();
 let activeSynchronization: Promise<EventSyncResult> | null = null;
+const persistenceBatch = 250;
 
 async function performFabricEventSync(maxEvents: number) {
   if (!Number.isInteger(maxEvents) || maxEvents < 1 || maxEvents > 50_000) {
@@ -25,18 +27,29 @@ async function performFabricEventSync(maxEvents: number) {
       checkpoint,
       startBlock: BigInt(process.env.FABRIC_EVENT_START_BLOCK ?? "0"),
     });
+    let pending: IndexedFabricEvent[] = [];
+    async function persistPending() {
+      if (!pending.length) return;
+      await appendProjectedEvents(pending);
+      processed += pending.length;
+      pending = [];
+    }
     try {
       for await (const event of events) {
         let payload: Record<string, unknown> = {};
-        try { payload = JSON.parse(decoder.decode(event.payload)) as Record<string, unknown>; } catch { payload = { undecodablePayload: true }; }
-        await appendProjectedEvent({
+        try {
+          const decoded: unknown = JSON.parse(decoder.decode(event.payload));
+          if (decoded && typeof decoded === "object" && !Array.isArray(decoded)) payload = decoded as Record<string, unknown>;
+          else payload = { undecodablePayload: true };
+        } catch { payload = { undecodablePayload: true }; }
+        pending.push({
           id: `${event.blockNumber}:${event.transactionId}:${event.eventName}`,
           blockNumber: event.blockNumber.toString(),
           transactionId: event.transactionId,
           eventName: event.eventName,
           payload,
         });
-        processed += 1;
+        if (pending.length >= persistenceBatch || processed + pending.length >= maxEvents) await persistPending();
         if (processed >= maxEvents) break;
       }
     } catch (error) {
@@ -45,6 +58,7 @@ async function performFabricEventSync(maxEvents: number) {
     } finally {
       events.close();
     }
+    await persistPending();
   });
   const projection = await readEventProjection();
   const communications = await deliverPendingBankCommunications();
@@ -52,7 +66,7 @@ async function performFabricEventSync(maxEvents: number) {
     processed,
     limitReached: processed >= maxEvents,
     checkpoint: projection.checkpoint,
-    totalEvents: projection.events.length,
+    totalEvents: Object.values(projection.countsByName).reduce((sum, count) => sum + count, 0),
     countsByName: projection.countsByName,
     communications,
   };

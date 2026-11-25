@@ -5,29 +5,32 @@ import { setTimeout as delay } from "node:timers/promises";
 
 const transientReplaceErrors = new Set(["EACCES", "EBUSY", "EEXIST", "ENOTEMPTY", "EPERM"]);
 
-export async function persistJsonFile(filePath, value) {
+export async function persistJsonFile(filePath, value, {
+  replace = fs.rename, pause = delay, exclusive = false,
+} = {}) {
   await fs.mkdir(path.dirname(filePath), { recursive: true });
   const temporary = `${filePath}.${process.pid}.${randomUUID()}.tmp`;
-  await fs.writeFile(temporary, `${JSON.stringify(value, null, 2)}\n`, { encoding: "utf8", mode: 0o600 });
-  let lastError;
   try {
-    for (let attempt = 0; attempt < 6; attempt += 1) {
+    const handle = await fs.open(temporary, "wx", 0o600);
+    try {
+      await handle.writeFile(`${JSON.stringify(value, null, 2)}\n`, "utf8");
+      await handle.sync();
+    } finally {
+      await handle.close();
+    }
+    // Immutable files use a hard-link publication so concurrent writers
+    // cannot replace a decision that has already been used to commit.
+    const publish = exclusive ? fs.link : replace;
+    for (let attempt = 0; ; attempt += 1) {
       try {
-        await fs.rename(temporary, filePath);
+        await publish(temporary, filePath);
         return;
       } catch (error) {
-        if (!transientReplaceErrors.has(error?.code)) throw error;
-        lastError = error;
-        if (attempt >= 2) {
-          try { await fs.rm(filePath, { force: true }); }
-          catch (removeError) {
-            if (!transientReplaceErrors.has(removeError?.code) && removeError?.code !== "ENOENT") throw removeError;
-          }
-        }
-        await delay(25 * (attempt + 1));
+        if (attempt === 5 || (exclusive && error.code === "EEXIST") ||
+            !transientReplaceErrors.has(error?.code)) throw error;
+        await pause(25 * 2 ** attempt);
       }
     }
-    throw lastError;
   } finally {
     await fs.rm(temporary, { force: true }).catch(() => undefined);
   }

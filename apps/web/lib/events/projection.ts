@@ -34,6 +34,8 @@ export type BankCommunication = {
   error: string;
   createdAt: string;
   deliveredAt: string;
+  deliveryAttempts?: number;
+  nextAttemptAt?: string;
   variables: Record<string, string | number | boolean>;
 };
 
@@ -59,6 +61,13 @@ export const emptyEventProjection = (): EventProjection => ({
 
 const text = (payload: Record<string, unknown>, key: string) => typeof payload[key] === "string" ? payload[key] : "";
 
+function claimActivity(payload: Record<string, unknown>, title: string, asset: string) {
+  return [
+    { role: "insurerAdmin", subject: "", title, asset },
+    ...(asset ? [{ role: "policyholder", subject: text(payload, "claimantId"), title, asset }] : []),
+  ];
+}
+
 function notificationTargets(event: IndexedFabricEvent) {
   const p = event.payload;
   switch (event.eventName) {
@@ -74,7 +83,24 @@ function notificationTargets(event: IndexedFabricEvent) {
     case "OracleVerificationRequested": return [{ role: "insurerAdmin", subject: "", title: "Oracle verification requested", asset: text(p, "id") }];
     case "OracleCommitmentSubmitted": return [{ role: "insurerAdmin", subject: "", title: "Oracle commitment received", asset: text(p, "requestId") }];
     case "OracleResultRevealed": return [{ role: "insurerAdmin", subject: "", title: "Oracle result revealed", asset: text(p, "requestId") }];
-    case "OracleRequestFinalized": return [{ role: "insurerAdmin", subject: "", title: `Oracle ${text(p, "finalizationCode").toLowerCase().replaceAll("_", " ")}`, asset: text(p, "id") }];
+    case "OracleRequestFinalized": return [
+      { role: "insurerAdmin", subject: "", title: `Oracle ${text(p, "finalizationCode").toLowerCase().replaceAll("_", " ")}`, asset: text(p, "id") },
+      ...(text(p, "claimId") ? [{ role: "policyholder", subject: "", title: "Oracle verification completed", asset: text(p, "claimId") }] : []),
+    ];
+    case "MedicalApprovalCertificatesActivated": return [{ role: "insurerAdmin", subject: "", title: "Medical approval certificates activated", asset: text(p, "id") }];
+    case "MedicalRulesConfigured": return [{ role: "insurerAdmin", subject: "", title: "Medical cover rules configured", asset: text(p, "packageId") }];
+    case "MedicalEpisodeSaved": return [{ role: "insurerAdmin", subject: "", title: "Hospital episode revision saved", asset: text(p, "id") }];
+    case "MedicalRegistrySnapshotActivated": return [{ role: "insurerAdmin", subject: "", title: "Medical registry snapshot activated", asset: text(p, "id") }];
+    case "MedicalModelReleaseRegistered":
+    case "MedicalModelReleaseUpdated": return [{ role: "insurerAdmin", subject: "", title: "Medical model release updated", asset: text(p, "id") }];
+    case "MedicalReviewPreparing": return claimActivity(p, "Medical review is being prepared", text(p, "claimId"));
+    case "MedicalClarificationRequested": return claimActivity(p, "Medical clarification requested", text(p, "id"));
+    case "MedicalClarificationResponded": return claimActivity(p, "Medical clarification updated", text(p, "id"));
+    case "MedicalEvidenceDecryptionConfirmed": return [{ role: "insurerAdmin", subject: "", title: "Review evidence access confirmed", asset: text(p, "reviewId") }];
+    case "MedicalOCRConfirmed": return claimActivity(p, "Receipt fields confirmed for review", text(p, "claimId"));
+    case "MedicalAuditSelectionResolved": return claimActivity(p, "Medical audit sampling resolved", text(p, "claimId"));
+    case "MedicalAppealNotePurged": return [{ role: "insurerAdmin", subject: "", title: "Appeal note retention applied", asset: text(p, "appealId") }];
+    case "ClaimReviewTimedOut": return claimActivity(p, "Claim review deadline ended", text(p, "claimId"));
     case "ClaimReviewOpened": return Array.isArray(p.assignedAuditorIds)
       ? p.assignedAuditorIds.filter((value): value is string => typeof value === "string").map((subject) => ({ role: "auditor", subject, title: "Review assignment received", asset: text(p, "id") }))
       : [];
@@ -123,7 +149,7 @@ function notificationTargets(event: IndexedFabricEvent) {
       { role: "policyholder", subject: text(p, "requesterId"), title: "Benefit payment confirmed", asset: text(p, "id") },
     ];
     case "SettlementPaymentFailed": return [{ role: "insurerAdmin", subject: "", title: "Claim payout failed at the Bank", asset: text(p, "claimId") }];
-    case "SettlementConfirmed": return [{ role: "insurerAdmin", subject: "", title: "Claim payout confirmed by the Bank", asset: text(p, "claimId") }];
+    case "SettlementConfirmed": return claimActivity(p, "Claim payout confirmed by the Bank", text(p, "claimId"));
     case "EvidenceAccessGranted": return [{ role: text(p, "granteeRole"), subject: text(p, "granteeSubject"), title: "Evidence access granted", asset: text(p, "id") }];
     case "EvidenceAccessRevoked": return [{ role: text(p, "granteeRole"), subject: text(p, "granteeSubject"), title: "Evidence access revoked", asset: text(p, "id") }];
     default: return [];
@@ -187,7 +213,8 @@ function communicationFor(event: IndexedFabricEvent, createdAt: string): BankCom
 }
 
 export function applyFabricEvent(current: EventProjection, event: IndexedFabricEvent, updatedAt: string): EventProjection {
-  if (current.events.some((item) => item.id === event.id)) return current;
+  if ((current.checkpoint && BigInt(event.blockNumber) < BigInt(current.checkpoint.blockNumber)) ||
+      current.events.some((item) => item.id === event.id)) return current;
   const notifications = notificationTargets(event).map((target, index) => ({
     id: `${event.id}:${index}`,
     eventId: event.id,
@@ -199,6 +226,10 @@ export function applyFabricEvent(current: EventProjection, event: IndexedFabricE
     blockNumber: event.blockNumber,
   }));
   const communication = communicationFor(event, updatedAt);
+  const queue = current.communications ?? [];
+  const nextCommunications = communication && !queue.some((item) => item.eventId === communication.eventId &&
+      item.recipientSubject === communication.recipientSubject && item.policyId === communication.policyId)
+    ? [...queue, communication] : queue;
   return {
     schemaVersion: 2,
     updatedAt,
@@ -206,7 +237,9 @@ export function applyFabricEvent(current: EventProjection, event: IndexedFabricE
     events: [...current.events, event].slice(-5_000),
     countsByName: { ...current.countsByName, [event.eventName]: (current.countsByName[event.eventName] ?? 0) + 1 },
     notifications: [...current.notifications, ...notifications].slice(-2_000),
-    communications: [...(current.communications ?? []), ...(communication ? [communication] : [])].slice(-2_000),
+    // Pending transmissions must survive a long catch-up. Terminal rows are
+    // retained to deduplicate and their inspection remains windowed by the API.
+    communications: nextCommunications,
   };
 }
 

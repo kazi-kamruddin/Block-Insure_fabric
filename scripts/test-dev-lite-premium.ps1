@@ -2,7 +2,7 @@
 param()
 # Live dev-lite premium journey: bank linking, first premium by OTP, EFT
 # mandates, automatic collection, an insufficient-funds bounce and a retry.
-# Start the app first with .\scripts\dev-lite-app.ps1 -TwoOracles.
+# Start the app first with .\scripts\dev-lite-app.ps1.
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 $web = Join-Path $root 'apps/web'

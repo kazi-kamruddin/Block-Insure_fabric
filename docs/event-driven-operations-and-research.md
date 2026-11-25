@@ -34,9 +34,11 @@ The ignored `data/events/projection.json` file is a local development adapter.
 Its default location is discovered from the repository root, including when the
 Next.js standalone runtime changes its working directory, so production rebuilds
 do not erase the checkpoint. Set `EVENT_PROJECTION_ROOT` to select an explicit
-deployment location. A synchronization request processes at most 5,000 events,
-reports `limitReached` when another catch-up pass is required, and allows ten
-seconds by default for historical replay and live delivery. The file contains no
+deployment location. A synchronization request processes at most 5,000 events
+and persists the checkpoint in batches. The worker follows `limitReached` to
+continue catch-up from that checkpoint. Cumulative counters include all indexed
+events, and the event list retains the latest 5,000. Pending Bank communications
+survive event and inbox retention. The file contains no
 private keys or evidence plaintext. Production should replace it
 with a transactional database, single-writer/lease coordination, retention and
 backup policy, delivery-lag monitoring, and a supervised continuously running
@@ -82,13 +84,16 @@ causal, or real-world fraud validation.
 
 ## Verification
 
-Bank communication delivery sends a stable Idempotency-Key qualified by channel,
-chaincode, event identity and recipient. The HTTP provider must honor this key
-across retries; a successful send followed by a lost response remains FAILED
-locally until reconciliation. This is not an unconditional exactly-once email
-guarantee. Missing recipient mappings remain visibly FAILED. A generic
-POLICYHOLDER_TRANSACTION_EMAIL fallback requires an exact matching
-POLICYHOLDER_TRANSACTION_SUBJECT; it cannot receive another owner's receipt.
+Bank communications for onboarded members resolve the active customer's email
+through the local customer store. Legacy transaction email fallback requires an
+exact match on `POLICYHOLDER_TRANSACTION_SUBJECT`. Delivery deduplicates by event
+and recipient, with a stable Idempotency-Key scoped to the channel, chaincode
+and, when available, ledger provisioning ID. An attempt is checkpointed before
+sending. Failures back off for 5, 10, 20 and 40 seconds. After five attempts the
+communication becomes FAILED and an operator can inspect its receipt in
+`dead-letter/` under the selected projection root. Delivery retries depend on
+the email gateway honoring the key through acknowledgement recovery. The local
+email connector keeps its idempotency cache for the lifetime of its process.
 OTP delivery failures revoke the challenge and remain visible to the requester.
 HTTP success also requires a valid nonempty messageId acknowledgement; malformed
 JSON, an empty acknowledgement and the bounded timeout remain unresolved failures.

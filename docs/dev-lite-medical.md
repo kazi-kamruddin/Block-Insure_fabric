@@ -35,11 +35,29 @@ response-schema package at sequence 2, retaining the existing ledger.
 In PowerShell, run `./scripts/dev-lite-app.ps1` and open
 `http://127.0.0.1:3219/workspace`. The controller uses local demo sessions,
 starts the event worker and Oracle workers, and keeps dev-lite application
-data and secrets under the same profile root. `-TwoOracles` leaves the third
-worker offline for the quorum and payment recovery rehearsal. With that
+data and secrets under the same profile root. The normal demo uses all three
+workers. During the fault-tolerance segment, `-TwoOracles` leaves the third
+worker offline. The two available workers wait about 60 seconds for the
+commit deadline before revealing. With that
 controller running, use `./scripts/test-dev-lite-medical.ps1` on the
 activated channel. Add `-Activate` for the first rehearsal on a freshly
 deployed, empty channel. The switch performs the one-time activation.
+
+### Production-mode demonstration
+
+Stop the application controller and the dev-lite Fabric containers, retaining
+their volumes. Run `npm --prefix apps/web run build` with Fabric stopped.
+Bring up the same retained LevelDB profile, then launch
+`./scripts/dev-lite-app.ps1 -Production -Onboarding`. It serves the standalone
+build at `http://127.0.0.1:3219` and refuses a missing or stale build. Starting
+without `-Production` returns to the development server.
+
+The historical teardown uses Compose down for the entire dev-lite project,
+including its CA containers. If an earlier approved rebuild removed those
+containers, `network.sh --dev-lite ca-start` recreates the CA services from
+retained material. Use `ca-stop` before launching the onboarding controller
+so it can start its own Insurer CA. An ordinary demo retains containers and
+volumes through `stop`.
 
 ### Isolated CouchDB acceptance profile
 
@@ -54,7 +72,7 @@ credentials, ledger and database files.
 Stop the development app controller and LevelDB project before selecting
 the CouchDB profile. Use the same `up` and `deploy` commands above with
 `--dev-lite-couchdb` and an explicit audited package. Then run
-`./scripts/dev-lite-app.ps1 -CouchDB -TwoOracles` and
+`./scripts/dev-lite-app.ps1 -CouchDB` and
 `./scripts/test-dev-lite-medical.ps1 -CouchDB -Activate` for the first
 rehearsal. The browser output, keys and app state stay in the CouchDB data
 root. The `stop` action retains volumes, including the existing LevelDB
@@ -112,10 +130,14 @@ Local Playwright reports are under
 escalation was exercised in Go tests. The browser rehearsal did not wait
 for the live stall deadline.
 
-The held-out ML set had 1,061 providers and 86 weak positives. At 213 review
-slots, logistic regression retrieved 73.3% of those positives at 29.6%
-precision. The additive-bin challenger retrieved 70.9% at 28.6% precision.
-The figures use provider-level labels and are local to this dataset and split.
+The fixed provider-disjoint Medicare test split had 1,061 providers and
+86 weak `PotentialFraud` positives (8.1% prevalence). Provider features
+used source reimbursement values of 0–125,000 on retained test claim rows,
+then aggregated their log-transformed values. At 213 review slots,
+logistic regression reached 73.3% recall and 29.6% precision. The
+additive-bin model reached 70.9% recall and 28.6% precision. These are
+[provider triage results](results/provider-advisory-shadow-2026-11-20.md).
+Promotion remains **HOLD**.
 
 ## Operator rehearsal
 
@@ -288,8 +310,8 @@ future dates were not re-run against this package.
 
 ## Customer onboarding (21 November 2026 onward)
 
-On `insurance-dev-lite-190`, start the existing sequence-7 lab and run
-`.\scripts\dev-lite-app.ps1 -TwoOracles -Onboarding` from PowerShell. The
+On `insurance-dev-lite-190`, start the existing lab and run
+`.\scripts\dev-lite-app.ps1 -Onboarding` from PowerShell. The
 controller starts the existing stopped Insurer CA by container ID and stops
 it when the controller exits. It adds the wallet and profile HMAC keys to the
 existing app secret store when those entries are absent. The default rehearsal
@@ -470,6 +492,30 @@ sequences, so the routine rotation uses INPATIENT, OTHER and CONSULTATION
 BDT 190,000 is out of range under either benchmark. Claims and cases staged
 before sequence 7 keep their small amounts. There is no pro-rata refund on
 cancellation, and waiting periods do not vary by cause.
+
+## Registry snapshot backup and recovery
+
+Include `data/dev-lite/registry-archive/` with the private dev-lite application
+backup. It contains the exact snapshot bytes and input digests by registry root.
+Apply the same access controls as for the working registry under
+`data/dev-lite/oracle/registries/`.
+
+To recover a missing working snapshot, obtain the root hash from the existing
+ledger proposal or pinned Oracle request and run:
+
+```powershell
+node scripts/restore-registry-snapshot.mjs ROOT_SHA256
+```
+
+The command verifies the stored bytes and recomputes the root with the frozen
+worker encoding, including the original snapshot timestamp. It restores the
+snapshot ID from the archive and refuses to overwrite a different working
+file. Registry snapshots published before the archive feature need their
+corresponding historical application backup unless the publisher reused and
+archived the same snapshot later.
+
+For incomplete registry source diagnostics, see the
+[medical source recovery runbook](runbooks/medical-source-recovery.md).
 
 ## Fresh ledger and demonstration seed (24 November 2026)
 
