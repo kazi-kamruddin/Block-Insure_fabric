@@ -1,11 +1,12 @@
 import { z } from "zod";
 import { ledgerIdSchema as id } from "./validation";
-import type { AuditorDecision, Claim, ClaimAppeal, ClaimReview, EvidenceAccessGrant, EvidenceReference, OracleRequest } from "./types";
+import type { AuditorDecision, Claim, ClaimAppeal, ClaimReview, EvidenceAccessGrant, EvidenceReference, MedicalTimingProfile, OracleRequest } from "./types";
 import type { MedicalQuote } from "./medical";
 import type { MedicalTimeline } from "./medical-timeline";
 import type { RevisionProof } from "./revision-proof";
 
 const date = z.string().datetime({ offset: true });
+const reviewDeadline = z.union([date, z.literal("")]);
 const hash = z.string().regex(/^[a-f0-9]{64}$/);
 const optionalHash = z.union([hash, z.literal("")]);
 const message = z.string().trim().min(1).max(2000);
@@ -23,17 +24,17 @@ export const medicalReviewCommand = z.discriminatedUnion("action", [
   z.strictObject({ action: z.literal("commitVote"), reviewId: id, round: voteRound, commitment: hash }),
   z.strictObject({ action: z.literal("revealVote"), reviewId: id, round: voteRound, decisionId: id, outcome: voteOutcome,
     reasonCode: voteReason, reasonHash: hash, salt: hash }),
-  z.strictObject({ action: z.literal("prepare"), claimId: id, reviewId: id, prepareBy: date }),
-  z.strictObject({ action: z.literal("open"), reviewId: id, deadline: date }),
-  z.strictObject({ action: z.literal("recover"), reviewId: id, newId: id, prepareBy: date }),
+  z.strictObject({ action: z.literal("prepare"), claimId: id, reviewId: id, prepareBy: reviewDeadline }),
+  z.strictObject({ action: z.literal("open"), reviewId: id, deadline: reviewDeadline }),
+  z.strictObject({ action: z.literal("recover"), reviewId: id, newId: id, prepareBy: reviewDeadline }),
   z.strictObject({ action: z.literal("expire"), reviewId: id }),
   z.strictObject({ action: z.literal("oracleTimeout"), requestId: id }),
   z.strictObject({ action: z.literal("recordReceiptSummary"), claimId: id, summary: z.strictObject({
     evidenceId: id, invoiceNumber: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9./_-]{0,63}$/),
     amountMinor: z.number().int().positive().safe(), serviceDate: z.iso.date(), hospitalId: id,
-    derivedFrom: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/),
+    derivedFrom: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/).optional(),
   }) }),
-  z.strictObject({ action: z.literal("ask"), reviewId: id, id, deadline: date, message }),
+  z.strictObject({ action: z.literal("ask"), reviewId: id, id, deadline: reviewDeadline, message }),
   z.strictObject({ action: z.literal("respond"), id, response: z.enum(["ANSWER", "UNAVAILABLE", "MATERIAL", "EXPIRED"]), evidenceHash: optionalHash, message: z.string().trim().max(2000) }),
   z.strictObject({ action: z.literal("share"), reviewId: id, expiresAt: date }),
   z.strictObject({ action: z.literal("confirm"), reviewId: id, evidenceId: id, accessId: id, contentHash: hash }),
@@ -45,11 +46,11 @@ export const medicalReviewCommand = z.discriminatedUnion("action", [
 ]);
 export type MedicalReviewCommand = z.infer<typeof medicalReviewCommand>;
 
-/** Mirrors the chaincode `medicalAppealWindow` on the certificate channel. */
+/** Compatibility for rejections recorded before the ledger stored the deadline. */
 export const medicalAppealWindowDays = 30;
 
-export function readMedicalAppealWindow(ledgerTime: number | null | undefined, closedAt: string) {
-  const endsAt = Date.parse(closedAt) + medicalAppealWindowDays * 86_400_000;
+export function readMedicalAppealWindow(ledgerTime: number | null | undefined, closedAt: string, appealEligibleUntil?: string) {
+  const endsAt = appealEligibleUntil ? Date.parse(appealEligibleUntil) : Date.parse(closedAt) + medicalAppealWindowDays * 86_400_000;
   return { endsAt: Number.isFinite(endsAt) ? endsAt : null,
     canAppeal: typeof ledgerTime === "number" && Number.isFinite(ledgerTime) && endsAt > ledgerTime };
 }
@@ -59,9 +60,11 @@ export function readMedicalAppealWindow(ledgerTime: number | null | undefined, c
  * once no appeal or recovery remains, otherwise when the window closes. The
  * chaincode decides with transaction time; this is display guidance only.
  */
-export function medicalReleaseAvailableAt(claim: Pick<Claim, "appealCount" | "medicalRecoveryUsed">, review: Pick<ClaimReview, "status" | "closedAt">): Date | null {
+export function medicalReleaseAvailableAt(claim: Pick<Claim, "appealCount" | "medicalRecoveryUsed">,
+  review: Pick<ClaimReview, "status" | "closedAt" | "appealEligibleUntil">): Date | null {
   const remaining = review.status === "REJECTED" ? claim.appealCount < 1 : !claim.medicalRecoveryUsed;
-  return remaining ? new Date(Date.parse(review.closedAt) + medicalAppealWindowDays * 86_400_000) : null;
+  const { endsAt } = readMedicalAppealWindow(null, review.closedAt, review.appealEligibleUntil);
+  return remaining && endsAt !== null ? new Date(endsAt) : null;
 }
 export const medicalReasonLabels = {
   TERMS_AND_EVIDENCE_SUPPORT: "The issued terms and evidence support reimbursement",
@@ -77,6 +80,9 @@ export type MedicalEvidenceCheck = { reviewId: string; evidenceId: string; grant
 export type MedicalReviewFacts = { service: string; serviceDate: string; termsHash: string; quote: MedicalQuote; duplicateExplanation?: string };
 export type MedicalReviewView = {
   oracleV2?: boolean;
+  sourcePublisher?: boolean;
+  activeTimingProfile?: MedicalTimingProfile;
+  escalationEligibleAt?: string;
   oracle?: OracleRequest | null;
   devLite?: boolean;
   viewerHasVoted?: boolean;

@@ -17,23 +17,24 @@ const medicalModelE3 = "fabric-xgb-synthetic-e3"
 const medicalReleaseActivationDelay = 10 * time.Minute
 
 type MedicalModelRelease struct {
-	ID                  string   `json:"id"`
-	ModelVersion        string   `json:"modelVersion"`
-	ArtifactHash        string   `json:"artifactHash"`
-	FeatureSchema       string   `json:"featureSchema"`
-	CalibrationVersion  string   `json:"calibrationVersion"`
-	IntendedTask        string   `json:"intendedTask"`
-	ShadowEvidenceHash  string   `json:"shadowEvidenceHash"`
-	Status              string   `json:"status"`
-	ApprovedMSPs        []string `json:"approvedMsps"`
-	HoldReasonHash      string   `json:"holdReasonHash"`
-	OracleInstalledHash string   `json:"oracleInstalledHash"`
-	GovernanceVersion   int      `json:"governanceVersion,omitempty" metadata:",optional"`
-	ApprovedAt          string   `json:"approvedAt,omitempty" metadata:",optional"`
-	ResumeReasonHash    string   `json:"resumeReasonHash,omitempty" metadata:",optional"`
-	AttestationRound    int      `json:"attestationRound,omitempty" metadata:",optional"`
-	AttestationRoster   string   `json:"attestationRoster,omitempty" metadata:",optional"`
-	OracleAttesters     []string `json:"oracleAttesters,omitempty" metadata:",optional"`
+	ID                   string   `json:"id"`
+	ModelVersion         string   `json:"modelVersion"`
+	ArtifactHash         string   `json:"artifactHash"`
+	FeatureSchema        string   `json:"featureSchema"`
+	CalibrationVersion   string   `json:"calibrationVersion"`
+	IntendedTask         string   `json:"intendedTask"`
+	ShadowEvidenceHash   string   `json:"shadowEvidenceHash"`
+	Status               string   `json:"status"`
+	ApprovedMSPs         []string `json:"approvedMsps"`
+	HoldReasonHash       string   `json:"holdReasonHash"`
+	OracleInstalledHash  string   `json:"oracleInstalledHash"`
+	GovernanceVersion    int      `json:"governanceVersion,omitempty" metadata:",optional"`
+	ApprovedAt           string   `json:"approvedAt,omitempty" metadata:",optional"`
+	ActivationEligibleAt string   `json:"activationEligibleAt,omitempty" metadata:",optional"`
+	ResumeReasonHash     string   `json:"resumeReasonHash,omitempty" metadata:",optional"`
+	AttestationRound     int      `json:"attestationRound,omitempty" metadata:",optional"`
+	AttestationRoster    string   `json:"attestationRoster,omitempty" metadata:",optional"`
+	OracleAttesters      []string `json:"oracleAttesters,omitempty" metadata:",optional"`
 }
 
 func (c *Contract) ReadMedicalModelRelease(ctx contractapi.TransactionContextInterface, id string) (*MedicalModelRelease, error) {
@@ -147,6 +148,14 @@ func (c *Contract) ApproveMedicalModelRelease(ctx contractapi.TransactionContext
 			if err != nil {
 				return nil, err
 			}
+			profile, err := c.ReadMedicalTimingProfile(ctx)
+			if err != nil {
+				return nil, err
+			}
+			release.ActivationEligibleAt, err = afterMedicalWait(release.ApprovedAt, timingWaits(profile.Profile).activation)
+			if err != nil {
+				return nil, err
+			}
 			release.Status = "APPROVED"
 			return saveMedicalModelRelease(ctx, release)
 		}
@@ -253,9 +262,17 @@ func (c *Contract) ActivateMedicalModelRelease(ctx contractapi.TransactionContex
 	if err != nil {
 		return nil, err
 	}
-	approvedAt, parseErr := time.Parse(time.RFC3339Nano, release.ApprovedAt)
-	if release.Status != "APPROVED" || parseErr != nil || now.Before(approvedAt.Add(medicalReleaseActivationDelay)) {
-		return nil, fmt.Errorf("release activation requires approval and a ten-minute delay")
+	eligibleAt := release.ActivationEligibleAt
+	realDeadline, _ := afterMedicalWait(release.ApprovedAt, medicalReleaseActivationDelay)
+	if eligibleAt == "" {
+		eligibleAt = realDeadline
+	}
+	earliest, parseErr := time.Parse(time.RFC3339Nano, eligibleAt)
+	if release.Status != "APPROVED" || parseErr != nil || now.Before(earliest) {
+		if eligibleAt == realDeadline {
+			return nil, fmt.Errorf("release activation requires approval and a ten-minute delay")
+		}
+		return nil, fmt.Errorf("release activation requires approval and its ledger delay to elapse")
 	}
 	if err := requireCurrentReleaseAttestations(ctx, release); err != nil {
 		return nil, err
@@ -286,6 +303,7 @@ func (c *Contract) RequestMedicalModelResume(ctx contractapi.TransactionContextI
 	release.Status = "RESUME_PENDING"
 	release.ResumeReasonHash = reasonHash
 	release.ApprovedAt, release.AttestationRoster, release.OracleInstalledHash = "", "", ""
+	release.ActivationEligibleAt = ""
 	release.ApprovedMSPs, release.OracleAttesters = []string{}, nil
 	release.AttestationRound++
 	return saveMedicalModelRelease(ctx, release)

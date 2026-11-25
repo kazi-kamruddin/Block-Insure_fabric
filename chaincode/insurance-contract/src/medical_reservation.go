@@ -8,9 +8,8 @@ import (
 )
 
 // A rejected medical claim keeps its coverage reservation while it can still
-// change. On the certificate channel that window is fixed at 30 days after the
-// rejecting review round closes. It is a chaincode constant, not an issued
-// rules field, so it is not covered by the policy terms digest.
+// change. The rejecting review fixes the window at close. Reviews from before
+// timing profiles retain the original 30-day window.
 const medicalAppealWindow = 30 * 24 * time.Hour
 
 // medicalRejectionWindow returns when appeal or procedural recovery for the
@@ -29,7 +28,20 @@ func medicalRejectionWindow(review *ClaimReview, claim *Claim) (time.Time, bool,
 	default:
 		return time.Time{}, false, fmt.Errorf("review %s is not a closed rejection", review.ID)
 	}
-	return closed.Add(medicalAppealWindow), remaining, nil
+	if review.AppealEligibleUntil != "" {
+		until, err := time.Parse(time.RFC3339Nano, review.AppealEligibleUntil)
+		return until, remaining, err
+	}
+	return closed.Add(timingWaits(review.TimingProfile).appeal), remaining, nil
+}
+
+func pinMedicalAppealDeadline(review *ClaimReview) error {
+	if review.TimingProfile == "" {
+		return nil
+	}
+	var err error
+	review.AppealEligibleUntil, err = afterMedicalWait(review.ClosedAt, timingWaits(review.TimingProfile).appeal)
+	return err
 }
 
 // requireOpenMedicalRejection refuses appeal or recovery once the reservation is

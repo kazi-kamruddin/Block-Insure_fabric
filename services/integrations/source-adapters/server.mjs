@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { createFeed, recordProof, signBody, signRecord } from "./feed.mjs";
 import { fixture } from "./fixtures/generate.mjs";
+import { createDevLiteMedicalPublisher } from "./medical-publisher.mjs";
 import { createFeedStore, mirrorFeeds, publishOnce } from "./store.mjs";
 
 export const issuers = Object.freeze({
@@ -58,7 +59,7 @@ function send(response, status, value) {
   response.end(JSON.stringify(value));
 }
 
-function handleRequests({ store, issuerId, privateKey, subjects }) {
+function handleRequests({ store, issuerId, privateKey, subjects, publication }) {
   async function chooseFeed(response, rawVersion) {
     if (rawVersion === null || rawVersion === "latest") {
       const latest = await store.latest(issuerId);
@@ -79,9 +80,21 @@ function handleRequests({ store, issuerId, privateKey, subjects }) {
   }
 
   return async function handle(request, response) {
+    const url = new URL(request.url, "http://127.0.0.1");
+    if (request.method === "GET" && url.pathname === "/health") {
+      const feedVersion = await store.latestVersion(issuerId);
+      return send(response, feedVersion ? 200 : 503, { status: feedVersion ? "ONLINE" : "UNAVAILABLE", feedVersion });
+    }
+    if (publication && request.method === "POST" && url.pathname === "/publish-medical") {
+      if (!authenticate(request, publication.subjects)) return send(response, 401, { code: "BEARER_REQUIRED" });
+      const body = await jsonBody(request);
+      if (!body || typeof body !== "object" || Array.isArray(body) || Object.keys(body).length !== 2 ||
+          typeof body.claimId !== "string" || !validVersion(body.claimVersion)) return send(response, 400, { code: "INVALID_CLAIM" });
+      try { return send(response, 200, await publication.publish(body)); }
+      catch (error) { return send(response, 409, { code: error.sourceCode ?? "MEDICAL_SOURCE_UNAVAILABLE" }); }
+    }
     const oracle = authenticate(request, subjects);
     if (!oracle) return send(response, 401, { code: "BEARER_REQUIRED" });
-    const url = new URL(request.url, "http://127.0.0.1");
     const match = /^\/(feed|coverage|record)\/([^/]+)$/.exec(url.pathname);
     if (request.method === "GET" && match) {
       const [, endpoint, parameter] = match;
@@ -113,7 +126,7 @@ function handleRequests({ store, issuerId, privateKey, subjects }) {
   };
 }
 
-export async function listenAdapters({ store, receiptKeys, ports, tokens, activeIssuers = issuerIds }) {
+export async function listenAdapters({ store, receiptKeys, ports, tokens, activeIssuers = issuerIds, publication }) {
   const subjects = credentials(tokens);
   const servers = [];
   const urls = {};
@@ -124,7 +137,7 @@ export async function listenAdapters({ store, receiptKeys, ports, tokens, active
       const privateKey = receiptKeys[issuerId]?.privateKey;
       const port = ports[issuerId];
       if (!privateKey || !Number.isSafeInteger(port) || port < 0 || port > 65535) throw new Error("Invalid adapter listener settings");
-      const handle = handleRequests({ store, issuerId, privateKey, subjects });
+      const handle = handleRequests({ store, issuerId, privateKey, subjects, publication: issuerId === "S-A" ? publication : undefined });
       const server = createServer({ requestTimeout: 10_000, headersTimeout: 5_000 }, (request, response) => {
         handle(request, response).catch(() => {
           if (!response.headersSent && !response.destroyed) send(response, 500, { code: "FEED_UNAVAILABLE" });
@@ -148,12 +161,12 @@ export async function listenAdapters({ store, receiptKeys, ports, tokens, active
   }
 }
 
-async function loadLocalKey(directory, issuerId) {
+async function loadLocalKey(directory, issuerId, createIfMissing) {
   const filename = join(directory, `${issuerId}.pem`);
   let pem;
   try { pem = await readFile(filename); }
   catch (error) {
-    if (error.code !== "ENOENT") throw error;
+    if (error.code !== "ENOENT" || !createIfMissing) throw error;
     const { privateKey } = generateKeyPairSync("ed25519");
     try { await publishOnce(filename, privateKey.export({ type: "pkcs8", format: "pem" })); }
     catch (conflict) { if (conflict.code !== "EEXIST") throw conflict; }
@@ -166,8 +179,8 @@ async function loadLocalKey(directory, issuerId) {
   } finally { pem.fill(0); }
 }
 
-async function localKeys(directory, activeIssuers) {
-  return Object.fromEntries(await Promise.all(activeIssuers.map(async issuerId => [issuerId, await loadLocalKey(directory, issuerId)])));
+async function localKeys(directory, activeIssuers, createIfMissing) {
+  return Object.fromEntries(await Promise.all(activeIssuers.map(async issuerId => [issuerId, await loadLocalKey(directory, issuerId, createIfMissing)])));
 }
 
 const encodeKey = key => key.export({ type: "spki", format: "der" }).toString("base64url");
@@ -199,6 +212,8 @@ async function main() {
   const options = Object.fromEntries(["root", "mirror-from", "through-version", "seed", "dataset", "r1-only", "port-his", "port-regulator", "port-receipt", "port-payment"]
     .map(name => [name, { type: "string" }]));
   options["r1-only"] = { type: "boolean" };
+  options["serve-existing"] = { type: "boolean" };
+  options["publish-medical"] = { type: "boolean" };
   const { values } = parseArgs({ options });
   const mirrorFrom = values["mirror-from"] ? resolve(values["mirror-from"]) : null;
   const defaultRoot = fileURLToPath(new URL("../../../data/dev-lite/source-adapters/", import.meta.url));
@@ -208,11 +223,16 @@ async function main() {
   if ((values["through-version"] && !mirrorFrom) || !validVersion(throughVersion)) throw new Error("A mirror version cap must be a positive integer");
   const seed = Number(values.seed ?? 42);
   const activeIssuers = values["r1-only"] ? issuerIds.filter(id => id !== "S-D") : issuerIds;
+  const retained = values["serve-existing"];
+  if (retained && (!values.root || values.seed || values.dataset)) throw new Error("Retained feeds require an explicit root and no fixture seed or dataset");
+  if (values["publish-medical"] && (!retained || mirrorFrom || !values["r1-only"])) {
+    throw new Error("Medical publication requires retained direct R1 sources");
+  }
   if (values.dataset && (mirrorFrom || values.seed || !values.root || !values["r1-only"])) {
     throw new Error("A supplied R1 dataset requires an explicit root and --r1-only without --seed or --mirror-from");
   }
-  const versions = mirrorFrom ? null : values.dataset ? JSON.parse(await readFile(resolve(values.dataset), "utf8")).versions : fixture(seed).versions;
-  if (!mirrorFrom && (!Array.isArray(versions) || !versions.length || versions.some(row =>
+  const versions = mirrorFrom || retained ? null : values.dataset ? JSON.parse(await readFile(resolve(values.dataset), "utf8")).versions : fixture(seed).versions;
+  if (!mirrorFrom && !retained && (!Array.isArray(versions) || !versions.length || versions.some(row =>
     !row.coverage || activeIssuers.some(id => !Array.isArray(row.records?.[id]))))) throw new Error("Invalid source dataset shape");
   const tokens = Object.fromEntries(oracleIds.map(id => [id, process.env[`ORACLE_ADAPTER_TOKEN_${id.toUpperCase()}`]]));
   credentials(tokens);
@@ -223,14 +243,21 @@ async function main() {
     throw new Error("Select distinct listener ports");
   }
 
-  const keys = await localKeys(join(root, "keys"), activeIssuers);
-  const registry = mirrorFrom ? JSON.parse(await readFile(join(mirrorFrom, "issuer-registry.json"), "utf8")) :
+  const keys = await localKeys(join(root, "keys"), activeIssuers, !retained);
+  const registry = mirrorFrom || retained ? JSON.parse(await readFile(join(mirrorFrom ?? root, "issuer-registry.json"), "utf8")) :
     activeIssuers.map(issuerId => ({ issuerId, ...issuers[issuerId], keyVersion: 1, ed25519PublicKey: encodeKey(keys[issuerId].publicKey),
       validFrom: "2026-11-01T00:00:00.000Z", validUntil: "2030-01-01T00:00:00.000Z", status: "ACTIVE" }));
   const publicKeys = Object.fromEntries(registry.map(row => [row.issuerId, decodeKey(row.ed25519PublicKey)]));
   const store = createFeedStore(root, publicKeys);
-  await retainMetadata(join(root, "issuer-registry.json"), registry);
-  await retainMetadata(join(root, "retrieval-keys.json"), Object.fromEntries(activeIssuers.map(id => [id, encodeKey(keys[id].publicKey)])));
+  const retrievalKeys = Object.fromEntries(activeIssuers.map(id => [id, encodeKey(keys[id].publicKey)]));
+  if (retained) {
+    const previousKeys = JSON.parse(await readFile(join(root, "retrieval-keys.json"), "utf8"));
+    if (activeIssuers.some(id => previousKeys[id] !== retrievalKeys[id] ||
+        (!mirrorFrom && encodeKey(publicKeys[id]) !== retrievalKeys[id]))) throw new Error("Retained adapter key identity differs");
+  } else {
+    await retainMetadata(join(root, "issuer-registry.json"), registry);
+    await retainMetadata(join(root, "retrieval-keys.json"), retrievalKeys);
+  }
 
   const source = mirrorFrom ? createFeedStore(mirrorFrom, publicKeys) : null;
   if (source) {
@@ -238,18 +265,28 @@ async function main() {
       throw new Error("A stale mirror needs a new directory when the existing copy already exceeded the requested cap");
     }
     await mirrorFeeds(source, store, activeIssuers, throughVersion);
-  } else await publishFixtures(store, keys, versions, activeIssuers);
+  } else if (!retained) await publishFixtures(store, keys, versions, activeIssuers);
 
-  const listener = await listenAdapters({ store, receiptKeys: keys, ports, tokens, activeIssuers });
+  let publication;
+  if (values["publish-medical"]) {
+    const token = process.env.ORACLE_REGISTRY_API_TOKEN;
+    if (!/^[A-Za-z0-9._~-]{32,256}$/.test(token ?? "") || Object.values(tokens).includes(token)) {
+      throw new Error("A separate local publication credential is required");
+    }
+    const { withDevLitePeer } = await import("../../../scripts/dev-lite-gateway.mjs");
+    publication = { subjects: [["medical-publisher", Buffer.from(token)]], publish: createDevLiteMedicalPublisher({ store, keys, withDevLitePeer }) };
+  }
+  const listener = await listenAdapters({ store, receiptKeys: keys, ports, tokens, activeIssuers, publication });
   console.info(JSON.stringify({ mode: source ? "mirror" : "direct", urls: listener.urls, memory: process.memoryUsage() }));
   let stopping = false;
   let timer;
+  const refreshDelay = retained ? 1_000 : 15_000;
   const refresh = async () => {
     try { await mirrorFeeds(source, store, activeIssuers, throughVersion); }
     catch { console.warn("Source adapter mirror refresh failed"); }
-    if (!stopping) timer = setTimeout(refresh, 15_000);
+    if (!stopping) timer = setTimeout(refresh, refreshDelay);
   };
-  if (source) timer = setTimeout(refresh, 15_000);
+  if (source) timer = setTimeout(refresh, refreshDelay);
   const close = () => {
     if (stopping) return;
     stopping = true;

@@ -34,7 +34,7 @@ export const operationsByRole = {
 
 export const workflowFormDefinitions: Record<WorkflowOperation, WorkflowFormDefinition> = {
   saveMedicalEpisode: { label: "Save patient intake", description: "Use the hospital's episode reference and the member ID from the patient's insurance card. For a correction, enter the revision shown after the previous save.", fields: [
-    { name: "episodeReference", label: "Hospital episode reference" }, { name: "expectedRevision", label: "Current revision (0 for a new episode)" },
+    { name: "episodeReference", label: "Hospital episode reference", help: "For diagnostic Oracle processing, enter the invoice number shown on the receipt." }, { name: "expectedRevision", label: "Current revision (0 for a new episode)" },
     { name: "patientReference", label: "Insurance member ID (from the patient's card)", help: "The member ID is hashed in this browser before submission." },
     { name: "service", label: "Service performed", kind: "select", options: ["SURGERY", "CONSULTATION", "DIAGNOSTIC", "INPATIENT", "OTHER"] },
     { name: "admissionDate", label: "Admission date", kind: "date" }, { name: "dischargeDate", label: "Discharge date", kind: "date" },
@@ -674,12 +674,15 @@ export async function buildWorkflowCommand(
   let command: unknown;
 
   switch (operation) {
-    case "saveMedicalEpisode":
-      command = { operation, episodeReferenceHash: await digest("episodeReference", "Hospital episode reference"),
+    case "saveMedicalEpisode": {
+      const reference = required(values, "episodeReference", "Hospital episode reference");
+      const invoiceNumber = values.service === "DIAGNOSTIC" && /^[A-Za-z0-9][A-Za-z0-9./_-]{0,63}$/.test(reference) ? reference : undefined;
+      command = { operation, episodeReferenceHash: await hashText(reference), ...(invoiceNumber && { invoiceNumber }),
         expectedRevision: Number(required(values, "expectedRevision", "Revision")), patientReferenceHash: await memberDigest("patientReference", "Insurance member ID"),
         service: values.service, admissionDate: values.admissionDate, dischargeDate: values.dischargeDate, serviceDate: values.serviceDate ?? "",
         billMinor: bdtToMinor(required(values, "billBdt", "Bill")), invoiceDate: values.invoiceDate ?? "", diagnosisCode: values.diagnosisCode ?? "" };
       break;
+    }
     case "configureMedicalRules":
       command = { operation, packageId: values.packageId, service: values.service, sublimit: bdtToMinor(required(values, "sublimit", "Sublimit")),
         deductibleBps: Number(required(values, "deductibleBps", "Deductible")), deductibleCap: values.deductibleCap === "0" ? 0 : bdtToMinor(required(values, "deductibleCap", "Deductible cap")),

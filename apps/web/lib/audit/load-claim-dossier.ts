@@ -22,6 +22,7 @@ import type {
   FraudAssessment,
   HospitalVerification,
   MedicalApprovalCertificate,
+  MedicalTimingProfile,
   OracleCommitment,
   OracleRegistrySnapshot,
   OracleRequest,
@@ -34,6 +35,7 @@ export type ClaimAuditDossier = Partial<Awaited<ReturnType<typeof readDossierLed
   panelVoteCommitments?: unknown[];
   auditorRosters?: unknown[];
   revisionProof?: unknown;
+  timingProfile?: MedicalTimingProfile;
   channel?: string;
   chaincode?: string;
   exportedAt: string;

@@ -391,7 +391,10 @@ export type OracleRegistrySnapshot = {
   createdAt: LedgerTimestamp;
 };
 
+export type MedicalTimingProfile = "REAL" | "DEMO";
+
 export type OracleRequest = {
+  timingProfile?: MedicalTimingProfile;
   patientTokenKeyVersion?: number;
   protocolVersion?: "v2";
   manifest?: { schema: string; requestedAt: string; pins: Array<{ issuerId: string; keyVersion: number; feedVersion: number; root: string; effectiveAt: string; anchoredAt: string }> };
@@ -585,6 +588,8 @@ export type AuditorDecision = {
 };
 
 export type ClaimReview = {
+  timingProfile?: MedicalTimingProfile;
+  appealEligibleUntil?: LedgerTimestamp;
   ballotVersion?: "panel-vote-v1";
   commitDeadline?: LedgerTimestamp;
   commitmentsCast?: number;
@@ -681,6 +686,7 @@ export type Settlement = {
 };
 
 export type MedicalApprovalCertificate = {
+  timingProfile?: MedicalTimingProfile;
   certificateVersion?: 3;
   reviewTranscriptHash?: string;
   samplingRecordHash?: string;

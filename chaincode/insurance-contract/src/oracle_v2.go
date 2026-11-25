@@ -51,6 +51,11 @@ func (c *Contract) RequestOracleVerificationV2(ctx contractapi.TransactionContex
 	if err != nil {
 		return nil, err
 	}
+	profile, err := c.ReadMedicalTimingProfile(ctx)
+	if err != nil {
+		return nil, err
+	}
+	waits := timingWaits(profile.Profile)
 	manifest, manifestHash, err := buildOracleV2Manifest(ctx, claim.HospitalID, now)
 	if err != nil {
 		return nil, err
@@ -91,7 +96,8 @@ func (c *Contract) RequestOracleVerificationV2(ctx contractapi.TransactionContex
 		Manifest: manifest, ManifestHash: manifestHash, PolicyVersion: oracleV2Policy, RosterVersion: roster.Version,
 		ModelVersion: release.ModelVersion, ModelHash: release.ArtifactHash, ModelReleaseID: release.ID,
 		AssignedOracleIDs: assignments, RequiredConfirmations: 2, ExpectedResponses: 3, Status: "PENDING", RequestedAt: manifest.RequestedAt,
-		CommitDeadline: now.Add(oracleV2CommitWindow).Format(time.RFC3339Nano), RevealDeadline: now.Add(oracleV2CommitWindow + oracleV2RevealWindow).Format(time.RFC3339Nano),
+		TimingProfile: profile.Profile, CommitDeadline: now.Add(waits.commit).Format(time.RFC3339Nano),
+		RevealDeadline: now.Add(waits.commit + waits.reveal).Format(time.RFC3339Nano),
 	}
 	if release.ModelVersion == medicalModelE3 {
 		if episode.DigestVersion != 2 {

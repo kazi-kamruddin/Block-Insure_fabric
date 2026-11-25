@@ -6,7 +6,7 @@ import subprocess
 import pytest
 
 import oracle_v2
-from verify_dossier import verify_oracle
+from verify_dossier import READBACK_SECTIONS, R2_SECTIONS, canonical_digest, verify, verify_oracle
 
 
 @pytest.fixture(scope="module")
@@ -72,6 +72,43 @@ def test_exact_v2_dossier(v2_dossier):
     requests, results = verify_oracle(v2_dossier, v2_dossier["claim"], True, [])
     assert len(requests) == 1
     assert len(results) == 2
+
+
+def test_e3_referral_requires_matching_peer_readback_and_nonce(v2_dossier):
+    dossier = deepcopy(v2_dossier)
+    for section in READBACK_SECTIONS + R2_SECTIONS:
+        dossier.setdefault(section, [])
+    dossier.update(schemaVersion=9, chaincode="insurance-contract", settlement=None, approvalCertificate=None)
+    request = dossier["oracleRequests"][0]
+    request["patientTokenKeyVersion"] = 1
+    dossier["claim"].update(status="MEDICAL_REVIEW_REQUIRED", currentOracleRequestId=request["id"],
+                            oracleResultHash=request["resultHash"], oracleOutcome=request["finalizationCode"],
+                            episodeId="episode", episodeRevision=1)
+    fields = ("episode", "a" * 64, "DIAGNOSTIC", "2026-11-25", "2026-11-25", "2026-11-25", 4000, "2026-11-25", "Z01")
+    proof = dict(zip(("id", "patientReferenceHash", "service", "serviceDate", "admissionDate", "dischargeDate",
+                      "billMinor", "invoiceDate", "diagnosisCode"), fields, strict=True))
+    nonce = "b" * 64
+    proof.update(digestVersion=2, revision=1, revisionNonce=nonce,
+                 publicHash=canonical_digest("fabric-medical-intake-v2", (nonce, *map(str, fields))))
+    dossier["revisionProof"] = proof
+    sections = READBACK_SECTIONS + R2_SECTIONS + ("oracleSourceIssuers", "oracleSourceFeeds")
+    readback = {"schema": "dossier-peer-readback-v1", "channel": dossier["channel"], "chaincode": dossier["chaincode"],
+                "blockHeight": 2, "blockHash": "f" * 64, "sections": {section: deepcopy(dossier[section]) for section in sections}}
+    assert verify(dossier, readback=readback, require_readback=True)["claimStatus"] == "MEDICAL_REVIEW_REQUIRED"
+    with pytest.raises(ValueError, match="Peer readback is required"):
+        verify(dossier)
+    wrong_outcome = deepcopy(dossier)
+    wrong_outcome["claim"]["status"] = "SUBMITTED"
+    with pytest.raises(ValueError, match="Unsupported claim dossier outcome"):
+        verify(wrong_outcome, readback=readback, require_readback=True)
+    wrong_nonce = deepcopy(dossier)
+    wrong_nonce["revisionProof"]["revisionNonce"] = "c" * 64
+    with pytest.raises(ValueError, match="Revision digest proof differs"):
+        verify(wrong_nonce, readback=readback, require_readback=True)
+    wrong_request = deepcopy(dossier)
+    wrong_request["claim"]["currentOracleRequestId"] = "other-request"
+    with pytest.raises(ValueError, match="E3 referral differs"):
+        verify(wrong_request, readback=readback, require_readback=True)
 
 
 @pytest.mark.parametrize("section,field,change", [

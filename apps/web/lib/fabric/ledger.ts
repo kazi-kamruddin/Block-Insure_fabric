@@ -1,9 +1,11 @@
 import "server-only";
 
 import { randomBytes } from "node:crypto";
+import { freemem } from "node:os";
 import type { Contract } from "@hyperledger/fabric-gateway";
 import { withFabricContract } from "./gateway";
 import { submitJournaled } from "@/lib/workflows/operation-journal";
+import { medicalSourcePublisherEnabled, type PublishedSourcePin } from "@/lib/oracle/publish-medical-sources";
 import type { FabricRole } from "./config";
 import type { MedicalEpisode, MedicalPreparation, MedicalQuote, MedicalRules } from "./medical";
 import type { MedicalClarification, MedicalEvidenceCheck, MedicalReviewCommand, MedicalReviewFacts } from "./medical-review";
@@ -61,6 +63,9 @@ function stringifyArguments(arguments_: Array<string | number>): string[] {
 
 function requireWritableLedger() {
   if (process.env.FABRIC_DEMO_READ_ONLY === "true") throw new Error("Ledger submissions are disabled for this verification run");
+  if (medicalSourcePublisherEnabled() && freemem() < 700 * 1024 * 1024) {
+    throw new Error("This demo needs at least 700 MB of available host memory to write to the ledger.");
+  }
 }
 
 async function evaluate<T>(role: FabricRole, transactionName: string, ...args: string[]) {
@@ -264,11 +269,13 @@ export const ledger = {
     return evaluate<MedicalRules>("insurerAdmin", "ReadMedicalRules", packageId);
   },
   saveMedicalEpisode(input: { episodeReferenceHash: string; expectedRevision: number; patientReferenceHash: string;
-    service: string; serviceDate: string; admissionDate: string; dischargeDate: string; billMinor: number; invoiceDate: string; diagnosisCode: string }, userName?: string) {
+    service: string; serviceDate: string; admissionDate: string; dischargeDate: string; billMinor: number; invoiceDate: string;
+    diagnosisCode: string; invoiceNumber?: string }, userName?: string) {
     if (!userName) throw new Error("No Fabric Hospital identity for this account");
-    const { episodeReferenceHash, expectedRevision, ...facts } = input;
+    const { episodeReferenceHash, expectedRevision, invoiceNumber, ...facts } = input;
     return submitWithTransient("hospitalOfficer", "SaveMedicalEpisode", [episodeReferenceHash, expectedRevision], {
       medicalEpisode: JSON.stringify(facts), revisionNonce: randomBytes(32),
+      ...(medicalSourcePublisherEnabled() && userName === "hospital2" && invoiceNumber && { medicalHospitalInvoiceNumber: invoiceNumber }),
     }, userName);
   },
   configureMedicalRules(input: { packageId: string; service: string; sublimit: number; deductibleBps: number; deductibleCap: number;
@@ -979,6 +986,23 @@ export const ledger = {
     return submit<OracleRequest>("insurerAdmin", "RequestOracleVerificationV2", requestId, claimId);
   },
 
+  requestPublishedMedicalOracleVerification(requestId: string, claimId: string, claimVersion: number, pins: PublishedSourcePin[]) {
+    requireWritableLedger();
+    return withFabricContract("insurerAdmin", async contract => {
+      const method = "RequestPublishedMedicalOracleVerification";
+      const started = performance.now();
+      const proposal = contract.newProposal(method, { arguments: [requestId, claimId, String(claimVersion), JSON.stringify(pins)] });
+      const transaction = await proposal.endorse();
+      requireWritableLedger();
+      const submitted = await transaction.submit();
+      const status = await submitted.getStatus();
+      console.info(JSON.stringify({ at: new Date().toISOString(), method, actor: "insurer", transactionId: submitted.getTransactionId(),
+        blockNumber: String(status.blockNumber), code: status.code, elapsedMs: Math.round(performance.now() - started) }));
+      if (!status.successful) throw new Error(`Oracle request committed INVALID (${status.code}). Refresh the case before retrying.`);
+      return decodeJson<OracleRequest>(submitted.getResult());
+    });
+  },
+
   readOracleGovernance<T>(name: "ListSourceIssuers" | "ListSourceFeeds" | "ListOracleRosters" | "ListMedicalModelReleases") {
     return evaluate<T>("insurerAdmin", name);
   },
@@ -994,7 +1018,14 @@ export const ledger = {
   },
 
   recordPrivateMedicalReceipt(claimId: string, summary: unknown) {
-    return submitWithTransient("policyholder", "RecordMedicalOCRSummary", [claimId], { medicalOCRSummary: JSON.stringify(summary) });
+    requireWritableLedger();
+    return withFabricContract("policyholder", async (contract) => {
+      await contract.submit("RecordMedicalOCRSummary", {
+        arguments: [claimId],
+        transientData: { medicalOCRSummary: JSON.stringify(summary) },
+      });
+      return null;
+    });
   },
 
   finalizeOracleTimeout(requestId: string, role: "insurerAdmin" | "policyholder" | "auditor" = "insurerAdmin", user?: string) {

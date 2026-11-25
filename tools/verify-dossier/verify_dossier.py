@@ -33,6 +33,7 @@ READBACK_SECTIONS = (
     "fraudAssessments", "settlement", "approvalCertificate", "certificateWrite", "auditSampling", "payoutBreakdown",
 )
 R2_SECTIONS = ("panelVoteCommitments", "auditorRosters", "revisionProof")
+TIMING_WINDOWS = {"REAL": (60, 120), "DEMO": (15, 30)}
 
 
 def require(condition, reason):
@@ -252,6 +253,47 @@ def time_value(value, label):
     return stamp
 
 
+def timing_profile(record):
+    if record is None or "timingProfile" not in record:
+        return None
+    value = record["timingProfile"]
+    require(isinstance(value, str) and value in TIMING_WINDOWS, "Invalid timing profile")
+    return value
+
+
+def verify_timing_profile(dossier, claim, certificate, requests):
+    reviews = {review["id"]: review for review in records(dossier, "reviewRounds")}
+    for record in [dossier, certificate, *requests.values(), *reviews.values()]:
+        require(timing_profile(record) != "DEMO" or dossier.get("channel") == "insurance-dev-lite-190",
+                "DEMO timing is restricted to dev-lite")
+    for request in requests.values():
+        profile = timing_profile(request)
+        if not profile:
+            continue
+        require(request.get("protocolVersion") == "v2", "Only Oracle v2 requests carry a timing profile")
+        commit_wait, reveal_wait = TIMING_WINDOWS[profile]
+        requested = time_value(request.get("requestedAt"), "Oracle request")
+        commit = time_value(request.get("commitDeadline"), "Oracle commit deadline")
+        reveal = time_value(request.get("revealDeadline"), "Oracle reveal deadline")
+        require(commit - requested == timedelta(seconds=commit_wait), "Oracle commit window differs from its timing profile")
+        require(reveal - commit == timedelta(seconds=reveal_wait), "Oracle reveal window differs from its timing profile")
+    certificate_profile = timing_profile(certificate)
+    if certificate_profile:
+        require(certificate.get("certificateVersion") == 3, "Only version 3 certificates carry a timing profile")
+        source = (reviews.get(certificate.get("reviewId")) if certificate.get("path") == "PANEL"
+                  else requests.get(certificate.get("oracleRequestId")))
+        require(source is not None and certificate_profile == (timing_profile(source) or "REAL"),
+                "Certificate timing profile differs from its source")
+    current_review = reviews.get(claim.get("currentReviewId"))
+    current_request = requests.get(claim.get("currentOracleRequestId"))
+    if current_review and current_review.get("medicalVersion") != claim["version"]:
+        current_review = None
+    if current_request and current_request.get("claimVersion") != claim["version"]:
+        current_request = None
+    current = certificate_profile or timing_profile(current_review) or timing_profile(current_request)
+    require(timing_profile(dossier) == current, "The dossier timing profile differs from its current ledger record")
+
+
 def draw_panel(review, subjects):
     seed = canonical_digest("medical-panel-draw-v1", (review["claimId"], str(review["medicalVersion"]), str(review["round"])))
     return sorted(subjects, key=lambda subject: (canonical_digest("medical-panel-seat-v1", (seed, subject)), subject))
@@ -309,7 +351,8 @@ def verify_sealed_panels(dossier, decisions):
             panel[panel.index(absent)] = standby.pop(0)
             replaced.add(new)
             if index == 0:
-                prepare_end = when + timedelta(minutes=5)
+                seconds = 30 if review.get("timingProfile") == "DEMO" else 300
+                prepare_end = when + timedelta(seconds=seconds)
         require(review["assignedAuditorIds"] == panel and review.get("standbyAuditorIds", []) == standby and
                 time_value(review["prepareBy"], "preparation") == prepare_end, "Panel assignments or preparation extension differ")
         records_in_round = [record for (round_id, _), record in commitments.items() if round_id == review["id"]]
@@ -349,6 +392,9 @@ def verify_review_transcript(dossier, certificate, commitments, votes):
             fields = [review["id"], str(review["round"]), str(review["medicalVersion"])]
             fields.extend(review.get(field, "") for field in ("kind", "status", "ballotVersion", "rosterVersion",
                 "standbyForReviewId", "initialPrepareBy", "prepareBy", "openedAt", "commitDeadline", "deadline", "closedAt"))
+            profile = timing_profile(review)
+            if profile:
+                fields.append(profile)
             for change in review.get("replacements", []):
                 fields.append(canonical_digest("medical-auditor-replacement-v1", (change["absentAuditorId"], change["newAuditorId"], change["replacedAt"])))
             for auditor in review["assignedAuditorIds"]:
@@ -452,9 +498,13 @@ def verify_certificate(claim, certificate, settlement, expected_hash):
                 (not certificate.get("samplingRecordHash") or valid_hash(certificate["samplingRecordHash"])), "Invalid certificate v3 evidence hash")
         require(time_value(certificate.get("decidedAt"), "decision") <= time_value(certificate.get("issuedAt"), "issuance"),
                 "Certificate issuance preceded the decision")
-        derived = canonical_digest("fabric-medical-approval-v3", (derived, certificate["reviewTranscriptHash"], certificate.get("samplingRecordHash", ""),
+        v3_fields = (derived, certificate["reviewTranscriptHash"], certificate.get("samplingRecordHash", ""),
             *(certificate.get(field, "") for field in oracle_v2.V2_CERTIFICATE_FIELDS), certificate.get("breakdownHash", ""),
-            certificate["decidedAt"], certificate["issuedAt"]))
+            certificate["decidedAt"], certificate["issuedAt"])
+        profile = timing_profile(certificate)
+        if profile:
+            v3_fields += (profile,)
+        derived = canonical_digest("fabric-medical-approval-v3", v3_fields)
         version = 3
     require(hmac.compare_digest(derived, observed), "Certificate hash mismatch")
     if expected_hash is not None:
@@ -668,7 +718,12 @@ def verify(dossier, expected_hash=None, readback=None, require_readback=False):
     require(not strict or not missing, "Missing dossier sections: " + ", ".join(missing))
     status = claim.get("status")
     digest = version = None
-    if status == "REJECTED":
+    e3_referral = schema == 9 and status == "MEDICAL_REVIEW_REQUIRED"
+    if e3_referral:
+        require(certificate is None and settlement is None and expected_hash is None,
+                "Claim awaiting medical review contains an approval or payout")
+        require(readback is not None, "Peer readback is required for an E3 referral")
+    elif status == "REJECTED":
         require(certificate is None and settlement is None and expected_hash is None, "Rejected claim contains an approval or payout")
     else:
         require(status in {"SETTLED", "SETTLEMENT_AUTHORIZED", "APPROVED"}, "Unsupported claim dossier outcome")
@@ -682,6 +737,14 @@ def verify(dossier, expected_hash=None, readback=None, require_readback=False):
             require(settlement is None, "Approved claim unexpectedly includes a settlement")
 
     requests, results = verify_oracle(dossier, claim, strict, missing)
+    if e3_referral:
+        request = requests.get(claim.get("currentOracleRequestId"))
+        require(request and request.get("protocolVersion") == "v2" and type(request.get("patientTokenKeyVersion")) is int and
+                request["patientTokenKeyVersion"] > 0 and
+                request.get("claimVersion") == claim["version"] and request.get("status") == "CONSENSUS" and
+                request.get("finalizationCode") == claim.get("oracleOutcome") and
+                request.get("resultHash") == claim.get("oracleResultHash"), "E3 referral differs from its current Oracle decision")
+    verify_timing_profile(dossier, claim, certificate, requests)
     decisions = {}
     if strict or "reviewRounds" in dossier or "auditorDecisions" in dossier or status == "REJECTED":
         decisions = verify_panel(dossier, claim, certificate)
@@ -739,7 +802,8 @@ def verify(dossier, expected_hash=None, readback=None, require_readback=False):
         sections = readback.get("sections")
         require(isinstance(sections, dict), "Peer readback has no sections")
         v2_sections = ("oracleSourceIssuers", "oracleSourceFeeds") if any(row.get("protocolVersion") == "v2" for row in requests.values()) else ()
-        for section in required_sections + v2_sections:
+        timing_sections = ("timingProfile",) if "timingProfile" in sections or "timingProfile" in dossier else ()
+        for section in required_sections + v2_sections + timing_sections:
             require(section in sections and section in dossier, f"Missing peer readback section: {section}")
             require(sections[section] == dossier[section], f"Peer readback differs: {section}")
     return {"claimId": claim["id"], "claimVersion": claim["version"], "claimStatus": status,

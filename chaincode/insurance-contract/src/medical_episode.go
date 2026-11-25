@@ -133,6 +133,7 @@ func (c *Contract) SaveMedicalEpisode(ctx contractapi.TransactionContextInterfac
 		}
 	}
 	id := canonicalProtocolHash("fabric-medical-episode-v1", hospital, episodeReferenceHash)
+	invoiceNumber := string(transient["medicalHospitalInvoiceNumber"])
 	key, err := stateKey(ctx, "medicalEpisode", id)
 	if err != nil {
 		return nil, err
@@ -157,7 +158,7 @@ func (c *Contract) SaveMedicalEpisode(ctx contractapi.TransactionContextInterfac
 			return nil, err
 		}
 		if medicalIntakeDigest(previous, "") == medicalIntakeDigest(revision, "") {
-			return head, nil
+			return head, rememberMedicalInvoiceNumber(ctx, id, episodeReferenceHash, invoiceNumber)
 		}
 	}
 	if expectedRevision != head.Revision {
@@ -195,6 +196,9 @@ func (c *Contract) SaveMedicalEpisode(ctx contractapi.TransactionContextInterfac
 	head.RevisionHash, head.DigestVersion = medicalIntakeDigest(revision, revision.RevisionNonce), revision.DigestVersion
 	revision.Revision = head.Revision
 	if err := putPrivateState(ctx, "medicalEpisodeRevision", medicalRevisionKey(id, head.Revision), revision); err != nil {
+		return nil, err
+	}
+	if err := rememberMedicalInvoiceNumber(ctx, id, episodeReferenceHash, invoiceNumber); err != nil {
 		return nil, err
 	}
 	if err := overwriteState(ctx, key, head); err != nil {

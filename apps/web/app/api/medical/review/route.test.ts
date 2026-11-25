@@ -11,6 +11,12 @@ import { GET, POST } from "./route";
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/fabric/ledger-time", () => ({ latestLedgerTimestamp: vi.fn(async () => null) }));
+vi.mock("@/lib/fabric/gateway", () => ({
+  withFabricContract: vi.fn(async (_role, evaluate) => evaluate({
+    evaluateTransaction: async (name: string) => Buffer.from(name === "ReadMedicalTimingProfile"
+      ? JSON.stringify({ profile: "DEMO" }) : "2026-11-25T09:04:00Z"),
+  })),
+}));
 vi.mock("@/lib/auth/current-session", () => ({
   currentSession: vi.fn(async () => ({ role: "insurerAdmin", accountId: "insurer-admin" })),
 }));
@@ -26,6 +32,7 @@ afterEach(() => {
 it("shows a held model returned by the ledger in the claim timeline and status badge", async () => {
   vi.stubEnv("FABRIC_CHANNEL_NAME", "insurance-dev-lite-190");
   vi.stubEnv("FABRIC_MEDICAL_REVIEW_ENABLED", "true");
+  vi.stubEnv("FABRIC_MEDICAL_SOURCE_PUBLISHER", "true");
   vi.mocked(currentSession).mockResolvedValue({ role: "insurerAdmin", accountId: "insurer-admin", issuedAt: 0, expiresAt: 1 });
   const claim: Claim = {
     assetType: "claim", schemaVersion: 15, hospitalId: "hospital-test", policyId: "policy-test",
@@ -51,9 +58,16 @@ it("shows a held model returned by the ledger in the claim timeline and status b
   vi.mocked(ledger.readOracleRequest).mockResolvedValue(oracle);
   const response = await GET(new Request("http://127.0.0.1:3219/api/medical/review?claim=claim-test"));
   expect(response.status).toBe(200);
-  const { timeline } = await response.json();
+  const { timeline, activeTimingProfile, sourcePublisher } = await response.json();
+  expect(activeTimingProfile).toBe("DEMO");
+  expect(sourcePublisher).toBe(true);
   expect(renderToStaticMarkup(createElement(MedicalTimeline, { timeline }))).toContain("Model on hold");
   expect(renderToStaticMarkup(createElement(StatusBadge, { status: "MODEL_HELD" }))).toContain("Model on hold");
+
+  vi.mocked(currentSession).mockResolvedValue({ role: "policyholder", accountId: "demo-holder", subjectId: claim.claimantId,
+    issuedAt: 0, expiresAt: 1 });
+  const holderView = await GET(new Request("http://127.0.0.1:3219/api/medical/review?claim=claim-test"));
+  expect(await holderView.json()).toMatchObject({ escalationEligibleAt: "2026-11-25T09:04:00Z" });
 });
 
 it("shows the missing decryption acknowledgment without exposing peer details", async () => {

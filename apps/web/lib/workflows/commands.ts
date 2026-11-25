@@ -10,6 +10,7 @@ export const medicalCandidateChannel = "insurance-medical-reimbursement";
 
 export const workflowCommandSchema = z.discriminatedUnion("operation", [
   z.strictObject({ operation: z.literal("saveMedicalEpisode"), episodeReferenceHash: hash, expectedRevision: nonnegative,
+    invoiceNumber: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9./_-]{0,63}$/).optional(),
     patientReferenceHash: hash, service: medicalService, serviceDate: z.union([date, z.literal("")]),
     admissionDate: date, dischargeDate: date, billMinor: money, invoiceDate: z.union([date, z.literal("")]), diagnosisCode: z.string().trim().max(40) }),
   z.strictObject({ operation: z.literal("configureMedicalRules"), packageId: id, service: medicalService,

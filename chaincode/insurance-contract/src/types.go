@@ -293,6 +293,7 @@ type Claim struct {
 	MedicalHeldReleaseID            string   `json:"medicalHeldReleaseId,omitempty" metadata:",optional"`
 	MedicalDuplicateReview          bool     `json:"medicalDuplicateReview,omitempty" metadata:",optional"`
 	MedicalEscalatedAt              string   `json:"medicalEscalatedAt,omitempty" metadata:",optional"`
+	MedicalEscalationEligibleAt     string   `json:"medicalEscalationEligibleAt,omitempty" metadata:",optional"`
 	MedicalReserveReleasedAt        string   `json:"medicalReservationReleasedAt,omitempty" metadata:",optional"`
 	MedicalClarificationID          string   `json:"medicalClarificationId"`
 	MedicalRecoveryUsed             bool     `json:"medicalRecoveryUsed"`
@@ -429,6 +430,7 @@ type OracleRegistrySnapshot struct {
 }
 
 type OracleRequest struct {
+	TimingProfile           string            `json:"timingProfile,omitempty" metadata:",optional"`
 	PatientTokenKeyVersion  int               `json:"patientTokenKeyVersion,omitempty" metadata:",optional"`
 	ProtocolVersion         string            `json:"protocolVersion,omitempty" metadata:",optional"`
 	Manifest                *OracleV2Manifest `json:"manifest,omitempty" metadata:",optional"`
@@ -637,6 +639,8 @@ type AuditorDecision struct {
 }
 
 type ClaimReview struct {
+	TimingProfile        string               `json:"timingProfile,omitempty" metadata:",optional"`
+	AppealEligibleUntil  string               `json:"appealEligibleUntil,omitempty" metadata:",optional"`
 	InitialPrepareBy     string               `json:"initialPrepareBy,omitempty" metadata:",optional"`
 	BallotVersion        string               `json:"ballotVersion,omitempty" metadata:",optional"`
 	CommitDeadline       string               `json:"commitDeadline,omitempty" metadata:",optional"`

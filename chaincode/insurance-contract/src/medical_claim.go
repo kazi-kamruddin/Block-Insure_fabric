@@ -243,6 +243,9 @@ func (c *Contract) SubmitMedicalClaim(ctx contractapi.TransactionContextInterfac
 		HospitalID: episode.HospitalID, EpisodeID: episodeID, EpisodeRevision: revision, HospitalInvoiceID: medicalRevisionKey(episodeID, revision),
 		AmountMinor: quote.PayableMinor, IncidentDate: episode.ServiceDate, DescriptionHash: quote.StatementHash, EvidenceIDs: []string{},
 		Version: 1, Status: "SUBMITTED", CreatedAt: now, UpdatedAt: now, MedicalEvidenceRequired: quote.EvidenceRequired}
+	if err := c.setInitialMedicalEscalation(ctx, claim, now); err != nil {
+		return nil, err
+	}
 	association, err := verifiedMedicalAssociation(ctx, episode, claim.ClaimantID)
 	if err != nil {
 		return nil, err
@@ -394,6 +397,9 @@ func (c *Contract) AcceptMedicalCorrection(ctx contractapi.TransactionContextInt
 	claim.MedicalDuplicateExplanationHash = ""
 	claim.UpdatedAt, err = ledgerTimestamp(ctx)
 	if err != nil {
+		return nil, err
+	}
+	if err := c.setInitialMedicalEscalation(ctx, claim, claim.UpdatedAt); err != nil {
 		return nil, err
 	}
 	if err := overwriteAsset(ctx, "claim", claim.ID, claim); err != nil {

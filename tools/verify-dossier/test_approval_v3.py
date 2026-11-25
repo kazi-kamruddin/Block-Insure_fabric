@@ -2,11 +2,57 @@ import copy
 import unittest
 
 from test_verify_dossier import fixture
-from verify_dossier import (canonical_digest, draw_panel, verify_certificate, verify_revision_proof,
-                            verify_r2_sampling, verify_sealed_panels)
+from verify_dossier import (canonical_digest, draw_panel, verify_certificate, verify_review_transcript, verify_revision_proof,
+                            verify_r2_sampling, verify_sealed_panels, verify_timing_profile)
 
 
 class ApprovalV3Tests(unittest.TestCase):
+    def test_timing_profile_certificate_cannot_be_changed_or_removed(self):
+        dossier = fixture()
+        cert = dossier["approvalCertificate"]
+        base = cert["hash"]
+        cert.update(certificateVersion=3, reviewTranscriptHash="a" * 64,
+                    decidedAt=cert["approvedAt"], issuedAt=cert["approvedAt"], timingProfile="DEMO")
+        cert["hash"] = canonical_digest("fabric-medical-approval-v3", (base, cert["reviewTranscriptHash"], "",
+            "", "", "", "", cert["breakdownHash"], cert["decidedAt"], cert["issuedAt"], "DEMO"))
+        dossier["settlement"]["approvalCertificateHash"] = cert["hash"]
+        self.assertEqual(verify_certificate(dossier["claim"], cert, dossier["settlement"], None)[1], 3)
+        for mutation in ("REAL", "FAST", None):
+            with self.subTest(mutation=mutation):
+                attempt = dict(cert)
+                if mutation is None:
+                    del attempt["timingProfile"]
+                else:
+                    attempt["timingProfile"] = mutation
+                with self.assertRaisesRegex(ValueError, "Certificate hash mismatch|Invalid timing profile"):
+                    verify_certificate(dossier["claim"], attempt, dossier["settlement"], None)
+
+    def test_timing_profile_matches_current_record_and_oracle_windows(self):
+        claim = {"id": "claim-one", "version": 3, "currentOracleRequestId": "request"}
+        request = {"id": "request", "claimVersion": 3, "protocolVersion": "v2", "timingProfile": "DEMO",
+                   "requestedAt": "2026-11-25T06:00:00.123456789Z", "commitDeadline": "2026-11-25T06:00:15.123456789Z",
+                   "revealDeadline": "2026-11-25T06:00:45.123456789Z"}
+        dossier = {"channel": "insurance-dev-lite-190", "timingProfile": "DEMO"}
+        verify_timing_profile(dossier, claim, None, {"request": request})
+        with self.assertRaisesRegex(ValueError, "dossier timing profile differs"):
+            verify_timing_profile(dict(dossier, timingProfile="REAL"), claim, None, {"request": request})
+        with self.assertRaisesRegex(ValueError, "Oracle reveal window differs"):
+            verify_timing_profile(dossier, claim, None, {"request": dict(request, revealDeadline="2026-11-25T06:03:00Z")})
+        with self.assertRaisesRegex(ValueError, "restricted to dev-lite"):
+            verify_timing_profile(dict(dossier, channel="other"), claim, None, {"request": request})
+
+    def test_review_transcript_binds_the_round_timing_profile(self):
+        review = {"id": "review-one", "round": 1, "medicalVersion": 3, "kind": "INITIAL", "status": "APPROVED",
+                  "timingProfile": "DEMO", "assignedAuditorIds": ["auditor1", "auditor2", "auditor3", "auditor4"]}
+        seats = [canonical_digest("medical-review-seat-v1", (auditor, "", "")) for auditor in review["assignedAuditorIds"]]
+        review_hash = canonical_digest("medical-review-round-v1", ("review-one", "1", "3", "INITIAL", "APPROVED",
+            "", "", "", "", "", "", "", "", "", "DEMO", *seats))
+        cert = {"claimId": "claim-one", "reviewId": review["id"], "path": "PANEL",
+                "reviewTranscriptHash": canonical_digest("medical-review-transcript-v1", ("claim-one", review_hash))}
+        verify_review_transcript({"reviewRounds": [review]}, cert, {}, {})
+        with self.assertRaisesRegex(ValueError, "Review transcript hash differs"):
+            verify_review_transcript({"reviewRounds": [dict(review, timingProfile="REAL")]}, cert, {}, {})
+
     def test_v3_certificate_decision_and_issuance_are_distinct_bindings(self):
         dossier = fixture()
         cert = dossier["approvalCertificate"]
@@ -41,6 +87,13 @@ class ApprovalV3Tests(unittest.TestCase):
             {"version": "roster-one", "subjects": subjects, "approvedMsps": ["InsurerMSP", "AuditorMSP", "OracleMSP"]}],
             "appeals": []}
         verify_sealed_panels(dossier, {vote["id"]: vote})
+        demo = copy.deepcopy(dossier)
+        demo["reviewRounds"][0].update(timingProfile="DEMO", prepareBy="2026-11-25T06:00:30Z",
+                                       openedAt="2026-11-25T06:00:20Z")
+        verify_sealed_panels(demo, {vote["id"]: vote})
+        demo["reviewRounds"][0]["prepareBy"] = review["prepareBy"]
+        with self.assertRaisesRegex(ValueError, "preparation extension differ"):
+            verify_sealed_panels(demo, {vote["id"]: vote})
         with self.assertRaisesRegex(ValueError, "does not open"):
             verify_sealed_panels(dossier, {vote["id"]: dict(vote, ballotSalt="c" * 64)})
         inconsistent = copy.deepcopy(dossier)

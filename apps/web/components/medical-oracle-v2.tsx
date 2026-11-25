@@ -26,10 +26,10 @@ export function MedicalOracleV2({ view, isClaimant, busy, onAction }: {
     onAction({ action: "recordReceiptSummary", claimId: view.claim.id, summary: {
       evidenceId: String(fields.get("evidenceId")), invoiceNumber: String(fields.get("invoiceNumber")).trim(),
       amountMinor: Number(fields.get("amountMinor")), serviceDate: view.facts.serviceDate, hospitalId: view.claim.hospitalId,
-      derivedFrom: String(fields.get("derivedFrom")).trim(),
+      ...(view.sourcePublisher ? {} : { derivedFrom: String(fields.get("derivedFrom")).trim() }),
     } });
   };
-  const waitingForReceipt = !request && isClaimant && view.documents.length > 0 && view.facts?.service === "DIAGNOSTIC" &&
+  const waitingForReceipt = (!request || request.claimVersion !== view.claim.version) && isClaimant && view.documents.length > 0 && view.facts?.service === "DIAGNOSTIC" &&
     ["SUBMITTED", "APPEAL_SUBMITTED"].includes(view.claim.status);
   return <>
     {request && <section className="medicalSubpanel" aria-label="Oracle v2 evidence decision">
@@ -54,7 +54,7 @@ export function MedicalOracleV2({ view, isClaimant, busy, onAction }: {
         </select></label>
         <label>Invoice or receipt number<input name="invoiceNumber" maxLength={64} required /></label>
         <label>Bill amount in poisha<input type="number" name="amountMinor" min="1" step="1" required /></label>
-        <label>Hospital source record ID<input name="derivedFrom" maxLength={128} required /></label>
+        {!view.sourcePublisher && <label>Hospital source record ID<input name="derivedFrom" maxLength={128} required /></label>}
         <button type="submit" className="secondary button" disabled={busy}>Save private receipt summary</button>
       </form>
     </section>}

@@ -223,13 +223,17 @@ export async function readDossierLedgerEvidence({ contract, qscc, channel, chain
 }
 
 export async function readDossierR2Evidence(evaluate, claim, rounds, requests, certificate, { includeRevision = true } = {}) {
+  const currentReview = rounds.find(round => round.id === claim.currentReviewId && round.medicalVersion === claim.version);
+  const currentRequest = requests.find(request => request.id === claim.currentOracleRequestId && request.claimVersion === claim.version);
+  const timingProfile = certificate?.timingProfile ?? currentReview?.timingProfile ?? currentRequest?.timingProfile;
+  const timing = timingProfile ? { timingProfile } : {};
   const sealed = rounds.filter(round => round.ballotVersion === "panel-vote-v1");
-  if (!sealed.length && certificate?.certificateVersion !== 3 && !requests.some(request => request.patientTokenKeyVersion)) return {};
+  if (!sealed.length && certificate?.certificateVersion !== 3 && !requests.some(request => request.patientTokenKeyVersion)) return timing;
   const rosterVersions = [...new Set(sealed.map(round => round.rosterVersion))].sort();
   const [commits, auditorRosters, revision] = await Promise.all([
     Promise.all(sealed.map(round => evaluate("ListAuditorVoteCommitments", round.id))),
     Promise.all(rosterVersions.map(version => evaluate("ReadAuditorRoster", version))),
     includeRevision ? evaluate("ReadMedicalRevisionDossierProof", claim.id) : null,
   ]);
-  return { panelVoteCommitments: commits.flat(), auditorRosters, revisionProof: revision?.digestVersion === 2 ? revision : null };
+  return { ...timing, panelVoteCommitments: commits.flat(), auditorRosters, revisionProof: revision?.digestVersion === 2 ? revision : null };
 }

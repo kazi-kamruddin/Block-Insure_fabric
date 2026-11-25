@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { StatusBadge } from "@/components/status-badge";
 import { MedicalTimeline } from "@/components/medical-timeline";
 import { MedicalRevisionProof } from "@/components/medical-revision-proof";
@@ -50,7 +50,37 @@ export function MedicalReview({ role, onEvidence, investigationEnabled = false }
   const preparing = review?.status === "PREPARING";
   const approveVotes = view?.decisions.filter(decision => decision.outcome === "APPROVE").length ?? 0;
   const rejectVotes = view?.decisions.filter(decision => decision.outcome === "REJECT").length ?? 0;
-  const appealWindow = review?.status === "REJECTED" ? readMedicalAppealWindow(view?.ledgerTime, review.closedAt) : null;
+  const appealWindow = review?.status === "REJECTED" ? readMedicalAppealWindow(view?.ledgerTime, review.closedAt, review.appealEligibleUntil) : null;
+  const newDeadlinesOnLedger = view?.activeTimingProfile !== undefined;
+  const prepareBy = () => newDeadlinesOnLedger ? "" : later(48);
+  const voteDeadline = () => newDeadlinesOnLedger ? "" : later(24);
+  const pinnedObject = view?.certificate ?? review ?? view?.oracle;
+  const timingProfile = pinnedObject ? pinnedObject.timingProfile ?? "REAL" : view?.activeTimingProfile;
+  const escalationEligibleAt = Date.parse(view?.escalationEligibleAt ?? "");
+  const oraclePendingClaimId = view?.oracle?.status === "PENDING" ? view.claim.id : undefined;
+
+  useEffect(() => {
+    const claim = oraclePendingClaimId;
+    if (!claim || busy) return;
+    const url = "/api/medical/review?" + new URLSearchParams({ claim });
+    const controller = new AbortController();
+    let timer: ReturnType<typeof setTimeout>;
+    async function refresh() {
+      try {
+        const response = await fetch(url, { cache: "no-store", signal: controller.signal });
+        if (response.ok) {
+          const next = await response.json() as MedicalReviewView;
+          if (!controller.signal.aborted) setView(next);
+          if (next.oracle?.status !== "PENDING" || (next.readAt ?? 0) > Date.parse(next.oracle.revealDeadline)) return;
+        }
+      } catch {
+        // Keep the last successful ledger read when the next poll fails.
+      }
+      if (!controller.signal.aborted) timer = setTimeout(refresh, 5_000);
+    }
+    timer = setTimeout(refresh, 5_000);
+    return () => { controller.abort(); clearTimeout(timer); };
+  }, [oraclePendingClaimId, busy]);
 
   async function load() {
     const response = await fetch("/api/medical/review?" + new URLSearchParams({ claim: claimId.trim() }), { cache: "no-store" });
@@ -178,6 +208,7 @@ export function MedicalReview({ role, onEvidence, investigationEnabled = false }
       <div className="reviewSummaryRow">
         <strong>Claim version {view.claim.version} · {view.claim.status}</strong>
         <StatusBadge status={view.claim.status} />
+        {timingProfile === "DEMO" && <StatusBadge status="DEMO" label="Demo time scale" tone="oracle" />}
       </div>
       {facts ? <p>Recorded service {facts.service} on {facts.serviceDate} · episode revision {view.claim.episodeRevision}</p>
         : <p>Review disclosure is awaiting preparation.</p>}
@@ -205,14 +236,17 @@ export function MedicalReview({ role, onEvidence, investigationEnabled = false }
       </dl>}
       {view.timeline && <MedicalTimeline timeline={view.timeline} />}
       <MedicalOracleV2 view={view} isClaimant={role === "policyholder"} busy={busy} onAction={command => work(() => send(command))} />
+      {Number.isFinite(escalationEligibleAt) && (view.readAt ?? 0) < escalationEligibleAt &&
+        <p className="cardNote">Escalation opens at {new Date(escalationEligibleAt).toLocaleString()}.</p>}
       {view.devLite && role === "policyholder" && !review && !view.claim.medicalEscalatedAt &&
+        (!newDeadlinesOnLedger || (view.readAt ?? 0) >= escalationEligibleAt) &&
         (view.oracleV2 ? ["SUBMITTED", "APPEAL_SUBMITTED", "ORACLE_PENDING", "ORACLE_FAILED", "MEDICAL_REVIEW_REQUIRED", "MEDICAL_AUDIT_PENDING"] :
           ["SUBMITTED", "APPEAL_SUBMITTED", "ORACLE_PENDING"]).includes(view.claim.status) &&
         <button type="button" className="secondary button" disabled={busy} onClick={() => work(() => send({ action: "escalate", claimId: view.claim.id }))}>
           Escalate after processing deadline
         </button>}
       {role === "auditor" && preparing && review && view.claim.medicalEscalatedAt &&
-        <button type="button" className="primary button" disabled={busy} onClick={() => work(() => send({ action: "open", reviewId: review.id, deadline: later(24) }))}>Open escalated voting</button>}
+        <button type="button" className="primary button" disabled={busy} onClick={() => work(() => send({ action: "open", reviewId: review.id, deadline: voteDeadline() }))}>Open escalated voting</button>}
       {facts && <dl className="planFacts">
         <div><dt>Billed</dt><dd>{formatBdt(facts.quote.billedMinor)}</dd></div>
         <div><dt>Eligible</dt><dd>{formatBdt(facts.quote.eligibleMinor)}</dd></div>
@@ -288,27 +322,27 @@ export function MedicalReview({ role, onEvidence, investigationEnabled = false }
           </div>
         </section>}
         {!review && ["ORACLE_FAILED", "MEDICAL_REVIEW_REQUIRED"].includes(view.claim.status) &&
-          <div className="medicalButtonGroup"><button type="button" className="primary button" disabled={busy} onClick={() => work(() => send({ action: "prepare", claimId: view.claim.id, reviewId: id("review"), prepareBy: later(48) }))}>Prepare four-auditor review</button></div>}
+          <div className="medicalButtonGroup"><button type="button" className="primary button" disabled={busy} onClick={() => work(() => send({ action: "prepare", claimId: view.claim.id, reviewId: id("review"), prepareBy: prepareBy() }))}>Prepare four-auditor review</button></div>}
         {preparing && review && <>
           {!clarification && <div className="medicalSubpanel">
             <label>Clarification question and requested evidence<textarea value={message} maxLength={2000} onChange={event => setMessage(event.target.value)} /></label>
             <div className="medicalButtonGroup">
               <button type="button" className="primary button" disabled={busy || !message.trim()} onClick={() => work(() => send({ action: "ask", reviewId: review.id, id: id("question"),
-                deadline: new Date(Math.min(Date.parse(review.prepareBy!), Date.now() + 24 * 3_600_000)).toISOString(), message }))}>Send clarification</button>
+                deadline: newDeadlinesOnLedger ? "" : new Date(Math.min(Date.parse(review.prepareBy!), Date.parse(later(24)))).toISOString(), message }))}>Send clarification</button>
             </div>
           </div>}
           <div className="medicalButtonGroup">
             {clarification?.status === "PENDING" && <button type="button" className="secondary button" disabled={busy} onClick={() => work(() => send({ action: "respond", id: clarification.id, response: "EXPIRED", message: "", evidenceHash: "" }))}>Close expired clarification</button>}
-            <button type="button" className="primary button" disabled={busy || clarification?.status === "PENDING"} onClick={() => work(() => send({ action: "open", reviewId: review.id, deadline: later(24) }))}>Open voting for 24 hours</button>
+            <button type="button" className="primary button" disabled={busy || clarification?.status === "PENDING"} onClick={() => work(() => send({ action: "open", reviewId: review.id, deadline: voteDeadline() }))}>{newDeadlinesOnLedger ? "Open voting" : "Open voting for 24 hours"}</button>
           </div>
         </>}
         <div className="medicalButtonGroup">
           {review && (preparing || review.status === "OPEN") &&
             <button type="button" className="secondary button" disabled={busy} onClick={() => work(() => send({ action: "expire", reviewId: review.id }))}>Finalize expired review</button>}
           {review && ["ACCESS_FAILED", "TIMED_OUT"].includes(review.status) && !view.claim.medicalRecoveryUsed &&
-            <button type="button" className="secondary button" disabled={busy} onClick={() => work(() => send({ action: "recover", reviewId: review.id, newId: id("review"), prepareBy: later(48) }))}>Use one procedural recovery</button>}
+            <button type="button" className="secondary button" disabled={busy} onClick={() => work(() => send({ action: "recover", reviewId: review.id, newId: id("review"), prepareBy: prepareBy() }))}>Use one procedural recovery</button>}
         {review?.status === "PROCEDURAL_FAILURE" &&
-          <button type="button" className="secondary button" disabled={busy} onClick={() => work(() => send({ action: "recover", reviewId: review.id, newId: id("review"), prepareBy: later(48) }))}>Restart review preparation</button>}
+          <button type="button" className="secondary button" disabled={busy} onClick={() => work(() => send({ action: "recover", reviewId: review.id, newId: id("review"), prepareBy: prepareBy() }))}>Restart review preparation</button>}
         </div>
       </>}
       {role === "policyholder" && <>
@@ -326,9 +360,11 @@ export function MedicalReview({ role, onEvidence, investigationEnabled = false }
         {preparing && review && view.documents.length > 0 &&
           <div className="medicalButtonGroup"><button type="button" className="primary button" disabled={busy} onClick={() => work(() => send({ action: "share", reviewId: review.id, expiresAt: later(96) }))}>Grant listed evidence to these four reviewers</button></div>}
         {view.devLite && review?.status === "REJECTED" && !view.claim.appealCount && !appealWindow?.canAppeal &&
-          <p>{view.ledgerTime && appealWindow?.endsAt ? `Appeal window closed on ${new Date(appealWindow.endsAt).toISOString().slice(0, 10)}.`
+          <p>{view.ledgerTime && appealWindow?.endsAt ? `Appeal window closed at ${new Date(appealWindow.endsAt).toLocaleString()}.`
             : "Appeal availability requires a current ledger timestamp."}</p>}
         {review?.status === "REJECTED" && !view.claim.appealCount && (!view.devLite || appealWindow?.canAppeal) && <div className="medicalSubpanel">
+          {appealWindow?.canAppeal && appealWindow.endsAt !== null && view.devLite &&
+            <p className="cardNote">Appeal before {new Date(appealWindow.endsAt).toLocaleString()}.</p>}
           <label>Disputed rejection<select value={decisionId} onChange={event => setDecisionId(event.target.value)}>
             <option value="">Choose a reason</option>
             {view.decisions.filter(decision => decision.outcome === "REJECT").map(decision =>

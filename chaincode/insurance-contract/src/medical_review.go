@@ -11,14 +11,18 @@ import (
 
 var medicalPanel = []string{"auditor1", "auditor2", "auditor3", "auditor4"}
 
-func medicalReviewClock(ctx contractapi.TransactionContextInterface, deadline string) (time.Time, error) {
+func medicalReviewDeadline(ctx contractapi.TransactionContextInterface, deadline, profile string, defaultWait time.Duration) (time.Time, error) {
 	ts, err := ledgerNow(ctx)
 	if err != nil {
 		return time.Time{}, err
 	}
+	if deadline == "" {
+		return ts.Add(defaultWait), nil
+	}
+	waits := timingWaits(profile)
 	end, err := time.Parse(time.RFC3339, deadline)
-	if err != nil || !end.After(ts) || (usesMedicalApprovalCertificates(ctx) && end.Before(ts.Add(time.Minute))) || end.After(ts.Add(14*24*time.Hour)) {
-		return time.Time{}, fmt.Errorf("choose a future deadline within fourteen days")
+	if err != nil || !end.After(ts) || (usesMedicalApprovalCertificates(ctx) && end.Before(ts.Add(waits.reviewMin))) || end.After(ts.Add(waits.reviewMax)) {
+		return time.Time{}, fmt.Errorf("choose a future deadline within the review timing profile bounds")
 	}
 	return end, nil
 }
@@ -150,7 +154,16 @@ func (c *Contract) createMedicalPreparation(ctx contractapi.TransactionContextIn
 	if _, err := currentMedicalHead(ctx, claim); err != nil {
 		return nil, err
 	}
-	end, err := medicalReviewClock(ctx, prepareBy)
+	profile, err := c.ReadMedicalTimingProfile(ctx)
+	if err != nil {
+		return nil, err
+	}
+	waits := timingWaits(profile.Profile)
+	prepareWait := waits.prepareDefault
+	if !disclose && claim.MedicalEscalatedAt != "" {
+		prepareWait = waits.escalationPrepare
+	}
+	end, err := medicalReviewDeadline(ctx, prepareBy, profile.Profile, prepareWait)
 	if err != nil {
 		return nil, err
 	}
@@ -167,7 +180,8 @@ func (c *Contract) createMedicalPreparation(ctx contractapi.TransactionContextIn
 	}
 	review := &ClaimReview{AssetType: "claimReview", SchemaVersion: SchemaVersion, ID: reviewID, ClaimID: claim.ID, AppealID: claim.CurrentAppealID,
 		Round: claim.ReviewRound + 1, Kind: kind, AssignedAuditorIDs: slices.Clone(panel), ApprovalThreshold: 3, RejectionThreshold: 2,
-		Status: "PREPARING", MedicalVersion: claim.Version, PrepareBy: end.UTC().Format(time.RFC3339)}
+		Status: "PREPARING", MedicalVersion: claim.Version, PrepareBy: end.UTC().Format(time.RFC3339Nano),
+		TimingProfile: profile.Profile}
 	roster, err := c.activeAuditorRoster(ctx)
 	if err != nil {
 		return nil, err
@@ -238,7 +252,7 @@ func (c *Contract) OpenMedicalVoting(ctx contractapi.TransactionContextInterface
 	if _, err := currentMedicalHead(ctx, claim); err != nil {
 		return nil, err
 	}
-	if _, err := medicalReviewClock(ctx, review.PrepareBy); err != nil {
+	if _, err := medicalReviewClockForGrant(ctx, review.PrepareBy); err != nil {
 		return nil, fmt.Errorf("access preparation expired")
 	}
 	if claim.MedicalClarificationID != "" {
@@ -250,7 +264,7 @@ func (c *Contract) OpenMedicalVoting(ctx contractapi.TransactionContextInterface
 			return nil, fmt.Errorf("resolve or expire the clarification before opening voting")
 		}
 	}
-	end, err := medicalReviewClock(ctx, deadline)
+	end, err := medicalReviewDeadline(ctx, deadline, review.TimingProfile, timingWaits(review.TimingProfile).voteDefault)
 	if err != nil {
 		return nil, err
 	}
@@ -273,7 +287,7 @@ func (c *Contract) OpenMedicalVoting(ctx contractapi.TransactionContextInterface
 	if err != nil {
 		return nil, err
 	}
-	review.Status, review.OpenedAt, review.Deadline = "OPEN", now, end.UTC().Format(time.RFC3339)
+	review.Status, review.OpenedAt, review.Deadline = "OPEN", now, end.UTC().Format(time.RFC3339Nano)
 	if review.BallotVersion == sealedPanelBallot {
 		start, err := time.Parse(time.RFC3339Nano, now)
 		if err != nil {

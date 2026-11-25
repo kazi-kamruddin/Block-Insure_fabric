@@ -64,7 +64,7 @@ const accountGroups: ReadonlyArray<{
 }> = [
   { label: "Insurance", description: "Coverage ownership and insurer governance", accountIds: ["insurer-admin", "policyholder-1"] },
   { label: "Hospital network", description: "Independent institutional invoice registers", accountIds: ["hospital-officer", "hospital-officer-2", "hospital-officer-3", "hospital-officer-4", "hospital-officer-5"] },
-  { label: "Independent review", description: "Certificate-bound fixed-quorum decisions", accountIds: ["auditor", "auditor-2", "auditor-3", "auditor-4"] },
+  { label: "Independent review", description: "Certificate-bound fixed-quorum decisions", accountIds: ["auditor", "auditor-2", "auditor-3", "auditor-4", "auditor-5", "auditor-6"] },
   { label: "Banking", description: "External payment execution and reconciliation", accountIds: ["bank-officer"] },
 ];
 
@@ -167,6 +167,7 @@ export function WorkspaceClient({
   onboardingEnabled = false,
   demoAuthEnabled = false,
   showLegacyPolicyholderLogin = false,
+  showR2AuditorLogin = false,
   workspace = "",
   children,
 }: {
@@ -179,6 +180,7 @@ export function WorkspaceClient({
   onboardingEnabled?: boolean;
   demoAuthEnabled?: boolean;
   showLegacyPolicyholderLogin?: boolean;
+  showR2AuditorLogin?: boolean;
   workspace?: string;
   children?: React.ReactNode;
 }) {
@@ -740,7 +742,11 @@ export function WorkspaceClient({
   if (!account) {
     const staffGroups = accountGroups.map(group => ({
       ...group,
-      accountIds: group.accountIds.filter(id => id !== "policyholder-1" || showLegacyPolicyholderLogin),
+      accountIds: group.accountIds.filter(id => {
+        if (id === "policyholder-1") return showLegacyPolicyholderLogin;
+        if (id === "auditor-5" || id === "auditor-6") return showR2AuditorLogin;
+        return true;
+      }),
     })).filter(group => group.accountIds.length);
     return (
       <section className="shell signInPanel">
@@ -1224,7 +1230,7 @@ export function WorkspaceClient({
     case "hospitalOfficer:intake":
       content = <div className="workGrid">{guidedForm}</div>; break;
     case "hospitalOfficer:registry":
-      content = devLite ? <div className="workGrid"><OracleGovernance role="hospitalOfficer" fallback={<MedicalRegistryControls role="hospitalOfficer" />} /></div>
+      content = devLite ? <div className="workGrid"><OracleGovernance role="hospitalOfficer" fallback={<MedicalRegistryControls role="hospitalOfficer" />} />{auditPeriodCard}</div>
         : <p className="emptyState">Registry approvals are not used on this network.</p>; break;
     case "bankOfficer:accounts":
       content = <div className="workGrid">{accountCards}<BankDesk show="links" />{guidedForm}</div>; break;

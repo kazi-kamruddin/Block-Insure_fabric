@@ -12,7 +12,19 @@ import (
 )
 
 func (c *Contract) deriveMedicalApprovalV3(ctx contractapi.TransactionContextInterface, cert *ApprovalCertificate, request *OracleRequest, current *ClaimReview, vote *AuditorDecision, selection *MedicalAuditSelection, issuedAt string) error {
+	return c.deriveMedicalApprovalV3WithTiming(ctx, cert, request, current, vote, selection, issuedAt, true)
+}
+
+func (c *Contract) deriveMedicalApprovalV3WithTiming(ctx contractapi.TransactionContextInterface, cert *ApprovalCertificate, request *OracleRequest, current *ClaimReview, vote *AuditorDecision, selection *MedicalAuditSelection, issuedAt string, stamp bool) error {
 	cert.CertificateVersion = 3
+	if stamp {
+		cert.TimingProfile = medicalTimingReal
+		if current != nil && current.TimingProfile != "" {
+			cert.TimingProfile = current.TimingProfile
+		} else if current == nil && request != nil && request.TimingProfile != "" {
+			cert.TimingProfile = request.TimingProfile
+		}
+	}
 	cert.DecidedAt, cert.IssuedAt = cert.ApprovedAt, issuedAt
 	transcript, err := medicalReviewTranscriptHash(ctx, cert.ClaimID, current, vote)
 	if err != nil {
@@ -43,8 +55,12 @@ func (c *Contract) deriveMedicalApprovalV3(ctx contractapi.TransactionContextInt
 		cert.ManifestHash, cert.FactVectorHash, cert.Decision, cert.PolicyVersion =
 			request.ManifestHash, request.FactVectorHash, request.Decision, request.PolicyVersion
 	}
-	cert.Hash = canonicalProtocolHash("fabric-medical-approval-v3", cert.Hash, cert.ReviewTranscriptHash, cert.SamplingRecordHash,
-		cert.ManifestHash, cert.FactVectorHash, cert.Decision, cert.PolicyVersion, cert.BreakdownHash, cert.DecidedAt, cert.IssuedAt)
+	fields := []string{cert.Hash, cert.ReviewTranscriptHash, cert.SamplingRecordHash,
+		cert.ManifestHash, cert.FactVectorHash, cert.Decision, cert.PolicyVersion, cert.BreakdownHash, cert.DecidedAt, cert.IssuedAt}
+	if stamp {
+		fields = append(fields, cert.TimingProfile)
+	}
+	cert.Hash = canonicalProtocolHash("fabric-medical-approval-v3", fields...)
 	return nil
 }
 
@@ -100,6 +116,9 @@ func medicalReviewTranscriptHash(ctx contractapi.TransactionContextInterface, cl
 		fields := []string{review.ID, strconv.Itoa(review.Round), strconv.Itoa(review.MedicalVersion), review.Kind, review.Status,
 			review.BallotVersion, review.RosterVersion, review.StandbyForReviewID, review.InitialPrepareBy, review.PrepareBy,
 			review.OpenedAt, review.CommitDeadline, review.Deadline, review.ClosedAt}
+		if review.TimingProfile != "" {
+			fields = append(fields, review.TimingProfile)
+		}
 		for _, replacement := range review.Replacements {
 			fields = append(fields, canonicalProtocolHash("medical-auditor-replacement-v1", replacement.AbsentAuditorID, replacement.NewAuditorID, replacement.ReplacedAt))
 		}

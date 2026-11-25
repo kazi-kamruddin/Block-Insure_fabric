@@ -314,7 +314,7 @@ func (c *Contract) RecordGrantedEvidenceAccess(ctx contractapi.TransactionContex
 				return nil, err
 			}
 			if review.Status == "PREPARING" {
-				if _, err := medicalReviewClock(ctx, review.PrepareBy); err != nil {
+				if _, err := medicalReviewClockForGrant(ctx, review.PrepareBy); err != nil {
 					return nil, fmt.Errorf("review preparation expired")
 				}
 			}

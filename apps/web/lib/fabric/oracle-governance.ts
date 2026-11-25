@@ -45,6 +45,6 @@ export type GovernanceAction = keyof typeof oracleGovernanceActions;
 export type GovernanceRecord = { id?: string; issuerId?: string; kind?: string; keyVersion?: number; feedVersion?: number;
   hospitalId?: string;
   root?: string; version?: string; status?: string; approvedAt?: string; subjects?: Array<{ subjectId: string; keyVersion: number }>;
-  approvedMsps?: string[]; modelVersion?: string };
+  approvedMsps?: string[]; modelVersion?: string; activationEligibleAt?: string };
 export type GovernanceView = { supported: boolean; issuers: GovernanceRecord[]; feeds: GovernanceRecord[];
   rosters: GovernanceRecord[]; releases: GovernanceRecord[] };

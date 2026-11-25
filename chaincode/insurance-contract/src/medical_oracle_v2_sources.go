@@ -67,8 +67,13 @@ func (c *Contract) RecordMedicalOCRSummary(ctx contractapi.TransactionContextInt
 		return err
 	}
 	var summary MedicalOCRSummary
-	if len(transient["medicalOCRSummary"]) > 2048 || json.Unmarshal(transient["medicalOCRSummary"], &summary) != nil ||
-		!medicalReceiptNumber.MatchString(summary.InvoiceNumber) || summary.AmountMinor <= 0 || summary.AmountMinor > oracleV2SafeInteger ||
+	if len(transient["medicalOCRSummary"]) > 2048 || json.Unmarshal(transient["medicalOCRSummary"], &summary) != nil {
+		return fmt.Errorf("invalid private medical receipt summary")
+	}
+	if summary.DerivedFrom == "" && usesMedicalApprovalCertificates(ctx) {
+		summary.DerivedFrom = medicalHospitalFeedRecordID(claimID, claim.Version)
+	}
+	if !medicalReceiptNumber.MatchString(summary.InvoiceNumber) || summary.AmountMinor <= 0 || summary.AmountMinor > oracleV2SafeInteger ||
 		!oracleV2Identifier.MatchString(summary.DerivedFrom) || summary.HospitalID != claim.HospitalID {
 		return fmt.Errorf("invalid private medical receipt summary")
 	}

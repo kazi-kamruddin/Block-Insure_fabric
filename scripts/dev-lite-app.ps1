@@ -5,11 +5,16 @@
 # -Onboarding enables LevelDB dev-lite customer accounts and starts its Insurer CA.
 param(
     [switch]$TwoOracles, [switch]$CouchDB, [switch]$Collections,
-    [switch]$Email, [switch]$Onboarding, [switch]$Production, [switch]$ReadOnly, [switch]$Stop
+    [switch]$Email, [switch]$Onboarding, [switch]$Production, [switch]$ReadOnly, [switch]$Stop,
+    [switch]$R2Demo, [ValidateRange(1,3)][int]$Worker
 )
 $ErrorActionPreference = 'Stop'
 if ($Onboarding -and $CouchDB) { throw '-Onboarding requires the LevelDB dev-lite profile.' }
 if ($ReadOnly -and ($Collections -or $Email)) { throw '-ReadOnly depends on local demo delivery and disables premium collection.' }
+if ($R2Demo -and ($CouchDB -or $TwoOracles -or $Email -or $Onboarding -or $ReadOnly -or (-not $Production -and -not $Stop))) {
+    throw '-R2Demo uses the supervised LevelDB production profile.'
+}
+if ($Worker -and -not $R2Demo) { throw '-Worker requires -R2Demo.' }
 $root = Split-Path -Parent $PSScriptRoot
 $definition = Get-Content -Raw -LiteralPath (Join-Path $PSScriptRoot 'profiles/dev-lite-190.json') | ConvertFrom-Json
 if ($definition.repoRoot) { $root = $definition.repoRoot }
@@ -18,9 +23,9 @@ $state = Join-Path $root "data/$profile"
 $web = Join-Path $root 'apps/web'
 $workers = Join-Path $root 'services/oracle-worker'
 $port = $definition.webPort
-$oraclePorts = if ($TwoOracles) { @(3311,3312) } else { @(3311,3312,3313) }
+$oraclePorts = if ($Worker) { @(3310 + $Worker) } elseif ($TwoOracles) { @(3311,3312) } else { @(3311,3312,3313) }
 $emailPort = 3330
-$pidDirectory = Join-Path $state 'logs/pids'
+$pidDirectory = Join-Path $state $(if ($R2Demo) { 'logs/r2-demo/apps' } else { 'logs/pids' })
 
 function Stop-RecordedChild($Child) {
     $process = Get-Process -Id $Child.Id -ErrorAction SilentlyContinue
@@ -36,7 +41,8 @@ function Stop-RecordedChild($Child) {
 
 if ($Stop) {
     $failed = 0
-    foreach ($file in @(Get-ChildItem -LiteralPath $pidDirectory -Filter '*.pid.json' -File -ErrorAction SilentlyContinue)) {
+    $filter = if ($Worker) { "*-oracle$Worker.pid.json" } else { '*.pid.json' }
+    foreach ($file in @(Get-ChildItem -LiteralPath $pidDirectory -Filter $filter -File -ErrorAction SilentlyContinue)) {
         try {
             $child = Get-Content -Raw -LiteralPath $file.FullName | ConvertFrom-Json
             if ($child.Id -notmatch '^\d+$' -or $child.Id -le 0 -or $child.Started -notmatch '^\d+$') {
@@ -70,7 +76,7 @@ if ($Production) {
     $env:HOSTNAME = '127.0.0.1'
     $webArguments = @('scripts/start-standalone.mjs')
 }
-$ownedPorts = @($port) + $oraclePorts + $(if ($Email) { @($emailPort) } else { @() })
+$ownedPorts = if ($Worker) { $oraclePorts } else { @($port) + $oraclePorts + $(if ($Email) { @($emailPort) } else { @() }) }
 if (@(Get-NetTCPConnection -LocalPort $ownedPorts -State Listen -ErrorAction SilentlyContinue).Count) {
     throw 'A dev-lite app or worker port already has an owner.'
 }
@@ -92,7 +98,8 @@ if ($Onboarding -and -not $ReadOnly) {
 }
 $secretPath = Join-Path $state 'app-secrets.json'
 $secretNames = 'AUTH_SECRET','OTP_SECRET','ORACLE_REGISTRY_API_TOKEN','EVENT_WORKER_SECRET','FABRIC_MEDICAL_REVIEW_NOTE_KEY','FABRIC_MEDICAL_REVIEW_REASON_KEY','BANKING_WORKER_SECRET','EMAIL_GATEWAY_TOKEN'
-if ($Onboarding) { $secretNames += 'CUSTOMER_WALLET_KEY','CUSTOMER_PII_KEY' }
+if ($Onboarding -or $R2Demo) { $secretNames += 'CUSTOMER_WALLET_KEY','CUSTOMER_PII_KEY' }
+if ($R2Demo) { $secretNames = @($secretNames | Where-Object { $_ -ne 'EMAIL_GATEWAY_TOKEN' }) }
 $secret = [ordered]@{}
 if (Test-Path -LiteralPath $secretPath) {
     try { $settings = Get-Content -LiteralPath $secretPath -Raw | ConvertFrom-Json }
@@ -102,6 +109,7 @@ if (Test-Path -LiteralPath $secretPath) {
 }
 # Existing secrets are never replaced; only newly introduced names are added.
 $missing = @($secretNames | Where-Object { -not $secret.Contains($_) })
+if ($R2Demo -and $missing.Count) { throw "Retained dev-lite app-secrets.json is missing settings: $($missing -join ', ')." }
 if ($missing.Count) {
     $rng = [Security.Cryptography.RandomNumberGenerator]::Create()
     try {
@@ -117,6 +125,7 @@ $adapterTokens = @{}
 foreach ($ordinal in 1,2,3) {
     $name = "ORACLE_ADAPTER_TOKEN_ORACLE$ordinal"
     $adapterTokens[$name] = if ($secret.Contains($name)) { $secret[$name] } else { [Environment]::GetEnvironmentVariable($name, 'Process') }
+    if ($R2Demo -and -not $adapterTokens[$name]) { throw "Retained source adapter setting $name is missing." }
     [Environment]::SetEnvironmentVariable($name, $null, 'Process')
 }
 foreach ($setting in $secret.GetEnumerator()) {
@@ -131,8 +140,8 @@ if (-not $CouchDB) {
     $env:FABRIC_LEDGER_INSTANCE_ID = $instance.provisioningId
 }
 $env:FABRIC_DEMO_READ_ONLY = if ($ReadOnly) { 'true' } else { 'false' }
-$env:DEV_LITE_ONBOARDING = if ($Onboarding) { 'true' } else { 'false' }
-if ($Onboarding) { $env:CUSTOMER_STATE_ROOT = $appState }
+$env:DEV_LITE_ONBOARDING = if ($Onboarding -or $R2Demo) { 'true' } else { 'false' }
+if ($Onboarding -or $R2Demo) { $env:CUSTOMER_STATE_ROOT = $appState }
 $env:FABRIC_CHANNEL_NAME = $definition.channel
 $env:FABRIC_CHAINCODE_NAME = $definition.chaincodeName
 $env:FABRIC_EXPECTED_SCHEMA_VERSION = "$($definition.schemaVersion)"
@@ -177,6 +186,16 @@ $env:ORACLE_MODEL_VERSION = 'fabric-xgb-synthetic-v1'
 $env:ORACLE_MODEL_HASH = '4954e2d2c71422d415c1d50d32687412479fee5bf61a3a9e283760726e6120b4'
 $env:ORACLE_E2_HASH = $definition.e2EvaluatorHash
 $env:ORACLE_E2_NODE_VERSION = $definition.nodeVersion
+if ($R2Demo) {
+    $env:FABRIC_MEDICAL_SOURCE_PUBLISHER = 'true'
+    $env:ORACLE_R2_DEMO = 'true'
+    $sourceUrls = @{}
+    foreach ($ordinal in 1,2,3) {
+        $ports = if ($ordinal -eq 2) { $definition.r2Demo.mirrorAdapterPorts } else { $definition.r2Demo.directAdapterPorts }
+        $sourceUrls["oracle$ordinal"] = @{'S-A' = "http://127.0.0.1:$($ports[0])"; 'S-B' = "http://127.0.0.1:$($ports[1])"; 'S-C' = "http://127.0.0.1:$($ports[2])"}
+    }
+    $env:ORACLE_V2_SOURCE_URLS = $sourceUrls | ConvertTo-Json -Compress
+}
 foreach ($ordinal in 1,2,3) {
     Set-Item -LiteralPath "Env:ORACLE${ordinal}_HEALTH_URL" -Value "http://127.0.0.1:$(3310 + $ordinal)/health"
 }
@@ -187,6 +206,7 @@ New-Item -ItemType Directory -Path $logs -Force | Out-Null
 New-Item -ItemType Directory -Path $pidDirectory -Force | Out-Null
 $children = [Collections.Generic.List[object]]::new()
 $startedOnboardingCA = $false
+$keepChildren = $false
 function Launch([string]$Name, [string]$Directory, [string[]]$Arguments) {
     $receipt = & node (Join-Path $PSScriptRoot 'start-background-node.mjs') --directory $Directory --stdout (Join-Path $logs "$stamp-$Name.out.log") --stderr (Join-Path $logs "$stamp-$Name.err.log") -- @Arguments
     if ($LASTEXITCODE -ne 0) { throw "Could not start dev-lite $Name" }
@@ -199,6 +219,18 @@ function Launch([string]$Name, [string]$Directory, [string[]]$Arguments) {
     $children.Add($child)
     @{ Id = $child.Id; Started = $child.Started } | ConvertTo-Json -Compress |
         Set-Content -LiteralPath $child.PidPath -Encoding Ascii
+}
+
+function Start-WebApp {
+    Launch 'web' $web $webArguments
+    for ($attempt = 0; $attempt -lt 30; $attempt++) {
+        try {
+            $health = Invoke-RestMethod "$env:APP_ORIGIN/api/fabric/health" -TimeoutSec 5
+            if ($health.channel -eq $definition.channel -and $health.schemaVersion -eq $definition.schemaVersion) { return }
+        } catch {}
+        Start-Sleep -Seconds 2
+    }
+    throw 'Dev-lite web health did not confirm the selected channel and schema.'
 }
 
 try {
@@ -216,17 +248,10 @@ try {
         }
         if (-not $emailReady) { throw 'The local email connector did not report ONLINE. Check its log under data/<profile>/logs.' }
     }
-    Launch 'web' $web $webArguments
-    $webPidPath = $children[$children.Count - 1].PidPath
-    $healthy = $false
-    for ($attempt = 0; $attempt -lt 30; $attempt++) {
-        try {
-            $health = Invoke-RestMethod "$env:APP_ORIGIN/api/fabric/health" -TimeoutSec 5
-            if ($health.channel -eq $definition.channel -and $health.schemaVersion -eq $definition.schemaVersion) { $healthy = $true; break }
-        } catch {}
-        Start-Sleep -Seconds 2
+    if (-not $R2Demo) {
+        Start-WebApp
+        $webPidPath = $children[$children.Count - 1].PidPath
     }
-    if (-not $healthy) { throw 'Dev-lite web health did not confirm the selected channel and schema.' }
     foreach ($workerPort in $oraclePorts) {
         $id = $workerPort - 3310
         $env:ORACLE_ID = "oracle$id"
@@ -241,30 +266,46 @@ try {
             [Environment]::SetEnvironmentVariable($adapterName, $null, 'Process')
         }
     }
-    if (-not $ReadOnly) { Launch 'events' $web @('scripts/sync-events.mjs') }
-    if ($Collections) { Launch 'collections' $web @('scripts/process-premium-collections.mjs') }
+    if (-not $R2Demo) {
+        if (-not $ReadOnly) { Launch 'events' $web @('scripts/sync-events.mjs') }
+        if ($Collections) { Launch 'collections' $web @('scripts/process-premium-collections.mjs') }
+    }
     $online = $false
     for ($attempt = 0; $attempt -lt 30; $attempt++) {
         $ready = @($oraclePorts | Where-Object {
-            try { (Invoke-RestMethod "http://127.0.0.1:$_/health" -TimeoutSec 2).status -eq 'ONLINE' }
+            try {
+                $workerHealth = Invoke-RestMethod "http://127.0.0.1:$_/health" -TimeoutSec 2
+                $workerHealth.status -in @('ONLINE','PROCESSING') -and $workerHealth.oracleId -eq "oracle$($_ - 3310)"
+            }
             catch { $false }
         })
         if ($ready.Count -eq $oraclePorts.Count) { $online = $true; break }
         Start-Sleep -Seconds 1
     }
     if (-not $online) { throw 'Dev-lite Oracle readiness did not confirm every selected worker.' }
+    if ($R2Demo) {
+        if (-not $Worker) {
+            Start-WebApp
+            Launch 'events' $web @('scripts/sync-events.mjs')
+            if ($Collections) { Launch 'collections' $web @('scripts/process-premium-collections.mjs') }
+        }
+        $keepChildren = $true
+        return
+    }
     $extras = @($(if ($Collections) { 'automatic premium collection' }), $(if ($Email) { 'email delivery through Brevo' }), $(if ($Onboarding) { 'customer onboarding' })) | Where-Object { $_ }
     if ($extras.Count) { Write-Host "Also running: $($extras -join ', ')." }
     Write-Host "Dev-lite application is available at $env:APP_ORIGIN. Stop this controller to stop its processes."
     while (Test-Path -LiteralPath $webPidPath) { Start-Sleep -Seconds 2 }
 } finally {
     try {
-        foreach ($child in $children) {
-            try {
-                Stop-RecordedChild $child
-                if (Test-Path -LiteralPath $child.PidPath) { Remove-Item -LiteralPath $child.PidPath -ErrorAction SilentlyContinue }
-            } catch {
-                Write-Warning "Could not clean up tracked dev-lite process $($child.Id). Use -Stop to retry."
+        if (-not $keepChildren) {
+            foreach ($child in $children) {
+                try {
+                    Stop-RecordedChild $child
+                    if (Test-Path -LiteralPath $child.PidPath) { Remove-Item -LiteralPath $child.PidPath -ErrorAction SilentlyContinue }
+                } catch {
+                    Write-Warning "Could not clean up tracked dev-lite process $($child.Id). Use -Stop to retry."
+                }
             }
         }
     } finally {

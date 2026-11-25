@@ -1,5 +1,5 @@
 import type { Contract } from "@hyperledger/fabric-gateway";
-import type { Claim, ClaimHistoryRecord, MedicalApprovalCertificate, OracleRequest, OracleResult } from "@/lib/fabric/types";
+import type { Claim, ClaimHistoryRecord, ClaimReview, MedicalApprovalCertificate, MedicalTimingProfile, OracleRequest, OracleResult } from "@/lib/fabric/types";
 
 type DossierLedgerEvidence = {
   oracleSourceIssuers?: unknown[];
@@ -23,9 +23,9 @@ export function readDossierLedgerEvidence(connection: {
 }): Promise<DossierLedgerEvidence>;
 export function readDossierR2Evidence(
   evaluate: (transaction: string, ...args: string[]) => Promise<unknown>,
-  claim: { id: string },
-  rounds: Array<{ id: string; ballotVersion?: string; rosterVersion?: string }>,
-  requests: Array<{ patientTokenKeyVersion?: number }>,
-  certificate: { certificateVersion?: number } | null,
+  claim: Pick<Claim, "id" | "version" | "currentReviewId" | "currentOracleRequestId">,
+  rounds: Array<Pick<ClaimReview, "id" | "ballotVersion" | "rosterVersion" | "medicalVersion" | "timingProfile">>,
+  requests: Array<Pick<OracleRequest, "id" | "claimVersion" | "patientTokenKeyVersion" | "timingProfile">>,
+  certificate: Pick<MedicalApprovalCertificate, "certificateVersion" | "timingProfile"> | null,
   options?: { includeRevision?: boolean },
-): Promise<{ panelVoteCommitments?: unknown[]; auditorRosters?: unknown[]; revisionProof?: unknown }>;
+): Promise<{ panelVoteCommitments?: unknown[]; auditorRosters?: unknown[]; revisionProof?: unknown; timingProfile?: MedicalTimingProfile }>;

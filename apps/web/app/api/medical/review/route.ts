@@ -10,6 +10,7 @@ import { medicalReviewCommand, type MedicalReviewCommand } from "@/lib/fabric/me
 import { isMedicalChannel, medicalDevLiteChannel } from "@/lib/fabric/medical-channel";
 import { buildMedicalTimeline, hasFinalMedicalApproval } from "@/lib/fabric/medical-timeline";
 import { latestLedgerTimestamp } from "@/lib/fabric/ledger-time";
+import { withFabricContract } from "@/lib/fabric/gateway";
 import { issuedMedicalTerms, medicalHospitalName, medicalRevisionProof } from "@/lib/fabric/medical-review-disclosure";
 import { checkMutationOrigin } from "@/lib/security/request-origin";
 import { redactVoteTallies, visibleDecisions } from "@/lib/fabric/vote-visibility";
@@ -22,6 +23,22 @@ function enabled() {
 type ReviewRole = "insurerAdmin" | "policyholder" | "auditor";
 function reviewRole(role: Session["role"]): role is ReviewRole {
   return role === "insurerAdmin" || role === "policyholder" || role === "auditor";
+}
+
+async function readTimingState(claimId: string, showEscalation: boolean) {
+  try {
+    return await withFabricContract("insurerAdmin", async contract => {
+      const decoder = new TextDecoder();
+      const profile = JSON.parse(decoder.decode(await contract.evaluateTransaction("ReadMedicalTimingProfile"))).profile;
+      if (profile !== "REAL" && profile !== "DEMO") return {};
+      const deadline = showEscalation
+        ? decoder.decode(await contract.evaluateTransaction("ReadMedicalClaimEscalationDeadline", claimId)) : "";
+      return { activeTimingProfile: profile, escalationEligibleAt: deadline };
+    });
+  } catch {
+    // Earlier definitions have no timing transactions. Their original windows still apply.
+    return {};
+  }
 }
 
 export async function GET(request: Request) {
@@ -45,7 +62,7 @@ export async function GET(request: Request) {
     }
     const devLite = loadFabricConfig().channelName === medicalDevLiteChannel;
     const sealedAuditor = session.role === "auditor" && review?.ballotVersion === "panel-vote-v1";
-    const [appeal, clarification, documents, grants, checks, decisions, facts, oracle, certificate, settlement, ledgerTime, revisionProof, issuedTerms, hospitalName, oracleV2, commitments, r2] = await Promise.all([
+    const [appeal, clarification, documents, grants, checks, decisions, facts, oracle, certificate, settlement, ledgerTime, revisionProof, issuedTerms, hospitalName, oracleV2, commitments, r2, timing] = await Promise.all([
       claim.currentAppealId ? ledger.readClaimAppeal(claim.currentAppealId) : null,
       claim.medicalClarificationId ? ledger.readMedicalClarification(session.role === "policyholder" ? session.role : "insurerAdmin", claim.medicalClarificationId) : null,
       Promise.all(claim.evidenceIds.map(id => ledger.readEvidenceReference(id))),
@@ -64,6 +81,7 @@ export async function GET(request: Request) {
       devLite ? ledger.supportsMedicalOracleV2?.() : false,
       sealedAuditor ? ledger.listAuditorVoteCommitments(review.id) : [],
       devLite ? ledger.supportsMedicalR2?.() : false,
+      devLite ? readTimingState(claim.id, session.role === "policyholder" && !review) : {},
     ]);
     const readAt = Date.now();
     const timeline = devLite ? buildMedicalTimeline({ claim,
@@ -73,7 +91,8 @@ export async function GET(request: Request) {
       certificate, settlement: settlement?.approvalCertificateHash === certificate?.hash ? settlement : null,
     }) : undefined;
     return reply({ claim, review: review ? redactVoteTallies(review, session) : null, appeal, clarification, documents, facts, devLite, readAt, timeline, ledgerTime, revisionProof, issuedTerms, hospitalName, certificate,
-      viewerSubjectId: session.role === "auditor" ? session.subjectId : undefined, r2,
+      viewerSubjectId: session.role === "auditor" ? session.subjectId : undefined, r2, ...timing,
+      sourcePublisher: devLite && process.env.FABRIC_MEDICAL_SOURCE_PUBLISHER === "true",
       viewerCommitment: commitments.find(record => record.auditorId === session.subjectId)?.commitment,
       oracleV2, oracle: oracle?.protocolVersion === "v2" && oracle.claimVersion === claim.version ? oracle : null,
       viewerHasVoted: session.role === "auditor" && decisions.some(decision => decision.reviewId === review?.id && decision.auditorId === session.subjectId),

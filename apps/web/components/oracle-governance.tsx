@@ -55,7 +55,8 @@ export function OracleGovernance({ role, fallback }: { role: GovernanceRole; fal
         : <p>No roster proposed.</p>}
       <h3>Model releases</h3>
       {data.releases.length ? <ul>{data.releases.map(row => {
-        const remainingSeconds = row.approvedAt && clock ? Math.max(0, Math.ceil((Date.parse(row.approvedAt) + 600_000 - clock) / 1000)) : null;
+        const eligibleAt = Date.parse(row.activationEligibleAt ?? "");
+        const remainingSeconds = Number.isFinite(eligibleAt) && clock ? Math.max(0, Math.ceil((eligibleAt - clock) / 1000)) : null;
         return <li key={row.id}>{row.id} · {row.modelVersion} · {row.status}
           {row.status === "APPROVED" && remainingSeconds !== null && (remainingSeconds ? ` · Activation in ${remainingSeconds} s` : " · Activation window open")}
         </li>;

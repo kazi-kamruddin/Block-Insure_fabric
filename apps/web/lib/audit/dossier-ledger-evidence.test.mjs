@@ -2,11 +2,20 @@ import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { test } from "vitest";
 import { common, ledger, peer } from "@hyperledger/fabric-protos";
-import { decodeDossierTransaction, readDossierLedgerEvidence, recomputePayoutBreakdown } from "./dossier-ledger-evidence.mjs";
+import { decodeDossierTransaction, readDossierLedgerEvidence, readDossierR2Evidence, recomputePayoutBreakdown } from "./dossier-ledger-evidence.mjs";
 
 const require = createRequire(import.meta.url);
 const { Timestamp } = require("google-protobuf/google/protobuf/timestamp_pb.js");
 const identity = { txId: "tx-42", channel: "test-channel", chaincode: "insurance-contract" };
+
+test("dossier exports the current ledger timing profile even without a certificate", async () => {
+  const evaluate = async () => { throw new Error("No ledger proof reads needed"); };
+  const claim = { id: "claim-42", version: 2, currentOracleRequestId: "req-42", currentReviewId: "review-42" };
+  const request = { id: claim.currentOracleRequestId, claimVersion: 2, timingProfile: "DEMO" };
+  const staleReview = { id: claim.currentReviewId, medicalVersion: 1, timingProfile: "REAL" };
+  assert.deepEqual(await readDossierR2Evidence(evaluate, claim, [staleReview], [request], null), { timingProfile: "DEMO" });
+  assert.deepEqual(await readDossierR2Evidence(evaluate, claim, [{ ...staleReview, medicalVersion: 2 }], [request], null), { timingProfile: "REAL" });
+});
 
 function encodeProcessedTransaction(validation, { txId = identity.txId,
   args = ["RevealOracleResult", "req-42"], value = { id: "req-42:oracle1" } } = {}) {

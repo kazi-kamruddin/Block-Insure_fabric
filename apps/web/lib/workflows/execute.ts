@@ -9,6 +9,7 @@ import type { WorkflowCommand } from "./commands";
 import { currentAttestedMedicalSnapshot, refreshHospitalRegistrySnapshot } from "@/lib/oracle/hospital-registry";
 import { medicalDevLiteChannel } from "@/lib/fabric/medical-channel";
 import { buildEvidenceMerkleTree } from "@/lib/evidence/merkle";
+import { medicalSourcePublisherEnabled, publishMedicalClaimSources } from "@/lib/oracle/publish-medical-sources";
 import evaluator from "@/lib/oracle/evaluator.json";
 
 export async function executeWorkflowCommand(command: WorkflowCommand, session: Session) {
@@ -148,6 +149,10 @@ export async function executeWorkflowCommand(command: WorkflowCommand, session: 
       if (claim.status === "ORACLE_PENDING" && claim.currentOracleRequestId) return ledger.readOracleRequest(claim.currentOracleRequestId);
       if (!["SUBMITTED", "APPEAL_SUBMITTED", "HOSPITAL_VERIFIED"].includes(claim.status)) throw new Error("This claim is not awaiting processing.");
       if (claim.episodeId && await ledger.supportsMedicalOracleV2()) {
+        if (medicalSourcePublisherEnabled()) {
+          const pins = await publishMedicalClaimSources(claim.id, claim.version);
+          return ledger.requestPublishedMedicalOracleVerification(`oracle-${randomUUID()}`, claim.id, claim.version, pins);
+        }
         return ledger.requestOracleVerificationV2(`oracle-${randomUUID()}`, claim.id);
       }
       const snapshot = process.env.FABRIC_CHANNEL_NAME === medicalDevLiteChannel
@@ -165,7 +170,14 @@ export async function executeWorkflowCommand(command: WorkflowCommand, session: 
     }
     case "requestOracleVerification": {
       const claim = await ledger.readClaim(command.claimId);
-      if (claim.episodeId && await ledger.supportsMedicalOracleV2()) return ledger.requestOracleVerificationV2(command.requestId, claim.id);
+      if (claim.episodeId && await ledger.supportsMedicalOracleV2()) {
+        if (medicalSourcePublisherEnabled()) {
+          if (claim.status === "ORACLE_PENDING" && claim.currentOracleRequestId) return ledger.readOracleRequest(claim.currentOracleRequestId);
+          const pins = await publishMedicalClaimSources(claim.id, claim.version);
+          return ledger.requestPublishedMedicalOracleVerification(command.requestId, claim.id, claim.version, pins);
+        }
+        return ledger.requestOracleVerificationV2(command.requestId, claim.id);
+      }
       const snapshot = process.env.FABRIC_CHANNEL_NAME === medicalDevLiteChannel
         ? await currentAttestedMedicalSnapshot(claim.hospitalId, claim.hospitalInvoiceId ?? "")
         : claim.hospitalInvoiceId ? await refreshHospitalRegistrySnapshot() : null;

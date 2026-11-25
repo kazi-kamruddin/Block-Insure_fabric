@@ -54,6 +54,7 @@ func usesMedicalApprovalCertificates(ctx contractapi.TransactionContextInterface
 }
 
 type ApprovalCertificate struct {
+	TimingProfile           string `json:"timingProfile,omitempty" metadata:",optional"`
 	CertificateVersion      int    `json:"certificateVersion,omitempty" metadata:",optional"`
 	ReviewTranscriptHash    string `json:"reviewTranscriptHash,omitempty" metadata:",optional"`
 	SamplingRecordHash      string `json:"samplingRecordHash,omitempty" metadata:",optional"`
@@ -350,7 +351,7 @@ func (c *Contract) verifyMedicalApproval(ctx contractapi.TransactionContextInter
 		return nil, err
 	}
 	if stored.CertificateVersion == 3 {
-		if err := c.deriveMedicalApprovalV3(ctx, expected, request, review, nil, nil, stored.IssuedAt); err != nil {
+		if err := c.deriveMedicalApprovalV3WithTiming(ctx, expected, request, review, nil, nil, stored.IssuedAt, stored.TimingProfile != ""); err != nil {
 			return nil, err
 		}
 	}

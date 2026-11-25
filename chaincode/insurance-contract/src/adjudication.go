@@ -473,6 +473,11 @@ func (c *Contract) recordAuditorDecision(ctx contractapi.TransactionContextInter
 			claim.Status = "REJECTED"
 		}
 		review.ClosedAt = now
+		if !approved {
+			if err := pinMedicalAppealDeadline(review); err != nil {
+				return nil, err
+			}
+		}
 		claim.AuditorDecisionID = decisionID
 		if approved && review.MedicalVersion != 0 && usesMedicalApprovalCertificates(ctx) {
 			request, err := c.medicalApprovalRequest(ctx, claim)
@@ -580,6 +585,11 @@ func (c *Contract) FinalizeExpiredReview(ctx contractapi.TransactionContextInter
 	claim.Status = "REJECTED"
 	if r1Medical && (preparation || review.BallotVersion == sealedPanelBallot) {
 		review.Status, claim.Status = "PROCEDURAL_FAILURE", "MEDICAL_REVIEW_REQUIRED"
+	}
+	if claim.Status == "REJECTED" {
+		if err := pinMedicalAppealDeadline(review); err != nil {
+			return nil, err
+		}
 	}
 	claim.UpdatedAt = now
 	if review.AppealID != "" && review.MedicalVersion == 0 {

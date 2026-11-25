@@ -11,7 +11,7 @@ import { devLiteProfile } from "../../../scripts/dev-lite-gateway.mjs";
 
 loadEnvironmentFile(environmentFileArgument());
 
-const [{ checkOracleNodeVersion, loadOracleConfig }, { connectOracleGateway }, { loadRegistrySnapshot, validateRegistrySnapshot, assessRegistryRecord }, protocol, privacy, cursorModule, retryModule, healthModule] = await Promise.all([
+const [{ checkOracleNodeVersion, loadOracleConfig }, { connectOracleGateway, submitGuardedOracleTransaction }, { loadRegistrySnapshot, validateRegistrySnapshot, assessRegistryRecord }, protocol, privacy, cursorModule, retryModule, healthModule] = await Promise.all([
   import("./config.mjs"),
   import("./gateway.mjs"),
   import("./registry.mjs"),
@@ -73,7 +73,12 @@ async function evaluateOrNull(transactionName, ...arguments_) {
 }
 
 async function submit(transactionName, ...arguments_) {
-  return decodeJson(await runtime.contract.submitTransaction(transactionName, ...arguments_.map(String)));
+  const args = arguments_.map(String);
+  if (config.fabric.channelName === "insurance-dev-lite-190" && process.env.ORACLE_R2_DEMO === "true") {
+    return decodeJson(await submitGuardedOracleTransaction(runtime.contract, transactionName, args, fields =>
+      log("info", "Oracle transaction status", { requestId: args[0], ...fields })));
+  }
+  return decodeJson(await runtime.contract.submitTransaction(transactionName, ...args));
 }
 
 async function registryForRequest(request) {

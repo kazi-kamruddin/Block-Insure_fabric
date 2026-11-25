@@ -237,7 +237,7 @@ func (c *Contract) ReplaceAbsentAuditor(ctx contractapi.TransactionContextInterf
 	review.AssignedAuditorIDs[seat] = replacement
 	review.Replacements = append(review.Replacements, AuditorReplacement{AbsentAuditorID: auditorID, NewAuditorID: replacement, ReplacedAt: now.Format(time.RFC3339Nano)})
 	if len(review.Replacements) == 1 {
-		review.PrepareBy = now.Add(5 * time.Minute).Format(time.RFC3339Nano)
+		review.PrepareBy = now.Add(timingWaits(review.TimingProfile).replacement).Format(time.RFC3339Nano)
 	}
 	if err := overwriteAsset(ctx, "claimReview", review.ID, review); err != nil {
 		return nil, err

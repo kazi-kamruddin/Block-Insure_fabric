@@ -25,3 +25,5 @@ The comparison describes the authority and consensus objects each source studies
 | Block-Insure | Signed source policy and independent origins for specific facts | Three exact-agreement Oracle workers | Manifest-pinned fact vector and route | Governed four-auditor panel and version-bound simulated payout |
 
 The frozen XGBoost and challengers are evaluated on authored synthetic labels. The [ML tables](ml-evidence.md) report model and panel-load behavior as supporting results.
+
+The live defence run measures transaction submission through commit status and elapsed time for the observed journeys. Journey measurements use the governed DEMO profile. The shared ccaas process, LevelDB peers, web app and workers run on one 8 GB host. There is no throughput figure for that host.

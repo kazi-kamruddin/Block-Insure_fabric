@@ -25,3 +25,29 @@ Certificate v3 wraps the legacy certificate digest with the panel transcript, sa
 ## Local chaincode runtime
 
 The dev-lite candidate uses one shared ccaas process on the internal Docker network. The peer's pinned 2.5.16 image and mounted configuration include the external builder. The local connection has no published host port. The chaincode server checks its package ID and retains the original peer-launched mode when the server settings are absent. A shared process is one failure domain and does not model independently operated institutional infrastructure.
+
+## Governed medical timing
+
+InsurerMSP proposes a named REAL or DEMO profile for `insurance-dev-lite-190`. AuditorMSP approves the proposal against the active revision. The ledger records the activation timestamp and transaction ID. A stale proposal cannot replace a newer profile. The default and the profile on all other channels are REAL.
+
+| Chaincode wait or clock | Classification | REAL | DEMO |
+| --- | --- | --- | --- |
+| Oracle v2 commit and subsequent reveal | Protocol | 60 s, then 120 s | 15 s, then 30 s |
+| Active model release eligibility after final approval | Protocol | 10 min | 30 s |
+| Claimant escalation after submission or Oracle finalization | Protocol | 24 h | 2 min |
+| Claimant escalation while Oracle request is pending | Protocol boundary | Ledger reveal deadline + 1 s | Ledger reveal deadline + 1 s |
+| Escalated review preparation | Protocol | 7 d | 10 min |
+| First standby replacement extension | Protocol | 5 min | 30 s |
+| Rejected review appeal or recovery | Protocol | 30 d | 30 min |
+| Review minimum and maximum, and default preparation and voting | Protocol | 1 min to 14 d, defaults 48 h and 24 h | 15 s to 20 min, defaults 3 min and 2 min |
+| Sealed ballot commit cutover and clarification deadline | Protocol | Voting midpoint, clarification capped at preparation deadline | Same calculation on the pinned DEMO deadlines |
+| Audit sampling duration and three-party grace | Governed calendar interval | 1 min to 31 d, grace 60 s to 7 d | Same user-governed interval and bounds |
+| Claimant escalation during audit seed grace | Governed calendar interval | Ledger grace end | Ledger grace end |
+| Legacy Oracle v1 and generic review deadline arguments | Caller-specified legacy clock | Absolute caller deadlines | Absolute caller deadlines |
+| Policy starts, ends, eligibility, waiting, filing, premium intervals, grace, renewals and mandate expiry | Calendar | Issued policy terms and existing calendar rules | Same |
+| Hospital agreement, credential, grant, presentation, issuer and source-feed validity | Calendar | Explicit dates, existing one-year bounds where applicable | Same |
+| Duplicate service-day neighborhood and Oracle's 90-day prior source window | Historical calendar | Existing day offsets and cutoff | Same |
+| Appeal-note disposal | Retention | 365 d | 365 d |
+| Peer ledger-clock tolerance | Clock | 15 s | 15 s |
+
+Oracle requests store their commit and reveal deadlines with the profile. Reviews keep the profile through voting, standby replacement, and closure. The final model approval records `activationEligibleAt` for that governance round. Earlier records fall back to REAL, including the existing failure on claim 206. Certificates v3 bind the decisive review or Oracle request profile into the digest. The dossier checks each stamped review, the Oracle v2 deadlines, and the certificate profile, including against independent readback when required.

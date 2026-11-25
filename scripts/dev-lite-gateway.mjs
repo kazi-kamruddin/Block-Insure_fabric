@@ -17,9 +17,10 @@ const peerIdentity = {
 
 export const devLiteOrganizations = Object.freeze(Object.keys(peerIdentity));
 
-export async function withDevLitePeer(org, action) {
+export async function withDevLitePeer(org, action, hospitalUser) {
   if (!Object.hasOwn(peerIdentity, org)) throw new Error("Unknown dev-lite organization");
   const { mspId, port, user } = peerIdentity[org];
+  if (hospitalUser !== undefined && (org !== "hospital" || hospitalUser !== "hospital2")) throw new Error("Unknown dev-lite source identity");
   const { connectOracleGateway } = await import("../services/oracle-worker/src/gateway.mjs");
   const domain = `${org}.blockinsure.test`;
   const organizationRoot = path.join(repoRoot, "data", "dev-lite", "organizations", "peerOrganizations", domain);
@@ -32,7 +33,7 @@ export async function withDevLitePeer(org, action) {
       channelName: devLiteProfile.channel,
       chaincodeName: devLiteProfile.chaincodeName,
       tlsCertificatePath: path.join(organizationRoot, "peers", peerHostAlias, "tls", "ca.crt"),
-      userMspPath: path.join(organizationRoot, "users", `${user}@${domain}`, "msp"),
+      userMspPath: path.join(organizationRoot, "users", `${hospitalUser ?? user}@${domain}`, "msp"),
     },
   });
   try {

@@ -5,6 +5,12 @@ set -euo pipefail
 root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 channel="${1:-insurance-dev-lite-190}"
 chaincode="${2:-insurance-contract}"
+package_id="${3:-}"
+sequence="${4:-}"
+version="${5:-}"
+if [[ -n "$package_id" ]]; then
+  [[ "$channel" = insurance-dev-lite-190 && "$chaincode" = insurance-contract && "$sequence" =~ ^[0-9]+$ ]]
+fi
 export PATH="$root/network/.fabric/fabric-samples/bin:$PATH"
 export FABRIC_CFG_PATH="$root/network/.fabric/fabric-samples/config" CORE_PEER_TLS_ENABLED=true
 orgs=(insurer hospital auditor bank oracle)
@@ -18,4 +24,11 @@ for i in "${!orgs[@]}"; do
   export CORE_PEER_BCCSP_SW_FILEKEYSTORE_KEYSTORE="$CORE_PEER_MSPCONFIGPATH/keystore"
   definition="$(peer lifecycle chaincode querycommitted -C "$channel" -n "$chaincode" 2>&1 | grep -o 'Version: [^,]*, Sequence: [0-9]*' || echo 'unreadable')"
   echo "$org $definition"
+  if [[ -n "$package_id" ]]; then
+    [[ "$definition" = "Version: $version, Sequence: $sequence" ]] || exit 1
+    approval="$(peer lifecycle chaincode queryapproved -C "$channel" -n "$chaincode" --sequence "$sequence" --output json 2>/dev/null)"
+    installed="$(peer lifecycle chaincode queryinstalled --output json 2>/dev/null)"
+    grep -Fq -- "$package_id" <<< "$approval" || exit 1
+    grep -Fq -- "$package_id" <<< "$installed" || exit 1
+  fi
 done

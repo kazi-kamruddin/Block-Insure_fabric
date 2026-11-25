@@ -29,6 +29,9 @@ func (c *Contract) advanceMedicalVersion(ctx contractapi.TransactionContextInter
 	quote.StatementHash = medicalSuccessorHash(quote.StatementHash, kind, claim.Version, noteHash)
 	claim.DescriptionHash = quote.StatementHash
 	claim.Status, claim.UpdatedAt = "SUBMITTED", now
+	if err := c.setInitialMedicalEscalation(ctx, claim, now); err != nil {
+		return err
+	}
 	claim.CurrentReviewID, claim.CurrentOracleRequestID, claim.HospitalVerificationID = "", "", ""
 	claim.OracleOutcome, claim.OracleResultHash, claim.AuditorDecisionID = "", "", ""
 	claim.MedicalSettlementID, claim.PrivacyPresentationID = "", ""
@@ -126,6 +129,9 @@ func (c *Contract) SubmitMedicalAppeal(ctx contractapi.TransactionContextInterfa
 		claim.MedicalDuplicateExplanationHash = ""
 		claim.MedicalEscalatedAt = ""
 		claim.MedicalHeldReleaseID = ""
+		if err := c.setInitialMedicalEscalation(ctx, claim, now); err != nil {
+			return nil, err
+		}
 		if err := c.screenMedicalDuplicate(ctx, claim, episode); err != nil {
 			return nil, err
 		}
