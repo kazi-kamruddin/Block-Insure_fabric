@@ -17,7 +17,7 @@ The web app opens at `http://127.0.0.1:3219/workspace`. Confirm sequence
 | End-to-end automatic approval | `CLM-2026-000201` · BDT 64,000 · SETTLED | Its claim timeline binds the Oracle release and snapshot, certificate and Bank payout. Export the dossier and compare it with a separately obtained peer readback. |
 | Bank handoff | `CLM-2026-000202` · `STL-2026-000202` · BDT 47,600 · SETTLEMENT_AUTHORIZED | Show the authorization and prepared signing request. A payout confirmation is a separate owner-approved ledger write. |
 | R1 diagnostic AUTO and R2 payout | `CLM-2026-000204` · BDT 3,024 | Show the manifest, exact fact vector quorum and automatic certificate, then the payout confirmed in R2 block 244. |
-| Oracle timeout | `CLM-2026-000206`, request `r1-206-1` | One worker committed and the claimant finalized TIMEOUT. Escalation requires its ledger deadline. |
+| Oracle timeout | `CLM-2026-000206`, request `r1-206-1` | One worker committed and the claimant finalized TIMEOUT. The read-only audit confirmed the REAL escalation deadline of 15:57:27.3 Dhaka on 26 November. |
 | R1 governed panel and R2 payout | `CLM-2026-000203` · BDT 13,920 | Two matching Oracle reveals required panel review. Three of four approved, and the Bank confirmed in R2 block 246. |
 | R2 standby and sealed panel | `CLM-2026-000209` · BDT 2,304 | Show the held original authorization, standby replacement, DEMO v3 certificate and the replacement payout. |
 | R2 corrected appeal | `CLM-2026-000207` · BDT 3,600 | Show the original rejection, matching version-2 receipt, mixed appeal panel, three sealed approval reveals and payout. |
@@ -48,8 +48,7 @@ premium due 24 December 2026. Use the current balance readback for premium
 account ****7001 and reserve account ****7002.
 
 The R1 case evidence is recorded in the [live journey table](results/r1-journeys-2026-11-25.md).
-The R2 production build passed offline. Session A verified the one-command
-launch and captured its measurements from the production demo. [Session A run](results/r2-journeys-2026-11-26.md) · [Memory sample](runbooks/defence-memory-plan.md)
+The R2 payout amounts and DEMO time above come from the dated production run. Session A measured the one-command launch. The pre-freeze audit independently rechecked the retained claims and policies by evaluating the ledger. [Session A live evidence and pre-freeze readback](results/r2-journeys-2026-11-26.md) · [Session A memory](runbooks/defence-memory-plan.md#session-a-measurement-26-november-2026)
 Session A screenshot capture is BLOCKED-TECH. The scoped Playwright Chromium pass used `--workers=1`. The launcher measured 934 MB available and Playwright's immediate check measured 790 MB. The 900 MB gate blocked Chromium before launch. Take the R2 screenshots in Session B once the immediate check passes. [Screenshot gate log](../.project-context/implementation/phase3-live/session-a-screenshots.log) · [Scenario cookbook](scenario-cookbook.md)
 F06 requires the separate Windows Bank operator and has no recorded result.
 [Custody and F06](custody.md)

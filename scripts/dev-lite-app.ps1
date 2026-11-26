@@ -11,7 +11,7 @@ param(
 $ErrorActionPreference = 'Stop'
 if ($Onboarding -and $CouchDB) { throw '-Onboarding requires the LevelDB dev-lite profile.' }
 if ($ReadOnly -and ($Collections -or $Email)) { throw '-ReadOnly depends on local demo delivery and disables premium collection.' }
-if ($R2Demo -and ($CouchDB -or $TwoOracles -or $Email -or $Onboarding -or $ReadOnly -or (-not $Production -and -not $Stop))) {
+if ($R2Demo -and ($CouchDB -or $TwoOracles -or $Email -or $Onboarding -or (-not $Production -and -not $Stop))) {
     throw '-R2Demo uses the supervised LevelDB production profile.'
 }
 if ($Worker -and -not $R2Demo) { throw '-Worker requires -R2Demo.' }
@@ -140,7 +140,7 @@ if (-not $CouchDB) {
     $env:FABRIC_LEDGER_INSTANCE_ID = $instance.provisioningId
 }
 $env:FABRIC_DEMO_READ_ONLY = if ($ReadOnly) { 'true' } else { 'false' }
-$env:DEV_LITE_ONBOARDING = if ($Onboarding -or $R2Demo) { 'true' } else { 'false' }
+$env:DEV_LITE_ONBOARDING = if (($Onboarding -or $R2Demo) -and -not $ReadOnly) { 'true' } else { 'false' }
 if ($Onboarding -or $R2Demo) { $env:CUSTOMER_STATE_ROOT = $appState }
 $env:FABRIC_CHANNEL_NAME = $definition.channel
 $env:FABRIC_CHAINCODE_NAME = $definition.chaincodeName
@@ -187,7 +187,7 @@ $env:ORACLE_MODEL_HASH = '4954e2d2c71422d415c1d50d32687412479fee5bf61a3a9e283760
 $env:ORACLE_E2_HASH = $definition.e2EvaluatorHash
 $env:ORACLE_E2_NODE_VERSION = $definition.nodeVersion
 if ($R2Demo) {
-    $env:FABRIC_MEDICAL_SOURCE_PUBLISHER = 'true'
+    $env:FABRIC_MEDICAL_SOURCE_PUBLISHER = if ($ReadOnly) { 'false' } else { 'true' }
     $env:ORACLE_R2_DEMO = 'true'
     $sourceUrls = @{}
     foreach ($ordinal in 1,2,3) {
@@ -286,7 +286,7 @@ try {
     if ($R2Demo) {
         if (-not $Worker) {
             Start-WebApp
-            Launch 'events' $web @('scripts/sync-events.mjs')
+            if (-not $ReadOnly) { Launch 'events' $web @('scripts/sync-events.mjs') }
             if ($Collections) { Launch 'collections' $web @('scripts/process-premium-collections.mjs') }
         }
         $keepChildren = $true

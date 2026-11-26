@@ -65,7 +65,7 @@ confirmed again after an uncertain response.
 
 ## Isolated run
 
-The current medical channel is already committed at sequence 2. To resume,
+The preserved 1.8.0 medical acceptance channel is committed at sequence 2. To resume that isolated profile,
 use the read-only checks below. Verify all five peer definitions
 and compare the package archive to the source before running the app. Use schema
 15, the medical channel name, `FABRIC_XGBOOST_ENABLED=true`, a protected local Oracle

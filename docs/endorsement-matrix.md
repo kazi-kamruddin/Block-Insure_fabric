@@ -1,6 +1,6 @@
 # Fabric transaction endorsement matrix
 
-Source review dated 25 November 2026. The matrix covers the Block-Insure Fabric Go contract, including the legacy paths it still exposes. The current LevelDB dev-lite ledger uses the 1.9.0 sequence-7 build committed at sequence 1. The signatures listed here come from deployment source. Live endorsement and collection dissemination require a separate peer check. [Dev-lite runbook](dev-lite-medical.md)
+Source review dated 25 November 2026. The matrix includes legacy paths and records the original sequence-1 deployment. The retained LevelDB ledger now runs R2 1.9.0, committed sequence 3. The signatures listed here come from deployment source. Use the dated R2 readback and journey record for current package identity and live collection evidence. [R2 readback](results/r2-journeys-2026-11-26.md#pre-freeze-readback)
 
 Each row uses chaincode endorsement **C**, `OutOf(2, InsurerMSP.peer, HospitalMSP.peer, AuditorMSP.peer, BankMSP.peer, OracleMSP.peer)`. The collection column records conditional private-state accesses. Collection writes use the applicable collection endorsement policy. Private reads need an eligible peer with the data needed for simulation. The public portions of a transaction still use **C**. The collection endorsement policies each provide two qualifying organizations, so the same two signatures can satisfy **C** on paths writing to one collection. [Dev-lite definition](../network/scripts/dev-lite.sh#L121) · [Legacy definition](../network/scripts/deploy-chaincode.sh#L21)
 

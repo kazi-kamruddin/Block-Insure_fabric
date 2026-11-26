@@ -37,6 +37,10 @@ Chaincode 1.9.0 at sequence 3, LevelDB, shared ccaas and DEMO. The one-command l
 
 Containers use Docker's memory reading. Windows processes use working set. The WSL reading already contains the Linux processes, so these values cannot be summed as host usage. The full-profile result is a spot sample on one 8 GB host. Check fresh memory before writes or Chromium.
 
+### Pre-freeze read-only samples, 26 November 2026
+
+Three read-only starts sampled 1,950, 1,339 and 1,561 MB before startup and 676, 631 and 750 MB at first supervisor health. The first preflight sampled 746 MB. The successful second pass sampled 634 MB before peer data and 680 MB before final heads. These are separate spot samples with Oracle event consumption, publication writes and event projection disabled. The observed 967 MB warmed figure above is from Session A's full production profile. `HEALTHY` indicates service reachability. Use `BusinessMemoryReady` and a fresh memory reading before writes. [Audit readback](../results/r2-journeys-2026-11-26.md#pre-freeze-readback)
+
 | Segment | Services to run |
 | --- | --- |
 | Package, Go, TLC, production Next build, offline Chromium | No Fabric containers |

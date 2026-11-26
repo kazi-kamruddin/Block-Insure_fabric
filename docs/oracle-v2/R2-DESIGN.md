@@ -50,4 +50,6 @@ InsurerMSP proposes a named REAL or DEMO profile for `insurance-dev-lite-190`. A
 | Appeal-note disposal | Retention | 365 d | 365 d |
 | Peer ledger-clock tolerance | Clock | 15 s | 15 s |
 
+The unchanged 15 s proposal tolerance equals the DEMO Oracle commit window. The phase guards compare with the accepted proposal timestamp during endorsement. Treat DEMO timing as a rehearsal setting. The pre-freeze audit leaves a strict peer-observed phase boundary open for a sequence-4 design. [Dated R2 run](../results/r2-journeys-2026-11-26.md#pre-freeze-readback)
+
 Oracle requests store their commit and reveal deadlines with the profile. Reviews keep the profile through voting, standby replacement, and closure. The final model approval records `activationEligibleAt` for that governance round. Earlier records fall back to REAL, including the existing failure on claim 206. Certificates v3 bind the decisive review or Oracle request profile into the digest. The dossier checks each stamped review, the Oracle v2 deadlines, and the certificate profile, including against independent readback when required.

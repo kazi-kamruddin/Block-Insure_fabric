@@ -3,7 +3,8 @@ param(
     [Parameter(Mandatory)][ValidateSet('Start','Status','Stop','StopWorker','RestartWorker')][string]$Action,
     [ValidateRange(1,3)][int]$Worker,
     [switch]$Onboarding,
-    [switch]$Collections
+    [switch]$Collections,
+    [switch]$ReadOnly
 )
 
 $ErrorActionPreference = 'Stop'
@@ -23,7 +24,8 @@ $mirrorPorts = $definition.r2Demo.mirrorAdapterPorts
 $businessFloor = $definition.r2Demo.writeMemoryFloorMb
 
 if (($Action -in @('StopWorker','RestartWorker')) -ne [bool]$Worker) { throw 'Specify -Worker only with StopWorker or RestartWorker.' }
-if (($Onboarding -or $Collections) -and $Action -ne 'Start') { throw '-Onboarding and -Collections apply only to Start.' }
+if (($Onboarding -or $Collections -or $ReadOnly) -and $Action -ne 'Start') { throw '-Onboarding, -Collections and -ReadOnly apply only to Start.' }
+if ($ReadOnly -and ($Onboarding -or $Collections)) { throw '-ReadOnly cannot be used with -Onboarding or -Collections.' }
 
 function Get-Containers {
     $lines = @(& docker ps --all --no-trunc --filter "label=com.docker.compose.project=$project" --format '{{.ID}}|{{.Names}}|{{.State}}')
@@ -95,7 +97,8 @@ function Start-Adapter([bool]$Mirror, $Record, $Secrets) {
     } else {
         $name = 'publisher'
         $ports = $directPorts
-        $arguments += @('--root',$direct,'--publish-medical')
+        $arguments += @('--root',$direct)
+        if (-not $Record.ReadOnly) { $arguments += '--publish-medical' }
     }
     $arguments += @('--port-his',"$($ports[0])",'--port-regulator',"$($ports[1])",'--port-receipt',"$($ports[2])")
     $tokenNames = 'ORACLE_ADAPTER_TOKEN_ORACLE1','ORACLE_ADAPTER_TOKEN_ORACLE2','ORACLE_ADAPTER_TOKEN_ORACLE3','ORACLE_REGISTRY_API_TOKEN'
@@ -203,7 +206,7 @@ try {
         if ($Action -eq 'Stop') { Stop-Run $record; Write-Output 'Stopped the tracked R2 demo.'; return }
         if (-not $record.AppStarted) { throw 'The R2 application did not reach its startup stage.' }
         & $appScript -R2Demo -Stop -Worker $Worker
-        if ($Action -eq 'RestartWorker') { & $appScript -R2Demo -Production -Worker $Worker }
+        if ($Action -eq 'RestartWorker') { & $appScript -R2Demo -Production -Worker $Worker -ReadOnly:([bool]$record.ReadOnly) }
         return
     }
 
@@ -230,7 +233,8 @@ try {
     foreach ($name in 'ORACLE_ADAPTER_TOKEN_ORACLE1','ORACLE_ADAPTER_TOKEN_ORACLE2','ORACLE_ADAPTER_TOKEN_ORACLE3','ORACLE_REGISTRY_API_TOKEN') {
         if (-not $secrets.$name) { throw "The retained adapter setting $name is missing." }
     }
-    $record = [pscustomobject]@{ Containers = @(); Adapters = @(); AppStarted = $false }
+    if ((Get-AvailableMemory) -lt $businessFloor) { throw "Full R2 startup requires $businessFloor MB available." }
+    $record = [pscustomobject]@{ Containers = @(); Adapters = @(); AppStarted = $false; ReadOnly = [bool]$ReadOnly }
     Write-RunReceipt $record
     try {
         foreach ($service in $baseServices) { Start-OwnedContainer $service $record }
@@ -262,7 +266,7 @@ try {
         Start-Adapter $true $record $secrets
         $record.AppStarted = $true
         Write-RunReceipt $record
-        & $appScript -R2Demo -Production -Collections:$Collections
+        & $appScript -R2Demo -Production -Collections:$Collections -ReadOnly:$ReadOnly
         Show-Status
     } catch {
         $startupError = $_

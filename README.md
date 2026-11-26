@@ -2,7 +2,7 @@
 
 [![Fabric CI](https://github.com/kazi-kamruddin/Block-Insure_fabric/actions/workflows/quality.yml/badge.svg?branch=main&event=push)](https://github.com/kazi-kamruddin/Block-Insure_fabric/actions/workflows/quality.yml)
 
-**[Verified medical demo](docs/results/medical-final-acceptance-2026-11-19.md)** — live isolated Fabric rehearsal covering medical intake, OCR, appeal, and Bank payout.
+**[R2 medical demo](docs/results/r2-journeys-2026-11-26.md)** — retained LevelDB ledger with signed-source processing, panel decisions, appeal and simulated BDT payouts.
 
 Block-Insure Fabric is the permissioned Hyperledger Fabric evolution of the
 Block-Insure insurance platform. It retains the insurance workflows from
@@ -16,19 +16,22 @@ The thesis demonstration uses `insurance-dev-lite-190`, a LevelDB channel
 with five business MSPs, one Raft orderer, Go chaincode and a Next.js
 Gateway on loopback port 3219. The Gateway holds Fabric identities. The
 policyholder, hospital, insurer, bank and auditor use role-scoped workspaces.
-Clinical evidence and Bank account state remain in scoped collections.
+Scoped collections hold medical facts and private Bank state. Encrypted
+evidence files stay off-ledger, with references and digests on the ledger.
 
-The three Oracle workers agree on the exact result of a request-pinned fact
-vector and policy decision. Source records carry signed authority, origin
+Three Oracle subjects in one OracleMSP run on the same host. Quorum requires
+two exact matches on the request-pinned fact vector and routing decision.
+Source records carry signed authority, origin
 and derivation data. Two matching reveals can route an eligible diagnostic
 claim automatically. Cases requiring review use a four-person panel with
 three approvals or two rejections. Bank settlement uses simulated BDT and
 checks the current version's approval certificate.
 
-The R2 source adds sealed voting, disclosure to the Auditor peer, a
-governed roster, three-share audit sampling, certificate v3 and an E3
-worker identity. The deployment profile records the actual committed
-sequence. Use its matching artifact when running the live demo.
+The retained definition is chaincode 1.9.0 at lifecycle sequence 3,
+package `a5992983…5878`. A single shared ccaas process serves the peers.
+DEMO revision 1, E3 routing and the six-auditor roster are active. R2 adds
+sealed votes, Auditor-peer disclosure, three-share audit sampling and
+certificate v3. S-B is simulated regulator data. [Dated R2 evidence](docs/results/r2-journeys-2026-11-26.md)
 
 [Deployment provenance](docs/provenance.md) · [Dev-lite runbook](docs/dev-lite-medical.md) · [R2 design](docs/oracle-v2/R2-DESIGN.md) · [Defence checklist](docs/defence-checklist.md) · [Historical deployments](docs/archive/README.md)
 
@@ -52,7 +55,7 @@ how to verify the local Medicare benchmark archive and prepare the isolated
 - `apps/web/` — Next.js web application.
 - `docs/` — architecture, role model, and implementation notes.
 - `scripts/` — shared verification and supervised demonstration automation.
-- `services/oracle-worker/` — independent Oracle processes, registry fixtures,
+- `services/oracle-worker/` — separately configured Oracle processes, registry fixtures,
   durable cursors, and health reporting.
 - `formal/insurance-workflow/` — TLA+ specification and exhaustive executable checker.
 - `benchmarks/` — Hyperledger Caliper and end-to-end Oracle fault experiments.
@@ -70,25 +73,26 @@ the active runtime.
 ## Implemented architecture
 
 The local network models separate organizations for the insurer, hospital,
-bank, auditor, and Oracle services, backed by Fabric CAs and CouchDB. Its Go chaincode enforces
+bank, auditor, and Oracle services. The R2 profile uses LevelDB. Archived
+profiles also use CouchDB. Go chaincode enforces
 MSP membership, certificate role attributes, asset ownership, and the complete
 policy-to-settlement and policy-to-benefit state machines. The Next.js server accesses the ledger
 through Fabric Gateway; browsers never hold Fabric private keys.
 
 ## Getting started
 
-Use the [LevelDB dev-lite runbook](docs/dev-lite-medical.md) for the current
-medical demonstration. Start the retained network and application from the
-repository root:
+Use the [scenario cookbook](docs/scenario-cookbook.md) for the retained R2
+demonstration. From the repository root, with the retained artifacts and a
+production build prepared offline, start the stack.
 
 ```powershell
-wsl.exe -d Ubuntu --cd (Get-Location).Path --exec bash network/scripts/network.sh --dev-lite up
-.\scripts\dev-lite-app.ps1 -Onboarding
+powershell -ExecutionPolicy Bypass -File .\scripts\r2-demo.ps1 Start
 ```
 
-Open `http://127.0.0.1:3219/workspace`. The controller starts all three
-Oracle workers by default. For a production-mode demonstration, follow the
-runbook's build and restart procedure.
+Open `http://127.0.0.1:3219/workspace`. The supervisor starts the retained
+peers, shared ccaas, signed-source processes, three workers and production
+web app. Use `Status` and `Stop` on the same script. A read-only inspection
+uses `Start -ReadOnly` and keeps Oracle event consumption and source publishing off.
 
 The earlier November alignment candidate has its own
 [startup and browser rehearsal](docs/candidate-demonstration.md).
