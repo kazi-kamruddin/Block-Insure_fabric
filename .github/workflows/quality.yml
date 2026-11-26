@@ -109,6 +109,13 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: 22
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      # The worker resolves its Fabric Gateway and gRPC clients from the web
+      # app's locked dependencies (src/gateway.mjs), so install those first.
+      - name: Install shared Fabric client dependencies
+        working-directory: apps/web
+        run: npm ci --ignore-scripts
       - name: Check worker source
         run: npm run check
       - name: Verify frozen evaluator identity
@@ -135,5 +142,12 @@ jobs:
         run: node --test tools/bank-signer/confirmation.test.mjs
       - name: Test local Brevo email connector
         run: node --test tools/email-gateway/gateway.test.mjs
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Install verifier test runner
+        run: python -m pip install pytest==9.1.1
+      # pytest runs both the unittest-style and the pytest-style verifier tests.
       - name: Test independent dossier verifier
-        run: python3 -B -m unittest discover -s tools/verify-dossier -p 'test_*.py'
+        run: python -B -m pytest tools/verify-dossier -q -p no:cacheprovider
