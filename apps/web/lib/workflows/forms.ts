@@ -1,4 +1,5 @@
 import type { FabricRole } from "@/lib/fabric/config";
+import { normalizeMemberReference } from "@/lib/customers/member-reference";
 import {
   workflowCommandSchema,
   type WorkflowCommand,
@@ -24,21 +25,21 @@ export type WorkflowFormValues = Record<string, string>;
 export type HashText = (value: string) => Promise<string>;
 
 export const operationsByRole = {
-  insurerAdmin: ["startClaimProcessing", "createPartnerAgreement", "setPartnerAgreementStatus", "createPolicyPackage", "configurePolicyPackagePartners", "publishPolicyPackage", "retirePolicyPackage", "createBenefitPlan", "publishBenefitPlan", "retireBenefitPlan", "issuePolicy", "issuePolicyPrivacyCredential", "revokePolicyPrivacyCredential", "advancePolicyLifecycle", "cancelPolicyAsInsurer", "queuePremiumCollection", "decideBenefitRequest", "markBenefitPaymentReady", "publishEvidenceMerkleBatch", "assessClaimFraud", "publishOracleRegistrySnapshot", "requestOracleVerification", "finalizeOracleTimeout", "routeOracleFailureToReview", "openClaimReview", "finalizeExpiredReview", "authorizeSettlement"],
-  policyholder: ["acquirePolicy", "requestBankMandate", "cancelBankMandate", "setBeneficiaries", "submitBenefitRequest", "renewPolicy", "cancelPolicy", "submitClaim", "registerClaimPrivacyPresentation", "submitClaimAppeal", "grantEvidenceAccess", "revokeEvidenceAccess"],
+  insurerAdmin: ["startClaimProcessing", "createPartnerAgreement", "setPartnerAgreementStatus", "createPolicyPackage", "configurePolicyPackagePartners", "publishPolicyPackage", "retirePolicyPackage", "createBenefitPlan", "publishBenefitPlan", "retireBenefitPlan", "issuePolicy", "issuePolicyPrivacyCredential", "revokePolicyPrivacyCredential", "advancePolicyLifecycle", "reinstatePolicy", "cancelPolicyAsInsurer", "queuePremiumCollection", "schedulePremiumCollections", "retryPremiumCollection", "decideBenefitRequest", "markBenefitPaymentReady", "publishEvidenceMerkleBatch", "assessClaimFraud", "publishOracleRegistrySnapshot", "requestOracleVerification", "finalizeOracleTimeout", "routeOracleFailureToReview", "openClaimReview", "finalizeExpiredReview", "authorizeSettlement"],
+  policyholder: ["acquirePolicy", "requestBankAccountLink", "cancelBankAccountLink", "requestBankMandate", "cancelBankMandate", "setBeneficiaries", "submitBenefitRequest", "renewPolicy", "cancelPolicy", "submitClaim", "registerClaimPrivacyPresentation", "submitClaimAppeal", "grantEvidenceAccess", "revokeEvidenceAccess"],
   hospitalOfficer: ["createHospitalInvoice", "updateHospitalInvoice", "recordHospitalModelFacts"],
   auditor: ["recordAuditorDecision"],
-  bankOfficer: ["openBankAccount", "adjustBankAccountBalance", "reviewBankMandate", "recordPremiumAdjustment", "processPremiumCollection", "expireBankMandate", "confirmBenefitPayment", "confirmSettlement"],
+  bankOfficer: ["openBankAccount", "reviewBankAccountLink", "adjustBankAccountBalance", "reviewBankMandate", "recordPremiumAdjustment", "processPremiumCollection", "expireBankMandate", "confirmBenefitPayment", "confirmSettlement"],
 } as const satisfies Record<FabricRole, readonly WorkflowOperation[]>;
 
 export const workflowFormDefinitions: Record<WorkflowOperation, WorkflowFormDefinition> = {
-  saveMedicalEpisode: { label: "Save patient intake", description: "Use the hospital's existing episode and patient references. For a correction, enter the revision shown after the previous save.", fields: [
-    { name: "episodeReference", label: "Hospital episode reference" }, { name: "expectedRevision", label: "Current revision (0 for a new episode)" },
-    { name: "patientReference", label: "Hospital patient reference" },
+  saveMedicalEpisode: { label: "Save patient intake", description: "Use the hospital's episode reference and the member ID from the patient's insurance card. For a correction, enter the revision shown after the previous save.", fields: [
+    { name: "episodeReference", label: "Hospital episode reference", help: "For diagnostic Oracle processing, enter the invoice number shown on the receipt." }, { name: "expectedRevision", label: "Current revision (0 for a new episode)" },
+    { name: "patientReference", label: "Insurance member ID (from the patient's card)", help: "The member ID is hashed in this browser before submission." },
     { name: "service", label: "Service performed", kind: "select", options: ["SURGERY", "CONSULTATION", "DIAGNOSTIC", "INPATIENT", "OTHER"] },
     { name: "admissionDate", label: "Admission date", kind: "date" }, { name: "dischargeDate", label: "Discharge date", kind: "date" },
-    { name: "serviceDate", label: "Documented service date (if known)", kind: "date" }, { name: "billBdt", label: "Billed BDT", kind: "money" },
-    { name: "invoiceDate", label: "Billing date (if documented)", kind: "date" }, { name: "diagnosisCode", label: "Diagnosis code (if recorded)" },
+    { name: "serviceDate", label: "Documented service date", kind: "date", help: "Claims are filed against this date. Leave it empty only if it is genuinely unknown." }, { name: "billBdt", label: "Billed BDT", kind: "money" },
+    { name: "invoiceDate", label: "Billing date", kind: "date", help: "Oracle verification needs the billing date. Without it this Hospital's history is incomplete and automatic verification is refused." }, { name: "diagnosisCode", label: "Diagnosis code (if recorded)" },
   ] },
   configureMedicalRules: { label: "Configure reimbursement terms", description: "Set the rules for a draft package before publishing it. Days follow Asia/Dhaka; calculations round down to the minor unit.", fields: [
     { name: "packageId", label: "Draft package ID" },
@@ -100,8 +101,8 @@ export const workflowFormDefinitions: Record<WorkflowOperation, WorkflowFormDefi
       { name: "id", label: "Package ID", placeholder: "package-essential" },
       { name: "name", label: "Package name", placeholder: "Essential Health" },
       { name: "description", label: "Public description", kind: "textarea", placeholder: "Coverage summary visible to channel members" },
-      { name: "premiumBdt", label: "Premium (BDT)", kind: "money", placeholder: "100.00" },
-      { name: "coverageLimitBdt", label: "Coverage limit (BDT)", kind: "money", placeholder: "10000.00" },
+      { name: "premiumBdt", label: "Premium (BDT)", kind: "money", placeholder: "1250.00", help: "Charged for each 30-day installment." },
+      { name: "coverageLimitBdt", label: "Coverage limit (BDT)", kind: "money", placeholder: "300000.00" },
       { name: "termsText", label: "Terms reference", kind: "textarea", placeholder: "Document identifier, version, or terms summary", help: "Hashed in this browser; only the SHA-256 digest is sent." },
     ],
   },
@@ -172,6 +173,11 @@ export const workflowFormDefinitions: Record<WorkflowOperation, WorkflowFormDefi
     description: "Apply a due-date transition to grace, lapse, or expiry using an explicit business date.",
     fields: [{ name: "id", label: "Policy ID" }, { name: "asOfDate", label: "Business date", kind: "date" }],
   },
+  reinstatePolicy: {
+    label: "Reinstate a lapsed medical policy",
+    description: "Offer reinstatement from today. The customer pays a new installment starting today; the lapse gap is never covered and waiting periods restart.",
+    fields: [{ name: "id", label: "Policy ID" }, { name: "reasonText", label: "Reinstatement decision reference", kind: "textarea" }],
+  },
   cancelPolicy: {
     label: "Cancel my policy",
     description: "Cancel owned coverage and retain only a hash of the private reason.",
@@ -190,12 +196,37 @@ export const workflowFormDefinitions: Record<WorkflowOperation, WorkflowFormDefi
   openBankAccount: {
     label: "Open simulated bank account",
     description: "Create a balance-bearing customer or insurer account at an actively contracted Bank.",
-    fields: [{ name: "id", label: "Account reference ID" }, { name: "bankId", label: "Contracted Bank ID" }, { name: "ownerId", label: "Account owner subject ID" }, { name: "accountType", label: "Account type", kind: "select", options: ["CUSTOMER", "INSURER"] }, { name: "accountLabel", label: "Account label", placeholder: "Primary savings" }, { name: "maskedAccount", label: "Masked account number", placeholder: "**** **** 4821", help: "Use dummy digits and hide all but the display suffix." }, { name: "openingBalanceBdt", label: "Opening balance (BDT)", kind: "money" }, { name: "accountTokenText", label: "Bank-vault token", help: "Hashed locally before Fabric submission." }],
+    fields: [{ name: "id", label: "Account reference ID" }, { name: "bankId", label: "Contracted Bank ID" }, { name: "ownerId", label: "Account owner subject ID" }, { name: "accountType", label: "Account type", kind: "select", options: ["CUSTOMER", "INSURER"] }, { name: "accountLabel", label: "Account label", placeholder: "Primary savings" }, { name: "maskedAccount", label: "Masked account number", placeholder: "**** **** 4821", help: "Show only the last four digits; hide the rest with *." }, { name: "openingBalanceBdt", label: "Opening balance (BDT)", kind: "money" }, { name: "accountTokenText", label: "Bank-vault token", help: "Hashed locally before Fabric submission." }],
   },
   adjustBankAccountBalance: {
     label: "Adjust account balance",
     description: "Record an auditable simulated credit or debit for demonstration funding.",
     fields: [{ name: "transferId", label: "Transfer ID" }, { name: "accountId", label: "Account reference ID" }, { name: "direction", label: "Direction", kind: "select", options: ["CREDIT", "DEBIT"] }, { name: "amountBdt", label: "Amount (BDT)", kind: "money" }, { name: "externalReferenceText", label: "External adjustment reference" }],
+  },
+  requestBankAccountLink: {
+    label: "Request a bank account link",
+    description: "Ask a contracted Bank to link one of your accounts. Enter only the masked number; the Bank verifies the account and supplies its private details.",
+    fields: [{ name: "id", label: "Link request ID" }, { name: "bankId", label: "Contracted Bank ID" }, { name: "accountLabel", label: "Account nickname" }, { name: "maskedAccount", label: "Masked account number", placeholder: "**** 1234" }],
+  },
+  reviewBankAccountLink: {
+    label: "Review a bank account link",
+    description: "Approve after verifying the customer's account in the Bank's own records, or reject. Approval opens the verified account with a private token and balance.",
+    fields: [{ name: "id", label: "Link request ID" }, { name: "outcome", label: "Outcome", kind: "select", options: ["APPROVE", "REJECT"] }, { name: "accountReferenceId", label: "New account reference ID (approval only)" }, { name: "accountTokenText", label: "Bank-vault token (approval only)" }, { name: "openingBalanceBdt", label: "Verified balance (BDT, approval only)", kind: "money" }, { name: "decisionText", label: "Decision reference" }],
+  },
+  cancelBankAccountLink: {
+    label: "Cancel a bank account link request",
+    description: "Withdraw a link request the Bank has not reviewed yet.",
+    fields: [{ name: "id", label: "Link request ID" }],
+  },
+  schedulePremiumCollections: {
+    label: "Schedule due EFT collections",
+    description: "Create a collection for every active mandate due on or before today's ledger date. Running it again creates nothing new.",
+    fields: [{ name: "asOfDate", label: "Business date (today or earlier)", kind: "date" }],
+  },
+  retryPremiumCollection: {
+    label: "Retry a bounced EFT collection",
+    description: "Present a bounced installment to the Bank again, for example after the customer funds the account. At most three attempts.",
+    fields: [{ name: "collectionId", label: "Collection ID" }],
   },
   requestBankMandate: {
     label: "Request debit mandate",
@@ -262,7 +293,7 @@ export const workflowFormDefinitions: Record<WorkflowOperation, WorkflowFormDefi
     description: "Add an invoice to this Hospital's independent billing register. Sensitive references are hashed in the browser.",
     fields: [
       { name: "id", label: "Invoice ID", placeholder: "invoice-1001" },
-      { name: "patientReferenceText", label: "Patient reference", placeholder: "policyholder1", help: "Use the patient’s insurance account reference, for example policyholder1. Hashed locally; it must identify the policyholder." },
+      { name: "patientReferenceText", label: "Insurance member ID (from the patient's card)", help: "The member ID is hashed in this browser before submission." },
       { name: "invoiceReferenceText", label: "Invoice reference", help: "Give this reference to the patient for a future claim." },
       { name: "treatmentText", label: "Treatment reference", kind: "textarea", help: "Hashed locally." },
       { name: "amountBdt", label: "Invoice total (BDT)", kind: "money" },
@@ -276,7 +307,7 @@ export const workflowFormDefinitions: Record<WorkflowOperation, WorkflowFormDefi
     description: "Update a draft, finalize it, or void an immutable finalized invoice.",
     fields: [
       { name: "id", label: "Invoice ID" },
-      { name: "patientReferenceText", label: "Patient reference" },
+      { name: "patientReferenceText", label: "Insurance member ID (from the patient's card)", help: "The member ID is hashed in this browser before submission." },
       { name: "invoiceReferenceText", label: "Invoice reference" },
       { name: "treatmentText", label: "Treatment reference", kind: "textarea" },
       { name: "amountBdt", label: "Invoice total (BDT)", kind: "money" },
@@ -293,7 +324,7 @@ export const workflowFormDefinitions: Record<WorkflowOperation, WorkflowFormDefi
       { name: "policyId", label: "Policy ID", placeholder: "policy-1001" },
       { name: "hospitalId", label: "Contracted hospital", kind: "select", options: ["hospital-demo", "hospital-2", "hospital-3", "hospital-4", "hospital-5"], help: "The Hospital must be included in the purchased policy's provider network." },
       { name: "hospitalInvoiceId", label: "Hospital invoice ID", placeholder: "invoice-1001", help: "Use the invoice supplied by your contracted Hospital. Its patient reference must match your account." },
-      { name: "amountBdt", label: "Claim amount (BDT)", kind: "money", placeholder: "2500.00" },
+      { name: "amountBdt", label: "Claim amount (BDT)", kind: "money", placeholder: "85000.00" },
       { name: "incidentDate", label: "Incident date", kind: "date" },
       { name: "descriptionText", label: "Claim description", kind: "textarea", placeholder: "Describe why you are claiming", help: "Write in your own words. You do not need to repeat the Hospital’s treatment wording. Hashed in this browser." },
     ],
@@ -473,9 +504,11 @@ export const workflowFormDefinitions: Record<WorkflowOperation, WorkflowFormDefi
   },
 };
 
-function dateOffset(years: number) {
-  const value = new Date();
+// Calendar dates follow Asia/Dhaka (UTC+06:00), the ledger's business day.
+function dateOffset(years: number, days = 0) {
+  const value = new Date(Date.now() + 6 * 3_600_000);
   value.setUTCFullYear(value.getUTCFullYear() + years);
+  value.setUTCDate(value.getUTCDate() + days);
   return value.toISOString().slice(0, 10);
 }
 
@@ -493,9 +526,10 @@ export function createWorkflowFormValues(
 ): WorkflowFormValues {
   const today = dateOffset(0);
   const defaults: Record<WorkflowOperation, WorkflowFormValues> = {
-    saveMedicalEpisode: { episodeReference: "", expectedRevision: "0", patientReference: "", service: "SURGERY", admissionDate: today, dischargeDate: today, serviceDate: "", invoiceDate: "", diagnosisCode: "", billBdt: "" },
-    configureMedicalRules: { packageId: "", service: "SURGERY", sublimit: "", deductibleBps: "1000", deductibleCap: "", shareBps: "8000", waitingDays: "0", filingDays: "30", evidenceRequired: "No" },
-    acquireMedicalPolicy: { id: generatedId("policy", idFactory), packageId: "", startDate: today, endDate: dateOffset(1), acceptedTermsHash: "" },
+    saveMedicalEpisode: { episodeReference: "", expectedRevision: "0", patientReference: "", service: "SURGERY", admissionDate: today, dischargeDate: today, serviceDate: today, invoiceDate: today, diagnosisCode: "", billBdt: "" },
+    configureMedicalRules: { packageId: "", service: "SURGERY", sublimit: "", deductibleBps: "1000", deductibleCap: "", shareBps: "8000", waitingDays: "30", filingDays: "30", evidenceRequired: "No" },
+    // A one-year medical term ends the day before the anniversary (Asia/Dhaka).
+    acquireMedicalPolicy: { id: generatedId("policy", idFactory), packageId: "", startDate: today, endDate: dateOffset(1, -1), acceptedTermsHash: "" },
     verifyMedicalAssociation: { episodeId: "", revision: "", beneficiaryId: "", decisionBasis: "", associationDecision: "VERIFY" },
     registerMedicalOracleBenchmark: { hospitalId: "", service: "SURGERY", minimum: "", maximum: "", licenseStatus: "ACTIVE", sourceReference: "" },
     prepareMedicalClaim: {},
@@ -514,11 +548,17 @@ export function createWorkflowFormValues(
     issuePolicy: { id: generatedId("policy", idFactory), packageId: "", policyholderId: "policyholder1", startDate: today, endDate: dateOffset(1) },
     acquirePolicy: { id: generatedId("policy", idFactory), packageId: "", startDate: today, endDate: dateOffset(1) },
     advancePolicyLifecycle: { id: "", asOfDate: today },
+    reinstatePolicy: { id: "", reasonText: "" },
     cancelPolicy: { id: "", reasonText: "" },
     cancelPolicyAsInsurer: { id: "", reasonText: "" },
     renewPolicy: { newId: generatedId("policy-renewal", idFactory), existingId: "", newEndDate: dateOffset(2) },
     openBankAccount: { id: generatedId("account-ref", idFactory), bankId: "bank-demo", ownerId: "policyholder1", accountType: "CUSTOMER", accountLabel: "Primary savings", maskedAccount: "**** **** 4821", openingBalanceBdt: "", accountTokenText: "" },
     adjustBankAccountBalance: { transferId: generatedId("bank-adjustment", idFactory), accountId: "", direction: "CREDIT", amountBdt: "", externalReferenceText: "" },
+    requestBankAccountLink: { id: generatedId("bank-link", idFactory), bankId: "bank-demo", accountLabel: "", maskedAccount: "" },
+    reviewBankAccountLink: { id: "", outcome: "APPROVE", accountReferenceId: generatedId("account", idFactory), accountTokenText: "", openingBalanceBdt: "0", decisionText: "" },
+    cancelBankAccountLink: { id: "" },
+    schedulePremiumCollections: { asOfDate: today },
+    retryPremiumCollection: { collectionId: "" },
     requestBankMandate: { id: generatedId("mandate", idFactory), policyId: "", accountReferenceId: "", expiryDate: dateOffset(1) },
     reviewBankMandate: { id: "", outcome: "APPROVE", decisionText: "" },
     cancelBankMandate: { id: "" },
@@ -559,8 +599,17 @@ export function createWorkflowFormValues(
   return defaults[operation];
 }
 
+// Accepts plain digits or correctly grouped amounts in either the
+// international (150,000.00) or the South Asian lakh (1,50,000.00) style.
 export function bdtToMinor(value: string) {
-  const normalized = value.trim();
+  let normalized = value.trim();
+  const [whole = ""] = normalized.split(".");
+  if (whole.includes(",")) {
+    if (!/^\d{1,3}(,\d{3})+$/.test(whole) && !/^\d{1,2}(,\d{2})*,\d{3}$/.test(whole)) {
+      throw new Error("Group thousands as 150,000.00 or 1,50,000.00.");
+    }
+    normalized = normalized.replaceAll(",", "");
+  }
   const match = /^(\d+)(?:\.(\d{1,2}))?$/.exec(normalized);
   if (!match) throw new Error("Enter a positive BDT amount with at most two decimal places.");
   const minor = BigInt(match[1]) * 100n + BigInt((match[2] ?? "").padEnd(2, "0"));
@@ -570,8 +619,8 @@ export function bdtToMinor(value: string) {
   return Number(minor);
 }
 
-function nonNegativeBdtToMinor(value: string) {
-  if (value.trim() === "0" || value.trim() === "0.00") return 0;
+export function nonNegativeBdtToMinor(value: string) {
+  if (/^0+(\.0{1,2})?$/.test(value.trim())) return 0;
   return bdtToMinor(value);
 }
 
@@ -619,15 +668,21 @@ export async function buildWorkflowCommand(
   hashText: HashText,
 ): Promise<WorkflowCommand> {
   const digest = async (name: string, label: string) => hashText(required(values, name, label));
+  // A typed member ID must reduce to the exact issued ID, or the Insurer's
+  // customer match silently fails. Other (legacy) references pass unchanged.
+  const memberDigest = async (name: string, label: string) => hashText(normalizeMemberReference(required(values, name, label)));
   let command: unknown;
 
   switch (operation) {
-    case "saveMedicalEpisode":
-      command = { operation, episodeReferenceHash: await digest("episodeReference", "Hospital episode reference"),
-        expectedRevision: Number(required(values, "expectedRevision", "Revision")), patientReferenceHash: await digest("patientReference", "Hospital patient reference"),
+    case "saveMedicalEpisode": {
+      const reference = required(values, "episodeReference", "Hospital episode reference");
+      const invoiceNumber = values.service === "DIAGNOSTIC" && /^[A-Za-z0-9][A-Za-z0-9./_-]{0,63}$/.test(reference) ? reference : undefined;
+      command = { operation, episodeReferenceHash: await hashText(reference), ...(invoiceNumber && { invoiceNumber }),
+        expectedRevision: Number(required(values, "expectedRevision", "Revision")), patientReferenceHash: await memberDigest("patientReference", "Insurance member ID"),
         service: values.service, admissionDate: values.admissionDate, dischargeDate: values.dischargeDate, serviceDate: values.serviceDate ?? "",
         billMinor: bdtToMinor(required(values, "billBdt", "Bill")), invoiceDate: values.invoiceDate ?? "", diagnosisCode: values.diagnosisCode ?? "" };
       break;
+    }
     case "configureMedicalRules":
       command = { operation, packageId: values.packageId, service: values.service, sublimit: bdtToMinor(required(values, "sublimit", "Sublimit")),
         deductibleBps: Number(required(values, "deductibleBps", "Deductible")), deductibleCap: values.deductibleCap === "0" ? 0 : bdtToMinor(required(values, "deductibleCap", "Deductible cap")),
@@ -635,6 +690,8 @@ export async function buildWorkflowCommand(
         filingDays: Number(required(values, "filingDays", "Filing days")), evidenceRequired: values.evidenceRequired === "Yes" };
       break;
     case "acquireMedicalPolicy":
+      if (!values.packageId?.trim()) throw new Error("Choose a medical package first.");
+      if (!values.acceptedTermsHash?.trim()) throw new Error("Read the terms and tick \"I accept these published terms\" before buying.");
       command = { operation, id: values.id, packageId: values.packageId, startDate: values.startDate, endDate: values.endDate, acceptedTermsHash: values.acceptedTermsHash };
       break;
     case "verifyMedicalAssociation":
@@ -711,6 +768,9 @@ export async function buildWorkflowCommand(
     case "advancePolicyLifecycle":
       command = { operation, id: required(values, "id", "Policy ID"), asOfDate: required(values, "asOfDate", "Business date") };
       break;
+    case "reinstatePolicy":
+      command = { operation, id: required(values, "id", "Policy ID"), reasonHash: await digest("reasonText", "Reinstatement decision reference") };
+      break;
     case "cancelPolicy":
     case "cancelPolicyAsInsurer":
       command = { operation, id: required(values, "id", "Policy ID"), reasonHash: await digest("reasonText", "Cancellation reason") };
@@ -723,6 +783,27 @@ export async function buildWorkflowCommand(
       break;
     case "adjustBankAccountBalance":
       command = { operation, transferId: required(values, "transferId", "Transfer ID"), accountId: required(values, "accountId", "Account reference ID"), direction: required(values, "direction", "Direction"), amountMinor: bdtToMinor(required(values, "amountBdt", "Amount")), externalReferenceHash: await digest("externalReferenceText", "External adjustment reference") };
+      break;
+    case "requestBankAccountLink":
+      command = { operation, id: required(values, "id", "Link request ID"), bankId: required(values, "bankId", "Contracted Bank ID"), accountLabel: required(values, "accountLabel", "Account nickname"), maskedAccount: required(values, "maskedAccount", "Masked account number") };
+      break;
+    case "reviewBankAccountLink": {
+      const approve = values.outcome === "APPROVE";
+      command = { operation, id: required(values, "id", "Link request ID"), outcome: required(values, "outcome", "Outcome"),
+        accountReferenceId: approve ? required(values, "accountReferenceId", "New account reference ID") : "",
+        accountTokenHash: approve ? await digest("accountTokenText", "Bank-vault token") : "",
+        openingBalanceMinor: approve ? nonNegativeBdtToMinor(values.openingBalanceBdt || "0") : 0,
+        decisionHash: await digest("decisionText", "Decision reference") };
+      break;
+    }
+    case "cancelBankAccountLink":
+      command = { operation, id: required(values, "id", "Link request ID") };
+      break;
+    case "schedulePremiumCollections":
+      command = { operation, asOfDate: required(values, "asOfDate", "Business date") };
+      break;
+    case "retryPremiumCollection":
+      command = { operation, collectionId: required(values, "collectionId", "Collection ID") };
       break;
     case "requestBankMandate":
       command = { operation, id: required(values, "id", "Mandate ID"), policyId: required(values, "policyId", "Policy ID"), accountReferenceId: required(values, "accountReferenceId", "Account reference ID"), expiryDate: required(values, "expiryDate", "Mandate expiry") };
@@ -770,7 +851,7 @@ export async function buildWorkflowCommand(
     case "updateHospitalInvoice":
       command = {
         operation, id: required(values, "id", "Invoice ID"),
-        patientReferenceHash: await digest("patientReferenceText", "Patient reference"),
+        patientReferenceHash: await memberDigest("patientReferenceText", "Patient reference"),
         invoiceReferenceHash: await digest("invoiceReferenceText", "Invoice reference"),
         treatmentHash: await digest("treatmentText", "Treatment reference"),
         amountMinor: bdtToMinor(required(values, "amountBdt", "Invoice total")),

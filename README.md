@@ -2,7 +2,7 @@
 
 [![Fabric CI](https://github.com/kazi-kamruddin/Block-Insure_fabric/actions/workflows/quality.yml/badge.svg?branch=main&event=push)](https://github.com/kazi-kamruddin/Block-Insure_fabric/actions/workflows/quality.yml)
 
-**[Verified medical demo](docs/results/medical-final-acceptance-2026-11-19.md)** — live isolated Fabric rehearsal covering medical intake, OCR, appeal, and Bank payout.
+**[R2 medical demo](docs/results/r2-journeys-2026-11-26.md)** — retained LevelDB ledger with signed-source processing, panel decisions, appeal and simulated BDT payouts.
 
 Block-Insure Fabric is the permissioned Hyperledger Fabric evolution of the
 Block-Insure insurance platform. It retains the insurance workflows from
@@ -10,68 +10,38 @@ the Ethereum prototype—policies, claims, clinical cross-checking, auditor
 review, banking, and evidence auditability—while using organization-issued
 identities and Fabric ledger controls.
 
-## Project status
+## Current architecture (final)
 
-An opt-in frozen XGBoost alignment candidate is under verification; see
-[its input contract and verification boundaries](docs/frozen-xgboost-alignment.md).
-It is not activated on preserved channels. Existing research results do not
-validate the new evaluator or establish real-patient classification accuracy.
-The current isolated candidate is1.6.3-xgb-alignment/sequence4. Its
-[recovery/security guide](docs/workflow-recovery-and-security.md) and
-[dated verification record](docs/results/recovery-security-2026-11-10.md)
-track durable critical actions, the patched Go builder and provider failure
-handling. Earlier [Stage B results](docs/results/alignment-stage-b-2026-11-09.md)
-remain historical. Preserved-channel activation still requires owner review.
-The maintained candidate launcher and full ordinary-form browser rehearsal now
-pass scoped local acceptance; see the [10 November demonstration results](docs/results/candidate-rehearsal-2026-11-10.md).
-The new [medical reimbursement candidate](docs/medical-reimbursement-candidate.md)
-uses its own channel and introduces verified patient associations, reimbursement
-statements and episode-based claim reservations. Use the matching November
-checkout for rehearsals of the previously verified deployment.
-The [medical review and OCR acceptance record](docs/results/medical-review-ocr-2026-11-19.md)
-records the live 1.8.0-medical sequence-2 rehearsal through clarification,
-decryption, browser-local OCR, same-panel appeal and one Bank payout.
-The follow-up verified deadline recovery and committed PDF and JPEG OCR
-receipts. The [synthetic challenger comparison](docs/fabric-ml-challengers.md)
-records the two offline alternatives at the same review workload.
-The [final medical acceptance record](docs/results/medical-final-acceptance-2026-11-19.md)
-tracks Bank commit recovery, private patient matching, separate insurer
-investigation outcomes and live challenger shadow scoring.
-The [dev-lite medical runbook](docs/dev-lite-medical.md#operator-rehearsal)
-covers the current claim and Bank timelines and the three synthetic rehearsals
-on the isolated 1.9.0 channel.
+The thesis demonstration uses `insurance-dev-lite-190`, a LevelDB channel
+with five business MSPs, one Raft orderer, Go chaincode and a Next.js
+Gateway on loopback port 3219. The Gateway holds Fabric identities. The
+policyholder, hospital, insurer, bank and auditor use role-scoped workspaces.
+Scoped collections hold medical facts and private Bank state. Encrypted
+evidence files stay off-ledger, with references and digests on the ledger.
 
-The original implementation areas and the policy/premium/benefit expansion are
-joined by a certificate-bound 2-of-3 Oracle consensus subsystem. The source now
-defines partner agreements, policy-specific provider networks, an independent
-Hospital invoice register, Oracle-led invoice checking, and a
-five-business-organization network with a Go contract, Next.js Gateway boundary, role-specific
-workflows/evidence, release verification, policy acquisition, premium collection,
-bank mandates, governed benefits, distributed adjudication, appeals, and advisory
-fraud triage, governed evidence grants, durable event projection, and
-ledger-derived research metrics, evidence Merkle inclusion proofs, a targeted
-Bank–Insurer private-data collection, independent Oracle workers, commit/reveal
-consensus, governed auditor fallback, issuer-bound selective-disclosure
-credentials, executable TLA+ workflow verification, and reproducible Caliper
-and fault-profile benchmarks. The archived clean local baseline runs
-`insurance-contract` 1.4.0 with schema 14. Its automated code gate and live Fabric
-workflow cover the Phase 1 partner and Hospital boundary.
+Three Oracle subjects in one OracleMSP run on the same host. Quorum requires
+two exact matches on the request-pinned fact vector and routing decision.
+Source records carry signed authority, origin
+and derivation data. Two matching reveals can route an eligible diagnostic
+claim automatically. Cases requiring review use a four-person panel with
+three approvals or two rejections. Bank settlement uses simulated BDT and
+checks the current version's approval certificate.
 
-The preserved October workflow demonstration uses a separate
-`insurance-workflow-20261005` channel with schema-15 chaincode 1.5.1-workflow.
-Select it explicitly with `scripts/workflow-demo.ps1 Start -Profile Historical`.
-The wrapper now defaults to the verified November candidate. Use the
-[presentation runbook](docs/local-demonstration.md) for the current isolated
-candidate and keep its application/package/schema aligned. The earlier3 October hardening gate is
-recorded in [the dated live record](docs/results/hardening-live-20261003.md).
-The default local environment file still selects the older main channel; select
-the isolated candidate environment explicitly for current alignment verification.
-Preserving a channel does not activate the latest source on it.
+The retained definition is chaincode 1.9.0 at lifecycle sequence 4,
+package `7240d4c0…82b1` (binary `398ee940…e344`). A single shared ccaas
+process serves the peers. DEMO revision 1, E3 routing and the six-auditor
+roster are active. R2 adds sealed votes, Auditor-peer disclosure,
+three-share audit sampling and certificate v3. Sequence 4 adds one protocol
+guarantee: once any Oracle result or panel vote is revealed, no further
+sealed commitment is accepted, whatever the proposal timestamp. S-B is
+simulated regulator data. [Dated R2 evidence](docs/results/r2-journeys-2026-11-26.md) ·
+[Sequence 4 record](docs/results/session-c-2026-11-26.md)
 
-This is not a production deployment claim. Institutional authentication,
-durable encrypted object storage and key recovery, multi-node/orderer high
-availability, production monitoring, backup/restore operations, and deployment
-governance remain environment-specific work outside the local release.
+[Deployment provenance](docs/provenance.md) · [Dev-lite runbook](docs/dev-lite-medical.md) · [R2 design](docs/oracle-v2/R2-DESIGN.md) · [Defence checklist](docs/defence-checklist.md) · [Historical deployments](docs/archive/README.md)
+
+The [thesis contribution](docs/paper/contribution.md) evaluates provenance
+conditions and Oracle routing on synthetic evidence. The [ML tables](docs/paper/ml-evidence.md)
+give the scope and limits of the frozen evaluator and shadow challengers.
 
 ## Workspace layout
 
@@ -84,16 +54,12 @@ The [Fabric research dataset guide](datasets/hybrid-v1/README.md) explains
 how to verify the local Medicare benchmark archive and prepare the isolated
 5,000-record comparison workload.
 
-The [Fabric research dataset guide](datasets/hybrid-v1/README.md) explains
-how to verify the local Medicare benchmark archive and prepare the isolated
-5,000-record comparison workload.
-
 - `network/` — local Fabric topology, channel configuration, and lifecycle scripts.
 - `chaincode/insurance-contract/` — insurance domain chaincode and its tests.
 - `apps/web/` — Next.js web application.
 - `docs/` — architecture, role model, and implementation notes.
 - `scripts/` — shared verification and supervised demonstration automation.
-- `services/oracle-worker/` — independent Oracle processes, registry fixtures,
+- `services/oracle-worker/` — separately configured Oracle processes, registry fixtures,
   durable cursors, and health reporting.
 - `formal/insurance-workflow/` — TLA+ specification and exhaustive executable checker.
 - `benchmarks/` — Hyperledger Caliper and end-to-end Oracle fault experiments.
@@ -111,31 +77,37 @@ the active runtime.
 ## Implemented architecture
 
 The local network models separate organizations for the insurer, hospital,
-bank, auditor, and Oracle services, backed by Fabric CAs and CouchDB. Its Go chaincode enforces
+bank, auditor, and Oracle services. The R2 profile uses LevelDB. Archived
+profiles also use CouchDB. Go chaincode enforces
 MSP membership, certificate role attributes, asset ownership, and the complete
 policy-to-settlement and policy-to-benefit state machines. The Next.js server accesses the ledger
 through Fabric Gateway; browsers never hold Fabric private keys.
 
 ## Getting started
 
-For this machine's existing November candidate, use the maintained supervisor:
+Use the [scenario cookbook](docs/scenario-cookbook.md) for the retained R2
+demonstration. From the repository root, with the retained artifacts and a
+production build prepared offline, start the stack.
 
 ```powershell
-.\scripts\workflow-demo.ps1 Start
-.\scripts\workflow-demo.ps1 Status
-.\scripts\workflow-demo.ps1 Stop
+powershell -ExecutionPolicy Bypass -File .\scripts\r2-demo.ps1 Start
 ```
 
-Open `http://127.0.0.1:3200/workspace`. This profile verifies the archived source,
-all five installed/approved/committed package identities and schema, drains late
-historical starts, and resumes existing state. It does not deploy, seed or reset.
-Restore the original ignored `data/candidate-demo/secrets.json` and existing
-identities/state when moving machines. No original secret is generated by Start.
-See [candidate startup and browser rehearsal](docs/candidate-demonstration.md).
+Open `http://127.0.0.1:3219/workspace`. The supervisor starts the retained
+peers, shared ccaas, signed-source processes, three workers and production
+web app. Use `Status` and `Stop` on the same script. A read-only inspection
+uses `Start -ReadOnly` and keeps Oracle event consumption and source publishing off.
+
+The earlier November alignment candidate has its own
+[startup and browser rehearsal](docs/candidate-demonstration.md).
 The commands below describe separate development/network setup, not a procedure
 to repeat against preserved ledgers.
 
 The local Fabric network is implemented under `network/`. From Ubuntu WSL:
+
+For the separate legacy CouchDB stack, supply `FABRIC_COUCHDB_USERNAME` and
+`FABRIC_COUCHDB_PASSWORD` through the environment or the ignored
+`network/compose/.env`. Its published ports bind to loopback.
 
 ```bash
 bash network/scripts/network.sh up

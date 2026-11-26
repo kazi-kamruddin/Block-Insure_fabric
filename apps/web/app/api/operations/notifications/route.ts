@@ -20,7 +20,8 @@ export async function GET() {
     return NextResponse.json({
       checkpoint: projection.checkpoint,
       updatedAt: projection.updatedAt,
-      notifications: notificationsFor(projection, session.role, session.subjectId, ownedAssetIds).slice(-50).reverse(),
+      notifications: notificationsFor(projection, session.role, session.subjectId, ownedAssetIds)
+        .filter(item => item.title !== "Auditor vote recorded").slice(-50).reverse(),
     });
   } catch {
     return NextResponse.json({ message: "Notifications are temporarily unavailable" }, { status: 503 });

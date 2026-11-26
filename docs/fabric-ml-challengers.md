@@ -61,6 +61,17 @@ per family, and 18 mandatory reviews. Its comparison uses 68 review slots.
 The primary set uses 48 slots. The frozen live threshold selected 11 and
 18 cases respectively and is reported separately.
 
+The unit for every metric below is one target claim episode. Positives
+are injected interventions from the authored generator. Both held-out
+provider-disjoint splits have 16.7% positives. The primary split has
+40/240 positives and target bills of BDT 338.96–1,025.00. The sealed split
+has 56/336 positives and target bills of BDT 301.34–1,025.00. The generator's
+reference benchmark band is BDT 220–850. The frozen adapter divides amounts
+in BDT minor units by 10,000,000. Macro recall averages positive-family
+recall, precision is the positive share of selected episodes, benign
+review is the selected share of negative episodes, and the residual
+Brier score measures probability error on episodes outside mandatory review.
+
 | Model | Primary macro recall | Sealed macro recall | Sealed precision | Sealed benign review | Sealed residual Brier |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | Rules plus random | 12.3% | 14.3% | 11.8% | 21.4% | 0.143 |
@@ -72,7 +83,8 @@ The primary set uses 48 slots. The frozen live threshold selected 11 and
 | Peer excess only | 34.2% | 33.9% | 27.9% | 17.5% | 0.132 |
 | Unconstrained ranker | 60.1% | 66.1% | 54.4% | 11.1% | 0.080 |
 
-B's sealed-family gain over frozen XGBoost was 55.4 percentage points
+B's gain in macro recall over frozen XGBoost on that sealed synthetic split
+was 55.4 percentage points
 with a paired provider-clustered interval of 35.7 to 73.2 points.
 It met the prespecified synthetic gate. Logistic regression led the
 sealed cohort and the unconstrained ranker tied B's macro recall there.

@@ -2,8 +2,23 @@ import { describe, expect, it } from "vitest";
 import { buildReadinessPayload } from "./readiness";
 
 const okOracle = async () => ({ ok: true });
+const downOracle = async () => ({ ok: false });
 
 describe("dependency readiness", () => {
+  it.each([
+    { second: okOracle, third: okOracle, status: "ready", quorum: true, roster: true },
+    { second: okOracle, third: downOracle, status: "not_ready", quorum: true, roster: false },
+    { second: downOracle, third: downOracle, status: "not_ready", quorum: false, roster: false },
+  ])("shows quorum $quorum and full roster $roster with readiness $status", async ({ second, third, status, quorum, roster }) => {
+    const payload = await buildReadinessPayload({
+      fabricProbe: async () => ({ ok: true, schemaVersion: 15 }),
+      oracle1Probe: okOracle,
+      oracle2Probe: second,
+      oracle3Probe: third,
+    });
+    expect(payload).toMatchObject({ status, oracleQuorumAvailable: quorum, oracleRosterReady: roster });
+  });
+
   it("is ready only for the expected live Fabric schema and all three Oracles", async () => {
     const payload = await buildReadinessPayload({
       fabricProbe: async () => ({ ok: true, schemaVersion: 15 }),

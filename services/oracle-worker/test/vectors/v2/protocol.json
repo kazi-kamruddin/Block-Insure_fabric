@@ -1,0 +1,155 @@
+{
+  "portable": {
+    "৳": 100,
+    "z": [
+      "নথি",
+      7
+    ],
+    "a": {
+      "B": -1
+    }
+  },
+  "encoding": "{\"a\":{\"B\":-1},\"z\":[\"নথি\",7],\"৳\":100}",
+  "domain": "oracle-v2:portable",
+  "digest": "20fb1bb2055055a03e73aadb79bd8a4e5d20bae7e85713cfd5c1c0716e3d4c38",
+  "vector": {
+    "schema": "fact-vector-v1",
+    "claimId": "synthetic-201",
+    "claimVersion": 2,
+    "manifestHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "policyVersion": "diagnostic-v1",
+    "facts": {
+      "tariffBand": {
+        "status": "PASS",
+        "evidence": [
+          "reg-2"
+        ]
+      },
+      "invoiceIssued": {
+        "status": "PASS",
+        "evidence": [
+          "his-1"
+        ]
+      },
+      "licenceActiveOnServiceDate": {
+        "status": "PASS",
+        "evidence": [
+          "reg-1"
+        ]
+      },
+      "serviceAccredited": {
+        "status": "PASS",
+        "evidence": [
+          "reg-1"
+        ]
+      },
+      "receiptConsistent": {
+        "status": "PASS",
+        "evidence": [
+          "receipt-1"
+        ]
+      }
+    },
+    "tariffBand": "IN",
+    "receiptCheck": "MATCH",
+    "modelAdvice": "AUTO"
+  },
+  "vectorHash": "747a54392b38b25c8062bf2b7c90e20f07740d1e03d36a8e0511647acbaaf139",
+  "commitmentInput": {
+    "channelId": "insurance-dev-lite-190",
+    "requestId": "request-synthetic-201",
+    "claimVersion": 2,
+    "oracleSubject": "oracle1",
+    "factVectorHash": "747a54392b38b25c8062bf2b7c90e20f07740d1e03d36a8e0511647acbaaf139",
+    "decision": "AUTO_APPROVE",
+    "salt": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  },
+  "commitment": "b201dd695fa96f23c33dc2b9871467f5555d36856ffb546a0590a5a0aec8379e",
+  "threshold": [
+    [
+      86932211,
+      86932212,
+      "AUTO"
+    ],
+    [
+      86932212,
+      86932212,
+      "REVIEW"
+    ],
+    [
+      86932213,
+      86932212,
+      "REVIEW"
+    ]
+  ],
+  "tariff": [
+    [
+      7999,
+      8000,
+      10000,
+      "BELOW"
+    ],
+    [
+      8000,
+      8000,
+      10000,
+      "IN"
+    ],
+    [
+      10000,
+      8000,
+      10000,
+      "IN"
+    ],
+    [
+      10001,
+      8000,
+      10000,
+      "ABOVE"
+    ],
+    [
+      11500,
+      8000,
+      10000,
+      "ABOVE"
+    ],
+    [
+      11501,
+      8000,
+      10000,
+      "FAR_ABOVE"
+    ]
+  ],
+  "decisions": [
+    {
+      "field": "invoiceIssued",
+      "status": "INSUFFICIENT",
+      "expected": "PANEL_REVIEW"
+    },
+    {
+      "field": "licenceActiveOnServiceDate",
+      "status": "CONTRADICTED",
+      "integrity": "INACTIVE_LICENCE",
+      "expected": "INTEGRITY_FAIL"
+    },
+    {
+      "field": "serviceAccredited",
+      "status": "CONTRADICTED",
+      "integrity": "UNACCREDITED_SERVICE",
+      "expected": "INTEGRITY_FAIL"
+    },
+    {
+      "field": "invoiceIssued",
+      "status": "UNVERIFIABLE",
+      "integrity": "INVALID_SIGNATURE",
+      "expected": "INTEGRITY_FAIL"
+    }
+  ],
+  "rejectedIntegrity": [
+    { "field": "invoiceIssued", "status": "PASS", "integrity": "INVALID_SIGNATURE" },
+    { "field": "invoiceIssued", "status": "UNVERIFIABLE", "integrity": "UNKNOWN" },
+    { "field": "invoiceIssued", "status": "UNVERIFIABLE", "integrity": null },
+    { "field": "invoiceIssued", "status": "CONTRADICTED", "integrity": "INACTIVE_LICENCE" },
+    { "field": "licenceActiveOnServiceDate", "status": "INSUFFICIENT", "integrity": "INACTIVE_LICENCE" }
+  ]
+}

@@ -2,7 +2,9 @@
 
 import { useState } from "react";
 import { StatusBadge } from "@/components/status-badge";
+import { OracleExplanation } from "@/components/oracle-explanation";
 import type { MedicalTimeline as Timeline } from "@/lib/fabric/medical-timeline";
+import { formatBdt } from "@/lib/money";
 
 function Approval({ approval }: { approval: NonNullable<Timeline["approval"]> }) {
   return <div>
@@ -15,7 +17,7 @@ function Approval({ approval }: { approval: NonNullable<Timeline["approval"]> })
 function Payout({ payout }: { payout: NonNullable<Timeline["payout"]> }) {
   return <div>
     <strong>Bank payout</strong> <StatusBadge status={payout.status} />
-    <p>BDT {(payout.amountMinor / 100).toFixed(2)} · <code className="medicalTimelineId">{payout.id}</code></p>
+    <p>{formatBdt(payout.amountMinor)} · <code className="medicalTimelineId">{payout.id}</code></p>
     {payout.failureCode && <p>Payment failure code <code>{payout.failureCode}</code></p>}
     {payout.status === "CONFIRMED" && <p>Transfer <code className="medicalTimelineId">{payout.transferId}</code>{payout.confirmedAt && <> · <time dateTime={payout.confirmedAt}>{payout.confirmedAt}</time></>}</p>}
   </div>;
@@ -31,9 +33,13 @@ export function MedicalTimeline({ timeline }: { timeline: Timeline }) {
     </div>}
     {timeline.oracle && <div>
       <strong>Pinned Oracle inputs</strong>
+      {timeline.oracle.finalizationCode && <> <StatusBadge status={timeline.oracle.finalizationCode} /></>}
       <p>Registry <code className="medicalTimelineId">{timeline.oracle.snapshotId}</code></p>
       <p>Model <code className="medicalTimelineId">{timeline.oracle.modelVersion}</code></p>
       <code className="medicalTimelineId">{timeline.oracle.modelHash}</code>
+      {timeline.oracle.modelVersion === "fabric-xgb-synthetic-v1" &&
+        ["EXACT_CONSENSUS", "NEGATIVE_RESULT"].includes(timeline.oracle.finalizationCode) &&
+        <OracleExplanation key={timeline.oracle.requestId} requestId={timeline.oracle.requestId} />}
     </div>}
     {timeline.approval && <Approval approval={timeline.approval} />}
     {timeline.payout && <Payout payout={timeline.payout} />}

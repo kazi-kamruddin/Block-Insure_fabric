@@ -6,9 +6,11 @@ import type { MedicalEpisode, MedicalPreparation, MedicalQuote } from "@/lib/fab
 import type { Claim, Policy } from "@/lib/fabric/types";
 import type { WorkflowCommand } from "@/lib/workflows/commands";
 import type { PreparedWorkflow } from "@/components/guided-workflow-form";
+import { formatBdt } from "@/lib/money";
 
 type Intake = { episodes: MedicalEpisode[]; policies?: Policy[]; claims?: Claim[] };
-const money = (minor: number) => "BDT " + (minor / 100).toFixed(2);
+type CustomerMatch = { memberId: string; fullName: string; dateOfBirth: string };
+const money = formatBdt;
 
 async function json<T>(url: string, command?: WorkflowCommand): Promise<T> {
   const response = await fetch(url, command ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(command) } : { cache: "no-store" });
@@ -17,8 +19,14 @@ async function json<T>(url: string, command?: WorkflowCommand): Promise<T> {
   return data as T;
 }
 
-export function MedicalIntake({ insurer, onAssociation }: { insurer: boolean; onAssociation: (prepared: PreparedWorkflow) => void }) {
+export function MedicalIntake({ insurer, customerMatching = false, onAssociation }: {
+  insurer: boolean;
+  customerMatching?: boolean;
+  onAssociation: (prepared: PreparedWorkflow) => void;
+}) {
   const [intake, setIntake] = useState<Intake | null>(null);
+  const [matches, setMatches] = useState<Partial<Record<string, CustomerMatch | null>>>({});
+  const [showVerified, setShowVerified] = useState(false);
   const [episodeId, setEpisodeId] = useState("");
   const [policyId, setPolicyId] = useState("");
   const [draft, setDraft] = useState<{ quote: MedicalQuote; receipt: MedicalPreparation | null; deadlineSoon: boolean }>();
@@ -55,6 +63,25 @@ export function MedicalIntake({ insurer, onAssociation }: { insurer: boolean; on
     setDraft({ quote, receipt, deadlineSoon });
   }
 
+  async function reviewAssociation(row: MedicalEpisode, selectionTime: number) {
+    let match = matches[row.id];
+    if (customerMatching && match === undefined) {
+      try {
+        const query = new URLSearchParams({ patientReferenceHash: row.patientReferenceHash });
+        ({ match } = await json<{ match: CustomerMatch | null }>("/api/insurer/customers?" + query));
+        setMatches(current => ({ ...current, [row.id]: match }));
+      } catch {
+        setStatus("The customer lookup is unavailable. You can still enter the member ID manually.");
+      }
+    }
+    onAssociation({ revision: selectionTime, command: {
+      operation: "verifyMedicalAssociation", episodeId: row.id, revision: row.revision,
+      beneficiaryId: row.beneficiaryId || match?.memberId,
+      // Only the digest of this note reaches the ledger; the operator may edit it.
+      ...(match ? { decisionBasis: `Member ID ${match.memberId} on the Hospital intake matches the approved customer record` } : {}),
+    } });
+  }
+
   async function submit() {
     if (!episode || !draft) return;
     const statementHash = draft.quote.statementHash;
@@ -68,25 +95,31 @@ export function MedicalIntake({ insurer, onAssociation }: { insurer: boolean; on
     resetDraft();
   }
 
+  // Pending episodes are the Insurer's work; verified ones stay available on request.
+  const episodes = intake?.episodes ?? [];
+  const pendingCount = episodes.filter(row => row.associationStatus !== "VERIFIED").length;
+  const settledCount = episodes.length - pendingCount;
+  const queue = episodes.filter(row => showVerified || row.associationStatus !== "VERIFIED");
+
   return <article className="workCard guidedCard">
-    <span className="kicker">Hospital episode coordination</span>
     <h2>{insurer ? "Episode association queue" : "Your medical episodes"}</h2>
     <div className="medicalButtonGroup">
       <button type="button" className="secondary button" disabled={busy} onClick={() => run(async () => {
-        setIntake(await json<Intake>("/api/medical/intake")); resetDraft();
+        setIntake(await json<Intake>("/api/medical/intake")); setMatches({}); resetDraft();
       })}>Refresh episodes</button>
     </div>
-    {intake && insurer && <div className="queueList" style={{ marginTop: 14 }}>{intake.episodes.map(row => <div className="queueItem" key={row.id}>
+    {intake && insurer && <p className="cardNote">{pendingCount} episode{pendingCount === 1 ? "" : "s"} awaiting association{settledCount ? ` · ${settledCount} already verified` : ""}.{settledCount > 0 && <> <button type="button" className="secondary button" onClick={() => setShowVerified(value => !value)}>{showVerified ? "Hide verified" : "Show verified"}</button></>}</p>}
+    {intake && insurer && <div className="queueList" style={{ marginTop: 14 }}>{queue.map(row => <div className="queueItem" key={row.id}>
       <div>
         <div className="queueTitle">
-          <strong>{row.hospitalId} · {row.service} · {row.serviceDate || "Service date to confirm"}</strong>
+          <strong>{row.hospitalId} · {row.service} · {row.serviceDate || "Service date not recorded"}</strong>
           <StatusBadge status={row.associationStatus} />
         </div>
         <small className="monoWrap">Patient reference fingerprint: {row.patientReferenceHash}</small>
+        {matches[row.id] && <p className="monoWrap">Suggested match: <strong>{matches[row.id]?.fullName}</strong> · Member ID {matches[row.id]?.memberId} · Date of birth {matches[row.id]?.dateOfBirth}</p>}
+        {matches[row.id] === null && <p>No customer match was found. Check the member ID against the card.</p>}
       </div>
-      <button type="button" className="secondary button" onClick={() => onAssociation({ revision: Date.now(), command: {
-        operation: "verifyMedicalAssociation", episodeId: row.id, revision: row.revision, beneficiaryId: row.beneficiaryId,
-      } })}>{row.associationStatus === "VERIFIED" ? "Review association" : "Resolve association"}</button>
+      <button type="button" className="secondary button" disabled={busy} onClick={event => void run(() => reviewAssociation(row, event.timeStamp))}>{row.associationStatus === "VERIFIED" ? "Review association" : "Resolve association"}</button>
     </div>)}</div>}
     {intake && !insurer && <div className="guidedForm" style={{ marginTop: 14 }}>
       <label>Medical policy<select disabled={busy} value={policyId} onChange={event => { setPolicyId(event.target.value); resetDraft(); }}>
@@ -95,7 +128,7 @@ export function MedicalIntake({ insurer, onAssociation }: { insurer: boolean; on
       </select></label>
       <label>Verified episode<select disabled={busy} value={episodeId} onChange={event => { setEpisodeId(event.target.value); resetDraft(); }}>
         <option value="">Choose an episode</option>
-        {intake.episodes.map(row => <option key={row.id} value={row.id}>{row.hospitalId} · {row.service} · {row.serviceDate || "date unresolved"}</option>)}
+        {intake.episodes.map(row => <option key={row.id} value={row.id}>{row.hospitalId} · {row.service} · {row.serviceDate || "service date not recorded"}</option>)}
       </select></label>
       {!intake.episodes.length && <p className="wideField emptyState">No verified episodes are available yet. The insurer can check an outstanding association.</p>}
       {episode && <div className="wideField medicalSubpanel">
@@ -103,7 +136,7 @@ export function MedicalIntake({ insurer, onAssociation }: { insurer: boolean; on
           <span>Revision {episode.revision} · {episode.service} · {money(episode.billMinor)} · {episode.admissionDate} to {episode.dischargeDate}</span>
           {existing && <StatusBadge status={existing.status} label={`Claim ${existing.id} · v${existing.version} · ${existing.status}`} />}
         </div>
-        {!episode.serviceDate && <p className="evidenceWarning">Ask the insurer to confirm the documented service date before filing.</p>}
+        {!episode.serviceDate && <p className="evidenceWarning">The Hospital has not recorded a service date for this stay. Ask the Hospital to save a corrected intake with the documented service date before filing.</p>}
         {(!existing || correction) && <div className="medicalButtonGroup">
           <button type="button" className="secondary button" disabled={busy || (!existing && !policyId) || !episode.serviceDate} onClick={() => run(prepare)}>{correction ? "Review corrected reimbursement" : "Prepare claim and calculate reimbursement"}</button>
         </div>}

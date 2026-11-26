@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { ledgerDateSchema, ledgerIdSchema } from "@/lib/fabric/validation";
-import { createHmac } from "node:crypto";
 import { ledger } from "@/lib/fabric/ledger";
 import { verifyBearerToken } from "@/lib/security/bearer-token";
+import { checkMutationOrigin } from "@/lib/security/request-origin";
+import { processDueCollection } from "@/lib/banking/collections";
 
 const commandSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("listDue"), asOfDate: ledgerDateSchema }),
@@ -22,21 +23,9 @@ function authorized(request: Request) {
   return verifyBearerToken(request.headers.get("authorization"), process.env.BANKING_WORKER_SECRET);
 }
 
-function addDays(value: string, days: number) {
-  const result = new Date(`${value}T00:00:00.000Z`);
-  result.setUTCDate(result.getUTCDate() + days);
-  return result.toISOString().slice(0, 10);
-}
-
-function earlier(left: string, right: string) {
-  return left < right ? left : right;
-}
-
-function stableHash(secret: string, value: string) {
-  return createHmac("sha256", secret).update(value).digest("hex");
-}
-
 export async function POST(request: Request) {
+  const trust = checkMutationOrigin(request);
+  if (!trust.trusted) return NextResponse.json({ message: trust.reason }, { status: 403 });
   if (!authorized(request)) return NextResponse.json({ message: "Worker authentication failed" }, { status: 401 });
   const parsed = commandSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ message: "Invalid collection worker command" }, { status: 400 });
@@ -48,8 +37,6 @@ export async function POST(request: Request) {
     }
     if (parsed.data.action === "run") {
       const asOfDate = parsed.data.asOfDate;
-      const secret = process.env.BANKING_WORKER_SECRET ?? "";
-      const destinationAccountId = process.env.INSURER_PREMIUM_ACCOUNT_ID ?? "bank-insurer-premium";
       const [mandates, existingCollections] = await Promise.all([ledger.listBankMandates(), ledger.listPremiumCollections()]);
       const existingKeys = new Set(existingCollections.map((item) => `${item.mandateId}:${item.dueDate}`));
       const hasUnmaterializedDueDate = mandates.some((item) => item.status === "ACTIVE" && Boolean(item.nextDebitDate) && item.nextDebitDate <= asOfDate && item.nextDebitDate <= item.expiryDate && !existingKeys.has(`${item.id}:${item.nextDebitDate}`));
@@ -58,24 +45,11 @@ export async function POST(request: Request) {
       const collections = currentCollections
         .filter((item) => ["DUE", "RETRY"].includes(item.status) && item.dueDate <= asOfDate)
         .sort((left, right) => left.dueDate.localeCompare(right.dueDate) || left.id.localeCompare(right.id));
+      const accounts = collections.length > 0 ? await ledger.listBankAccountReferences() : [];
       const results: Array<{ collectionId: string; status: string; message?: string }> = [];
       for (const collection of collections) {
         try {
-          const [mandate, policy] = await Promise.all([
-            ledger.readBankMandate(collection.mandateId),
-            ledger.readPolicy(collection.policyId),
-          ]);
-          const periodEndDate = earlier(earlier(addDays(collection.dueDate, Math.max(1, mandate.intervalDays) - 1), mandate.expiryDate), policy.endDate);
-          const attempt = Math.max(1, collection.attemptCount + 1);
-          const baseId = `${collection.id}-a${attempt}`;
-          const result = await ledger.processPremiumCollection({
-            collectionId: collection.id,
-            paymentId: `payment-${baseId}`,
-            transferId: `transfer-${baseId}`,
-            destinationAccountId,
-            periodEndDate,
-            externalReferenceHash: stableHash(secret, `block-insure-eft:${baseId}`),
-          });
+          const result = await processDueCollection(collection, { accounts });
           results.push({ collectionId: collection.id, status: result.status });
         } catch (error) {
           results.push({ collectionId: collection.id, status: "ERROR", message: error instanceof Error ? error.message : "Unknown processing error" });

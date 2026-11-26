@@ -2,8 +2,16 @@ import { workflowCommandSchema, type WorkflowCommand } from "./commands";
 
 export type SavedWorkflowAction = { requestId: string; command: WorkflowCommand; state?: string };
 type Storage = Pick<globalThis.Storage, "getItem" | "setItem" | "removeItem">;
-export function savedActionKey(deployment: string, accountId: string) {
-  return "fabric-workflow-action-v1:" + JSON.stringify([deployment, accountId]);
+export function savedActionKey(deployment: string, accountId: string, provisioningId?: string) {
+  return provisioningId
+    ? "fabric-workflow-action-v2:" + JSON.stringify([deployment, provisioningId, accountId])
+    : "fabric-workflow-action-v1:" + JSON.stringify([deployment, accountId]);
+}
+
+export function pendingPremiumKey(deployment: string, accountId: string, provisioningId?: string) {
+  return provisioningId
+    ? "block-insure:premium-intent-v2:" + JSON.stringify([deployment, provisioningId, accountId])
+    : `block-insure:premium-intent:${accountId}`;
 }
 export function readSavedAction(storage: Storage, key: string): SavedWorkflowAction | null {
   return parseSavedAction(storage.getItem(key));

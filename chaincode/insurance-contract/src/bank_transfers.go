@@ -30,6 +30,9 @@ func (c *Contract) openBankAccount(ctx contractapi.TransactionContextInterface, 
 	if _, err := requireIdentity(ctx, "BankMSP", "bankOfficer"); err != nil {
 		return nil, err
 	}
+	if err := c.requireBankSubject(ctx, bankID); err != nil {
+		return nil, err
+	}
 	if _, err := c.requireActivePartner(ctx, "BANK", bankID); err != nil {
 		return nil, err
 	}
@@ -43,18 +46,14 @@ func (c *Contract) openBankAccount(ctx contractapi.TransactionContextInterface, 
 	if openingBalanceMinor < 0 {
 		return nil, fmt.Errorf("opening balance cannot be negative")
 	}
-	accountLabel = strings.TrimSpace(accountLabel)
-	maskedAccount = strings.TrimSpace(maskedAccount)
-	if accountLabel == "" || len(accountLabel) > 80 {
-		return nil, fmt.Errorf("accountLabel must contain between 1 and 80 characters")
-	}
-	if len(maskedAccount) < 4 || len(maskedAccount) > 40 || !strings.Contains(maskedAccount, "*") {
-		return nil, fmt.Errorf("maskedAccount must contain a masked display value between 4 and 40 characters")
+	accountLabel, maskedAccount, err := normalizeAccountDisplay(accountLabel, maskedAccount)
+	if err != nil {
+		return nil, err
 	}
 	if err := validateHash("accountTokenHash", accountTokenHash); err != nil {
 		return nil, err
 	}
-	now, err := timestamp(ctx)
+	now, err := ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -72,6 +71,18 @@ func (c *Contract) openBankAccount(ctx contractapi.TransactionContextInterface, 
 		return nil, err
 	}
 	return account, nil
+}
+
+func normalizeAccountDisplay(accountLabel, maskedAccount string) (string, string, error) {
+	accountLabel = strings.TrimSpace(accountLabel)
+	maskedAccount = strings.TrimSpace(maskedAccount)
+	if accountLabel == "" || len(accountLabel) > 80 {
+		return "", "", fmt.Errorf("accountLabel must contain between 1 and 80 characters")
+	}
+	if len(maskedAccount) < 4 || len(maskedAccount) > 40 || !strings.Contains(maskedAccount, "*") {
+		return "", "", fmt.Errorf("maskedAccount must contain a masked display value between 4 and 40 characters")
+	}
+	return accountLabel, maskedAccount, nil
 }
 
 func (c *Contract) AdjustBankAccountBalance(ctx contractapi.TransactionContextInterface, transferID, accountID, direction string, amountMinor int64, externalReferenceHash string) (*BankTransfer, error) {
@@ -95,6 +106,9 @@ func (c *Contract) AdjustBankAccountBalance(ctx contractapi.TransactionContextIn
 	if account.BankID == "" || account.Status != "VERIFIED" {
 		return nil, fmt.Errorf("bank account %s is not a Phase 2 verified account", accountID)
 	}
+	if err := c.requireBankSubject(ctx, account.BankID); err != nil {
+		return nil, err
+	}
 	if _, err := c.requireActivePartner(ctx, "BANK", account.BankID); err != nil {
 		return nil, err
 	}
@@ -110,7 +124,7 @@ func (c *Contract) AdjustBankAccountBalance(ctx contractapi.TransactionContextIn
 	} else if marker != nil {
 		return nil, fmt.Errorf("external bank transfer reference has already been recorded")
 	}
-	now, err := timestamp(ctx)
+	now, err := ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -143,9 +157,12 @@ func (c *Contract) AdjustBankAccountBalance(ctx contractapi.TransactionContextIn
 	return transfer, nil
 }
 
-func validatePremiumPeriod(policy *Policy, periodStartDate, periodEndDate string, amountMinor int64) error {
+func validatePremiumPeriod(ctx contractapi.TransactionContextInterface, policy *Policy, periodStartDate, periodEndDate string, amountMinor int64) error {
 	if policy.Status == "CANCELLED" || policy.Status == "EXPIRED" {
 		return fmt.Errorf("policy %s cannot accept a premium from %s", policy.ID, policy.Status)
+	}
+	if err := validateMedicalPremiumTiming(ctx, policy, periodStartDate); err != nil {
+		return err
 	}
 	start, err := validateDate("periodStartDate", periodStartDate)
 	if err != nil {
@@ -213,7 +230,7 @@ func validatePremiumAccounts(ctx contractapi.TransactionContextInterface, c *Con
 }
 
 func (c *Contract) writePremiumTransfer(ctx contractapi.TransactionContextInterface, transfer *BankTransfer, policy *Policy, mandate *BankMandate, periodStartDate, periodEndDate string, amountMinor int64) (*PremiumPayment, error) {
-	if err := validatePremiumPeriod(policy, periodStartDate, periodEndDate, amountMinor); err != nil {
+	if err := validatePremiumPeriod(ctx, policy, periodStartDate, periodEndDate, amountMinor); err != nil {
 		return nil, err
 	}
 	paymentMarker, err := paymentMarkerKey(ctx, transfer.ExternalReferenceHash)
@@ -225,7 +242,7 @@ func (c *Contract) writePremiumTransfer(ctx contractapi.TransactionContextInterf
 	} else if marker != nil {
 		return nil, fmt.Errorf("external payment reference has already been recorded")
 	}
-	now, err := timestamp(ctx)
+	now, err := ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -246,6 +263,14 @@ func (c *Contract) writePremiumTransfer(ctx contractapi.TransactionContextInterf
 		return nil, fmt.Errorf("reserve external payment reference: %w", err)
 	}
 	end, _ := validateDate("periodEndDate", periodEndDate)
+	if policy.Status == "PENDING_PAYMENT" && policy.MedicalRulesVersion != 0 {
+		// No premium, no cover: risk begins when the first premium settles.
+		_, today, err := ledgerToday(ctx)
+		if err != nil {
+			return nil, err
+		}
+		policy.CoverStartDate = max(policy.StartDate, today)
+	}
 	policy.Status = "ACTIVE"
 	policy.PaidThroughDate = periodEndDate
 	policy.NextPremiumDueDate = end.AddDate(0, 0, 1).Format("2006-01-02")
@@ -330,14 +355,17 @@ func (c *Contract) ExecuteManualPremiumPayment(ctx contractapi.TransactionContex
 	if err != nil {
 		return nil, err
 	}
-	if err := validatePremiumPeriod(policy, periodStartDate, periodEndDate, amountMinor); err != nil {
+	if err := validatePremiumPeriod(ctx, policy, periodStartDate, periodEndDate, amountMinor); err != nil {
 		return nil, err
 	}
 	source, destination, err := validatePremiumAccounts(ctx, c, policy, sourceAccountID, destinationAccountID)
 	if err != nil {
 		return nil, err
 	}
-	now, err := timestamp(ctx)
+	if err := c.requireBankSubject(ctx, source.BankID); err != nil {
+		return nil, err
+	}
+	now, err := ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -396,7 +424,7 @@ func (c *Contract) reconcileCollectedPremium(ctx contractapi.TransactionContextI
 	if matched == nil {
 		return nil, nil
 	}
-	now, err := timestamp(ctx)
+	now, err := ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -430,12 +458,18 @@ func (c *Contract) ProcessPremiumCollection(ctx contractapi.TransactionContextIn
 	if collection.Status != "DUE" && collection.Status != "RETRY" {
 		return nil, fmt.Errorf("premium collection %s is not due", collectionID)
 	}
+	if err := requireNotAfterLedgerDate(ctx, "collection due date", collection.DueDate); err != nil {
+		return nil, err
+	}
 	mandate, err := c.ReadBankMandate(ctx, collection.MandateID)
 	if err != nil {
 		return nil, err
 	}
 	if mandate.Status != "ACTIVE" || mandate.PolicyID != collection.PolicyID || mandate.AmountMinor != collection.AmountMinor {
 		return nil, fmt.Errorf("mandate %s is not active for collection %s", mandate.ID, collection.ID)
+	}
+	if err := c.requireBankAccountSubject(ctx, mandate.AccountReferenceID); err != nil {
+		return nil, err
 	}
 	policy, err := c.ReadPolicy(ctx, collection.PolicyID)
 	if err != nil {
@@ -444,7 +478,7 @@ func (c *Contract) ProcessPremiumCollection(ctx contractapi.TransactionContextIn
 	if reconciled, err := c.reconcileCollectedPremium(ctx, collection, policy, destinationAccountID, periodEndDate); err != nil || reconciled != nil {
 		return reconciled, err
 	}
-	if err := validatePremiumPeriod(policy, collection.DueDate, periodEndDate, collection.AmountMinor); err != nil {
+	if err := validatePremiumPeriod(ctx, policy, collection.DueDate, periodEndDate, collection.AmountMinor); err != nil {
 		return nil, err
 	}
 	if collection.DueDate > mandate.ExpiryDate || periodEndDate > mandate.ExpiryDate {
@@ -454,7 +488,7 @@ func (c *Contract) ProcessPremiumCollection(ctx contractapi.TransactionContextIn
 	if err != nil {
 		return nil, err
 	}
-	now, err := timestamp(ctx)
+	now, err := ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}

@@ -31,7 +31,7 @@ run verify
 for port in 31051 31151 31251 31351 31451; do grep -Fxq "localhost:$port" "$test_log"; done
 run ca-start
 run stop
-grep -Fq 'ca-insurer ca-hospital ca-auditor ca-bank ca-oracle ca-orderer' "$test_log"
+grep -Fq ' up -d --no-recreate ca-insurer ca-hospital ca-auditor ca-bank ca-oracle ca-orderer' "$test_log"
 grep -Fq 'Drain -Profile DevLite -ChaincodeVersion 1.9.0 -CoreOnly' "$test_log"
 : > "$test_log"
 if run teardown; then exit 1; fi
@@ -48,6 +48,7 @@ bash "$here/network.sh" --dev-lite-couchdb ca-start
 bash "$here/network.sh" --dev-lite-couchdb stop
 grep -Fq 'docker compose --project-name block-insure-dev-lite-couchdb' "$test_log"
 grep -Fq 'compose-dev-lite-couchdb.yaml' "$test_log"
+grep -Fq ' up -d ca-insurer ca-hospital ca-auditor ca-bank ca-oracle ca-orderer' "$test_log"
 if grep -Eq '^docker volume rm|^powershell' "$test_log"; then exit 1; fi
 # Source-level contract: only evaluate the known exact-equality guard.
 # Fail closed if its implementation changes; never infer success from a missing match.

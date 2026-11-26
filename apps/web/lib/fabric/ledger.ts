@@ -1,9 +1,11 @@
 import "server-only";
 
 import { randomBytes } from "node:crypto";
+import { freemem } from "node:os";
 import type { Contract } from "@hyperledger/fabric-gateway";
 import { withFabricContract } from "./gateway";
 import { submitJournaled } from "@/lib/workflows/operation-journal";
+import { medicalSourcePublisherEnabled, type PublishedSourcePin } from "@/lib/oracle/publish-medical-sources";
 import type { FabricRole } from "./config";
 import type { MedicalEpisode, MedicalPreparation, MedicalQuote, MedicalRules } from "./medical";
 import type { MedicalClarification, MedicalEvidenceCheck, MedicalReviewCommand, MedicalReviewFacts } from "./medical-review";
@@ -11,6 +13,7 @@ import { openMedicalReviewNote, sealMedicalReviewNote } from "./medical-review-n
 import type {
   AuditorDecision,
   BankAccountReference,
+  BankAccountLinkRequest,
   BankMandate,
   BankTransfer,
   BeneficiaryDesignation,
@@ -35,6 +38,7 @@ import type {
   OracleRegistrySnapshot,
   OracleRequest,
   OracleRequestHistoryRecord,
+  PanelVoteCommitment,
   OracleResult,
   Policy,
   PolicyPackage,
@@ -57,6 +61,13 @@ function stringifyArguments(arguments_: Array<string | number>): string[] {
   return arguments_.map(String);
 }
 
+function requireWritableLedger() {
+  if (process.env.FABRIC_DEMO_READ_ONLY === "true") throw new Error("Ledger submissions are disabled for this verification run");
+  if (medicalSourcePublisherEnabled() && freemem() < 700 * 1024 * 1024) {
+    throw new Error("This demo needs at least 700 MB of available host memory to write to the ledger.");
+  }
+}
+
 async function evaluate<T>(role: FabricRole, transactionName: string, ...args: string[]) {
   return withFabricContract(role, async (contract) =>
     decodeJson<T>(await contract.evaluateTransaction(transactionName, ...args)),
@@ -68,6 +79,7 @@ async function submit<T>(
   transactionName: string,
   ...args: Array<string | number>
 ) {
+  requireWritableLedger();
   return withFabricContract(role, async (contract, gateway, identity) =>
     decodeJson<T>(
       await submitJournaled(contract, gateway, identity, role, transactionName, stringifyArguments(args)),
@@ -81,9 +93,11 @@ async function submitWithTransient<T>(
   args: Array<string | number>,
   transientData: Record<string, string | Uint8Array>,
   profileUserName?: string,
+  endorsingOrganizations?: string[],
 ) {
+  requireWritableLedger();
   return withFabricContract(role, async (contract) => decodeJson<T>(
-    await contract.submit(transactionName, { arguments: stringifyArguments(args), transientData }),
+    await contract.submit(transactionName, { arguments: stringifyArguments(args), transientData, endorsingOrganizations }),
   ), profileUserName);
 }
 
@@ -96,6 +110,7 @@ async function submitAsAuditor<T>(
   transactionName: string,
   ...args: Array<string | number>
 ) {
+  requireWritableLedger();
   if (!auditorUserName) throw new Error("This auditor account has no server-owned Fabric identity");
   return withFabricContract(
     "auditor",
@@ -111,6 +126,7 @@ async function submitAsHospital<T>(
   transactionName: string,
   ...args: Array<string | number>
 ) {
+  requireWritableLedger();
   if (!hospitalUserName) throw new Error("This Hospital account has no server-owned Fabric identity");
   return withFabricContract(
     "hospitalOfficer",
@@ -135,6 +151,34 @@ export const ledger = {
   readMedicalReviewFacts(claimId: string) {
     return evaluate<MedicalReviewFacts>("insurerAdmin", "ReadMedicalReviewFacts", claimId);
   },
+  readMedicalReviewDisclosure(reviewId: string, userName: string | undefined) {
+    if (!userName) throw new Error("This auditor has no Fabric identity");
+    return withFabricContract("auditor", async contract =>
+      decodeJson<MedicalReviewFacts>(await contract.evaluateTransaction("ReadMedicalReviewDisclosure", reviewId)), userName);
+  },
+  listAuditorVoteCommitments(reviewId: string) {
+    return evaluate<PanelVoteCommitment[]>("insurerAdmin", "ListAuditorVoteCommitments", reviewId);
+  },
+  readMedicalAuditPeriod(id: string) {
+    return evaluate<{ id: string; status?: string; startsAt: string; endsAt: string; graceEndsAt?: string; rateBps: number; panelLoad?: number;
+      shares?: Array<{ msp: string; commitment: string; share?: string }> }>("insurerAdmin", "ReadMedicalAuditPeriod", id);
+  },
+  medicalAuditAction(role: "insurerAdmin" | "auditor" | "hospitalOfficer", user: string | undefined, transaction: string, args: Array<string | number>) {
+    if (role === "hospitalOfficer") return submitAsHospital(user, transaction, ...args);
+    if (role === "auditor") return submitAsAuditor(user, transaction, ...args);
+    return submit(role, transaction, ...args);
+  },
+  resolveMedicalAuditSelection(role: "policyholder" | "insurerAdmin", claimId: string) {
+    return submit(role, "ResolveMedicalAuditSelection", claimId);
+  },
+  async supportsMedicalR2() {
+    if (process.env.FABRIC_CHANNEL_NAME !== "insurance-dev-lite-190") return false;
+    try {
+      return (await evaluate<{ status: string }>("insurerAdmin", "ReadActiveAuditorRoster")).status === "ACTIVE";
+    } catch {
+      return false;
+    }
+  },
   async readMedicalClarification(role: "insurerAdmin" | "policyholder", id: string) {
     const note = await evaluate<MedicalClarification>(role, "ReadMedicalClarification", id);
     return { ...note, question: openMedicalReviewNote("question", id, note.question),
@@ -151,20 +195,44 @@ export const ledger = {
   quoteMedicalAppeal(claimId: string, revision: string) {
     return evaluate<MedicalQuote>("policyholder", "QuoteMedicalAppeal", claimId, revision);
   },
-  medicalReviewAction(role: "insurerAdmin" | "policyholder" | "auditor", input: MedicalReviewCommand, userName?: string) {
+  async medicalReviewAction(role: "insurerAdmin" | "policyholder" | "auditor", input: MedicalReviewCommand, userName?: string) {
     const write = (name: string, ...args: Array<string | number>) => role === "auditor" ? submitAsAuditor(userName, name, ...args) : submit(role, name, ...args);
     const message = (name: string, text: string, ...args: Array<string | number>) => submitWithTransient(role, name, args, { medicalMessage: text }, userName);
+    const disclosure = async (name: string, claimId: string, ...args: string[]) => {
+      const source = await evaluate<{ episodeBytes: string; statementBytes: string; duplicateExplanationBytes?: string }>(
+        "insurerAdmin", "ReadMedicalReviewDisclosureSource", claimId);
+      const transient: Record<string, Uint8Array> = {
+        medicalEpisodeFacts: Buffer.from(source.episodeBytes, "base64"),
+        medicalStatementFacts: Buffer.from(source.statementBytes, "base64"),
+      };
+      if (source.duplicateExplanationBytes) transient.medicalDuplicateExplanation = Buffer.from(source.duplicateExplanationBytes, "base64");
+      return submitWithTransient(role, name, args, transient, userName, ["InsurerMSP", "AuditorMSP"]);
+    };
     switch (input.action) {
-      case "prepare": return write("PrepareMedicalReview", input.claimId, input.reviewId, input.prepareBy);
+      case "prepare": return await this.supportsMedicalR2()
+        ? disclosure("PrepareMedicalReview", input.claimId, input.claimId, input.reviewId, input.prepareBy)
+        : write("PrepareMedicalReview", input.claimId, input.reviewId, input.prepareBy);
       case "escalate": return write("EscalateStalledMedicalClaim", input.claimId);
+      case "release": return write("ReleaseMedicalReservation", input.claimId);
+      case "retire": return write("RetireInvalidatedApproval", input.claimId, input.reasonHash);
+      case "replace": return write("ReplaceAbsentAuditor", input.reviewId, input.auditorId);
+      case "acknowledge": return write("AcknowledgeMedicalReview", input.reviewId);
+      case "disclose": return disclosure("DiscloseMedicalReviewFacts", (await this.readClaimReview(input.reviewId)).claimId, input.reviewId);
+      case "explainDuplicate": return submitWithTransient(role, "ExplainMedicalDuplicate", [input.claimId], { medicalDuplicateExplanation: input.message });
       case "open": return write("OpenMedicalVoting", input.reviewId, input.deadline);
-      case "recover": return write("RecoverMedicalReview", input.reviewId, input.newId, input.prepareBy);
+      case "recover": return await this.supportsMedicalR2()
+        ? disclosure("RecoverMedicalReview", (await this.readClaimReview(input.reviewId)).claimId, input.reviewId, input.newId, input.prepareBy)
+        : write("RecoverMedicalReview", input.reviewId, input.newId, input.prepareBy);
       case "expire": return write("FinalizeExpiredReview", input.reviewId);
+      case "oracleTimeout": return write("FinalizeOracleTimeout", input.requestId);
+      case "recordReceiptSummary": return this.recordPrivateMedicalReceipt(input.claimId, input.summary);
       case "ask": return message("RequestMedicalClarification", sealMedicalReviewNote("question", input.id, input.message), input.reviewId, input.id, input.deadline);
       case "respond": return message("RespondMedicalClarification", input.response === "EXPIRED" ? "" : sealMedicalReviewNote("answer", input.id, input.message), input.id, input.response, input.evidenceHash);
       case "share": return write("ShareMedicalReviewEvidence", input.reviewId, input.expiresAt);
       case "confirm": return write("ConfirmMedicalEvidence", input.reviewId, input.evidenceId, input.accessId, input.contentHash);
       case "vote": return write("RecordMedicalAuditorDecision", input.reviewId, input.decisionId, input.outcome, input.reasonCode, input.reasonHash);
+      case "commitVote": return write("CommitAuditorVote", input.reviewId, input.round, input.commitment);
+      case "revealVote": return write("RevealAuditorVote", input.reviewId, input.round, input.decisionId, input.outcome, input.reasonCode, input.reasonHash, input.salt);
       case "appeal": return message("SubmitMedicalAppeal", sealMedicalReviewNote("appeal", input.id, input.message), input.id, input.claimId, input.decisionId, input.evidenceHash, input.revision, input.acceptedStatementHash);
       case "recordOCR": return write("RecordMedicalOCR", input.id, input.evidenceId, input.engineVersion, input.sourceHash,
         input.suggestionsHash, input.confirmedHash, String(input.lowConfidence), input.accessId);
@@ -201,10 +269,14 @@ export const ledger = {
     return evaluate<MedicalRules>("insurerAdmin", "ReadMedicalRules", packageId);
   },
   saveMedicalEpisode(input: { episodeReferenceHash: string; expectedRevision: number; patientReferenceHash: string;
-    service: string; serviceDate: string; admissionDate: string; dischargeDate: string; billMinor: number; invoiceDate: string; diagnosisCode: string }, userName?: string) {
+    service: string; serviceDate: string; admissionDate: string; dischargeDate: string; billMinor: number; invoiceDate: string;
+    diagnosisCode: string; invoiceNumber?: string }, userName?: string) {
     if (!userName) throw new Error("No Fabric Hospital identity for this account");
-    const { episodeReferenceHash, expectedRevision, ...facts } = input;
-    return submitWithTransient("hospitalOfficer", "SaveMedicalEpisode", [episodeReferenceHash, expectedRevision], { medicalEpisode: JSON.stringify(facts) }, userName);
+    const { episodeReferenceHash, expectedRevision, invoiceNumber, ...facts } = input;
+    return submitWithTransient("hospitalOfficer", "SaveMedicalEpisode", [episodeReferenceHash, expectedRevision], {
+      medicalEpisode: JSON.stringify(facts), revisionNonce: randomBytes(32),
+      ...(medicalSourcePublisherEnabled() && userName === "hospital2" && invoiceNumber && { medicalHospitalInvoiceNumber: invoiceNumber }),
+    }, userName);
   },
   configureMedicalRules(input: { packageId: string; service: string; sublimit: number; deductibleBps: number; deductibleCap: number;
     shareBps: number; waitingDays: number; filingDays: number; evidenceRequired: boolean }) {
@@ -274,6 +346,14 @@ export const ledger = {
 
   listBankTransfers() {
     return evaluate<BankTransfer[]>("bankOfficer", "ListBankTransfers");
+  },
+
+  readBankAccountLink(id: string) {
+    return evaluate<BankAccountLinkRequest>("insurerAdmin", "ReadBankAccountLink", id);
+  },
+
+  listBankAccountLinks() {
+    return evaluate<BankAccountLinkRequest[]>("insurerAdmin", "ListBankAccountLinks");
   },
 
   readBankMandate(id: string) {
@@ -594,6 +674,10 @@ export const ledger = {
     return submit<Policy>("insurerAdmin", "AdvancePolicyLifecycle", id, asOfDate);
   },
 
+  reinstatePolicy(id: string, reasonHash: string) {
+    return submit<Policy>("insurerAdmin", "ReinstatePolicy", id, reasonHash);
+  },
+
   cancelPolicy(id: string, reasonHash: string, role: "policyholder" | "insurerAdmin") {
     return submit<Policy>(role, "CancelPolicy", id, reasonHash);
   },
@@ -631,6 +715,23 @@ export const ledger = {
     return submit<BankMandate>("bankOfficer", "ReviewBankMandate", id, outcome, decisionHash);
   },
 
+  requestBankAccountLink(input: { id: string; bankId: string; accountLabel: string; maskedAccount: string }) {
+    return submit<BankAccountLinkRequest>("policyholder", "RequestBankAccountLink", input.id, input.bankId, input.accountLabel, input.maskedAccount);
+  },
+
+  reviewBankAccountLink(input: { id: string; outcome: "APPROVE" | "REJECT"; accountReferenceId: string; decisionHash: string; accountTokenHash: string; openingBalanceMinor: number }) {
+    const args = [input.id, input.outcome, input.outcome === "APPROVE" ? input.accountReferenceId : "", input.decisionHash];
+    // The account token and balance stay in transient data, as for OpenPrivateBankAccount.
+    return input.outcome === "APPROVE"
+      ? submitWithTransient<BankAccountLinkRequest>("bankOfficer", "ReviewBankAccountLink", args,
+        { bankAccountPrivate: JSON.stringify({ accountTokenHash: input.accountTokenHash, openingBalanceMinor: input.openingBalanceMinor }) })
+      : submit<BankAccountLinkRequest>("bankOfficer", "ReviewBankAccountLink", ...args);
+  },
+
+  cancelBankAccountLink(id: string) {
+    return submit<BankAccountLinkRequest>("policyholder", "CancelBankAccountLink", id);
+  },
+
   cancelBankMandate(id: string) {
     return submit<BankMandate>("policyholder", "CancelBankMandate", id);
   },
@@ -658,6 +759,10 @@ export const ledger = {
 
   queuePremiumCollection(id: string, mandateId: string, dueDate: string) {
     return submit<PremiumCollection>("insurerAdmin", "QueuePremiumCollection", id, mandateId, dueDate);
+  },
+
+  retryPremiumCollection(collectionId: string) {
+    return submit<PremiumCollection>("insurerAdmin", "RetryPremiumCollection", collectionId);
   },
 
   schedulePremiumCollections(asOfDate: string) {
@@ -868,8 +973,65 @@ export const ledger = {
     );
   },
 
-  finalizeOracleTimeout(requestId: string) {
-    return submit<OracleRequest>("insurerAdmin", "FinalizeOracleTimeout", requestId);
+  async supportsMedicalOracleV2() {
+    if (process.env.FABRIC_CHANNEL_NAME !== "insurance-dev-lite-190") return false;
+    try {
+      return (await evaluate<{ protocolVersion: string }>("insurerAdmin", "ReadMedicalOracleProtocol")).protocolVersion === "v2";
+    } catch {
+      return false;
+    }
+  },
+
+  requestOracleVerificationV2(requestId: string, claimId: string) {
+    return submit<OracleRequest>("insurerAdmin", "RequestOracleVerificationV2", requestId, claimId);
+  },
+
+  requestPublishedMedicalOracleVerification(requestId: string, claimId: string, claimVersion: number, pins: PublishedSourcePin[]) {
+    requireWritableLedger();
+    return withFabricContract("insurerAdmin", async contract => {
+      const method = "RequestPublishedMedicalOracleVerification";
+      const started = performance.now();
+      const proposal = contract.newProposal(method, { arguments: [requestId, claimId, String(claimVersion), JSON.stringify(pins)] });
+      const transaction = await proposal.endorse();
+      requireWritableLedger();
+      const submitted = await transaction.submit();
+      const status = await submitted.getStatus();
+      console.info(JSON.stringify({ at: new Date().toISOString(), method, actor: "insurer", transactionId: submitted.getTransactionId(),
+        blockNumber: String(status.blockNumber), code: status.code, elapsedMs: Math.round(performance.now() - started) }));
+      if (!status.successful) throw new Error(`Oracle request committed INVALID (${status.code}). Refresh the case before retrying.`);
+      return decodeJson<OracleRequest>(submitted.getResult());
+    });
+  },
+
+  readOracleGovernance<T>(name: "ListSourceIssuers" | "ListSourceFeeds" | "ListOracleRosters" | "ListMedicalModelReleases") {
+    return evaluate<T>("insurerAdmin", name);
+  },
+
+  readSourceIssuer(id: string, version: string) {
+    return evaluate<{ issuerId: string; hospitalId: string; kind: string }>("insurerAdmin", "ReadSourceIssuer", id, version);
+  },
+
+  writeOracleGovernance(role: "insurerAdmin" | "auditor" | "hospitalOfficer", name: string, args: string[], user?: string) {
+    if (role === "auditor") return submitAsAuditor(user, name, ...args);
+    if (role === "hospitalOfficer") return submitAsHospital(user, name, ...args);
+    return submit(role, name, ...args);
+  },
+
+  recordPrivateMedicalReceipt(claimId: string, summary: unknown) {
+    requireWritableLedger();
+    return withFabricContract("policyholder", async (contract) => {
+      await contract.submit("RecordMedicalOCRSummary", {
+        arguments: [claimId],
+        transientData: { medicalOCRSummary: JSON.stringify(summary) },
+      });
+      return null;
+    });
+  },
+
+  finalizeOracleTimeout(requestId: string, role: "insurerAdmin" | "policyholder" | "auditor" = "insurerAdmin", user?: string) {
+    return role === "auditor"
+      ? submitAsAuditor<OracleRequest>(user, "FinalizeOracleTimeout", requestId)
+      : submit<OracleRequest>(role, "FinalizeOracleTimeout", requestId);
   },
 
   routeOracleFailureToReview(input: {

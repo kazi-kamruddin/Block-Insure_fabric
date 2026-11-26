@@ -15,7 +15,7 @@ test("medical evidence decrypts and OCR runs locally on a PNG and PDF", async ({
   });
   const login = await page.request.post("/api/auth/demo-login", { data: { accountId: "policyholder-1" } });
   expect(login.ok()).toBe(true);
-  await page.goto("/workspace/policyholder");
+  await page.goto("/workspace/policyholder/documents");
 
   const image = await page.evaluate(() => {
     const canvas = document.createElement("canvas");

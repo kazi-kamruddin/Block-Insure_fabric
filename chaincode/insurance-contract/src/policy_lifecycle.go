@@ -72,7 +72,12 @@ func (c *Contract) acquirePolicy(ctx contractapi.TransactionContextInterface, id
 	if acceptedTermsHash != "" && policyPackage.MedicalRulesVersion == 0 {
 		return nil, fmt.Errorf("this package does not publish medical reimbursement rules")
 	}
-	now, err := timestamp(ctx)
+	if policyPackage.MedicalRulesVersion != 0 {
+		if err := requireMedicalPolicyTerm(ctx, start, end); err != nil {
+			return nil, err
+		}
+	}
+	now, err := ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -95,6 +100,10 @@ func (c *Contract) AdvancePolicyLifecycle(ctx contractapi.TransactionContextInte
 	}
 	asOf, err := validateDate("asOfDate", asOfDate)
 	if err != nil {
+		return nil, err
+	}
+	// A typed future date would let the Insurer lapse a paying customer early.
+	if err := requireNotAfterLedgerDate(ctx, "asOfDate", asOfDate); err != nil {
 		return nil, err
 	}
 	policy, err := c.ReadPolicy(ctx, id)
@@ -131,12 +140,23 @@ func (c *Contract) AdvancePolicyLifecycle(ctx contractapi.TransactionContextInte
 	if policy.Status == previous {
 		return nil, fmt.Errorf("policy %s is already %s", id, previous)
 	}
-	policy.UpdatedAt, err = timestamp(ctx)
+	// An earlier as-of date must not walk a lapsed policy back into grace;
+	// only reinstatement (medical) or a premium can end a lapse.
+	if previous == "LAPSED" && policy.Status != "EXPIRED" {
+		return nil, fmt.Errorf("policy %s is LAPSED; only expiry or reinstatement can change it", id)
+	}
+	policy.UpdatedAt, err = ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}
 	if err := overwriteAsset(ctx, "policy", id, policy); err != nil {
 		return nil, err
+	}
+	// A lapsed or expired medical policy cannot accept the queued installments.
+	if policy.MedicalRulesVersion != 0 && (policy.Status == "LAPSED" || policy.Status == "EXPIRED") {
+		if err := c.supersedeOpenCollections(ctx, id, "9999-12-31", policy.UpdatedAt); err != nil {
+			return nil, err
+		}
 	}
 	if err := emit(ctx, "PolicyLifecycleAdvanced", policy); err != nil {
 		return nil, err
@@ -173,11 +193,17 @@ func (c *Contract) CancelPolicy(ctx contractapi.TransactionContextInterface, id,
 	}
 	policy.Status = "CANCELLED"
 	policy.CancellationReasonHash = strings.ToLower(reasonHash)
-	policy.UpdatedAt, err = timestamp(ctx)
+	policy.UpdatedAt, err = ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}
+	if policy.CancelledDate, err = ledgerBusinessDate(ctx); err != nil {
+		return nil, err
+	}
 	if err := overwriteAsset(ctx, "policy", id, policy); err != nil {
+		return nil, err
+	}
+	if err := c.endPolicyDebits(ctx, id, policy.UpdatedAt); err != nil {
 		return nil, err
 	}
 	if err := emit(ctx, "PolicyCancelled", policy); err != nil {
@@ -223,7 +249,7 @@ func (c *Contract) RenewPolicy(ctx contractapi.TransactionContextInterface, newI
 	if policyPackage.Status != "PUBLISHED" {
 		return nil, fmt.Errorf("policy package %s is not published for renewal", existing.PackageID)
 	}
-	now, err := timestamp(ctx)
+	now, err := ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}

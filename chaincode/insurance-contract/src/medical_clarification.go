@@ -54,19 +54,22 @@ func (c *Contract) RequestMedicalClarification(ctx contractapi.TransactionContex
 	if review.Status != "PREPARING" || claim.MedicalClarificationID != "" {
 		return nil, fmt.Errorf("one clarification is available before voting in this review cycle")
 	}
-	end, err := medicalReviewClock(ctx, deadline)
+	end, err := medicalReviewDeadline(ctx, deadline, review.TimingProfile, timingWaits(review.TimingProfile).voteDefault)
 	if err != nil {
 		return nil, err
 	}
 	prepare, _ := time.Parse(time.RFC3339, review.PrepareBy)
-	if end.After(prepare) {
+	if deadline == "" && end.After(prepare) {
+		end = prepare
+	}
+	if _, err := medicalReviewClockForGrant(ctx, end.Format(time.RFC3339Nano)); err != nil || end.After(prepare) {
 		return nil, fmt.Errorf("clarification must end before access preparation closes")
 	}
 	question, err := medicalPrivateEnvelope(ctx)
 	if err != nil {
 		return nil, err
 	}
-	note := &MedicalClarification{ID: id, ReviewID: reviewID, ClaimID: claim.ID, ClaimVersion: claim.Version, Question: question, Status: "PENDING", Deadline: end.UTC().Format(time.RFC3339)}
+	note := &MedicalClarification{ID: id, ReviewID: reviewID, ClaimID: claim.ID, ClaimVersion: claim.Version, Question: question, Status: "PENDING", Deadline: end.UTC().Format(time.RFC3339Nano)}
 	if err := putPrivateState(ctx, "medicalClarification", id, note); err != nil {
 		return nil, err
 	}
@@ -93,7 +96,7 @@ func (c *Contract) RespondMedicalClarification(ctx contractapi.TransactionContex
 	if msp != "InsurerMSP" || note.Status != "PENDING" || review.Status != "PREPARING" || claim.MedicalClarificationID != id {
 		return nil, fmt.Errorf("clarification is unavailable")
 	}
-	now, err := timestamp(ctx)
+	now, err := ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}

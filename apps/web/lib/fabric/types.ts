@@ -77,6 +77,9 @@ export type Policy = {
   gracePeriodDays?: number;
   paidThroughDate?: string;
   nextPremiumDueDate?: string;
+  coverStartDate?: string;
+  reinstatedDate?: string;
+  cancelledDate?: string;
   renewedFromPolicyId?: string;
   cancellationReasonHash?: string;
   benefitPlanId?: string;
@@ -126,6 +129,21 @@ export type BankTransfer = {
   externalReferenceHash: string;
   authorizationHash: string;
   createdAt: LedgerTimestamp;
+};
+
+export type BankAccountLinkRequest = {
+  assetType: "bankAccountLink";
+  schemaVersion: number;
+  id: string;
+  bankId: string;
+  ownerId: string;
+  accountLabel: string;
+  maskedAccount: string;
+  status: "PENDING" | "LINKED" | "REJECTED" | "CANCELLED";
+  accountReferenceId: string;
+  decisionHash: string;
+  createdAt: LedgerTimestamp;
+  updatedAt: LedgerTimestamp;
 };
 
 export type BankMandate = {
@@ -184,7 +202,7 @@ export type PremiumCollection = {
   mandateId: string;
   dueDate: string;
   amountMinor: number;
-  status: "DUE" | "RETRY" | "COMPLETED" | "FAILED" | "BOUNCED";
+  status: "DUE" | "RETRY" | "COMPLETED" | "FAILED" | "BOUNCED" | "SUPERSEDED";
   paymentId: string;
   transferId: string;
   failureHash: string;
@@ -275,11 +293,15 @@ export type ClaimStatus =
   | "SETTLED";
 
 export type Claim = {
+  medicalDuplicateReason?: "CROSS_HOSPITAL_OVERLAP";
+  medicalDuplicateExplanationHash?: string;
+  medicalRetirementHash?: string;
   medicalDuplicateReview?: boolean;
   medicalEvidenceRequired?: boolean;
   medicalRevisionKind?: "CORRECTION" | "APPEAL" | "CLARIFICATION" | "";
   medicalSettlementId?: string;
   medicalEscalatedAt?: string;
+  medicalReservationReleasedAt?: string;
   medicalClarificationId?: string;
   medicalRecoveryUsed?: boolean;
   medicalSupplementHash?: string;
@@ -369,7 +391,19 @@ export type OracleRegistrySnapshot = {
   createdAt: LedgerTimestamp;
 };
 
+export type MedicalTimingProfile = "REAL" | "DEMO";
+
 export type OracleRequest = {
+  timingProfile?: MedicalTimingProfile;
+  patientTokenKeyVersion?: number;
+  protocolVersion?: "v2";
+  manifest?: { schema: string; requestedAt: string; pins: Array<{ issuerId: string; keyVersion: number; feedVersion: number; root: string; effectiveAt: string; anchoredAt: string }> };
+  manifestHash?: string;
+  rosterVersion?: string;
+  policyVersion?: string;
+  factVectorHash?: string;
+  factVectorJSON?: string;
+  decision?: "AUTO_APPROVE" | "PANEL_REVIEW" | "INTEGRITY_FAIL";
   assetType: "oracleRequest";
   schemaVersion: number;
   id: string;
@@ -397,7 +431,7 @@ export type OracleRequest = {
   status: "PENDING" | "CONSENSUS" | "FAILED";
   verifiedResult: boolean;
   resultHash: string;
-  finalizationCode: "" | "EXACT_CONSENSUS" | "NEGATIVE_RESULT" | "CONFLICT" | "TIMEOUT" | "ESCALATED_TIMEOUT";
+  finalizationCode: "" | "EXACT_CONSENSUS" | "NEGATIVE_RESULT" | "CONFLICT" | "TIMEOUT" | "ESCALATED_TIMEOUT" | "MODEL_HELD";
   commitDeadline: LedgerTimestamp;
   revealDeadline: LedgerTimestamp;
   requestedAt: LedgerTimestamp;
@@ -418,6 +452,10 @@ export type OracleCommitment = {
 };
 
 export type OracleResult = {
+  protocolVersion?: "v2";
+  factVectorJSON?: string;
+  decision?: OracleRequest["decision"];
+  workerDiagnosticsHash?: string;
   assetType: "oracleResult";
   schemaVersion: number;
   id: string;
@@ -533,6 +571,8 @@ export type HospitalVerification = {
 };
 
 export type AuditorDecision = {
+  ballotVersion?: "panel-vote-v1";
+  ballotSalt?: string;
   reasonCode?: string;
   assetType: "auditorDecision";
   schemaVersion: number;
@@ -548,6 +588,17 @@ export type AuditorDecision = {
 };
 
 export type ClaimReview = {
+  timingProfile?: MedicalTimingProfile;
+  appealEligibleUntil?: LedgerTimestamp;
+  ballotVersion?: "panel-vote-v1";
+  commitDeadline?: LedgerTimestamp;
+  commitmentsCast?: number;
+  rosterVersion?: string;
+  standbyAuditorIds?: string[];
+  acknowledgedAuditorIds?: string[];
+  replacements?: Array<{ absentAuditorId: string; newAuditorId: string; replacedAt: LedgerTimestamp }>;
+  disclosureIssuedAt?: LedgerTimestamp;
+  standbyForReviewId?: string;
   medicalVersion?: number;
   prepareBy?: string;
   assetType: "claimReview";
@@ -563,7 +614,7 @@ export type ClaimReview = {
   approvals: number;
   rejections: number;
   votesCast: number;
-  status: "PREPARING" | "OPEN" | "APPROVED" | "REJECTED" | "TIMED_OUT" | "ACCESS_FAILED" | "SUPERSEDED";
+  status: "PREPARING" | "OPEN" | "APPROVED" | "REJECTED" | "TIMED_OUT" | "ACCESS_FAILED" | "PROCEDURAL_FAILURE" | "SUPERSEDED";
   deadline: LedgerTimestamp;
   openedAt: LedgerTimestamp;
   closedAt: LedgerTimestamp;
@@ -635,6 +686,17 @@ export type Settlement = {
 };
 
 export type MedicalApprovalCertificate = {
+  timingProfile?: MedicalTimingProfile;
+  certificateVersion?: 3;
+  reviewTranscriptHash?: string;
+  samplingRecordHash?: string;
+  decidedAt?: LedgerTimestamp;
+  issuedAt?: LedgerTimestamp;
+  manifestHash?: string;
+  factVectorHash?: string;
+  decision?: string;
+  policyVersion?: string;
+  supersededBy?: string;
   claimId: string;
   claimVersion: number;
   amountMinor: number;
@@ -644,6 +706,15 @@ export type MedicalApprovalCertificate = {
   modelHash: string;
   hash: string;
   approvedAt: LedgerTimestamp;
+};
+
+export type PanelVoteCommitment = {
+  reviewId: string;
+  round: number;
+  claimVersion: number;
+  auditorId: string;
+  commitment: string;
+  committedAt: LedgerTimestamp;
 };
 
 export type ClaimHistoryRecord = {

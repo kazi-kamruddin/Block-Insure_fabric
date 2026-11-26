@@ -1,6 +1,7 @@
 package insurance
 
 import (
+	"encoding/json"
 	"fmt"
 	"slices"
 	"strconv"
@@ -9,6 +10,7 @@ import (
 )
 
 type MedicalOracleBenchmark struct {
+	EffectiveFrom    string `json:"effectiveFrom,omitempty" metadata:",optional"`
 	HospitalID       string `json:"hospitalId"`
 	Service          string `json:"service"`
 	ExpectedMinMinor int64  `json:"expectedMinMinor"`
@@ -18,6 +20,17 @@ type MedicalOracleBenchmark struct {
 }
 
 func (c *Contract) RegisterMedicalOracleBenchmark(ctx contractapi.TransactionContextInterface, hospitalID, service string, minimum, maximum int64, licenseStatus, sourceHash string) (*MedicalOracleBenchmark, error) {
+	return c.registerMedicalOracleBenchmark(ctx, hospitalID, service, minimum, maximum, licenseStatus, sourceHash, "")
+}
+
+func (c *Contract) RegisterMedicalOracleBenchmarkVersion(ctx contractapi.TransactionContextInterface, hospitalID, service string, minimum, maximum int64, licenseStatus, sourceHash, effectiveFrom string) (*MedicalOracleBenchmark, error) {
+	if _, err := validateDate("benchmark effective date", effectiveFrom); err != nil {
+		return nil, err
+	}
+	return c.registerMedicalOracleBenchmark(ctx, hospitalID, service, minimum, maximum, licenseStatus, sourceHash, effectiveFrom)
+}
+
+func (c *Contract) registerMedicalOracleBenchmark(ctx contractapi.TransactionContextInterface, hospitalID, service string, minimum, maximum int64, licenseStatus, sourceHash, effectiveFrom string) (*MedicalOracleBenchmark, error) {
 	if !isMedicalCandidate(ctx) {
 		return nil, fmt.Errorf("medical benchmark requires the isolated medical channel")
 	}
@@ -36,10 +49,81 @@ func (c *Contract) RegisterMedicalOracleBenchmark(ctx contractapi.TransactionCon
 	}
 	benchmark := &MedicalOracleBenchmark{HospitalID: hospitalID, Service: service, ExpectedMinMinor: minimum, ExpectedMaxMinor: maximum, LicenseStatus: licenseStatus, SourceHash: sourceHash}
 	key := canonicalProtocolHash("fabric-medical-benchmark-v1", hospitalID, service)
+	if effectiveFrom != "" {
+		benchmark.EffectiveFrom = effectiveFrom
+		indexKey, err := stateKey(ctx, "medicalOracleBenchmarkDates", key)
+		if err != nil {
+			return nil, err
+		}
+		raw, err := ctx.GetStub().GetState(indexKey)
+		if err != nil {
+			return nil, err
+		}
+		dates := []string{}
+		if len(raw) > 0 {
+			if err := json.Unmarshal(raw, &dates); err != nil {
+				return nil, err
+			}
+		}
+		if slices.Contains(dates, effectiveFrom) {
+			return nil, fmt.Errorf("medical benchmark version already exists")
+		}
+		dates = append(dates, effectiveFrom)
+		slices.Sort(dates)
+		versionKey, err := ctx.GetStub().CreateCompositeKey("medicalOracleBenchmark", []string{hospitalID, service, effectiveFrom})
+		if err != nil {
+			return nil, err
+		}
+		if err := writeMedicalPrivate(ctx, versionKey, benchmark); err != nil {
+			return nil, err
+		}
+		if err := overwriteAsset(ctx, "medicalOracleBenchmarkDates", key, dates); err != nil {
+			return nil, err
+		}
+		return benchmark, nil
+	}
 	if err := putPrivateState(ctx, "medicalOracleBenchmark", key, benchmark); err != nil {
 		return nil, err
 	}
 	return benchmark, nil
+}
+
+func medicalOracleBenchmarkAt(ctx contractapi.TransactionContextInterface, hospitalID, service, serviceDate string) (*MedicalOracleBenchmark, error) {
+	id := canonicalProtocolHash("fabric-medical-benchmark-v1", hospitalID, service)
+	index, err := stateKey(ctx, "medicalOracleBenchmarkDates", id)
+	if err != nil {
+		return nil, err
+	}
+	raw, err := ctx.GetStub().GetState(index)
+	if err != nil {
+		return nil, err
+	}
+	if len(raw) > 0 {
+		var dates []string
+		if err := json.Unmarshal(raw, &dates); err != nil {
+			return nil, err
+		}
+		pos, exact := slices.BinarySearch(dates, serviceDate)
+		if !exact {
+			pos--
+		}
+		if pos >= 0 {
+			key, err := ctx.GetStub().CreateCompositeKey("medicalOracleBenchmark", []string{hospitalID, service, dates[pos]})
+			if err != nil {
+				return nil, err
+			}
+			raw, err := ctx.GetStub().GetPrivateData(oracleProofCollection, key)
+			if err != nil {
+				return nil, err
+			}
+			var benchmark MedicalOracleBenchmark
+			if err := json.Unmarshal(raw, &benchmark); err != nil {
+				return nil, err
+			}
+			return &benchmark, nil
+		}
+	}
+	return getPrivateState[MedicalOracleBenchmark](ctx, "medicalOracleBenchmark", id)
 }
 
 type MedicalOracleSource struct {
@@ -80,7 +164,7 @@ func (c *Contract) ListMedicalOracleSources(ctx contractapi.TransactionContextIn
 			TreatmentHash: head.RevisionHash, AmountMinor: episode.BillMinor, AdmissionDate: episode.AdmissionDate,
 			DischargeDate: episode.DischargeDate, Status: "FINALIZED"}
 		source := MedicalOracleSource{Invoice: invoice}
-		benchmark, err := getPrivateState[MedicalOracleBenchmark](ctx, "medicalOracleBenchmark", canonicalProtocolHash("fabric-medical-benchmark-v1", episode.HospitalID, episode.Service))
+		benchmark, err := medicalOracleBenchmarkAt(ctx, episode.HospitalID, episode.Service, episode.ServiceDate)
 		if err == nil && episode.InvoiceDate != "" {
 			source.Complete = true
 			source.BenchmarkHash = benchmark.SourceHash
@@ -125,7 +209,7 @@ func (c *Contract) bindMedicalOracle(ctx contractapi.TransactionContextInterface
 	}
 	slices.Sort(digests)
 	manifest := canonicalProtocolHash("fabric-medical-evidence-v1", digests...)
-	now, err := timestamp(ctx)
+	now, err := ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}

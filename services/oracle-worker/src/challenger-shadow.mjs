@@ -3,11 +3,13 @@ import { isAbsolute } from "node:path";
 import { challengerFeatures, protocol } from "../../../benchmarks/ml-challengers/cohort.mjs";
 import { scoreChallenger } from "../../../benchmarks/ml-challengers/models.mjs";
 import { evaluatorHash, evaluatorVersion, hash } from "./xgboost.mjs";
+import { devLiteProfile } from "../../../scripts/dev-lite-gateway.mjs";
 
 const selectedModels = ["additive-stumps", "monotonic-ranker"];
 
 export async function loadChallengerShadow(channel, file, expectedHash) {
-  if (channel !== "insurance-medical-reimbursement" || !isAbsolute(file) || !/^[a-f0-9]{64}$/.test(expectedHash)) {
+  if (!["insurance-medical-reimbursement", devLiteProfile.channel].includes(channel) ||
+      !isAbsolute(file) || !/^[a-f0-9]{64}$/.test(expectedHash)) {
     throw new Error("Shadow requires the isolated medical channel and a pinned absolute artifact path");
   }
   const artifact = JSON.parse(await readFile(file, "utf8"));

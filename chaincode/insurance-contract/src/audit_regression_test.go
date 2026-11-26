@@ -28,11 +28,12 @@ func premiumAuditFixture(t *testing.T) (*Contract, *testContext, *Policy) {
 }
 
 func TestPremiumPeriodCannotBuyExcessCoverage(t *testing.T) {
+	ctx := &testContext{stub: newMemoryStub()}
 	p := &Policy{ID: "policy-audit", Status: "ACTIVE", StartDate: "2026-01-01", EndDate: "2026-12-31", NextPremiumDueDate: "2026-01-01", PremiumMinor: 100, PremiumIntervalDays: 30}
-	requireNoError(t, validatePremiumPeriod(p, "2026-01-01", "2026-01-30", 100))
-	requireError(t, validatePremiumPeriod(p, "2026-01-01", "2026-12-31", 100), "premium interval")
+	requireNoError(t, validatePremiumPeriod(ctx, p, "2026-01-01", "2026-01-30", 100))
+	requireError(t, validatePremiumPeriod(ctx, p, "2026-01-01", "2026-12-31", 100), "premium interval")
 	p.PremiumIntervalDays = 0 // Retained policies use the default interval.
-	requireError(t, validatePremiumPeriod(p, "2026-01-01", "2026-01-31", 100), "premium interval")
+	requireError(t, validatePremiumPeriod(ctx, p, "2026-01-01", "2026-01-31", 100), "premium interval")
 }
 
 func TestPremiumCollectionRespectsMandateExpiry(t *testing.T) {
@@ -85,6 +86,8 @@ func TestPolicyExpiryIncludesLastCoverageDayAndUnpaidPolicies(t *testing.T) {
 		t.Run(status, func(t *testing.T) {
 			c := &Contract{}
 			ctx := &testContext{stub: newMemoryStub()}
+			// Ledger time is 1 January 2027 in Dhaka, so both dates are allowed.
+			ctx.stub.timestamp = timestamppb.New(time.Date(2026, time.December, 31, 18, 0, 0, 0, time.UTC))
 			setIdentity(ctx, "admin", "InsurerMSP", "insurerAdmin", nil)
 			p := &Policy{ID: "policy-expiry", Status: status, EndDate: "2026-12-31", NextPremiumDueDate: "2027-01-01"}
 			requireNoError(t, putState(ctx, "policy", p.ID, p))

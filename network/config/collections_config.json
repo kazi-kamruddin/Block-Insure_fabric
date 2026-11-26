@@ -22,5 +22,17 @@
     "endorsementPolicy": {
       "signaturePolicy": "OutOf(2,'HospitalMSP.peer','InsurerMSP.peer','OracleMSP.peer')"
     }
+  },
+  {
+    "name": "auditorReviewPrivateData",
+    "policy": "OR('InsurerMSP.member','AuditorMSP.member')",
+    "requiredPeerCount": 1,
+    "maxPeerCount": 2,
+    "blockToLive": 0,
+    "memberOnlyRead": true,
+    "memberOnlyWrite": true,
+    "endorsementPolicy": {
+      "signaturePolicy": "AND('InsurerMSP.peer','AuditorMSP.peer')"
+    }
   }
 ]

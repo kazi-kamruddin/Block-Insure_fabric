@@ -1,4 +1,33 @@
-# Fabric 1.9.0 maintenance run
+# Fabric 1.9.0 run summary
+
+## Current state — 26 November 2026 freeze (Asia/Dhaka)
+
+This section is the current summary. Everything below the next heading is the dated 20 November maintenance record, kept unchanged as history.
+
+**Deployment.** The thesis demonstration runs on `insurance-dev-lite-190`, a LevelDB channel with five business organisations (Insurer, Hospital, Auditor, Bank, Oracle), one Raft orderer and a single shared chaincode-as-a-service (ccaas) process. Chaincode 1.9.0 is committed at lifecycle **sequence 4** with package `insurance-contract_1.9.0-r2:7240d4c0…82b1`. All five peers read back the same definition, package and approval. The ledger height after the upgrade is 406. The ledger carries every claim, policy and payout recorded since the 24 November seed: sequence 4 changed code, not state.
+
+**What the system does.** A customer buys a diagnostic or surgical policy and pays premiums by EFT mandate or one-time payment. The hospital records the treatment episode and bill. The customer files a claim against that episode. Three Oracle workers independently assemble a fact vector from three signed sources: the hospital's own records (S-A, signed under HospitalMSP), a simulated regulator feed (S-B) and receipt consistency (S-C). They commit to it, then reveal it. Two exact matches decide the route. An automatic approval issues a certificate and the Bank pays in simulated BDT. Anything else goes to a four-auditor panel that votes by sealed ballot (three approvals approve, two rejections reject). A rejection can be appealed, which creates a new claim version that runs through the same checks. The frozen XGBoost evaluator and its E2/E3 successors only advise and route. They never decide payment alone.
+
+**Last change (Session C).** Once any Oracle result or panel vote is revealed, no further sealed commitment is accepted. Before this, the ±15 s proposal-timestamp tolerance let a participant that had withheld its commitment submit a backdated one after seeing a revealed value. Three Go tests reproduce that attack; they failed on the sequence-3 source and pass on sequence 4. A live probe on the sequence-4 peer also showed that one changed bit in disclosed medical facts is refused. [Session C record](session-c-2026-11-26.md)
+
+**Verification at freeze.**
+
+| Suite | Result |
+| --- | --- |
+| Go chaincode (pinned container): gofmt, vet, tests | Clean, clean, 105 top-level tests passed |
+| Web: lint, typecheck, Vitest, production build | Pass, pass, 234/234 in 68 files, 30/30 pages |
+| Oracle worker: check, tests, frozen evaluator hash | Pass, 54/54, v1 hash matched |
+| Source adapters | 8/8 |
+| Demo launcher and registry restore scripts | 4/4 |
+| Bounded workflow model (JS checker) | 544 states, 7 invariants |
+| Dossier verifier (Session A, unchanged code) | 30 passed, 11 subtests |
+| TLC (Session A and pre-freeze, models unchanged) | 5/5 configurations |
+
+**Coverage.** Of the 62 tracked items, 52 are DONE, 5 PARTIAL, 4 deferred by plan and 1 is an owner drill. The five partial items need the owner's hands-on run: browser screenshots (Chromium needs 900 MB free with the stack running), the claim-206 escalation and a warmed-memory sample at or above 1,000 MB. [Coverage audit](../final-coverage-audit.md)
+
+**Limits that stay.** All five organisations, the CAs and the three Oracle workers run on one laptop. The three Oracle subjects share one OracleMSP. S-B is simulated, and the fraud labels are synthetic, so no fraud-detection accuracy is claimed. Agreement between sources shows consistency and integrity, not clinical truth. No throughput figure is reported for the R2 system; the 24.1 TPS figure in the Phase 2 study belongs to a different CouchDB channel and workload. Twenty MVCC conflicts were measured on shared Oracle request keys ([attribution](r2-latency-2026-11-26.md#mvcc-attribution)).
+
+## 20 November 2026 maintenance run (historical)
 
 Branch `feature/1.9.0`. Evidence dated 20 November 2026 in Asia/Dhaka.
 Go counts below are top-level tests / subtests. Full suites ran on native

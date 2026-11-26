@@ -13,17 +13,19 @@ This snapshot records one reproducible local execution of the comparative protoc
 
 ## Comparative protocol results
 
+These September 19 measurements are single-evaluator in-process timings. Each threshold profile reuses one registry assessment. The selective-disclosure profile runs three proof checks.
+
 | Configuration | Mean latency (µs) | Median (µs) | P95 (µs) | Trial-mean 95% CI (µs) | Mean throughput (ops/s) | Latency vs centralized |
 |---|---:|---:|---:|---:|---:|---:|
 | Centralized trusted verifier | 3.837 | 3.1 | 5.2 | 3.338–4.336 | 266,483.748 | 1.000× |
 | Single Oracle (1-of-1) | 11.861 | 9.9 | 15.4 | 11.240–12.482 | 84,432.195 | 3.091× |
 | Unanimous Oracles (2-of-2) | 15.102 | 12.8 | 19.0 | 14.778–15.426 | 65,833.537 | 3.936× |
-| Fault-tolerant Oracles (2-of-3) | 18.144 | 15.6 | 21.8 | 17.764–18.523 | 54,874.663 | 4.729× |
+| 2-of-3 threshold | 18.144 | 15.6 | 21.8 | 17.764–18.523 | 54,874.663 | 4.729× |
 | 2-of-3 with selective disclosure | 382.689 | 319.4 | 693.2 | 363.647–401.730 | 2,646.198 | 99.737× |
 
 The privacy-bound configuration was 21.092× slower than non-private 2-of-3 computation in this CPU microbenchmark, but its mean cost remained below 0.4 ms. These measurements cover protocol computation only. Fabric network, endorsement, ordering, and storage costs are separately measured by Caliper.
 
-The latest live Caliper validation completed all five rounds without failed transactions. At a fixed offered rate it recorded 20.2 TPS for the read-only 1-of-1, 2-of-2, and 2-of-3 threshold rounds, and 10.1 TPS with 0.63-second average latency for anchored registry writes.
+The September 19 live Caliper validation completed all five rounds without failed transactions. At a fixed offered rate it recorded 20.2 TPS for the read-only 1-of-1, 2-of-2, and 2-of-3 threshold rounds, and 10.1 TPS with 0.63-second average latency for anchored registry writes. These are separate workloads from the September 26 Phase 2 claim-submit sweep.
 
 ## Threat-evaluation results
 

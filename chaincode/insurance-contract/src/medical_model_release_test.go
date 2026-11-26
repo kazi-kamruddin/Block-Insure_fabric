@@ -167,7 +167,11 @@ func TestDevLiteModelReleaseApprovalAndHoldOrder(t *testing.T) {
 			c, ctx := medicalTestContext()
 			ctx.stub.channelID = medicalDevLiteChannel
 			hash := strings.Repeat("a", 64)
-			_, err := c.RegisterMedicalModelRelease(ctx, "next-release", "medical-next", hash, "schema-v1", "threshold-v1", "ROUTING")
+			// Exercise the pre-R1 asset stored on disk before governance version 2.
+			err := putState(ctx, "medicalModelRelease", "next-release", &MedicalModelRelease{
+				ID: "next-release", ModelVersion: "medical-next", ArtifactHash: hash, FeatureSchema: "schema-v1",
+				CalibrationVersion: "threshold-v1", IntendedTask: "ROUTING", Status: "CANDIDATE", ApprovedMSPs: []string{},
+			})
 			requireNoError(t, err)
 			_, err = c.ShadowMedicalModelRelease(ctx, "next-release", hash)
 			requireNoError(t, err)

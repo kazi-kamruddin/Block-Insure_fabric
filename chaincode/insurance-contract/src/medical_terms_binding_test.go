@@ -36,7 +36,7 @@ func TestDevLiteApprovalPinsPayableBreakdown(t *testing.T) {
 	claim.CurrentOracleRequestID = "terms-oracle"
 	request := &OracleRequest{ID: claim.CurrentOracleRequestID, ClaimID: claim.ID, ClaimVersion: claim.Version, Status: "PENDING"}
 	requireNoError(t, putState(ctx, "oracleRequest", request.ID, request))
-	now, err := timestamp(ctx)
+	now, err := ledgerTimestamp(ctx)
 	requireNoError(t, err)
 	requireNoError(t, c.finalizeOracleRequest(ctx, request, claim, true, digest, "EXACT_CONSENSUS", now))
 	cert, err := c.ReadMedicalApprovalCertificate(ctx, claim.ID, claim.Version)

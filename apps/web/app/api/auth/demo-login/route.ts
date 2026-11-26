@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { findDemoAccount } from "@/lib/auth/accounts";
@@ -28,7 +29,7 @@ export async function POST(request: Request) {
 
   const ttlSeconds = sessionTtlSeconds();
   const token = createSessionToken(
-    { accountId: account.id, role: account.role, subjectId: account.subjectId },
+    { accountId: account.id, role: account.role, subjectId: account.subjectId, sessionId: randomUUID() },
     sessionSecret(),
     ttlSeconds,
   );

@@ -55,35 +55,46 @@ type PolicyPackage struct {
 }
 
 type Policy struct {
-	MedicalRulesVersion    int      `json:"medicalRulesVersion"`
-	AssetType              string   `json:"assetType"`
-	SchemaVersion          int      `json:"schemaVersion"`
-	ID                     string   `json:"id"`
-	PackageID              string   `json:"packageId"`
-	PackageVersion         int      `json:"packageVersion"`
-	PolicyholderID         string   `json:"policyholderId"`
-	StartDate              string   `json:"startDate"`
-	EndDate                string   `json:"endDate"`
-	PremiumMinor           int64    `json:"premiumMinor"`
-	CoverageLimitMinor     int64    `json:"coverageLimitMinor"`
-	TermsHash              string   `json:"termsHash"`
-	HospitalIDs            []string `json:"hospitalIds"`
-	BankIDs                []string `json:"bankIds"`
-	Status                 string   `json:"status"`
-	PremiumIntervalDays    int      `json:"premiumIntervalDays"`
-	GracePeriodDays        int      `json:"gracePeriodDays"`
-	PaidThroughDate        string   `json:"paidThroughDate"`
-	NextPremiumDueDate     string   `json:"nextPremiumDueDate"`
-	RenewedFromPolicyID    string   `json:"renewedFromPolicyId"`
-	CancellationReasonHash string   `json:"cancellationReasonHash"`
-	BenefitPlanID          string   `json:"benefitPlanId"`
-	BenefitPlanVersion     int      `json:"benefitPlanVersion"`
-	DeathBenefitMinor      int64    `json:"deathBenefitMinor"`
-	SurrenderBenefitMinor  int64    `json:"surrenderBenefitMinor"`
-	MaturityBenefitMinor   int64    `json:"maturityBenefitMinor"`
-	BenefitRulesHash       string   `json:"benefitRulesHash"`
-	CreatedAt              string   `json:"createdAt"`
-	UpdatedAt              string   `json:"updatedAt"`
+	MedicalRulesVersion int      `json:"medicalRulesVersion"`
+	AssetType           string   `json:"assetType"`
+	SchemaVersion       int      `json:"schemaVersion"`
+	ID                  string   `json:"id"`
+	PackageID           string   `json:"packageId"`
+	PackageVersion      int      `json:"packageVersion"`
+	PolicyholderID      string   `json:"policyholderId"`
+	StartDate           string   `json:"startDate"`
+	EndDate             string   `json:"endDate"`
+	PremiumMinor        int64    `json:"premiumMinor"`
+	CoverageLimitMinor  int64    `json:"coverageLimitMinor"`
+	TermsHash           string   `json:"termsHash"`
+	HospitalIDs         []string `json:"hospitalIds"`
+	BankIDs             []string `json:"bankIds"`
+	Status              string   `json:"status"`
+	PremiumIntervalDays int      `json:"premiumIntervalDays"`
+	GracePeriodDays     int      `json:"gracePeriodDays"`
+	PaidThroughDate     string   `json:"paidThroughDate"`
+	NextPremiumDueDate  string   `json:"nextPremiumDueDate"`
+	// CoverStartDate is when a medical policy's risk began: the later of its
+	// start date and the settlement date of its first premium. Policies
+	// written before this field existed leave it empty and keep their issued
+	// eligibility terms.
+	CoverStartDate string `json:"coverStartDate"`
+	// ReinstatedDate is the last date the Insurer reinstated a lapsed medical
+	// policy. The lapse gap is never covered and waiting periods restart here.
+	ReinstatedDate string `json:"reinstatedDate"`
+	// CancelledDate is the Asia/Dhaka date a policy was cancelled or ended by
+	// a terminal benefit. Treatment before it stays claimable; nothing after.
+	CancelledDate          string `json:"cancelledDate"`
+	RenewedFromPolicyID    string `json:"renewedFromPolicyId"`
+	CancellationReasonHash string `json:"cancellationReasonHash"`
+	BenefitPlanID          string `json:"benefitPlanId"`
+	BenefitPlanVersion     int    `json:"benefitPlanVersion"`
+	DeathBenefitMinor      int64  `json:"deathBenefitMinor"`
+	SurrenderBenefitMinor  int64  `json:"surrenderBenefitMinor"`
+	MaturityBenefitMinor   int64  `json:"maturityBenefitMinor"`
+	BenefitRulesHash       string `json:"benefitRulesHash"`
+	CreatedAt              string `json:"createdAt"`
+	UpdatedAt              string `json:"updatedAt"`
 }
 
 type BankAccountReference struct {
@@ -275,45 +286,50 @@ type Liability struct {
 }
 
 type Claim struct {
-	MedicalDuplicateRuleVersion int      `json:"medicalDuplicateRuleVersion,omitempty" metadata:",optional"`
-	MedicalHeldReleaseID        string   `json:"medicalHeldReleaseId,omitempty" metadata:",optional"`
-	MedicalDuplicateReview      bool     `json:"medicalDuplicateReview,omitempty" metadata:",optional"`
-	MedicalEscalatedAt          string   `json:"medicalEscalatedAt,omitempty" metadata:",optional"`
-	MedicalClarificationID      string   `json:"medicalClarificationId"`
-	MedicalRecoveryUsed         bool     `json:"medicalRecoveryUsed"`
-	MedicalRevisionKind         string   `json:"medicalRevisionKind"`
-	MedicalSupplementHash       string   `json:"medicalSupplementHash"`
-	EpisodeID                   string   `json:"episodeId"`
-	EpisodeRevision             int      `json:"episodeRevision"`
-	MedicalEvidenceRequired     bool     `json:"medicalEvidenceRequired"`
-	MedicalSettlementID         string   `json:"medicalSettlementId"`
-	MedicalAssociationKey       string   `json:"medicalAssociationKey"`
-	MedicalAssociationVersion   int      `json:"medicalAssociationVersion"`
-	AssetType                   string   `json:"assetType"`
-	SchemaVersion               int      `json:"schemaVersion"`
-	ID                          string   `json:"id"`
-	PolicyID                    string   `json:"policyId"`
-	ClaimantID                  string   `json:"claimantId"`
-	HospitalID                  string   `json:"hospitalId"`
-	HospitalInvoiceID           string   `json:"hospitalInvoiceId"`
-	AmountMinor                 int64    `json:"amountMinor"`
-	IncidentDate                string   `json:"incidentDate"`
-	DescriptionHash             string   `json:"descriptionHash"`
-	EvidenceIDs                 []string `json:"evidenceIds"`
-	HospitalVerificationID      string   `json:"hospitalVerificationId"`
-	AuditorDecisionID           string   `json:"auditorDecisionId"`
-	CurrentReviewID             string   `json:"currentReviewId"`
-	CurrentAppealID             string   `json:"currentAppealId"`
-	CurrentOracleRequestID      string   `json:"currentOracleRequestId"`
-	PrivacyPresentationID       string   `json:"privacyPresentationId"`
-	OracleOutcome               string   `json:"oracleOutcome"`
-	OracleResultHash            string   `json:"oracleResultHash"`
-	Version                     int      `json:"version"`
-	ReviewRound                 int      `json:"reviewRound"`
-	AppealCount                 int      `json:"appealCount"`
-	Status                      string   `json:"status"`
-	CreatedAt                   string   `json:"createdAt"`
-	UpdatedAt                   string   `json:"updatedAt"`
+	MedicalDuplicateReason          string   `json:"medicalDuplicateReason,omitempty" metadata:",optional"`
+	MedicalDuplicateExplanationHash string   `json:"medicalDuplicateExplanationHash,omitempty" metadata:",optional"`
+	MedicalRetirementHash           string   `json:"medicalRetirementHash,omitempty" metadata:",optional"`
+	MedicalDuplicateRuleVersion     int      `json:"medicalDuplicateRuleVersion,omitempty" metadata:",optional"`
+	MedicalHeldReleaseID            string   `json:"medicalHeldReleaseId,omitempty" metadata:",optional"`
+	MedicalDuplicateReview          bool     `json:"medicalDuplicateReview,omitempty" metadata:",optional"`
+	MedicalEscalatedAt              string   `json:"medicalEscalatedAt,omitempty" metadata:",optional"`
+	MedicalEscalationEligibleAt     string   `json:"medicalEscalationEligibleAt,omitempty" metadata:",optional"`
+	MedicalReserveReleasedAt        string   `json:"medicalReservationReleasedAt,omitempty" metadata:",optional"`
+	MedicalClarificationID          string   `json:"medicalClarificationId"`
+	MedicalRecoveryUsed             bool     `json:"medicalRecoveryUsed"`
+	MedicalRevisionKind             string   `json:"medicalRevisionKind"`
+	MedicalSupplementHash           string   `json:"medicalSupplementHash"`
+	EpisodeID                       string   `json:"episodeId"`
+	EpisodeRevision                 int      `json:"episodeRevision"`
+	MedicalEvidenceRequired         bool     `json:"medicalEvidenceRequired"`
+	MedicalSettlementID             string   `json:"medicalSettlementId"`
+	MedicalAssociationKey           string   `json:"medicalAssociationKey"`
+	MedicalAssociationVersion       int      `json:"medicalAssociationVersion"`
+	AssetType                       string   `json:"assetType"`
+	SchemaVersion                   int      `json:"schemaVersion"`
+	ID                              string   `json:"id"`
+	PolicyID                        string   `json:"policyId"`
+	ClaimantID                      string   `json:"claimantId"`
+	HospitalID                      string   `json:"hospitalId"`
+	HospitalInvoiceID               string   `json:"hospitalInvoiceId"`
+	AmountMinor                     int64    `json:"amountMinor"`
+	IncidentDate                    string   `json:"incidentDate"`
+	DescriptionHash                 string   `json:"descriptionHash"`
+	EvidenceIDs                     []string `json:"evidenceIds"`
+	HospitalVerificationID          string   `json:"hospitalVerificationId"`
+	AuditorDecisionID               string   `json:"auditorDecisionId"`
+	CurrentReviewID                 string   `json:"currentReviewId"`
+	CurrentAppealID                 string   `json:"currentAppealId"`
+	CurrentOracleRequestID          string   `json:"currentOracleRequestId"`
+	PrivacyPresentationID           string   `json:"privacyPresentationId"`
+	OracleOutcome                   string   `json:"oracleOutcome"`
+	OracleResultHash                string   `json:"oracleResultHash"`
+	Version                         int      `json:"version"`
+	ReviewRound                     int      `json:"reviewRound"`
+	AppealCount                     int      `json:"appealCount"`
+	Status                          string   `json:"status"`
+	CreatedAt                       string   `json:"createdAt"`
+	UpdatedAt                       string   `json:"updatedAt"`
 }
 
 // PrivacyCredential is the public, Fabric-signed anchor for a credential whose
@@ -414,40 +430,50 @@ type OracleRegistrySnapshot struct {
 }
 
 type OracleRequest struct {
-	AuditPeriodID           string   `json:"auditPeriodId,omitempty" metadata:",optional"`
-	ModelReleaseID          string   `json:"modelReleaseId,omitempty" metadata:",optional"`
-	AssetType               string   `json:"assetType"`
-	SchemaVersion           int      `json:"schemaVersion"`
-	ID                      string   `json:"id"`
-	ClaimID                 string   `json:"claimId"`
-	ClaimVersion            int      `json:"claimVersion"`
-	HospitalVerificationID  string   `json:"hospitalVerificationId"`
-	AppealID                string   `json:"appealId"`
-	AppealCommitmentHash    string   `json:"appealCommitmentHash"`
-	PrivacyPresentationID   string   `json:"privacyPresentationId"`
-	PrivacyPresentationHash string   `json:"privacyPresentationHash"`
-	PrivacyProtocolVersion  string   `json:"privacyProtocolVersion"`
-	QueryHash               string   `json:"queryHash"`
-	RegistrySnapshotID      string   `json:"registrySnapshotId"`
-	RegistryVersion         int      `json:"registryVersion"`
-	RegistryRootHash        string   `json:"registryRootHash"`
-	RulesVersion            string   `json:"rulesVersion"`
-	RulesHash               string   `json:"rulesHash"`
-	ModelVersion            string   `json:"modelVersion"`
-	ModelHash               string   `json:"modelHash"`
-	AssignedOracleIDs       []string `json:"assignedOracleIds"`
-	RequiredConfirmations   int      `json:"requiredConfirmations"`
-	ExpectedResponses       int      `json:"expectedResponses"`
-	CommitmentCount         int      `json:"commitmentCount"`
-	RevealCount             int      `json:"revealCount"`
-	Status                  string   `json:"status"`
-	VerifiedResult          bool     `json:"verifiedResult"`
-	ResultHash              string   `json:"resultHash"`
-	FinalizationCode        string   `json:"finalizationCode"`
-	CommitDeadline          string   `json:"commitDeadline"`
-	RevealDeadline          string   `json:"revealDeadline"`
-	RequestedAt             string   `json:"requestedAt"`
-	FinalizedAt             string   `json:"finalizedAt"`
+	TimingProfile           string            `json:"timingProfile,omitempty" metadata:",optional"`
+	PatientTokenKeyVersion  int               `json:"patientTokenKeyVersion,omitempty" metadata:",optional"`
+	ProtocolVersion         string            `json:"protocolVersion,omitempty" metadata:",optional"`
+	Manifest                *OracleV2Manifest `json:"manifest,omitempty" metadata:",optional"`
+	ManifestHash            string            `json:"manifestHash,omitempty" metadata:",optional"`
+	PolicyVersion           string            `json:"policyVersion,omitempty" metadata:",optional"`
+	RosterVersion           string            `json:"rosterVersion,omitempty" metadata:",optional"`
+	FactVectorHash          string            `json:"factVectorHash,omitempty" metadata:",optional"`
+	Decision                string            `json:"decision,omitempty" metadata:",optional"`
+	FactVectorJSON          string            `json:"factVectorJSON,omitempty" metadata:",optional"`
+	AuditPeriodID           string            `json:"auditPeriodId,omitempty" metadata:",optional"`
+	ModelReleaseID          string            `json:"modelReleaseId,omitempty" metadata:",optional"`
+	AssetType               string            `json:"assetType"`
+	SchemaVersion           int               `json:"schemaVersion"`
+	ID                      string            `json:"id"`
+	ClaimID                 string            `json:"claimId"`
+	ClaimVersion            int               `json:"claimVersion"`
+	HospitalVerificationID  string            `json:"hospitalVerificationId"`
+	AppealID                string            `json:"appealId"`
+	AppealCommitmentHash    string            `json:"appealCommitmentHash"`
+	PrivacyPresentationID   string            `json:"privacyPresentationId"`
+	PrivacyPresentationHash string            `json:"privacyPresentationHash"`
+	PrivacyProtocolVersion  string            `json:"privacyProtocolVersion"`
+	QueryHash               string            `json:"queryHash"`
+	RegistrySnapshotID      string            `json:"registrySnapshotId"`
+	RegistryVersion         int               `json:"registryVersion"`
+	RegistryRootHash        string            `json:"registryRootHash"`
+	RulesVersion            string            `json:"rulesVersion"`
+	RulesHash               string            `json:"rulesHash"`
+	ModelVersion            string            `json:"modelVersion"`
+	ModelHash               string            `json:"modelHash"`
+	AssignedOracleIDs       []string          `json:"assignedOracleIds"`
+	RequiredConfirmations   int               `json:"requiredConfirmations"`
+	ExpectedResponses       int               `json:"expectedResponses"`
+	CommitmentCount         int               `json:"commitmentCount"`
+	RevealCount             int               `json:"revealCount"`
+	Status                  string            `json:"status"`
+	VerifiedResult          bool              `json:"verifiedResult"`
+	ResultHash              string            `json:"resultHash"`
+	FinalizationCode        string            `json:"finalizationCode"`
+	CommitDeadline          string            `json:"commitDeadline"`
+	RevealDeadline          string            `json:"revealDeadline"`
+	RequestedAt             string            `json:"requestedAt"`
+	FinalizedAt             string            `json:"finalizedAt"`
 }
 
 type OracleCommitment struct {
@@ -464,6 +490,10 @@ type OracleCommitment struct {
 }
 
 type OracleResult struct {
+	ProtocolVersion         string `json:"protocolVersion,omitempty" metadata:",optional"`
+	WorkerDiagnosticsHash   string `json:"workerDiagnosticsHash,omitempty" metadata:",optional"`
+	FactVectorJSON          string `json:"factVectorJSON,omitempty" metadata:",optional"`
+	Decision                string `json:"decision,omitempty" metadata:",optional"`
 	AssetType               string `json:"assetType"`
 	SchemaVersion           int    `json:"schemaVersion"`
 	ID                      string `json:"id"`
@@ -592,6 +622,8 @@ type HospitalVerification struct {
 }
 
 type AuditorDecision struct {
+	BallotSalt      string `json:"ballotSalt,omitempty" metadata:",optional"`
+	BallotVersion   string `json:"ballotVersion,omitempty" metadata:",optional"`
 	ReasonCode      string `json:"reasonCode"`
 	AssetType       string `json:"assetType"`
 	SchemaVersion   int    `json:"schemaVersion"`
@@ -607,25 +639,37 @@ type AuditorDecision struct {
 }
 
 type ClaimReview struct {
-	MedicalVersion     int      `json:"medicalVersion"`
-	PrepareBy          string   `json:"prepareBy"`
-	AssetType          string   `json:"assetType"`
-	SchemaVersion      int      `json:"schemaVersion"`
-	ID                 string   `json:"id"`
-	ClaimID            string   `json:"claimId"`
-	AppealID           string   `json:"appealId"`
-	Round              int      `json:"round"`
-	Kind               string   `json:"kind"`
-	AssignedAuditorIDs []string `json:"assignedAuditorIds"`
-	ApprovalThreshold  int      `json:"approvalThreshold"`
-	RejectionThreshold int      `json:"rejectionThreshold"`
-	Approvals          int      `json:"approvals"`
-	Rejections         int      `json:"rejections"`
-	VotesCast          int      `json:"votesCast"`
-	Status             string   `json:"status"`
-	Deadline           string   `json:"deadline"`
-	OpenedAt           string   `json:"openedAt"`
-	ClosedAt           string   `json:"closedAt"`
+	TimingProfile        string               `json:"timingProfile,omitempty" metadata:",optional"`
+	AppealEligibleUntil  string               `json:"appealEligibleUntil,omitempty" metadata:",optional"`
+	InitialPrepareBy     string               `json:"initialPrepareBy,omitempty" metadata:",optional"`
+	BallotVersion        string               `json:"ballotVersion,omitempty" metadata:",optional"`
+	CommitDeadline       string               `json:"commitDeadline,omitempty" metadata:",optional"`
+	CommitmentsCast      int                  `json:"commitmentsCast,omitempty" metadata:",optional"`
+	RosterVersion        string               `json:"rosterVersion,omitempty" metadata:",optional"`
+	StandbyAuditorIDs    []string             `json:"standbyAuditorIds,omitempty" metadata:",optional"`
+	AcknowledgedAuditors []string             `json:"acknowledgedAuditorIds,omitempty" metadata:",optional"`
+	Replacements         []AuditorReplacement `json:"replacements,omitempty" metadata:",optional"`
+	DisclosureIssuedAt   string               `json:"disclosureIssuedAt,omitempty" metadata:",optional"`
+	StandbyForReviewID   string               `json:"standbyForReviewId,omitempty" metadata:",optional"`
+	MedicalVersion       int                  `json:"medicalVersion"`
+	PrepareBy            string               `json:"prepareBy"`
+	AssetType            string               `json:"assetType"`
+	SchemaVersion        int                  `json:"schemaVersion"`
+	ID                   string               `json:"id"`
+	ClaimID              string               `json:"claimId"`
+	AppealID             string               `json:"appealId"`
+	Round                int                  `json:"round"`
+	Kind                 string               `json:"kind"`
+	AssignedAuditorIDs   []string             `json:"assignedAuditorIds"`
+	ApprovalThreshold    int                  `json:"approvalThreshold"`
+	RejectionThreshold   int                  `json:"rejectionThreshold"`
+	Approvals            int                  `json:"approvals"`
+	Rejections           int                  `json:"rejections"`
+	VotesCast            int                  `json:"votesCast"`
+	Status               string               `json:"status"`
+	Deadline             string               `json:"deadline"`
+	OpenedAt             string               `json:"openedAt"`
+	ClosedAt             string               `json:"closedAt"`
 }
 
 type ClaimAppeal struct {
@@ -675,22 +719,23 @@ type FraudAssessment struct {
 }
 
 type Settlement struct {
-	ApprovalCertificateHash string `json:"approvalCertificateHash,omitempty" metadata:",optional"`
-	AssetType               string `json:"assetType"`
-	SchemaVersion           int    `json:"schemaVersion"`
-	ID                      string `json:"id"`
-	ClaimID                 string `json:"claimId"`
-	SourceAccountID         string `json:"sourceAccountId"`
-	DestinationAccountID    string `json:"destinationAccountId"`
-	TransferID              string `json:"transferId"`
-	AmountMinor             int64  `json:"amountMinor"`
-	Currency                string `json:"currency"`
-	Status                  string `json:"status"`
-	FailureCode             string `json:"failureCode"`
-	BankReferenceHash       string `json:"bankReferenceHash"`
-	AuthorizedAt            string `json:"authorizedAt"`
-	ConfirmedAt             string `json:"confirmedAt"`
-	UpdatedAt               string `json:"updatedAt"`
+	PostPaymentAuditRequired bool   `json:"postPaymentAuditRequired,omitempty" metadata:",optional"`
+	ApprovalCertificateHash  string `json:"approvalCertificateHash,omitempty" metadata:",optional"`
+	AssetType                string `json:"assetType"`
+	SchemaVersion            int    `json:"schemaVersion"`
+	ID                       string `json:"id"`
+	ClaimID                  string `json:"claimId"`
+	SourceAccountID          string `json:"sourceAccountId"`
+	DestinationAccountID     string `json:"destinationAccountId"`
+	TransferID               string `json:"transferId"`
+	AmountMinor              int64  `json:"amountMinor"`
+	Currency                 string `json:"currency"`
+	Status                   string `json:"status"`
+	FailureCode              string `json:"failureCode"`
+	BankReferenceHash        string `json:"bankReferenceHash"`
+	AuthorizedAt             string `json:"authorizedAt"`
+	ConfirmedAt              string `json:"confirmedAt"`
+	UpdatedAt                string `json:"updatedAt"`
 }
 
 type HistoryRecord struct {

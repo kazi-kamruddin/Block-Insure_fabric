@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { OtpChallengeStore } from "./otp";
+import { OtpChallengeStore, OtpRateLimitError } from "./otp";
 import { premiumOtpBinding } from "./premium-intent";
 
 const secret = "test-secret-that-is-longer-than-thirty-two-characters";
@@ -11,6 +11,32 @@ const temporaryDirectories: string[] = [];
 afterEach(() => { for (const directory of temporaryDirectories.splice(0)) rmSync(directory, { recursive: true, force: true }); });
 
 describe("manual premium OTP challenges", () => {
+  it("enforces durable account limits across source IPs for sends and verification attempts", () => {
+    const directory = mkdtempSync(path.join(os.tmpdir(), "fabric-otp-limit-test-"));
+    temporaryDirectories.push(directory);
+    for (let attempt = 0; attempt < 3; attempt++) new OtpChallengeStore(directory).issue(binding, secret, 60, 1000, { id: `code-${attempt}`, code: "123456" }, `ip-${attempt}`);
+    expect(() => new OtpChallengeStore(directory).issue(binding, secret, 60, 1000, undefined, "different")).toThrow(OtpRateLimitError);
+    for (let attempt = 0; attempt < 15; attempt++) {
+      expect(() => new OtpChallengeStore(directory).consume("invalid", "000000", binding, secret, 2000, `ip-${attempt}`))
+        .toThrow(/invalid or expired/);
+    }
+    expect(() => new OtpChallengeStore(directory).consume("invalid", "000000", binding, secret, 2000, "different")).toThrow(OtpRateLimitError);
+    expect(() => new OtpChallengeStore(directory).issue(binding, secret, 60, 601_000, undefined, "different")).not.toThrow();
+  });
+
+  it("enforces source-IP limits across different accounts", () => {
+    const store = new OtpChallengeStore();
+    const at = 1000;
+    const multiple = (n: number) => ({ ...binding, sourceAccountId: `account-${n}` });
+    for (let i = 0; i < 12; i++) store.issue(multiple(i), secret, 60, at, undefined, "shared");
+    expect(() => store.issue(multiple(12), secret, 60, at, undefined, "shared")).toThrow(OtpRateLimitError);
+    for (let i = 0; i < 60; i++) {
+      expect(() => store.consume("invalid", "000000", multiple(i), secret, at, "shared")).toThrow(/invalid or expired/);
+    }
+    expect(() => store.consume("invalid", "000000", multiple(61), secret, at, "shared")).toThrow(OtpRateLimitError);
+    expect(() => store.consume("invalid", "000000", multiple(61), secret, at, "different")).toThrow(/invalid or expired/);
+  });
+
   it("binds a one-time challenge to its policyholder, policy, and source account", () => {
     const store = new OtpChallengeStore();
     const challenge = store.issue(binding, secret, 60, 1_000, { id: "challenge-1", code: "123456" });

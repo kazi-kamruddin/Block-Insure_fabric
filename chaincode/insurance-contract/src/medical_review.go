@@ -11,14 +11,18 @@ import (
 
 var medicalPanel = []string{"auditor1", "auditor2", "auditor3", "auditor4"}
 
-func medicalReviewClock(ctx contractapi.TransactionContextInterface, deadline string) (time.Time, error) {
-	ts, err := ctx.GetStub().GetTxTimestamp()
+func medicalReviewDeadline(ctx contractapi.TransactionContextInterface, deadline, profile string, defaultWait time.Duration) (time.Time, error) {
+	ts, err := ledgerNow(ctx)
 	if err != nil {
 		return time.Time{}, err
 	}
+	if deadline == "" {
+		return ts.Add(defaultWait), nil
+	}
+	waits := timingWaits(profile)
 	end, err := time.Parse(time.RFC3339, deadline)
-	if err != nil || !end.After(ts.AsTime()) || end.After(ts.AsTime().Add(14*24*time.Hour)) {
-		return time.Time{}, fmt.Errorf("choose a future deadline within fourteen days")
+	if err != nil || !end.After(ts) || (usesMedicalApprovalCertificates(ctx) && end.Before(ts.Add(waits.reviewMin))) || end.After(ts.Add(waits.reviewMax)) {
+		return time.Time{}, fmt.Errorf("choose a future deadline within the review timing profile bounds")
 	}
 	return end, nil
 }
@@ -33,7 +37,7 @@ func (c *Contract) PrepareMedicalReview(ctx contractapi.TransactionContextInterf
 	}
 	var request *OracleRequest
 	if usesMedicalApprovalCertificates(ctx) && claim.EpisodeID != "" && claim.CurrentOracleRequestID != "" &&
-		(claim.Status == "ORACLE_PENDING" || claim.Status == "APPROVED" ||
+		(claim.Status == "ORACLE_PENDING" || claim.Status == "APPROVED" || claim.Status == "SETTLEMENT_AUTHORIZED" ||
 			(claim.CurrentReviewID == "" && (claim.Status == "ORACLE_FAILED" || claim.Status == "MEDICAL_REVIEW_REQUIRED"))) {
 		request, err = c.ReadOracleRequest(ctx, claim.CurrentOracleRequestID)
 		if err != nil {
@@ -44,8 +48,24 @@ func (c *Contract) PrepareMedicalReview(ctx contractapi.TransactionContextInterf
 			return nil, err
 		}
 		if held && claim.MedicalHeldReleaseID == "" && request.ClaimVersion == claim.Version {
+			if claim.Status == "APPROVED" || claim.Status == "SETTLEMENT_AUTHORIZED" {
+				cert, err := c.ReadMedicalApprovalCertificate(ctx, claim.ID, claim.Version)
+				if err != nil {
+					return nil, err
+				}
+				if cert.Path != "ORACLE_AUTO" {
+					return nil, fmt.Errorf("held-release replacement requires an automatic certificate")
+				}
+			}
+			claim.MedicalHeldReleaseID = effectiveMedicalModelReleaseID(request)
+			if claim.Status == "SETTLEMENT_AUTHORIZED" {
+				if err := c.supersedeUnpaidMedicalSettlement(ctx, claim); err != nil {
+					return nil, err
+				}
+				claim.MedicalSettlementID = ""
+			}
 			if claim.Status == "ORACLE_PENDING" {
-				now, err := timestamp(ctx)
+				now, err := ledgerTimestamp(ctx)
 				if err != nil {
 					return nil, err
 				}
@@ -53,7 +73,6 @@ func (c *Contract) PrepareMedicalReview(ctx contractapi.TransactionContextInterf
 					return nil, err
 				}
 			}
-			claim.MedicalHeldReleaseID = effectiveMedicalModelReleaseID(request)
 			claim.CurrentReviewID, claim.AuditorDecisionID, claim.Status = "", "", "MEDICAL_REVIEW_REQUIRED"
 		}
 	}
@@ -87,11 +106,18 @@ func (c *Contract) PrepareMedicalReview(ctx contractapi.TransactionContextInterf
 	if err != nil {
 		return nil, err
 	}
-	return c.createMedicalPreparation(ctx, claim, reviewID, prepareBy, panel)
+	return c.createMedicalPreparation(ctx, claim, reviewID, prepareBy, panel, true, "")
 }
 
 func (c *Contract) medicalReviewPanel(ctx contractapi.TransactionContextInterface, claim *Claim) ([]string, error) {
+	roster, err := c.activeAuditorRoster(ctx)
+	if err != nil {
+		return nil, err
+	}
 	panel := medicalPanel
+	if roster != nil {
+		panel = drawAuditors(claim, roster.Subjects)[:4]
+	}
 	if claim.CurrentAppealID != "" {
 		appeal, err := c.ReadClaimAppeal(ctx, claim.CurrentAppealID)
 		if err != nil {
@@ -102,25 +128,49 @@ func (c *Contract) medicalReviewPanel(ctx contractapi.TransactionContextInterfac
 			return nil, err
 		}
 		panel = prior.AssignedAuditorIDs
+		if roster != nil {
+			standbys := make([]string, 0, 2)
+			originals := make([]string, 0, 4)
+			for _, subject := range roster.Subjects {
+				if slices.Contains(panel, subject) {
+					originals = append(originals, subject)
+				} else {
+					standbys = append(standbys, subject)
+				}
+			}
+			if len(standbys) != 2 || len(originals) != 4 {
+				return nil, fmt.Errorf("current roster does not support a two-overlap appeal panel")
+			}
+			panel = append(drawAuditors(claim, standbys), drawAuditors(claim, originals)[:2]...)
+		}
 	}
 	return panel, nil
 }
 
-func (c *Contract) createMedicalPreparation(ctx contractapi.TransactionContextInterface, claim *Claim, reviewID, prepareBy string, panel []string) (*ClaimReview, error) {
+func (c *Contract) createMedicalPreparation(ctx contractapi.TransactionContextInterface, claim *Claim, reviewID, prepareBy string, panel []string, disclose bool, standbyFor string) (*ClaimReview, error) {
 	if !isMedicalCandidate(ctx) {
 		return nil, fmt.Errorf("isolated medical channel required")
 	}
 	if _, err := currentMedicalHead(ctx, claim); err != nil {
 		return nil, err
 	}
-	end, err := medicalReviewClock(ctx, prepareBy)
+	profile, err := c.ReadMedicalTimingProfile(ctx)
+	if err != nil {
+		return nil, err
+	}
+	waits := timingWaits(profile.Profile)
+	prepareWait := waits.prepareDefault
+	if !disclose && claim.MedicalEscalatedAt != "" {
+		prepareWait = waits.escalationPrepare
+	}
+	end, err := medicalReviewDeadline(ctx, prepareBy, profile.Profile, prepareWait)
 	if err != nil {
 		return nil, err
 	}
 	if err := validateReviewRules(panel, 3, 2); err != nil || len(panel) != 4 {
 		return nil, fmt.Errorf("exactly four assigned auditors required")
 	}
-	now, err := timestamp(ctx)
+	now, err := ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -130,7 +180,26 @@ func (c *Contract) createMedicalPreparation(ctx contractapi.TransactionContextIn
 	}
 	review := &ClaimReview{AssetType: "claimReview", SchemaVersion: SchemaVersion, ID: reviewID, ClaimID: claim.ID, AppealID: claim.CurrentAppealID,
 		Round: claim.ReviewRound + 1, Kind: kind, AssignedAuditorIDs: slices.Clone(panel), ApprovalThreshold: 3, RejectionThreshold: 2,
-		Status: "PREPARING", MedicalVersion: claim.Version, PrepareBy: end.UTC().Format(time.RFC3339)}
+		Status: "PREPARING", MedicalVersion: claim.Version, PrepareBy: end.UTC().Format(time.RFC3339Nano),
+		TimingProfile: profile.Profile}
+	roster, err := c.activeAuditorRoster(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if roster != nil {
+		review.RosterVersion, review.BallotVersion, review.StandbyForReviewID = roster.Version, sealedPanelBallot, standbyFor
+		review.InitialPrepareBy = review.PrepareBy
+		for _, auditor := range drawAuditors(claim, roster.Subjects) {
+			if !slices.Contains(panel, auditor) {
+				review.StandbyAuditorIDs = append(review.StandbyAuditorIDs, auditor)
+			}
+		}
+		if disclose {
+			if err := bindReviewDisclosure(ctx, review, claim); err != nil {
+				return nil, err
+			}
+		}
+	}
 	if err := putState(ctx, "claimReview", reviewID, review); err != nil {
 		return nil, err
 	}
@@ -176,10 +245,14 @@ func (c *Contract) OpenMedicalVoting(ctx contractapi.TransactionContextInterface
 	if review.Status != "PREPARING" {
 		return nil, fmt.Errorf("review is not in access preparation")
 	}
+	if review.BallotVersion == sealedPanelBallot &&
+		(review.DisclosureIssuedAt == "" || len(review.AcknowledgedAuditors) != len(review.AssignedAuditorIDs)) {
+		return nil, fmt.Errorf("all assigned auditors must acknowledge the review disclosure before voting")
+	}
 	if _, err := currentMedicalHead(ctx, claim); err != nil {
 		return nil, err
 	}
-	if _, err := medicalReviewClock(ctx, review.PrepareBy); err != nil {
+	if _, err := medicalReviewClockForGrant(ctx, review.PrepareBy); err != nil {
 		return nil, fmt.Errorf("access preparation expired")
 	}
 	if claim.MedicalClarificationID != "" {
@@ -191,7 +264,7 @@ func (c *Contract) OpenMedicalVoting(ctx contractapi.TransactionContextInterface
 			return nil, fmt.Errorf("resolve or expire the clarification before opening voting")
 		}
 	}
-	end, err := medicalReviewClock(ctx, deadline)
+	end, err := medicalReviewDeadline(ctx, deadline, review.TimingProfile, timingWaits(review.TimingProfile).voteDefault)
 	if err != nil {
 		return nil, err
 	}
@@ -210,11 +283,18 @@ func (c *Contract) OpenMedicalVoting(ctx contractapi.TransactionContextInterface
 			}
 		}
 	}
-	now, err := timestamp(ctx)
+	now, err := ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}
-	review.Status, review.OpenedAt, review.Deadline = "OPEN", now, end.UTC().Format(time.RFC3339)
+	review.Status, review.OpenedAt, review.Deadline = "OPEN", now, end.UTC().Format(time.RFC3339Nano)
+	if review.BallotVersion == sealedPanelBallot {
+		start, err := time.Parse(time.RFC3339Nano, now)
+		if err != nil {
+			return nil, err
+		}
+		review.CommitDeadline = start.Add(end.Sub(start) / 2).Format(time.RFC3339Nano)
+	}
 	claim.Status, claim.UpdatedAt = "UNDER_REVIEW", now
 	if review.AppealID != "" {
 		appeal, err := c.ReadClaimAppeal(ctx, review.AppealID)
@@ -243,11 +323,40 @@ func (c *Contract) RecoverMedicalReview(ctx contractapi.TransactionContextInterf
 	if err != nil {
 		return nil, err
 	}
-	if claim.Status != "REJECTED" || (prior.Status != "TIMED_OUT" && prior.Status != "ACCESS_FAILED") || claim.MedicalRecoveryUsed {
+	procedural := claim.Status == "MEDICAL_REVIEW_REQUIRED" && prior.Status == "PROCEDURAL_FAILURE"
+	legacy := claim.Status == "REJECTED" && (prior.Status == "TIMED_OUT" || prior.Status == "ACCESS_FAILED")
+	if !procedural && (!legacy || claim.MedicalRecoveryUsed) {
 		return nil, fmt.Errorf("no procedural recovery is available")
 	}
+	if legacy {
+		if err := requireOpenMedicalRejection(ctx, prior, claim); err != nil {
+			return nil, err
+		}
+	}
 	claim.MedicalRecoveryUsed = true
-	return c.createMedicalPreparation(ctx, claim, newID, prepareBy, prior.AssignedAuditorIDs)
+	panel := prior.AssignedAuditorIDs
+	standbyFor := ""
+	if prior.BallotVersion == sealedPanelBallot {
+		if prior.StandbyForReviewID != "" {
+			return nil, fmt.Errorf("standby round already used")
+		}
+		roster, err := c.ReadAuditorRoster(ctx, prior.RosterVersion)
+		if err != nil {
+			return nil, err
+		}
+		panel = make([]string, 0, 4)
+		originals := make([]string, 0, 4)
+		for _, subject := range roster.Subjects {
+			if slices.Contains(prior.AssignedAuditorIDs, subject) {
+				originals = append(originals, subject)
+			} else {
+				panel = append(panel, subject)
+			}
+		}
+		panel = append(drawAuditors(claim, panel), drawAuditors(claim, originals)[:2]...)
+		standbyFor = prior.ID
+	}
+	return c.createMedicalPreparation(ctx, claim, newID, prepareBy, panel, true, standbyFor)
 }
 
 func medicalReviewDocumentKey(reviewID, evidenceID, auditorID string) string {

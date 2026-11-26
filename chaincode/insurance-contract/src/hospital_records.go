@@ -79,7 +79,7 @@ func (c *Contract) createHospitalInvoice(ctx contractapi.TransactionContextInter
 	if status == "VOID" {
 		return nil, fmt.Errorf("a new invoice cannot start as VOID")
 	}
-	now, err := timestamp(ctx)
+	now, err := ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -175,7 +175,7 @@ func (c *Contract) updateHospitalInvoice(ctx contractapi.TransactionContextInter
 			}
 		}
 	}
-	invoice.UpdatedAt, err = timestamp(ctx)
+	invoice.UpdatedAt, err = ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -196,12 +196,12 @@ func (c *Contract) ensureInvoiceCredential(ctx contractapi.TransactionContextInt
 	if err != nil {
 		return err
 	}
-	tx, err := ctx.GetStub().GetTxTimestamp()
+	tx, err := ledgerNow(ctx)
 	if err != nil {
 		return err
 	}
 	id := "invoice-credential-" + patientSubjectHash(invoice.ID)
-	_, err = c.issueInvoiceCredential(ctx, id, invoice, issuer, tx.AsTime().AddDate(1, 0, 0).UTC().Format(time.RFC3339))
+	_, err = c.issueInvoiceCredential(ctx, id, invoice, issuer, tx.AddDate(1, 0, 0).UTC().Format(time.RFC3339))
 	if err == nil {
 		invoice.PrivacyCredentialID = id
 	}

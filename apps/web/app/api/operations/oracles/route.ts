@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { currentSession } from "@/lib/auth/current-session";
 import { ledger } from "@/lib/fabric/ledger";
-import { readOracleWorkerHealth } from "@/lib/oracle/health";
+import { summarizeOracleReadiness } from "@/lib/health/readiness";
+import { isOracleWorkerOperational, readOracleWorkerHealth } from "@/lib/oracle/health";
 
 export const runtime = "nodejs";
 
@@ -13,8 +14,10 @@ export async function GET() {
     readOracleWorkerHealth("oracle1"), readOracleWorkerHealth("oracle2"), readOracleWorkerHealth("oracle3"), ledger.listOracleRequests(),
   ]);
   const finalized = requests.filter((item) => item.status !== "PENDING");
+  const workers = [oracle1, oracle2, oracle3];
   return NextResponse.json({
-    workers: [oracle1, oracle2, oracle3],
+    workers,
+    ...summarizeOracleReadiness(workers.filter(worker => isOracleWorkerOperational(worker.status)).length),
     metrics: {
       requests: requests.length,
       pending: requests.filter((item) => item.status === "PENDING").length,

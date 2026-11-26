@@ -85,7 +85,7 @@ func (c *Contract) RecordMedicalOCR(ctx contractapi.TransactionContextInterface,
 			return nil, err
 		}
 	}
-	now, err := timestamp(ctx)
+	now, err := ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}

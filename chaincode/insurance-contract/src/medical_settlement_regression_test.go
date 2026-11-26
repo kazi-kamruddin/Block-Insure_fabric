@@ -49,7 +49,7 @@ func newMedicalSettlementFixture(t *testing.T) medicalSettlementFixture {
 	}))
 	request := &OracleRequest{ID: claim.CurrentOracleRequestID, ClaimID: claim.ID, ClaimVersion: claim.Version, Status: "PENDING"}
 	requireNoError(t, putState(ctx, "oracleRequest", request.ID, request))
-	now, err := timestamp(ctx)
+	now, err := ledgerTimestamp(ctx)
 	requireNoError(t, err)
 	requireNoError(t, contract.finalizeOracleRequest(ctx, request, claim, true, digest, "EXACT_CONSENSUS", now))
 	if claim.Status != "APPROVED" {
@@ -157,7 +157,7 @@ func TestDevLitePositiveOracleRetainsRequiredReview(t *testing.T) {
 			request := &OracleRequest{ID: claim.CurrentOracleRequestID, ClaimID: claim.ID, ClaimVersion: claim.Version, Status: "PENDING"}
 			requireNoError(t, putState(ctx, "claim", claim.ID, claim))
 			requireNoError(t, putState(ctx, "oracleRequest", request.ID, request))
-			now, err := timestamp(ctx)
+			now, err := ledgerTimestamp(ctx)
 			requireNoError(t, err)
 			requireNoError(t, contract.finalizeOracleRequest(ctx, request, claim, true, strings.Repeat("a", 64), "EXACT_CONSENSUS", now))
 			updated, err := contract.ReadClaim(ctx, claim.ID)

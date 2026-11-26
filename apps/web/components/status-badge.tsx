@@ -37,6 +37,8 @@ const PENDING_STATES = new Set([
   "PREPARING",
   "MEDICAL_REVIEW_PREPARING",
   "MEDICAL_REVIEW_REQUIRED",
+  "MEDICAL_AUDIT_PENDING",
+  "MODEL_HELD",
   "DUE",
   "RETRY",
   "FUNDING_REQUIRED",
@@ -51,6 +53,10 @@ const PENDING_STATES = new Set([
   "UPHELD",
   "MEDIUM",
   "INCONCLUSIVE",
+  // Chaincode status for "the Oracles did not auto-approve". The agreed Oracle
+  // decision (panel review or integrity issue) routes the claim onwards, so it
+  // is not a terminal failure. The ledger value is kept for compatibility.
+  "ORACLE_FAILED",
 ]);
 
 const REJECTED_STATES = new Set([
@@ -65,8 +71,8 @@ const REJECTED_STATES = new Set([
   "TIMED_OUT",
   "FAILED",
   "PAYMENT_FAILED",
-  "ORACLE_FAILED",
   "ACCESS_FAILED",
+  "PROCEDURAL_FAILURE",
   "UNHEALTHY",
   "DISCONNECTED",
   "UNREADY",
@@ -157,7 +163,17 @@ export function StatusBadge({
 }) {
   const resolvedTone = resolveStatusTone(status, tone);
   const statusSlug = status.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_");
-  const display = label ?? status.replaceAll("_", " ");
+  const labels: Record<string, string> = {
+    exact_consensus: "Oracle quorum agreed",
+    negative_result: "Oracle quorum referred for review",
+    conflict: "Oracle results differed",
+    timeout: "Oracle verification timed out",
+    escalated_timeout: "Claim escalated after Oracle timeout",
+    model_held: "Model on hold",
+    medical_audit_pending: "Held for random audit sampling",
+    oracle_failed: "Oracle did not auto-approve",
+  };
+  const display = label ?? labels[statusSlug] ?? status.replaceAll("_", " ");
   return (
     <span className={`status status-${resolvedTone} status-${statusSlug} ${className}`.trim()}>
       <StatusGlyph tone={resolvedTone} />

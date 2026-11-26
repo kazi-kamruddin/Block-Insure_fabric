@@ -5,7 +5,7 @@ export type MedicalTimeline = {
   nextAction: string;
   referrals: string[];
   milestones: { label: string; at: string }[];
-  oracle: { snapshotId: string; modelVersion: string; modelHash: string } | null;
+  oracle: { requestId: string; snapshotId: string; modelVersion: string; modelHash: string; finalizationCode: OracleRequest["finalizationCode"] } | null;
   approval: { path: MedicalApprovalCertificate["path"]; hash: string } | null;
   payout: {
     id: string; amountMinor: number; status: Settlement["status"]; transferId: string;
@@ -106,7 +106,11 @@ export function buildMedicalTimeline(input: TimelineRecords): MedicalTimeline {
   else if (claim.medicalRevisionKind === "CORRECTION" || claim.medicalSupplementHash) {
     referrals.push("The current version contains new or corrected material.");
   }
-  if (oracle?.status === "FAILED" && !claim.medicalEscalatedAt) referrals.push("Oracle verification did not establish a positive result.");
+  if (oracle?.status === "FAILED" && !claim.medicalEscalatedAt) {
+    referrals.push(oracle.finalizationCode === "MODEL_HELD"
+      ? "The held Oracle model release requires panel review."
+      : "Oracle verification did not establish a positive result.");
+  }
 
   const milestones: MedicalTimeline["milestones"] = [];
   function record(label: string, at?: string) {
@@ -120,7 +124,7 @@ export function buildMedicalTimeline(input: TimelineRecords): MedicalTimeline {
   record("Clarification resolved", clarification?.resolvedAt);
   record("Panel voting opened", review?.openedAt);
   record("Panel round closed", review?.closedAt);
-  record("Approval certificate recorded", certificate?.approvedAt);
+  record(certificate?.path === "ORACLE_AUTO" ? "Oracle finalised at" : "Panel approved at", certificate?.approvedAt);
   record("Settlement authorized", settlement?.authorizedAt);
   if (settlement?.status === "PAYMENT_FAILED") record("Payment attempt failed", settlement.updatedAt);
   record("Bank payout confirmed", settlement?.confirmedAt);
@@ -129,7 +133,10 @@ export function buildMedicalTimeline(input: TimelineRecords): MedicalTimeline {
     nextAction: nextAction(input),
     referrals,
     milestones: milestones.sort((left, right) => Date.parse(left.at) - Date.parse(right.at)),
-    oracle: oracle ? { snapshotId: oracle.registrySnapshotId, modelVersion: oracle.modelVersion, modelHash: oracle.modelHash } : null,
+    oracle: oracle ? {
+      requestId: oracle.id, snapshotId: oracle.registrySnapshotId, modelVersion: oracle.modelVersion,
+      modelHash: oracle.modelHash, finalizationCode: oracle.finalizationCode,
+    } : null,
     approval: certificate ? { path: certificate.path, hash: certificate.hash } : null,
     payout: settlement ? medicalPayoutTimeline(settlement) : null,
   };

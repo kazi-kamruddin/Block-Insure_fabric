@@ -11,6 +11,7 @@ import {
   storeCiphertext,
 } from "@/lib/evidence/storage";
 import { ledger } from "@/lib/fabric/ledger";
+import { withPeerReasons } from "@/lib/fabric/peer-reasons";
 import { checkMutationOrigin } from "@/lib/security/request-origin";
 
 const metadataSchema = z.object({
@@ -98,7 +99,8 @@ export async function POST(request: Request) {
       // SDK phase-specific errors establish rejection/invalidity. A failed
       // endorsement never reached Submit; an unknown submit/status still may.
       if (error instanceof EndorseError) {
-        const reason = error.details.map(detail => detail.message).find(Boolean)?.slice(0, 500) ?? "Endorsement unavailable";
+        withPeerReasons(error);
+        const reason = error.message;
         return NextResponse.json({ status: "REJECTED", evidenceId, ciphertextHash: storage.ciphertextHash, transactionId: error.transactionId,
           message: `Evidence registration rejected before submission: ${reason}. Ciphertext retained; review the instruction before retrying.` }, { status: 409 });
       }

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/hyperledger/fabric-contract-api-go/v2/contractapi"
 )
@@ -11,19 +12,29 @@ import (
 const genesisMedicalModelID = "frozen-medical-v1"
 const frozenMedicalModelVersion = "fabric-xgb-synthetic-v1"
 const frozenMedicalModelHash = "4954e2d2c71422d415c1d50d32687412479fee5bf61a3a9e283760726e6120b4"
+const medicalModelE2 = "fabric-xgb-synthetic-e2"
+const medicalModelE3 = "fabric-xgb-synthetic-e3"
+const medicalReleaseActivationDelay = 10 * time.Minute
 
 type MedicalModelRelease struct {
-	ID                  string   `json:"id"`
-	ModelVersion        string   `json:"modelVersion"`
-	ArtifactHash        string   `json:"artifactHash"`
-	FeatureSchema       string   `json:"featureSchema"`
-	CalibrationVersion  string   `json:"calibrationVersion"`
-	IntendedTask        string   `json:"intendedTask"`
-	ShadowEvidenceHash  string   `json:"shadowEvidenceHash"`
-	Status              string   `json:"status"`
-	ApprovedMSPs        []string `json:"approvedMsps"`
-	HoldReasonHash      string   `json:"holdReasonHash"`
-	OracleInstalledHash string   `json:"oracleInstalledHash"`
+	ID                   string   `json:"id"`
+	ModelVersion         string   `json:"modelVersion"`
+	ArtifactHash         string   `json:"artifactHash"`
+	FeatureSchema        string   `json:"featureSchema"`
+	CalibrationVersion   string   `json:"calibrationVersion"`
+	IntendedTask         string   `json:"intendedTask"`
+	ShadowEvidenceHash   string   `json:"shadowEvidenceHash"`
+	Status               string   `json:"status"`
+	ApprovedMSPs         []string `json:"approvedMsps"`
+	HoldReasonHash       string   `json:"holdReasonHash"`
+	OracleInstalledHash  string   `json:"oracleInstalledHash"`
+	GovernanceVersion    int      `json:"governanceVersion,omitempty" metadata:",optional"`
+	ApprovedAt           string   `json:"approvedAt,omitempty" metadata:",optional"`
+	ActivationEligibleAt string   `json:"activationEligibleAt,omitempty" metadata:",optional"`
+	ResumeReasonHash     string   `json:"resumeReasonHash,omitempty" metadata:",optional"`
+	AttestationRound     int      `json:"attestationRound,omitempty" metadata:",optional"`
+	AttestationRoster    string   `json:"attestationRoster,omitempty" metadata:",optional"`
+	OracleAttesters      []string `json:"oracleAttesters,omitempty" metadata:",optional"`
 }
 
 func (c *Contract) ReadMedicalModelRelease(ctx contractapi.TransactionContextInterface, id string) (*MedicalModelRelease, error) {
@@ -56,7 +67,7 @@ func (c *Contract) RegisterMedicalModelRelease(ctx contractapi.TransactionContex
 	}
 	release := &MedicalModelRelease{ID: id, ModelVersion: modelVersion, ArtifactHash: strings.ToLower(artifactHash),
 		FeatureSchema: featureSchema, CalibrationVersion: calibrationVersion, IntendedTask: task,
-		Status: "CANDIDATE", ApprovedMSPs: []string{}}
+		Status: "REGISTERED", GovernanceVersion: 2, AttestationRound: 1, ApprovedMSPs: []string{}}
 	if err := putState(ctx, "medicalModelRelease", id, release); err != nil {
 		return nil, err
 	}
@@ -74,8 +85,8 @@ func (c *Contract) ShadowMedicalModelRelease(ctx contractapi.TransactionContextI
 	if err != nil {
 		return nil, err
 	}
-	if release.Status != "CANDIDATE" {
-		return nil, fmt.Errorf("only a CANDIDATE release may enter SHADOW")
+	if release.Status != "REGISTERED" && release.Status != "CANDIDATE" {
+		return nil, fmt.Errorf("only a registered release may enter SHADOW")
 	}
 	release.Status, release.ShadowEvidenceHash = "SHADOW", strings.ToLower(evidenceHash)
 	return saveMedicalModelRelease(ctx, release)
@@ -105,8 +116,8 @@ func (c *Contract) ApproveMedicalModelRelease(ctx contractapi.TransactionContext
 	if err != nil {
 		return nil, err
 	}
-	if release.Status != "SHADOW" {
-		return nil, fmt.Errorf("only a SHADOW release may be approved")
+	if release.Status != "SHADOW" && release.Status != "RESUME_PENDING" {
+		return nil, fmt.Errorf("only a SHADOW or RESUME_PENDING release may be approved")
 	}
 	if slices.Contains(release.ApprovedMSPs, msp) {
 		return nil, fmt.Errorf("this MSP already approved")
@@ -118,12 +129,36 @@ func (c *Contract) ApproveMedicalModelRelease(ctx contractapi.TransactionContext
 		if !strings.EqualFold(installedArtifactHash, release.ArtifactHash) {
 			return nil, fmt.Errorf("installed evaluator does not match the release artifact")
 		}
+		if release.GovernanceVersion >= 2 {
+			if err := requireCurrentReleaseAttestations(ctx, release); err != nil {
+				return nil, err
+			}
+		}
 		release.OracleInstalledHash = strings.ToLower(installedArtifactHash)
 	} else if installedArtifactHash != "" {
 		return nil, fmt.Errorf("only Oracle may attest the installed evaluator")
 	}
 	release.ApprovedMSPs = append(release.ApprovedMSPs, msp)
 	if len(release.ApprovedMSPs) == 3 {
+		if release.GovernanceVersion >= 2 {
+			if err := requireCurrentReleaseAttestations(ctx, release); err != nil {
+				return nil, err
+			}
+			release.ApprovedAt, err = ledgerTimestamp(ctx)
+			if err != nil {
+				return nil, err
+			}
+			profile, err := c.ReadMedicalTimingProfile(ctx)
+			if err != nil {
+				return nil, err
+			}
+			release.ActivationEligibleAt, err = afterMedicalWait(release.ApprovedAt, timingWaits(profile.Profile).activation)
+			if err != nil {
+				return nil, err
+			}
+			release.Status = "APPROVED"
+			return saveMedicalModelRelease(ctx, release)
+		}
 		release.Status = "PROMOTED"
 		if release.IntendedTask == "ROUTING" {
 			if _, err := c.activeMedicalRoutingRelease(ctx); err != nil {
@@ -148,11 +183,150 @@ func (c *Contract) HoldMedicalModelRelease(ctx contractapi.TransactionContextInt
 	if err != nil {
 		return nil, err
 	}
-	if release.Status != "SHADOW" && release.Status != "PROMOTED" {
-		return nil, fmt.Errorf("only a SHADOW or PROMOTED release may be held")
+	if !slices.Contains([]string{"SHADOW", "PROMOTED", "APPROVED", "ACTIVE", "RESUME_PENDING"}, release.Status) {
+		return nil, fmt.Errorf("only a shadow, approved, active or resuming model release may be held")
 	}
 	release.Status, release.HoldReasonHash = "HELD", strings.ToLower(reasonHash)
 	return saveMedicalModelRelease(ctx, release)
+}
+
+func requireCurrentReleaseAttestations(ctx contractapi.TransactionContextInterface, release *MedicalModelRelease) error {
+	roster, err := new(Contract).ReadActiveOracleRoster(ctx)
+	if err != nil {
+		return err
+	}
+	if roster.Version != release.AttestationRoster {
+		return fmt.Errorf("release requires two attestations from the current Oracle roster")
+	}
+	count := 0
+	for _, subject := range roster.Subjects {
+		if !slices.Contains(release.OracleAttesters, subject.SubjectID) {
+			continue
+		}
+		revoked, err := oracleSubjectRevoked(ctx, subject)
+		if err != nil {
+			return err
+		}
+		if !revoked {
+			count++
+		}
+	}
+	if count < 2 {
+		return fmt.Errorf("release requires two distinct Oracle attestations matching the artifact")
+	}
+	return nil
+}
+
+func (c *Contract) AttestMedicalModelRelease(ctx contractapi.TransactionContextInterface, id, installedHash string) (*MedicalModelRelease, error) {
+	_, subject, err := requireOracleIdentity(ctx)
+	if err != nil {
+		return nil, err
+	}
+	release, err := c.ReadMedicalModelRelease(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if release.GovernanceVersion < 2 || (release.Status != "SHADOW" && release.Status != "RESUME_PENDING") || installedHash != release.ArtifactHash {
+		return nil, fmt.Errorf("release is not eligible for this Oracle artifact attestation")
+	}
+	roster, err := c.ReadActiveOracleRoster(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if err := requireOracleRosterSubject(ctx, roster.Version, subject); err != nil {
+		return nil, err
+	}
+	if release.AttestationRoster != roster.Version {
+		release.AttestationRoster = roster.Version
+		release.OracleAttesters = nil
+		release.OracleInstalledHash = ""
+		release.ApprovedMSPs = slices.DeleteFunc(release.ApprovedMSPs, func(msp string) bool { return msp == "OracleMSP" })
+	}
+	if slices.Contains(release.OracleAttesters, subject) {
+		return nil, fmt.Errorf("Oracle subject already attested this release round")
+	}
+	release.OracleAttesters = append(release.OracleAttesters, subject)
+	slices.Sort(release.OracleAttesters)
+	return saveMedicalModelRelease(ctx, release)
+}
+
+func (c *Contract) ActivateMedicalModelRelease(ctx contractapi.TransactionContextInterface, id string) (*MedicalModelRelease, error) {
+	if _, err := requireIdentity(ctx, "InsurerMSP", "insurerAdmin"); err != nil {
+		return nil, err
+	}
+	release, err := c.ReadMedicalModelRelease(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	now, err := ledgerNow(ctx)
+	if err != nil {
+		return nil, err
+	}
+	eligibleAt := release.ActivationEligibleAt
+	realDeadline, _ := afterMedicalWait(release.ApprovedAt, medicalReleaseActivationDelay)
+	if eligibleAt == "" {
+		eligibleAt = realDeadline
+	}
+	earliest, parseErr := time.Parse(time.RFC3339Nano, eligibleAt)
+	if release.Status != "APPROVED" || parseErr != nil || now.Before(earliest) {
+		if eligibleAt == realDeadline {
+			return nil, fmt.Errorf("release activation requires approval and a ten-minute delay")
+		}
+		return nil, fmt.Errorf("release activation requires approval and its ledger delay to elapse")
+	}
+	if err := requireCurrentReleaseAttestations(ctx, release); err != nil {
+		return nil, err
+	}
+	release.Status = "ACTIVE"
+	if release.IntendedTask == "ROUTING" {
+		if err := overwriteAsset(ctx, "activeMedicalModelRelease", "ROUTING", id); err != nil {
+			return nil, err
+		}
+	}
+	return saveMedicalModelRelease(ctx, release)
+}
+
+func (c *Contract) RequestMedicalModelResume(ctx contractapi.TransactionContextInterface, id, reasonHash string) (*MedicalModelRelease, error) {
+	if _, err := requireIdentity(ctx, "InsurerMSP", "insurerAdmin"); err != nil {
+		return nil, err
+	}
+	if !oracleV2Hash.MatchString(reasonHash) {
+		return nil, fmt.Errorf("resume requires a reason hash")
+	}
+	release, err := c.ReadMedicalModelRelease(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if release.Status != "HELD" || release.GovernanceVersion < 2 {
+		return nil, fmt.Errorf("only a held governed release may request resume")
+	}
+	release.Status = "RESUME_PENDING"
+	release.ResumeReasonHash = reasonHash
+	release.ApprovedAt, release.AttestationRoster, release.OracleInstalledHash = "", "", ""
+	release.ActivationEligibleAt = ""
+	release.ApprovedMSPs, release.OracleAttesters = []string{}, nil
+	release.AttestationRound++
+	return saveMedicalModelRelease(ctx, release)
+}
+
+func (c *Contract) ReadActiveMedicalModelRelease(ctx contractapi.TransactionContextInterface) (*MedicalModelRelease, error) {
+	id, err := getState[string](ctx, "activeMedicalModelRelease", "ROUTING")
+	if err != nil {
+		return nil, err
+	}
+	return c.ReadMedicalModelRelease(ctx, *id)
+}
+
+func (c *Contract) ListMedicalModelReleases(ctx contractapi.TransactionContextInterface) ([]MedicalModelRelease, error) {
+	return listState[MedicalModelRelease](ctx, "medicalModelRelease")
+}
+
+func (c *Contract) requireActiveMedicalV2Release(ctx contractapi.TransactionContextInterface) (*MedicalModelRelease, error) {
+	release, err := c.ReadActiveMedicalModelRelease(ctx)
+	if err != nil || release.Status != "ACTIVE" || (release.ModelVersion != medicalModelE2 && release.ModelVersion != medicalModelE3) || release.GovernanceVersion < 2 {
+		return nil, fmt.Errorf("active Oracle v2 routing release is unavailable")
+	}
+	return release, nil
 }
 
 func saveMedicalModelRelease(ctx contractapi.TransactionContextInterface, release *MedicalModelRelease) (*MedicalModelRelease, error) {
@@ -204,7 +378,7 @@ func (c *Contract) heldMedicalRequest(ctx contractapi.TransactionContextInterfac
 	if err != nil {
 		return false, err
 	}
-	return release.Status == "HELD", nil
+	return release.Status == "HELD" || (release.GovernanceVersion >= 2 && release.Status != "ACTIVE"), nil
 }
 
 func effectiveMedicalModelReleaseID(request *OracleRequest) string {

@@ -1,0 +1,4 @@
+{
+  "source": "src/xgboost.mjs, src/registry.mjs, src/protocol.mjs, src/privacy.mjs and contents pinned by frozen/provenance.json",
+  "evaluatorHash": "4954e2d2c71422d415c1d50d32687412479fee5bf61a3a9e283760726e6120b4"
+}

@@ -62,7 +62,10 @@ func (c *Contract) medicalFacts(ctx contractapi.TransactionContextInterface, pol
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
-	if policy.PolicyholderID != owner || policy.MedicalRulesVersion != 1 || policy.Status == "PENDING_PAYMENT" || policy.Status == "CANCELLED" {
+	// A cancelled policy still answers for treatment before its cancellation
+	// date; policies cancelled before that date was recorded keep refusing.
+	if policy.PolicyholderID != owner || policy.MedicalRulesVersion != 1 || policy.Status == "PENDING_PAYMENT" ||
+		(policy.Status == "CANCELLED" && policy.CancelledDate == "") {
 		return nil, nil, nil, nil, fmt.Errorf("paid medical coverage for this patient is required")
 	}
 	head, err := medicalEpisodeHead(ctx, episodeID)
@@ -103,12 +106,18 @@ func (c *Contract) medicalFacts(ctx contractapi.TransactionContextInterface, pol
 	if service.Before(start.AddDate(0, 0, rules.WaitingDays)) || episode.ServiceDate > policy.EndDate || episode.ServiceDate > policy.PaidThroughDate {
 		return nil, nil, nil, nil, fmt.Errorf("service falls outside paid eligible coverage or the waiting period")
 	}
+	if policy.Status == "CANCELLED" && (episode.ServiceDate >= policy.CancelledDate || episode.AdmissionDate >= policy.CancelledDate) {
+		return nil, nil, nil, nil, fmt.Errorf("the policy was cancelled on %s; only treatment before that date is covered", policy.CancelledDate)
+	}
 	if err := c.requirePaidMedicalPeriod(ctx, policy, episode.ServiceDate); err != nil {
+		return nil, nil, nil, nil, err
+	}
+	if err := c.requireMedicalCoverForStay(ctx, policy, episode, rules); err != nil {
 		return nil, nil, nil, nil, err
 	}
 	deadline := service.AddDate(0, 0, rules.FilingDays).Format(time.DateOnly)
 	if filedAt == "" {
-		filedAt, err = timestamp(ctx)
+		filedAt, err = ledgerTimestamp(ctx)
 		if err != nil {
 			return nil, nil, nil, nil, err
 		}
@@ -118,7 +127,7 @@ func (c *Contract) medicalFacts(ctx contractapi.TransactionContextInterface, pol
 		return nil, nil, nil, nil, err
 	}
 	// Asia/Dhaka uses UTC+06:00 for contemporary policy dates.
-	filingDate := filingTime.In(time.FixedZone("Asia/Dhaka", 6*60*60)).Format(time.DateOnly)
+	filingDate := dhakaDate(filingTime)
 	if filingDate > deadline || filingDate < episode.ServiceDate {
 		return nil, nil, nil, nil, fmt.Errorf("service date or original filing deadline makes the claim ineligible")
 	}
@@ -203,7 +212,7 @@ func (c *Contract) PrepareMedicalClaim(ctx contractapi.TransactionContextInterfa
 	if err != nil {
 		return nil, err
 	}
-	now, err := timestamp(ctx)
+	now, err := ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -226,7 +235,7 @@ func (c *Contract) SubmitMedicalClaim(ctx contractapi.TransactionContextInterfac
 	if quote.PayableMinor <= 0 || acceptedStatementHash != quote.StatementHash {
 		return nil, fmt.Errorf("review the current reimbursement statement before submission")
 	}
-	now, err := timestamp(ctx)
+	now, err := ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -234,6 +243,9 @@ func (c *Contract) SubmitMedicalClaim(ctx contractapi.TransactionContextInterfac
 		HospitalID: episode.HospitalID, EpisodeID: episodeID, EpisodeRevision: revision, HospitalInvoiceID: medicalRevisionKey(episodeID, revision),
 		AmountMinor: quote.PayableMinor, IncidentDate: episode.ServiceDate, DescriptionHash: quote.StatementHash, EvidenceIDs: []string{},
 		Version: 1, Status: "SUBMITTED", CreatedAt: now, UpdatedAt: now, MedicalEvidenceRequired: quote.EvidenceRequired}
+	if err := c.setInitialMedicalEscalation(ctx, claim, now); err != nil {
+		return nil, err
+	}
 	association, err := verifiedMedicalAssociation(ctx, episode, claim.ClaimantID)
 	if err != nil {
 		return nil, err
@@ -295,8 +307,14 @@ func (c *Contract) medicalCorrectionFacts(ctx contractapi.TransactionContextInte
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
-	if claim.EpisodeID == "" || claim.Status == "SETTLED" || revision < claim.EpisodeRevision {
+	if claim.EpisodeID == "" || claim.Status == "SETTLED" || claim.MedicalReserveReleasedAt != "" || revision < claim.EpisodeRevision {
 		return nil, nil, nil, nil, fmt.Errorf("only an unpaid claim with a current episode revision can be corrected")
+	}
+	// Only the certificate channel can supersede an unpaid settlement and its
+	// liability. Elsewhere a correction would orphan both and leave the claim
+	// unable to settle, so refuse it before any state changes.
+	if claim.MedicalSettlementID != "" && !usesMedicalApprovalCertificates(ctx) {
+		return nil, nil, nil, nil, fmt.Errorf("a settlement is already authorized for this claim; complete or reconcile it before correcting")
 	}
 	_, episode, quote, coverage, err := c.medicalFacts(ctx, claim.PolicyID, claim.EpisodeID, revision, claim.AmountMinor, claim.CreatedAt)
 	if err == nil && revision == claim.EpisodeRevision {
@@ -334,6 +352,9 @@ func (c *Contract) AcceptMedicalCorrection(ctx contractapi.TransactionContextInt
 		return nil, fmt.Errorf("review the corrected statement before reconfirming")
 	}
 	previous := claim.AmountMinor
+	if err := c.supersedeMedicalCertificateForCorrection(ctx, claim); err != nil {
+		return nil, err
+	}
 	if usesMedicalApprovalCertificates(ctx) && claim.MedicalSettlementID != "" {
 		if err := c.supersedeUnpaidMedicalSettlement(ctx, claim); err != nil {
 			return nil, err
@@ -373,8 +394,12 @@ func (c *Contract) AcceptMedicalCorrection(ctx contractapi.TransactionContextInt
 		return nil, err
 	}
 	claim.Version++
-	claim.UpdatedAt, err = timestamp(ctx)
+	claim.MedicalDuplicateExplanationHash = ""
+	claim.UpdatedAt, err = ledgerTimestamp(ctx)
 	if err != nil {
+		return nil, err
+	}
+	if err := c.setInitialMedicalEscalation(ctx, claim, claim.UpdatedAt); err != nil {
 		return nil, err
 	}
 	if err := overwriteAsset(ctx, "claim", claim.ID, claim); err != nil {

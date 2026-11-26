@@ -9,6 +9,7 @@ import type { WorkflowCommand } from "./commands";
 import { currentAttestedMedicalSnapshot, refreshHospitalRegistrySnapshot } from "@/lib/oracle/hospital-registry";
 import { medicalDevLiteChannel } from "@/lib/fabric/medical-channel";
 import { buildEvidenceMerkleTree } from "@/lib/evidence/merkle";
+import { medicalSourcePublisherEnabled, publishMedicalClaimSources } from "@/lib/oracle/publish-medical-sources";
 import evaluator from "@/lib/oracle/evaluator.json";
 
 export async function executeWorkflowCommand(command: WorkflowCommand, session: Session) {
@@ -58,6 +59,8 @@ export async function executeWorkflowCommand(command: WorkflowCommand, session: 
       return ledger.acquirePolicy(command);
     case "advancePolicyLifecycle":
       return ledger.advancePolicyLifecycle(command.id, command.asOfDate);
+    case "reinstatePolicy":
+      return ledger.reinstatePolicy(command.id, command.reasonHash);
     case "cancelPolicy":
       return ledger.cancelPolicy(command.id, command.reasonHash, "policyholder");
     case "cancelPolicyAsInsurer":
@@ -68,6 +71,18 @@ export async function executeWorkflowCommand(command: WorkflowCommand, session: 
       return ledger.openBankAccount(command);
     case "adjustBankAccountBalance":
       return ledger.adjustBankAccountBalance(command);
+    case "requestBankAccountLink":
+      return ledger.requestBankAccountLink(command);
+    case "reviewBankAccountLink":
+      if (command.outcome === "APPROVE" && (!command.accountReferenceId || !command.accountTokenHash)) throw new Error("Approval needs a new account ID and the Bank-vault token.");
+      if (command.outcome === "REJECT" && command.accountReferenceId) throw new Error("A rejected link cannot name an account.");
+      return ledger.reviewBankAccountLink(command);
+    case "cancelBankAccountLink":
+      return ledger.cancelBankAccountLink(command.id);
+    case "schedulePremiumCollections":
+      return ledger.schedulePremiumCollections(command.asOfDate);
+    case "retryPremiumCollection":
+      return ledger.retryPremiumCollection(command.collectionId);
     case "requestBankMandate":
       return ledger.requestBankMandate(command);
     case "reviewBankMandate":
@@ -133,6 +148,13 @@ export async function executeWorkflowCommand(command: WorkflowCommand, session: 
       if (claim.episodeId && process.env.FABRIC_XGBOOST_ENABLED !== "true") throw new Error("The isolated medical channel requires the frozen Fabric evaluator");
       if (claim.status === "ORACLE_PENDING" && claim.currentOracleRequestId) return ledger.readOracleRequest(claim.currentOracleRequestId);
       if (!["SUBMITTED", "APPEAL_SUBMITTED", "HOSPITAL_VERIFIED"].includes(claim.status)) throw new Error("This claim is not awaiting processing.");
+      if (claim.episodeId && await ledger.supportsMedicalOracleV2()) {
+        if (medicalSourcePublisherEnabled()) {
+          const pins = await publishMedicalClaimSources(claim.id, claim.version);
+          return ledger.requestPublishedMedicalOracleVerification(`oracle-${randomUUID()}`, claim.id, claim.version, pins);
+        }
+        return ledger.requestOracleVerificationV2(`oracle-${randomUUID()}`, claim.id);
+      }
       const snapshot = process.env.FABRIC_CHANNEL_NAME === medicalDevLiteChannel
         ? await currentAttestedMedicalSnapshot(claim.hospitalId, claim.hospitalInvoiceId ?? "")
         : await refreshHospitalRegistrySnapshot();
@@ -148,6 +170,14 @@ export async function executeWorkflowCommand(command: WorkflowCommand, session: 
     }
     case "requestOracleVerification": {
       const claim = await ledger.readClaim(command.claimId);
+      if (claim.episodeId && await ledger.supportsMedicalOracleV2()) {
+        if (medicalSourcePublisherEnabled()) {
+          if (claim.status === "ORACLE_PENDING" && claim.currentOracleRequestId) return ledger.readOracleRequest(claim.currentOracleRequestId);
+          const pins = await publishMedicalClaimSources(claim.id, claim.version);
+          return ledger.requestPublishedMedicalOracleVerification(command.requestId, claim.id, claim.version, pins);
+        }
+        return ledger.requestOracleVerificationV2(command.requestId, claim.id);
+      }
       const snapshot = process.env.FABRIC_CHANNEL_NAME === medicalDevLiteChannel
         ? await currentAttestedMedicalSnapshot(claim.hospitalId, claim.hospitalInvoiceId ?? "")
         : claim.hospitalInvoiceId ? await refreshHospitalRegistrySnapshot() : null;

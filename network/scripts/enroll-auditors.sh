@@ -22,6 +22,38 @@ command -v fabric-ca-client >/dev/null || { echo "Missing required tool: fabric-
 test -f "${ca_cert}" || { echo "Auditor CA certificate is missing; start the network CAs first." >&2; exit 1; }
 test -f "${base}/msp/config.yaml" || { echo "Auditor organization admin enrollment is missing." >&2; exit 1; }
 
+if [[ "${2:-}" == --r2-only ]]; then
+  [[ "${1:-}" == --dev-lite ]] || { echo 'R2 enrollment is scoped to LevelDB dev-lite.' >&2; exit 2; }
+  command -v openssl >/dev/null || { echo 'OpenSSL is required for fresh enrollment credentials.' >&2; exit 1; }
+  for index in 5 6; do
+    user="auditor${index}"
+    user_msp="${base}/users/${user}@${domain}/msp"
+    if compgen -G "${user_msp}/signcerts/*" >/dev/null; then
+      echo "${user} is already enrolled."
+      continue
+    fi
+    umask 077
+    mkdir -p "${user_msp}/.."
+    credential_file="${user_msp}/../r2-enrollment"
+    if [[ ! -s "$credential_file" ]]; then
+      openssl rand -hex 24 > "$credential_file"
+    fi
+    IFS= read -r enrollment_credential < "$credential_file"
+    fabric-ca-client register --caname ca-auditor --id.name "$user" --id.secret "$enrollment_credential" \
+      --id.type client --id.maxenrollments 1 --id.attrs "role=auditor:ecert,subjectId=${user}:ecert" \
+      --tls.certfiles "$ca_cert" >/dev/null 2>&1 || true
+    if ! fabric-ca-client enroll -u "https://${user}:${enrollment_credential}@localhost:${port}" \
+      --caname ca-auditor -M "$user_msp" --tls.certfiles "$ca_cert" >/dev/null 2>&1; then
+      echo "Enrollment failed for $user. Retaining its scoped enrollment credential." >&2
+      exit 1
+    fi
+    unset enrollment_credential
+    cp "${base}/msp/config.yaml" "$user_msp/config.yaml"
+    echo "Enrolled $user with an immutable subjectId certificate attribute."
+  done
+  exit 0
+fi
+
 for index in 1 2 3 4; do
   user="auditor${index}"
   user_msp="${base}/users/${user}@${domain}/msp"

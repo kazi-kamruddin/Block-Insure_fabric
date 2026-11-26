@@ -1,0 +1,32 @@
+{
+  "channel": "insurance-dev-lite-190",
+  "chaincodeName": "insurance-contract",
+  "chaincodeVersion": "1.9.0",
+  "expectedSequence": 4,
+  "schemaVersion": 15,
+  "database": "LevelDB",
+  "webPort": 3219,
+  "packageSha256": "7240d4c0fbb8474e9a5d9a93304fb1506d71d7ee2f9966ee780115af9e1d82b1",
+  "packagePath": "data/dev-lite/channel-artifacts/r2/insurance-contract_1.9.0-r2.tar.gz",
+  "goBuilderImage": "block-insure/fabric-ccenv:2.5.16-go1.26.11",
+  "r2CandidateRuntime": {
+    "type": "ccaas",
+    "targetSequence": 4,
+    "composeService": "insurance-chaincode",
+    "image": "hyperledger/fabric-peer:2.5.16",
+    "packageDirectory": "data/dev-lite/channel-artifacts/r2",
+    "packageSha256": "7240d4c0fbb8474e9a5d9a93304fb1506d71d7ee2f9966ee780115af9e1d82b1",
+    "binarySha256": "398ee9406c322bf76d34ef5f3c9a4f8106d25fbe8efe1c049d61139c5fb4e344",
+    "e3EvaluatorHash": "cbef844f9c31fb6678c21b08334ef76be0b4bab27d893e2c02cf808cff108fd9"
+  },
+  "r2Demo": {
+    "directAdapterPorts": [3411, 3412, 3413],
+    "mirrorAdapterPorts": [3421, 3422, 3423],
+    "lifecycleMemoryFloorMb": 500,
+    "writeMemoryFloorMb": 700,
+    "screenshotMemoryFloorMb": 900
+  },
+  "nodeVersion": "v24.16.0",
+  "e2EvaluatorHash": "6b0b1df713f9b28da89052bf748886d4d15d743ecd4adde30f3f15a9596f6166",
+  "repoRoot": null
+}

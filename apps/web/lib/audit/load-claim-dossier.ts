@@ -2,9 +2,12 @@ import "server-only";
 
 import { ledger } from "@/lib/fabric/ledger";
 import { loadFabricConfig } from "@/lib/fabric/config";
+import { withFabricContract } from "@/lib/fabric/gateway";
 import { medicalDevLiteChannel } from "@/lib/fabric/medical-channel";
 import { hasFinalMedicalApproval } from "@/lib/fabric/medical-timeline";
+import { isVoteVisible, redactVoteTallies, visibleDecisions } from "@/lib/fabric/vote-visibility";
 import { buildEvidenceMerkleTree, evidenceLeafHash } from "@/lib/evidence/merkle";
+import { readDossierLedgerEvidence, readDossierR2Evidence } from "./dossier-ledger-evidence.mjs";
 import type {
   AuditorDecision,
   Claim,
@@ -19,6 +22,7 @@ import type {
   FraudAssessment,
   HospitalVerification,
   MedicalApprovalCertificate,
+  MedicalTimingProfile,
   OracleCommitment,
   OracleRegistrySnapshot,
   OracleRequest,
@@ -26,11 +30,14 @@ import type {
   Settlement,
 } from "@/lib/fabric/types";
 
-const isFinalReview = (review: ClaimReview) =>
-  ["APPROVED", "REJECTED", "TIMED_OUT", "ACCESS_FAILED", "SUPERSEDED"].includes(review.status);
-
-export type ClaimAuditDossier = {
-  schemaVersion: 6;
+export type ClaimAuditDossier = Partial<Awaited<ReturnType<typeof readDossierLedgerEvidence>>> & {
+  schemaVersion: 6 | 7 | 8 | 9;
+  panelVoteCommitments?: unknown[];
+  auditorRosters?: unknown[];
+  revisionProof?: unknown;
+  timingProfile?: MedicalTimingProfile;
+  channel?: string;
+  chaincode?: string;
   exportedAt: string;
   claim: Claim;
   history: ClaimHistoryRecord[];
@@ -54,12 +61,13 @@ export type ClaimAuditDossier = {
 
 export async function loadClaimAuditDossier(claimId: string, auditorSubject?: string): Promise<ClaimAuditDossier | null> {
   const claim = await ledger.readClaim(claimId);
-  const devLiteMedical = !!claim.episodeId && loadFabricConfig().channelName === medicalDevLiteChannel;
+  const config = loadFabricConfig();
+  const devLiteMedical = !!claim.episodeId && config.channelName === medicalDevLiteChannel;
   const auditorMedicalExport = devLiteMedical && auditorSubject !== undefined;
+  const viewer = auditorSubject === undefined ? { role: "insurerAdmin" as const } : { role: "auditor" as const, subjectId: auditorSubject };
   if (auditorMedicalExport) {
     const review = claim.currentReviewId ? await ledger.readClaimReview(claim.currentReviewId) : null;
-    if (!review || !isFinalReview(review) || review.medicalVersion !== claim.version ||
-        !review.assignedAuditorIds.includes(auditorSubject)) return null;
+    if (!review || !isVoteVisible(review, viewer) || review.medicalVersion !== claim.version) return null;
   }
   const [history, allEvidence, allEvidenceBatches, allAccess, allGrants, allVerifications, allDecisions, allReviews, allAppeals, allFraudAssessments, allSettlements, allOracleRequests, allOracleCommitments, allOracleResults, allOracleSnapshots, approvalCertificate] = await Promise.all([
     ledger.claimHistory(claimId),
@@ -96,10 +104,22 @@ export async function loadClaimAuditDossier(claimId: string, auditorSubject?: st
   });
 
   const reviewRounds = allReviews.filter(review => review.claimId === claimId &&
-    (!auditorMedicalExport || isFinalReview(review)));
+    (!auditorMedicalExport || isVoteVisible(review, viewer))).map(review => redactVoteTallies(review, viewer));
   const exportRoundIds = new Set(reviewRounds.map(review => review.id));
+  const oracleRequests = allOracleRequests.filter((item) => item.claimId === claimId);
+  const oracleResults = allOracleResults.filter((item) => item.claimId === claimId);
+  const r2 = devLiteMedical ? await withFabricContract("insurerAdmin", (contract) => readDossierR2Evidence(
+    async (name, ...args) => JSON.parse(Buffer.from(await contract.evaluateTransaction(name, ...args)).toString("utf8")),
+    claim, reviewRounds, oracleRequests, approvalCertificate, { includeRevision: !auditorMedicalExport },
+  )) : {};
+  const proof = devLiteMedical ? await withFabricContract("insurerAdmin", (contract, gateway) =>
+    readDossierLedgerEvidence({
+      contract, qscc: gateway.getNetwork(config.channelName).getContract("qscc"),
+      channel: config.channelName, chaincode: config.chaincodeName,
+    }, { claim, history, oracleRequests, oracleResults, approvalCertificate }),
+  ) : {};
   return {
-    schemaVersion: 6,
+    schemaVersion: r2.panelVoteCommitments ? 9 : devLiteMedical ? (oracleRequests.some(request => request.protocolVersion === "v2") ? 8 : 7) : 6,
     exportedAt: new Date().toISOString(),
     claim,
     history,
@@ -109,17 +129,17 @@ export async function loadClaimAuditDossier(claimId: string, auditorSubject?: st
     evidenceGrants: allGrants.filter((item) => item.claimId === claimId),
     hospitalVerification: allVerifications.find((item) => item.id === claim.hospitalVerificationId) ?? null,
     hospitalVerifications: allVerifications.filter((item) => item.claimId === claimId),
-    oracleRequests: allOracleRequests.filter((item) => item.claimId === claimId),
+    oracleRequests,
     oracleCommitments: allOracleCommitments.filter((item) => item.claimId === claimId),
-    oracleResults: allOracleResults.filter((item) => item.claimId === claimId),
-    oracleRegistrySnapshots: allOracleSnapshots.filter((snapshot) => allOracleRequests.some((request) => request.claimId === claimId && request.registrySnapshotId === snapshot.id)),
-    auditorDecisions: allDecisions.filter(item => item.claimId === claimId &&
-      (!auditorMedicalExport || exportRoundIds.has(item.reviewId))),
+    oracleResults,
+    oracleRegistrySnapshots: allOracleSnapshots.filter((snapshot) => oracleRequests.some((request) => request.registrySnapshotId === snapshot.id)),
+    auditorDecisions: visibleDecisions(allDecisions.filter(item => item.claimId === claimId &&
+      (!auditorMedicalExport || exportRoundIds.has(item.reviewId))), allReviews, viewer),
     reviewRounds,
     appeals: allAppeals.filter((item) => item.claimId === claimId),
     fraudAssessments: allFraudAssessments.filter((item) => item.claimId === claimId),
     settlement: allSettlements.find(item => item.claimId === claimId &&
       (!devLiteMedical || item.id === claim.medicalSettlementId)) ?? null,
-    ...(devLiteMedical ? { approvalCertificate } : {}),
+    ...(devLiteMedical ? { channel: config.channelName, chaincode: config.chaincodeName, approvalCertificate, ...proof, ...r2 } : {}),
   };
 }

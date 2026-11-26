@@ -1,0 +1,10 @@
+{
+  "name": "@block-insure/source-adapters",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node --test test/*.test.mjs",
+    "fixture": "node fixtures/generate.mjs --seed 42"
+  }
+}

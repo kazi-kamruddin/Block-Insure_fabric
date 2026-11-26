@@ -22,7 +22,7 @@ export type BankCommunication = {
   eventId: string;
   recipientSubject: string;
   policyId: string;
-  template: "bank-transaction-status" | "bank-mandate-status" | "bank-benefit-payment";
+  template: "bank-transaction-status" | "bank-mandate-status" | "bank-benefit-payment" | "bank-link-status";
   title: string;
   assetId: string;
   amountMinor: number;
@@ -34,6 +34,8 @@ export type BankCommunication = {
   error: string;
   createdAt: string;
   deliveredAt: string;
+  deliveryAttempts?: number;
+  nextAttemptAt?: string;
   variables: Record<string, string | number | boolean>;
 };
 
@@ -59,6 +61,13 @@ export const emptyEventProjection = (): EventProjection => ({
 
 const text = (payload: Record<string, unknown>, key: string) => typeof payload[key] === "string" ? payload[key] : "";
 
+function claimActivity(payload: Record<string, unknown>, title: string, asset: string) {
+  return [
+    { role: "insurerAdmin", subject: "", title, asset },
+    ...(asset ? [{ role: "policyholder", subject: text(payload, "claimantId"), title, asset }] : []),
+  ];
+}
+
 function notificationTargets(event: IndexedFabricEvent) {
   const p = event.payload;
   switch (event.eventName) {
@@ -74,7 +83,24 @@ function notificationTargets(event: IndexedFabricEvent) {
     case "OracleVerificationRequested": return [{ role: "insurerAdmin", subject: "", title: "Oracle verification requested", asset: text(p, "id") }];
     case "OracleCommitmentSubmitted": return [{ role: "insurerAdmin", subject: "", title: "Oracle commitment received", asset: text(p, "requestId") }];
     case "OracleResultRevealed": return [{ role: "insurerAdmin", subject: "", title: "Oracle result revealed", asset: text(p, "requestId") }];
-    case "OracleRequestFinalized": return [{ role: "insurerAdmin", subject: "", title: `Oracle ${text(p, "finalizationCode").toLowerCase().replaceAll("_", " ")}`, asset: text(p, "id") }];
+    case "OracleRequestFinalized": return [
+      { role: "insurerAdmin", subject: "", title: `Oracle ${text(p, "finalizationCode").toLowerCase().replaceAll("_", " ")}`, asset: text(p, "id") },
+      ...(text(p, "claimId") ? [{ role: "policyholder", subject: "", title: "Oracle verification completed", asset: text(p, "claimId") }] : []),
+    ];
+    case "MedicalApprovalCertificatesActivated": return [{ role: "insurerAdmin", subject: "", title: "Medical approval certificates activated", asset: text(p, "id") }];
+    case "MedicalRulesConfigured": return [{ role: "insurerAdmin", subject: "", title: "Medical cover rules configured", asset: text(p, "packageId") }];
+    case "MedicalEpisodeSaved": return [{ role: "insurerAdmin", subject: "", title: "Hospital episode revision saved", asset: text(p, "id") }];
+    case "MedicalRegistrySnapshotActivated": return [{ role: "insurerAdmin", subject: "", title: "Medical registry snapshot activated", asset: text(p, "id") }];
+    case "MedicalModelReleaseRegistered":
+    case "MedicalModelReleaseUpdated": return [{ role: "insurerAdmin", subject: "", title: "Medical model release updated", asset: text(p, "id") }];
+    case "MedicalReviewPreparing": return claimActivity(p, "Medical review is being prepared", text(p, "claimId"));
+    case "MedicalClarificationRequested": return claimActivity(p, "Medical clarification requested", text(p, "id"));
+    case "MedicalClarificationResponded": return claimActivity(p, "Medical clarification updated", text(p, "id"));
+    case "MedicalEvidenceDecryptionConfirmed": return [{ role: "insurerAdmin", subject: "", title: "Review evidence access confirmed", asset: text(p, "reviewId") }];
+    case "MedicalOCRConfirmed": return claimActivity(p, "Receipt fields confirmed for review", text(p, "claimId"));
+    case "MedicalAuditSelectionResolved": return claimActivity(p, "Medical audit sampling resolved", text(p, "claimId"));
+    case "MedicalAppealNotePurged": return [{ role: "insurerAdmin", subject: "", title: "Appeal note retention applied", asset: text(p, "appealId") }];
+    case "ClaimReviewTimedOut": return claimActivity(p, "Claim review deadline ended", text(p, "claimId"));
     case "ClaimReviewOpened": return Array.isArray(p.assignedAuditorIds)
       ? p.assignedAuditorIds.filter((value): value is string => typeof value === "string").map((subject) => ({ role: "auditor", subject, title: "Review assignment received", asset: text(p, "id") }))
       : [];
@@ -82,6 +108,10 @@ function notificationTargets(event: IndexedFabricEvent) {
     case "ClaimAppealSubmitted": return [
       { role: "insurerAdmin", subject: "", title: "Claim appeal submitted", asset: text(p, "claimId") },
       { role: "policyholder", subject: text(p, "claimantId"), title: "Appeal submitted for corrected-invoice verification", asset: text(p, "claimId") },
+    ];
+    case "MedicalReservationReleased": return [
+      { role: "insurerAdmin", subject: "", title: "Rejected claim cover returned to the policy", asset: text(p, "id") },
+      { role: "policyholder", subject: text(p, "claimantId"), title: "Reserved cover returned after final rejection", asset: text(p, "id") },
     ];
     case "SettlementAuthorized": return [{ role: "bankOfficer", subject: "", title: "Settlement ready for confirmation", asset: text(p, "id") }];
     case "PremiumCollectionQueued": return [{ role: "bankOfficer", subject: "", title: "Premium collection queued", asset: text(p, "id") }];
@@ -93,7 +123,21 @@ function notificationTargets(event: IndexedFabricEvent) {
       { role: "bankOfficer", subject: "", title: `EFT mandate ${text(p, "status").toLowerCase()}`, asset: text(p, "id") },
       { role: "policyholder", subject: text(p, "ownerId"), title: `EFT mandate ${text(p, "status").toLowerCase()}`, asset: text(p, "id") },
     ];
-    case "PremiumCollectionProcessed": return [{ role: "insurerAdmin", subject: "", title: `Premium collection ${text(p, "status").toLowerCase()}`, asset: text(p, "id") }];
+    case "BankMandateRequested": return [{ role: "bankOfficer", subject: "", title: "EFT mandate awaiting Bank review", asset: text(p, "id") }];
+    case "BankAccountLinkRequested": return [{ role: "bankOfficer", subject: "", title: `Account link requested for ${text(p, "maskedAccount")}`, asset: text(p, "id") }];
+    case "BankAccountLinkReviewed": return [
+      { role: "policyholder", subject: text(p, "ownerId"), title: text(p, "status") === "LINKED" ? `Bank linked account ${text(p, "maskedAccount")}` : `Bank rejected the link for ${text(p, "maskedAccount")}`, asset: text(p, "id") },
+      { role: "insurerAdmin", subject: "", title: `Customer bank link ${text(p, "status").toLowerCase()}`, asset: text(p, "id") },
+    ];
+    case "PolicyReinstated": return [
+      { role: "policyholder", subject: text(p, "policyholderId"), title: `Policy reinstated on ${text(p, "reinstatedDate")}: pay today's installment to resume cover`, asset: text(p, "policyId") },
+      { role: "insurerAdmin", subject: "", title: `Policy reinstated; uncovered from ${text(p, "uncoveredFrom")}`, asset: text(p, "policyId") },
+    ];
+    case "PremiumCollectionRetryQueued": return [{ role: "bankOfficer", subject: "", title: "Bounced premium collection queued for retry", asset: text(p, "id") }];
+    case "PremiumCollectionProcessed": return [
+      { role: "insurerAdmin", subject: "", title: `Premium collection ${text(p, "status").toLowerCase()}`, asset: text(p, "id") },
+      ...(text(p, "status") === "BOUNCED" ? [{ role: "policyholder", subject: "", title: "Automatic premium payment bounced: insufficient funds", asset: text(p, "policyId") }] : []),
+    ];
     case "PremiumCollectionReconciled": return [
       { role: "insurerAdmin", subject: "", title: "Queued premium was already collected", asset: text(p, "id") },
       { role: "bankOfficer", subject: "", title: "Queued premium was already collected", asset: text(p, "id") },
@@ -105,7 +149,7 @@ function notificationTargets(event: IndexedFabricEvent) {
       { role: "policyholder", subject: text(p, "requesterId"), title: "Benefit payment confirmed", asset: text(p, "id") },
     ];
     case "SettlementPaymentFailed": return [{ role: "insurerAdmin", subject: "", title: "Claim payout failed at the Bank", asset: text(p, "claimId") }];
-    case "SettlementConfirmed": return [{ role: "insurerAdmin", subject: "", title: "Claim payout confirmed by the Bank", asset: text(p, "claimId") }];
+    case "SettlementConfirmed": return claimActivity(p, "Claim payout confirmed by the Bank", text(p, "claimId"));
     case "EvidenceAccessGranted": return [{ role: text(p, "granteeRole"), subject: text(p, "granteeSubject"), title: "Evidence access granted", asset: text(p, "id") }];
     case "EvidenceAccessRevoked": return [{ role: text(p, "granteeRole"), subject: text(p, "granteeSubject"), title: "Evidence access revoked", asset: text(p, "id") }];
     default: return [];
@@ -147,6 +191,15 @@ function communicationFor(event: IndexedFabricEvent, createdAt: string): BankCom
       variables: { mandateId: text(p, "id"), policyId: text(p, "policyId"), status: text(p, "status"), amountMinor: Number(p.amountMinor ?? 0), currency: "BDT" },
     };
   }
+  if (event.eventName === "BankAccountLinkReviewed" && text(p, "ownerId")) {
+    return {
+      id: `${event.id}:email`, eventId: event.id, recipientSubject: text(p, "ownerId"), policyId: "",
+      template: "bank-link-status", title: text(p, "status") === "LINKED" ? "Bank account linked" : "Bank account link rejected",
+      assetId: text(p, "id"), amountMinor: 0, currency: "BDT",
+      status: "PENDING", adapter: "", recipient: "", messageId: "", error: "", createdAt, deliveredAt: "",
+      variables: { linkId: text(p, "id"), bankId: text(p, "bankId"), maskedAccount: text(p, "maskedAccount"), status: text(p, "status") },
+    };
+  }
   if (event.eventName === "BenefitPaymentConfirmed" && text(p, "requesterId")) {
     return {
       id: `${event.id}:email`, eventId: event.id, recipientSubject: text(p, "requesterId"), policyId: text(p, "policyId"),
@@ -160,7 +213,8 @@ function communicationFor(event: IndexedFabricEvent, createdAt: string): BankCom
 }
 
 export function applyFabricEvent(current: EventProjection, event: IndexedFabricEvent, updatedAt: string): EventProjection {
-  if (current.events.some((item) => item.id === event.id)) return current;
+  if ((current.checkpoint && BigInt(event.blockNumber) < BigInt(current.checkpoint.blockNumber)) ||
+      current.events.some((item) => item.id === event.id)) return current;
   const notifications = notificationTargets(event).map((target, index) => ({
     id: `${event.id}:${index}`,
     eventId: event.id,
@@ -172,6 +226,10 @@ export function applyFabricEvent(current: EventProjection, event: IndexedFabricE
     blockNumber: event.blockNumber,
   }));
   const communication = communicationFor(event, updatedAt);
+  const queue = current.communications ?? [];
+  const nextCommunications = communication && !queue.some((item) => item.eventId === communication.eventId &&
+      item.recipientSubject === communication.recipientSubject && item.policyId === communication.policyId)
+    ? [...queue, communication] : queue;
   return {
     schemaVersion: 2,
     updatedAt,
@@ -179,7 +237,9 @@ export function applyFabricEvent(current: EventProjection, event: IndexedFabricE
     events: [...current.events, event].slice(-5_000),
     countsByName: { ...current.countsByName, [event.eventName]: (current.countsByName[event.eventName] ?? 0) + 1 },
     notifications: [...current.notifications, ...notifications].slice(-2_000),
-    communications: [...(current.communications ?? []), ...(communication ? [communication] : [])].slice(-2_000),
+    // Pending transmissions must survive a long catch-up. Terminal rows are
+    // retained to deduplicate and their inspection remains windowed by the API.
+    communications: nextCommunications,
   };
 }
 

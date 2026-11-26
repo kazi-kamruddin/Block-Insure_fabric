@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { ledger } from "@/lib/fabric/ledger";
+import { configuredLedgerProvisioningId } from "@/lib/fabric/ledger-instance";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -23,6 +24,7 @@ export async function GET() {
       chaincode: process.env.FABRIC_CHAINCODE_NAME ?? "insurance-contract",
       schemaVersion,
       expectedSchemaVersion,
+      ledgerProvisioningId: configuredLedgerProvisioningId() ?? null,
     }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     console.error("Fabric health check failed", error);

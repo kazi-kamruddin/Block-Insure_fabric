@@ -2,7 +2,7 @@
 
 ## Research questions
 
-- **RQ1 — Cost:** What computational overhead is introduced by Oracle replication, strict-majority consensus, and selective disclosure relative to a centralized verifier?
+- **RQ1 — Cost:** What local overhead do commitment generation, strict-majority threshold evaluation and selective disclosure add to one registry assessment?
 - **RQ2 — Resilience:** Does 2-of-3 consensus preserve a correct decision when one worker is malicious or unavailable, and does it fail closed when quorum is lost?
 - **RQ3 — Security:** Are identity forgery, replay, stale results, proof alteration, deadline manipulation, and appeal substitution prevented or safely contained by enforceable controls?
 
@@ -12,7 +12,7 @@
 
 The output includes operation-level mean, median, and P95 latency; a 95% confidence interval calculated over independent trial means; throughput confidence intervals; process CPU time and utilization; memory deltas; raw trial summaries; and machine/environment metadata. Process CPU utilization can exceed 100% when runtime helper threads use more than one logical CPU. JSON, CSV, and Markdown reports are written under `benchmarks/comparative/reports`.
 
-This is a controlled **protocol computation** benchmark. It measures registry assessment, request/result binding, commitment generation, threshold evaluation, and optional Merkle-proof verification. It does not represent production network capacity. The existing Hyperledger Caliper suite separately measures Fabric Gateway and ledger overhead, while the live fault matrix measures full workflow recovery time.
+This is a controlled **single-evaluator protocol computation** benchmark. Each operation assesses the registry once, then reuses that result for the selected number of commitments and threshold responses. The privacy profile also performs three proof checks. The existing Hyperledger Caliper suite separately measures Fabric Gateway and ledger overhead, while the live fault matrix measures full workflow recovery time. Historical Phase 2 claim-submit load figures use the scope (phase-2 lineage, CouchDB, `SubmitInvoiceClaim`, ascending sweep).
 
 The Phase 2 protocol report, raw trial data, and deployed experiment are archived under `docs/results/phase2-comparative`, `docs/results/phase2-caliper`, and `docs/results/phase2-faults.json`. Run a new experiment on an otherwise idle, documented machine:
 

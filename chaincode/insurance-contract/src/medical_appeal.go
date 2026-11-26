@@ -22,12 +22,16 @@ func (c *Contract) advanceMedicalVersion(ctx contractapi.TransactionContextInter
 		return err
 	}
 	claim.Version++
+	claim.MedicalDuplicateExplanationHash = ""
 	claim.MedicalEscalatedAt = ""
 	claim.MedicalHeldReleaseID = ""
 	claim.MedicalRevisionKind = kind
 	quote.StatementHash = medicalSuccessorHash(quote.StatementHash, kind, claim.Version, noteHash)
 	claim.DescriptionHash = quote.StatementHash
 	claim.Status, claim.UpdatedAt = "SUBMITTED", now
+	if err := c.setInitialMedicalEscalation(ctx, claim, now); err != nil {
+		return err
+	}
 	claim.CurrentReviewID, claim.CurrentOracleRequestID, claim.HospitalVerificationID = "", "", ""
 	claim.OracleOutcome, claim.OracleResultHash, claim.AuditorDecisionID = "", "", ""
 	claim.MedicalSettlementID, claim.PrivacyPresentationID = "", ""
@@ -58,6 +62,9 @@ func (c *Contract) SubmitMedicalAppeal(ctx contractapi.TransactionContextInterfa
 	}
 	if review.Status != "REJECTED" {
 		return nil, fmt.Errorf("procedural failures use recovery, not an appeal")
+	}
+	if err := requireOpenMedicalRejection(ctx, review, claim); err != nil {
+		return nil, err
 	}
 	decision, err := getState[AuditorDecision](ctx, "auditorDecision", decisionID)
 	if err != nil {
@@ -92,7 +99,7 @@ func (c *Contract) SubmitMedicalAppeal(ctx contractapi.TransactionContextInterfa
 	if err != nil {
 		return nil, err
 	}
-	now, err := timestamp(ctx)
+	now, err := ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -119,8 +126,12 @@ func (c *Contract) SubmitMedicalAppeal(ctx contractapi.TransactionContextInterfa
 		claim.AmountMinor, claim.IncidentDate, claim.EpisodeRevision = quote.PayableMinor, episode.ServiceDate, revision
 		claim.HospitalInvoiceID = medicalRevisionKey(episode.ID, revision)
 		claim.Version++
+		claim.MedicalDuplicateExplanationHash = ""
 		claim.MedicalEscalatedAt = ""
 		claim.MedicalHeldReleaseID = ""
+		if err := c.setInitialMedicalEscalation(ctx, claim, now); err != nil {
+			return nil, err
+		}
 		if err := c.screenMedicalDuplicate(ctx, claim, episode); err != nil {
 			return nil, err
 		}
@@ -173,6 +184,13 @@ func (c *Contract) QuoteMedicalAppeal(ctx contractapi.TransactionContextInterfac
 	}
 	if claim.Status != "REJECTED" || revision <= claim.EpisodeRevision {
 		return nil, fmt.Errorf("a newer revision for a rejected claim is required")
+	}
+	review, _, err := c.currentMedicalReview(ctx, claim.CurrentReviewID)
+	if err != nil {
+		return nil, err
+	}
+	if err := requireOpenMedicalRejection(ctx, review, claim); err != nil {
+		return nil, err
 	}
 	_, _, quote, _, err := c.medicalFacts(ctx, claim.PolicyID, claim.EpisodeID, revision, claim.AmountMinor, claim.CreatedAt)
 	return quote, err

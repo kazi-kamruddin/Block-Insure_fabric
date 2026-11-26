@@ -3,13 +3,15 @@ import { z } from "zod";
 import { currentSession } from "@/lib/auth/current-session";
 import { findDemoAccount } from "@/lib/auth/accounts";
 import { ledger } from "@/lib/fabric/ledger";
+import { redactVoteTallies, visibleDecisions } from "@/lib/fabric/vote-visibility";
+import { auditorAssetScope, isAuditorReviewAsset } from "@/lib/fabric/auditor-scope";
 
-const assetTypeSchema = z.enum(["partner-agreement", "hospital-invoice", "package", "policy", "claim", "evidence", "evidence-batch", "evidence-grant", "verification", "decision", "review", "appeal", "fraud-assessment", "settlement", "access", "account", "bank-transfer", "mandate", "premium-payment", "premium-adjustment", "collection", "benefit-plan", "beneficiaries", "benefit-request", "liability", "oracle-snapshot", "oracle-request", "oracle-commitment", "oracle-result", "privacy-credential", "privacy-presentation"]);
+const assetTypeSchema = z.enum(["partner-agreement", "hospital-invoice", "package", "policy", "claim", "evidence", "evidence-batch", "evidence-grant", "verification", "decision", "review", "appeal", "fraud-assessment", "settlement", "access", "account", "bank-link", "bank-transfer", "mandate", "premium-payment", "premium-adjustment", "collection", "benefit-plan", "beneficiaries", "benefit-request", "liability", "oracle-snapshot", "oracle-request", "oracle-commitment", "oracle-result", "privacy-credential", "privacy-presentation"]);
 type RouteContext = { params: Promise<{ assetType: string }> };
 
 export const runtime = "nodejs";
 
-const bankAssetTypes = new Set(["partner-agreement", "account", "bank-transfer", "mandate", "premium-payment", "premium-adjustment", "collection", "liability", "settlement"]);
+const bankAssetTypes = new Set(["partner-agreement", "account", "bank-link", "bank-transfer", "mandate", "premium-payment", "premium-adjustment", "collection", "liability", "settlement"]);
 
 export async function GET(_request: Request, context: RouteContext) {
   const session = await currentSession().catch(() => null);
@@ -17,6 +19,9 @@ export async function GET(_request: Request, context: RouteContext) {
 
   const assetType = assetTypeSchema.safeParse((await context.params).assetType);
   if (!assetType.success) return NextResponse.json({ message: "Invalid asset collection" }, { status: 400 });
+  if (session.role === "auditor" && (!session.subjectId || !isAuditorReviewAsset(assetType.data))) {
+    return NextResponse.json({ message: "Auditor access requires an assigned review" }, { status: 403 });
+  }
   if (session.role === "hospitalOfficer" && !["partner-agreement", "hospital-invoice", "package", "privacy-credential", "privacy-presentation"].includes(assetType.data)) {
     return NextResponse.json({ message: "The independent Hospital portal exposes only its agreement, invoices, and public package network" }, { status: 403 });
   }
@@ -159,19 +164,16 @@ export async function GET(_request: Request, context: RouteContext) {
         break;
       }
       case "decision": {
-        const decisions = await ledger.listAuditorDecisions();
+        const [decisions, reviews] = await Promise.all([ledger.listAuditorDecisions(), ledger.listClaimReviews()]);
         const claimIds = await visibleClaimIds();
-        result = claimIds ? decisions.filter((item) => claimIds.has(item.claimId)) : decisions;
+        result = visibleDecisions(claimIds ? decisions.filter((item) => claimIds.has(item.claimId)) : decisions, reviews, session);
         break;
       }
       case "review": {
         const reviews = await ledger.listClaimReviews();
-        if (session.role === "auditor") {
-          result = reviews.filter((item) => item.assignedAuditorIds.includes(session.subjectId ?? ""));
-          break;
-        }
         const claimIds = await visibleClaimIds();
-        result = claimIds ? reviews.filter((item) => claimIds.has(item.claimId)) : reviews;
+        result = (claimIds ? reviews.filter((item) => claimIds.has(item.claimId)) : reviews)
+          .map(review => redactVoteTallies(review, session));
         break;
       }
       case "appeal": {
@@ -214,6 +216,14 @@ export async function GET(_request: Request, context: RouteContext) {
         if (session.role !== "policyholder") { result = transfers; break; }
         const ownedPolicyIds = new Set((await ledger.listPolicies()).filter((item) => item.policyholderId === session.subjectId).map((item) => item.id));
         result = transfers.filter((item) => ownedPolicyIds.has(item.policyId));
+        break;
+      }
+      case "bank-link": {
+        if (!["bankOfficer", "insurerAdmin", "policyholder"].includes(session.role)) {
+          return NextResponse.json({ message: "Bank account link requests are visible only to the Bank, insurer, and requesting policyholder" }, { status: 403 });
+        }
+        const links = await ledger.listBankAccountLinks();
+        result = session.role === "policyholder" ? links.filter((item) => item.ownerId === session.subjectId) : links;
         break;
       }
       case "mandate": {
@@ -262,6 +272,10 @@ export async function GET(_request: Request, context: RouteContext) {
         result = liabilities.filter((item) => ownedPolicyIds.has(item.policyId));
         break;
       }
+    }
+    if (session.role === "auditor" && session.subjectId) {
+      const visible = await auditorAssetScope(assetType.data, session.subjectId);
+      result = result.map(item => visible(item)).filter(item => item !== undefined);
     }
     return NextResponse.json({ result });
   } catch (error) {

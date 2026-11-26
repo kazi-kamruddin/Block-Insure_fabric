@@ -1,4 +1,5 @@
 import type { FabricRole } from "@/lib/fabric/config";
+import type { Session } from "@/lib/auth/session-token";
 
 export type DemoAccountId = keyof typeof demoAccounts;
 
@@ -11,6 +12,8 @@ export type DemoAccount = {
   fabricUserName?: string;
   email?: string;
 };
+
+export type WorkspaceAccount = Omit<DemoAccount, "id"> & { id: string };
 
 export const demoAccounts = {
   "insurer-admin": {
@@ -106,6 +109,8 @@ export const demoAccounts = {
     role: "bankOfficer",
     subjectId: "bank-demo",
   },
+  "auditor-5": { id: "auditor-5", displayName: "Independent Auditor Five", organization: "AuditorMSP", role: "auditor", subjectId: "auditor5", fabricUserName: "auditor5" },
+  "auditor-6": { id: "auditor-6", displayName: "Independent Auditor Six", organization: "AuditorMSP", role: "auditor", subjectId: "auditor6", fabricUserName: "auditor6" },
 } as const satisfies Record<string, Omit<DemoAccount, "id"> & { id: string }>;
 
 export function findDemoAccount(id: string): DemoAccount | undefined {
@@ -124,6 +129,19 @@ export const workspaceByRole: Record<FabricRole, string> = {
   bankOfficer: "bank",
 };
 
-export function workspaceForAccount(account: DemoAccount) {
+export function workspaceForAccount(account: Pick<WorkspaceAccount, "role">) {
   return workspaceByRole[account.role];
+}
+
+export function workspaceAccountForSession(session: Pick<Session, "accountId" | "role" | "subjectId">): WorkspaceAccount | undefined {
+  if (session.role === "policyholder" && session.subjectId && session.accountId === `customer:${session.subjectId}`) {
+    return {
+      id: session.accountId,
+      role: "policyholder",
+      displayName: "Customer workspace",
+      organization: "InsurerMSP",
+      subjectId: session.subjectId,
+    };
+  }
+  return findDemoAccount(session.accountId);
 }

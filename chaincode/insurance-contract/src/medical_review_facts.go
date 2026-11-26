@@ -7,10 +7,11 @@ import (
 )
 
 type MedicalReviewFacts struct {
-	Service     string       `json:"service"`
-	ServiceDate string       `json:"serviceDate"`
-	TermsHash   string       `json:"termsHash"`
-	Quote       MedicalQuote `json:"quote"`
+	DuplicateExplanation string       `json:"duplicateExplanation,omitempty" metadata:",optional"`
+	Service              string       `json:"service"`
+	ServiceDate          string       `json:"serviceDate"`
+	TermsHash            string       `json:"termsHash"`
+	Quote                MedicalQuote `json:"quote"`
 }
 
 func (c *Contract) ReadMedicalReviewFacts(ctx contractapi.TransactionContextInterface, claimID string) (*MedicalReviewFacts, error) {

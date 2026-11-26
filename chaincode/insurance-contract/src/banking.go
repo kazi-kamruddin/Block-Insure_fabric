@@ -36,6 +36,20 @@ func (c *Contract) RequestBankMandate(ctx contractapi.TransactionContextInterfac
 	if policy.Status == "CANCELLED" || policy.Status == "EXPIRED" {
 		return nil, fmt.Errorf("policy %s cannot accept a mandate from %s", policyID, policy.Status)
 	}
+	// A mandate cannot reach back for installments the policy may no longer accept.
+	if err := validateMedicalPremiumTiming(ctx, policy, policy.NextPremiumDueDate); err != nil {
+		return nil, err
+	}
+	// One standing instruction per policy, so a customer is never debited twice.
+	existing, err := c.ListBankMandates(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, other := range existing {
+		if other.PolicyID == policyID && (other.Status == "PENDING" || other.Status == "ACTIVE") {
+			return nil, fmt.Errorf("policy %s already has a %s EFT mandate %s; cancel it before setting up another", policyID, strings.ToLower(other.Status), other.ID)
+		}
+	}
 	account, err := c.ReadBankAccountReference(ctx, accountReferenceID)
 	if err != nil {
 		return nil, err
@@ -67,7 +81,7 @@ func (c *Contract) RequestBankMandate(ctx contractapi.TransactionContextInterfac
 	if expiryDate < due {
 		return nil, fmt.Errorf("mandate expiry cannot precede the next premium due date")
 	}
-	now, err := timestamp(ctx)
+	now, err := ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -108,13 +122,16 @@ func (c *Contract) ReviewBankMandate(ctx contractapi.TransactionContextInterface
 	if mandate.Status != "PENDING" {
 		return nil, fmt.Errorf("bank mandate %s must be PENDING for review", id)
 	}
+	if err := c.requireBankAccountSubject(ctx, mandate.AccountReferenceID); err != nil {
+		return nil, err
+	}
 	if outcome == "APPROVE" {
 		mandate.Status = "ACTIVE"
 	} else {
 		mandate.Status = "REJECTED"
 	}
 	mandate.DecisionHash = strings.ToLower(decisionHash)
-	mandate.UpdatedAt, err = timestamp(ctx)
+	mandate.UpdatedAt, err = ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -146,7 +163,7 @@ func (c *Contract) CancelBankMandate(ctx contractapi.TransactionContextInterface
 		return nil, fmt.Errorf("bank mandate %s cannot be cancelled from %s", id, mandate.Status)
 	}
 	mandate.Status = "CANCELLED"
-	mandate.UpdatedAt, err = timestamp(ctx)
+	mandate.UpdatedAt, err = ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -167,6 +184,9 @@ func (c *Contract) ExpireBankMandate(ctx contractapi.TransactionContextInterface
 	if err != nil {
 		return nil, err
 	}
+	if err := requireNotAfterLedgerDate(ctx, "asOfDate", asOfDate); err != nil {
+		return nil, err
+	}
 	mandate, err := c.ReadBankMandate(ctx, id)
 	if err != nil {
 		return nil, err
@@ -175,8 +195,11 @@ func (c *Contract) ExpireBankMandate(ctx contractapi.TransactionContextInterface
 	if !asOf.After(expiry) || mandate.Status != "ACTIVE" {
 		return nil, fmt.Errorf("bank mandate %s is not eligible for expiry", id)
 	}
+	if err := c.requireBankAccountSubject(ctx, mandate.AccountReferenceID); err != nil {
+		return nil, err
+	}
 	mandate.Status = "EXPIRED"
-	mandate.UpdatedAt, err = timestamp(ctx)
+	mandate.UpdatedAt, err = ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -217,6 +240,9 @@ func (c *Contract) RecordPremiumAdjustment(ctx contractapi.TransactionContextInt
 	if err != nil {
 		return nil, err
 	}
+	if err := c.requireBankAccountSubject(ctx, payment.SourceAccountID); err != nil {
+		return nil, err
+	}
 	adjustments, err := c.ListPremiumAdjustments(ctx)
 	if err != nil {
 		return nil, err
@@ -239,7 +265,7 @@ func (c *Contract) RecordPremiumAdjustment(ctx contractapi.TransactionContextInt
 	} else if marker != nil {
 		return nil, fmt.Errorf("external payment reference has already been recorded")
 	}
-	now, err := timestamp(ctx)
+	now, err := ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -317,6 +343,9 @@ func (c *Contract) QueuePremiumCollection(ctx contractapi.TransactionContextInte
 	if _, err := validateDate("dueDate", dueDate); err != nil {
 		return nil, err
 	}
+	if err := requireNotAfterLedgerDate(ctx, "dueDate", dueDate); err != nil {
+		return nil, err
+	}
 	collections, err := c.ListPremiumCollections(ctx)
 	if err != nil {
 		return nil, err
@@ -326,7 +355,7 @@ func (c *Contract) QueuePremiumCollection(ctx contractapi.TransactionContextInte
 			return nil, fmt.Errorf("premium collection already exists for mandate %s on %s", mandateID, dueDate)
 		}
 	}
-	now, err := timestamp(ctx)
+	now, err := ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -359,6 +388,9 @@ func (c *Contract) SchedulePremiumCollections(ctx contractapi.TransactionContext
 	if _, err := validateDate("asOfDate", asOfDate); err != nil {
 		return nil, err
 	}
+	if err := requireNotAfterLedgerDate(ctx, "asOfDate", asOfDate); err != nil {
+		return nil, err
+	}
 	mandates, err := c.ListBankMandates(ctx)
 	if err != nil {
 		return nil, err
@@ -371,7 +403,7 @@ func (c *Contract) SchedulePremiumCollections(ctx contractapi.TransactionContext
 	for _, collection := range existingCollections {
 		existing[collection.MandateID+":"+collection.DueDate] = true
 	}
-	now, err := timestamp(ctx)
+	now, err := ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -382,6 +414,14 @@ func (c *Contract) SchedulePremiumCollections(ctx contractapi.TransactionContext
 		}
 		key := mandate.ID + ":" + mandate.NextDebitDate
 		if existing[key] {
+			continue
+		}
+		policy, err := c.ReadPolicy(ctx, mandate.PolicyID)
+		if err != nil {
+			return nil, err
+		}
+		// Do not queue debits that the policy can no longer accept.
+		if policy.Status == "CANCELLED" || policy.Status == "EXPIRED" || validateMedicalPremiumTiming(ctx, policy, mandate.NextDebitDate) != nil {
 			continue
 		}
 		collection := PremiumCollection{
@@ -403,6 +443,56 @@ func (c *Contract) SchedulePremiumCollections(ctx contractapi.TransactionContext
 		return nil, err
 	}
 	return created, nil
+}
+
+const maxPremiumCollectionAttempts = 3
+
+// RetryPremiumCollection lets the Insurer re-present a bounced EFT installment
+// after the customer's account is funded. The Bank still derives the outcome
+// from the account balance when it processes the retry.
+func (c *Contract) RetryPremiumCollection(ctx contractapi.TransactionContextInterface, collectionID string) (*PremiumCollection, error) {
+	if _, err := requireIdentity(ctx, "InsurerMSP", "insurerAdmin"); err != nil {
+		return nil, err
+	}
+	collection, err := c.ReadPremiumCollection(ctx, collectionID)
+	if err != nil {
+		return nil, err
+	}
+	if collection.Status != "BOUNCED" {
+		return nil, fmt.Errorf("premium collection %s must be BOUNCED to retry", collectionID)
+	}
+	if collection.AttemptCount >= maxPremiumCollectionAttempts {
+		return nil, fmt.Errorf("premium collection %s has reached the maximum of %d attempts", collectionID, maxPremiumCollectionAttempts)
+	}
+	mandate, err := c.ReadBankMandate(ctx, collection.MandateID)
+	if err != nil {
+		return nil, err
+	}
+	if mandate.Status != "ACTIVE" || mandate.NextDebitDate != collection.DueDate {
+		return nil, fmt.Errorf("mandate %s no longer owes the installment due on %s", mandate.ID, collection.DueDate)
+	}
+	policy, err := c.ReadPolicy(ctx, collection.PolicyID)
+	if err != nil {
+		return nil, err
+	}
+	if policy.Status == "CANCELLED" || policy.Status == "EXPIRED" || policy.Status == "LAPSED" {
+		return nil, fmt.Errorf("policy %s cannot retry a premium from %s", policy.ID, policy.Status)
+	}
+	if err := validateMedicalPremiumTiming(ctx, policy, collection.DueDate); err != nil {
+		return nil, err
+	}
+	collection.Status = "RETRY"
+	collection.UpdatedAt, err = ledgerTimestamp(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if err := overwriteAsset(ctx, "premiumCollection", collection.ID, collection); err != nil {
+		return nil, err
+	}
+	if err := emit(ctx, "PremiumCollectionRetryQueued", collection); err != nil {
+		return nil, err
+	}
+	return collection, nil
 }
 
 func (c *Contract) CompletePremiumCollection(ctx contractapi.TransactionContextInterface, collectionID, paymentID, periodEndDate, externalReferenceHash string) (*PremiumCollection, error) {
@@ -443,14 +533,28 @@ func (c *Contract) ReadPremiumAdjustment(ctx contractapi.TransactionContextInter
 	return getState[PremiumAdjustment](ctx, "premiumAdjustment", id)
 }
 
+// ledgerBusinessDate is the Dhaka calendar date of the transaction timestamp.
+func ledgerBusinessDate(ctx contractapi.TransactionContextInterface) (string, error) {
+	now, err := transactionDate(ctx)
+	if err != nil {
+		return "", err
+	}
+	return dhakaDate(now), nil
+}
+
+// requireNotAfterLedgerDate stops a caller from moving premium obligations
+// forward in time by supplying a future calendar date.
+func requireNotAfterLedgerDate(ctx contractapi.TransactionContextInterface, field, value string) error {
+	today, err := ledgerBusinessDate(ctx)
+	if err != nil {
+		return err
+	}
+	if value > today {
+		return fmt.Errorf("%s %s is later than the ledger business date %s", field, value, today)
+	}
+	return nil
+}
+
 func transactionDate(ctx contractapi.TransactionContextInterface) (time.Time, error) {
-	value, err := timestamp(ctx)
-	if err != nil {
-		return time.Time{}, err
-	}
-	parsed, err := time.Parse(time.RFC3339Nano, value)
-	if err != nil {
-		return time.Time{}, fmt.Errorf("parse transaction date: %w", err)
-	}
-	return parsed, nil
+	return ledgerNow(ctx)
 }

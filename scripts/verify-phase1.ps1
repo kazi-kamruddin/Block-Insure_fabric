@@ -19,10 +19,10 @@ if ($TimeoutOnly) {
     $env:ORACLE_E2E_SCENARIO = "timeout"
     Push-Location (Join-Path $projectRoot "apps/web")
     try {
-        & npx playwright test --grep "@oracle-timeout"
+        & npx playwright test --workers=1 --grep "@oracle-timeout"
         if ($LASTEXITCODE -ne 0) { throw "Phase 1 timeout browser case exited with code $LASTEXITCODE" }
     }
     finally { Pop-Location }
 } else {
-    & (Join-Path $PSScriptRoot "verify-all.ps1")
+    & (Join-Path $PSScriptRoot "verify-all.ps1") -LegacyWebPort 3000
 }

@@ -173,7 +173,7 @@ test("@alignment-mobile essential role forms and navigation at 320px", async ({ 
     expect((await page.request.post("/api/auth/demo-login", { data: { accountId } })).ok()).toBe(true);
     await page.goto(`/workspace/${workspace}`);
     await expect(page.getByRole("heading", { name: heading })).toBeVisible();
-    await expect(page.getByLabel("Workflow action")).toBeVisible();
+    await expect(page.getByRole("navigation", { name: "Workspace pages" })).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     const foreign = workspace === "insurer" ? "bank" : "insurer";
     await page.goto(`/workspace/${foreign}`);

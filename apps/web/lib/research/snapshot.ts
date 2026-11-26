@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { visibleDecisions } from "@/lib/fabric/vote-visibility";
 import type {
   AuditorDecision, BenefitRequest, Claim, ClaimAppeal, ClaimReview,
   EvidenceAccessGrant, EvidenceAccessRecord, EvidenceReference, FraudAssessment,
@@ -25,6 +26,11 @@ export type ResearchInput = {
   oracleResults: OracleResult[];
   privacyCredentials?: PrivacyCredential[];
   privacyPresentations?: SelectiveDisclosurePresentation[];
+  oracleFaultTrials?: OracleFaultTrial[];
+};
+
+export type OracleFaultTrial = {
+  requestId: string; injectedFault: string; expectedOutcome: string; observedOutcome: string; date: string;
 };
 
 const countBy = <T>(values: T[], key: (value: T) => string) => values.reduce<Record<string, number>>((counts, value) => {
@@ -48,8 +54,10 @@ export function buildResearchSnapshot(
 ) {
   const closedReviews = input.reviews.filter((review) => review.closedAt);
   const reviewLatencies = closedReviews.map((review) => Date.parse(review.closedAt) - Date.parse(review.openedAt)).filter((value) => Number.isFinite(value) && value >= 0);
-  const finalizedDecisionByReview = new Map(closedReviews.map((review) => [review.id, review.status === "APPROVED" ? "APPROVE" : "REJECT"]));
-  const alignedVotes = input.decisions.filter((decision) => finalizedDecisionByReview.get(decision.reviewId) === decision.outcome).length;
+  const finalReviews = closedReviews.filter(review => review.status === "APPROVED" || review.status === "REJECTED");
+  const finalizedDecisionByReview = new Map(finalReviews.map((review) => [review.id, review.status === "APPROVED" ? "APPROVE" : "REJECT"]));
+  const closedVotes = visibleDecisions(input.decisions, finalReviews, { role: "insurerAdmin" });
+  const alignedVotes = closedVotes.filter((decision) => finalizedDecisionByReview.get(decision.reviewId) === decision.outcome).length;
   const now = Date.parse(generatedAt);
   const grantState = (grant: EvidenceAccessGrant) => grant.status === "REVOKED" ? "REVOKED" : Date.parse(grant.expiresAt) <= now ? "EXPIRED" : grant.accessCount >= grant.maxAccesses ? "EXHAUSTED" : "ACTIVE";
   const confirmedSettlements = input.settlements.filter((item) => item.status === "CONFIRMED");
@@ -59,18 +67,24 @@ export function buildResearchSnapshot(
   const oracleResultsByRequest = new Map<string, OracleResult[]>();
   for (const result of input.oracleResults) oracleResultsByRequest.set(result.requestId, [...(oracleResultsByRequest.get(result.requestId) ?? []), result]);
   const requestResultCounts = (request: OracleRequest) => Object.values(countBy(oracleResultsByRequest.get(request.id) ?? [], (item) => item.resultHash));
-  const observedFaultTolerantFinalizations = finalizedOracleRequests.filter((request) => {
-    const results = oracleResultsByRequest.get(request.id) ?? [];
-    return request.status === "CONSENSUS" && (request.revealCount < request.expectedResponses || new Set(results.map((item) => item.resultHash)).size > 1);
-  }).length;
+  const quorumReachedWithTwoReveals = finalizedOracleRequests.filter(request =>
+    request.status === "CONSENSUS" && request.revealCount === 2 && request.revealCount < request.expectedResponses).length;
+  const competingResultFinalizations = finalizedOracleRequests.filter(request => requestResultCounts(request).length > 1).length;
+  const consensusIds = new Set(finalizedOracleRequests.filter(request => request.status === "CONSENSUS").map(request => request.id));
+  const faultSurvival = new Set((input.oracleFaultTrials ?? [])
+    .filter(trial => trial.injectedFault.trim() && trial.expectedOutcome === "CONSENSUS" &&
+      trial.observedOutcome === "CONSENSUS" && consensusIds.has(trial.requestId))
+    .map(trial => trial.requestId)).size;
   const oracleSafetyViolations = finalizedOracleRequests.filter((request) => requestResultCounts(request).filter((count) => count >= request.requiredConfirmations).length > 1).length;
   const privacyCredentials = input.privacyCredentials ?? [];
   const privacyPresentations = input.privacyPresentations ?? [];
+  const eventCounts = { ...provenance.eventCounts };
+  delete eventCounts.AuditorDecisionRecorded;
 
   const body = {
     schemaVersion: 1,
     generatedAt,
-    provenance,
+    provenance: { ...provenance, eventCounts },
     portfolio: {
       policies: input.policies.length,
       policyStatus: countBy(input.policies, (item) => item.status),
@@ -83,7 +97,7 @@ export function buildResearchSnapshot(
       reviewStatus: countBy(input.reviews, (item) => item.status),
       meanVotesPerClosedReview: closedReviews.length ? sum(closedReviews.map((item) => item.votesCast)) / closedReviews.length : null,
       meanClosureLatencyMs: reviewLatencies.length ? sum(reviewLatencies) / reviewLatencies.length : null,
-      voteAlignmentBps: input.decisions.length ? Math.round(alignedVotes * 10_000 / input.decisions.length) : null,
+      voteAlignmentBps: closedVotes.length ? Math.round(alignedVotes * 10_000 / closedVotes.length) : null,
       appeals: input.appeals.length,
       appealStatus: countBy(input.appeals, (item) => item.status),
     },
@@ -96,7 +110,9 @@ export function buildResearchSnapshot(
       agreementBps: finalizedOracleRequests.length ? Math.round(finalizedOracleRequests.filter((item) => ["EXACT_CONSENSUS", "NEGATIVE_RESULT"].includes(item.finalizationCode)).length * 10_000 / finalizedOracleRequests.length) : null,
       meanFinalizationLatencyMs: oracleLatencies.length ? sum(oracleLatencies) / oracleLatencies.length : null,
       meanRevealParticipationBps: finalizedOracleRequests.length ? Math.round(sum(finalizedOracleRequests.map((item) => item.revealCount * 10_000 / item.expectedResponses)) / finalizedOracleRequests.length) : null,
-      observedFaultTolerantFinalizations,
+      quorumReachedWithTwoReveals,
+      competingResultFinalizations,
+      faultSurvival,
       safetyViolations: oracleSafetyViolations,
     },
     privacyPreservingVerification: {

@@ -33,10 +33,10 @@ func TestMedicalTermsAcceptanceAndIntakeRevision(t *testing.T) {
 		t.Fatal(err)
 	}
 	setIdentity(ctx, "owner", "InsurerMSP", "policyholder", map[string]string{"subjectId": "owner"})
-	if _, err := contract.AcquireMedicalPolicy(ctx, "new-policy", "medicine", "2026-09-01", "2026-12-01", hash); err == nil {
+	if _, err := contract.AcquireMedicalPolicy(ctx, "new-policy", "medicine", "2026-09-05", "2026-12-01", hash); err == nil {
 		t.Fatal("accepted stale terms")
 	}
-	policy, err := contract.AcquireMedicalPolicy(ctx, "new-policy", "medicine", "2026-09-01", "2026-12-01", rules.TermsHash)
+	policy, err := contract.AcquireMedicalPolicy(ctx, "new-policy", "medicine", "2026-09-05", "2026-12-01", rules.TermsHash)
 	if err != nil || policy.Status != "PENDING_PAYMENT" || policy.MedicalRulesVersion != 1 {
 		t.Fatalf("unexpected policy: %+v, %v", policy, err)
 	}

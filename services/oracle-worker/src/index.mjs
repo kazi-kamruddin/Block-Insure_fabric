@@ -1,15 +1,17 @@
 import { createHash } from "node:crypto";
 import path from "node:path";
-import { pinnedDecision, decisionIdentity, historicalDecisionAliases } from "./decision-store.mjs";
+import { pinnedDecision, decisionIdentity, historicalDecisionAliases, findPinnedDecision, writeExplanationReceipt } from "./decision-store.mjs";
 import { observeProviderShadow } from "./provider-risk.mjs";
 import { buildReleaseResultDigest } from "./release-protocol.mjs";
 import { routeModel, evaluatorVersion, evaluatorHash } from "./xgboost.mjs";
 import { registryAssessmentRequest } from "./medical-revision.mjs";
 import { environmentFileArgument, loadEnvironmentFile } from "./environment.mjs";
+import { OrderedEvents } from "./ordered-events.mjs";
+import { devLiteProfile } from "../../../scripts/dev-lite-gateway.mjs";
 
 loadEnvironmentFile(environmentFileArgument());
 
-const [{ loadOracleConfig }, { connectOracleGateway }, { loadRegistrySnapshot, validateRegistrySnapshot, assessRegistryRecord }, protocol, privacy, cursorModule, retryModule, healthModule] = await Promise.all([
+const [{ checkOracleNodeVersion, loadOracleConfig }, { connectOracleGateway, submitGuardedOracleTransaction }, { loadRegistrySnapshot, validateRegistrySnapshot, assessRegistryRecord }, protocol, privacy, cursorModule, retryModule, healthModule] = await Promise.all([
   import("./config.mjs"),
   import("./gateway.mjs"),
   import("./registry.mjs"),
@@ -20,6 +22,7 @@ const [{ loadOracleConfig }, { connectOracleGateway }, { loadRegistrySnapshot, v
   import("./health.mjs"),
 ]);
 
+checkOracleNodeVersion();
 const config = loadOracleConfig();
 const shadowFile = process.env.ORACLE_CHALLENGER_SHADOW_ARTIFACT?.trim();
 const shadow = shadowFile ? await import("./challenger-shadow.mjs").then(async (module) => ({
@@ -36,6 +39,9 @@ const decoder = new TextDecoder();
 let stopping = false;
 let activeEvents;
 let shutdownPromise;
+let healthPersisted = Promise.resolve();
+let inFlightRequests = 0;
+const revealWaiters = new Map();
 
 function log(level, message, details = {}) {
   console[level](JSON.stringify({ timestamp: new Date().toISOString(), service: config.oracleId, message, ...details }));
@@ -43,7 +49,9 @@ function log(level, message, details = {}) {
 
 async function updateHealth(patch) {
   const current = healthState.update(patch);
-  await healthModule.persistHealth(healthPath, current);
+  const write = healthPersisted.then(() => healthModule.persistHealth(healthPath, current));
+  healthPersisted = write.catch(() => undefined);
+  await write;
   return current;
 }
 
@@ -65,7 +73,12 @@ async function evaluateOrNull(transactionName, ...arguments_) {
 }
 
 async function submit(transactionName, ...arguments_) {
-  return decodeJson(await runtime.contract.submitTransaction(transactionName, ...arguments_.map(String)));
+  const args = arguments_.map(String);
+  if (config.fabric.channelName === "insurance-dev-lite-190" && process.env.ORACLE_R2_DEMO === "true") {
+    return decodeJson(await submitGuardedOracleTransaction(runtime.contract, transactionName, args, fields =>
+      log("info", "Oracle transaction status", { requestId: args[0], ...fields })));
+  }
+  return decodeJson(await runtime.contract.submitTransaction(transactionName, ...args));
 }
 
 async function registryForRequest(request) {
@@ -106,15 +119,24 @@ async function submitCommitment(request, commitmentHash) {
 }
 
 async function waitForRevealPhase(requestId) {
-  for (;;) {
+  while (!stopping) {
     const request = await evaluate("ReadOracleRequest", requestId);
     const phase = protocol.oracleRequestPhase(request);
     if (phase === "FINALIZED") return request;
     if (await evaluateOrNull("ReadOracleResult", `${requestId}:${config.oracleId}`)) return request;
     if (phase === "REVEAL") return request;
     if (phase === "TIMED_OUT") return request;
-    await delay(config.pollIntervalMs);
+    await new Promise(resolve => {
+      const wake = () => {
+        clearTimeout(timer);
+        if (revealWaiters.get(requestId) === wake) revealWaiters.delete(requestId);
+        resolve();
+      };
+      const timer = setTimeout(wake, config.pollIntervalMs);
+      revealWaiters.set(requestId, wake);
+    });
   }
+  return null;
 }
 
 async function submitReveal(request, assessment, resultHash, salt) {
@@ -164,6 +186,20 @@ async function processRequest(requestId) {
   if ((!existingCommitment && Date.now() > Date.parse(request.commitDeadline)) || Date.now() > Date.parse(request.revealDeadline)) return;
   const currentClaim = await evaluate("ReadClaim", request.claimId);
   if (currentClaim.version !== request.claimVersion || currentClaim.currentOracleRequestId !== request.id) return;
+  if (request.protocolVersion === "v2") {
+    const processRequest = request.modelVersion === "fabric-xgb-synthetic-e3"
+      ? (await import("./e3-worker.mjs")).processE3Request
+      : (await import("./v2/worker.mjs")).processV2Request;
+    await processRequest({ request, claim: currentClaim, config, runtime, evaluate, evaluateOrNull, submit, retry, waitForRevealPhase,
+      saltFor: () => protocol.buildDeterministicSalt(runtime.privateKey, request.id, config.oracleId),
+      log: code => log("warn", "Oracle v2 evaluation disposition", { requestId, code }),
+    }).catch(error => {
+      const code = /^[A-Z_]+$/.test(error?.code ?? "") ? error.code : "V2_REQUEST_FAILED";
+      log("error", "Oracle v2 request stopped", { requestId, code });
+      if (Date.now() < Date.parse(request.revealDeadline)) throw new Error(code);
+    });
+    return;
+  }
   let shadowPacket;
   const decision = await pinnedDecision({
     directory: path.join(config.stateRoot, config.oracleId, "decisions"),
@@ -222,7 +258,16 @@ async function processRequest(requestId) {
       recordHash: request.privacyPresentationHash || "0".repeat(64),
     };
   }
-  assessment = routeModel({ snapshot: requestRegistry, request, claim, assessment });
+  try {
+    const sourceVerified = assessment.verified;
+    assessment = routeModel({ snapshot: requestRegistry, request, claim, assessment });
+    if (sourceVerified && !assessment.verified && !assessment.verificationCode.startsWith("XGB_REVIEW:")) {
+      log("warn", "Oracle model routing unavailable", { requestId, failureReason: assessment.verificationCode });
+    }
+  } catch (error) {
+    log("error", "Oracle model routing failed", { requestId, failureReason: "MODEL_ROUTING_EXCEPTION" });
+    throw error;
+  }
   if (shadow && assessment.result?.prepared && request.modelHash === evaluatorHash) {
     const records = requestRegistry.modelContext.records;
     const source = records.find(row => row.invoiceId === claim.hospitalInvoiceId && row.hospitalId === claim.hospitalId);
@@ -255,9 +300,10 @@ async function processRequest(requestId) {
   });
   if (await submitCommitment(request, commitmentHash)) {
     request = await waitForRevealPhase(request.id);
-    if (request.status === "PENDING" && Date.now() <= Date.parse(request.revealDeadline)) await submitReveal(request, assessment, resultHash, salt);
+    if (request?.status === "PENDING" && Date.now() <= Date.parse(request.revealDeadline)) await submitReveal(request, assessment, resultHash, salt);
   }
-  if (config.fabric.channelName === "insurance-dev-lite-190" && process.env.ORACLE_PROVIDER_SHADOW_RELEASE &&
+  if (stopping) return;
+  if (config.fabric.channelName === devLiteProfile.channel && process.env.ORACLE_PROVIDER_SHADOW_RELEASE &&
       process.env.ORACLE_PROVIDER_SHADOW_ARTIFACT && process.env.ORACLE_PROVIDER_SHADOW_CATALOG) {
     setImmediate(async () => {
       try {
@@ -279,7 +325,7 @@ async function processRequest(requestId) {
     }
   });
   await updateHealth({
-    status: "ONLINE",
+    status: inFlightRequests > 1 ? "PROCESSING" : "ONLINE",
     lastProcessedRequestId: request.id,
     lastProcessingLatencyMs: Date.now() - startedAt,
     lastError: null,
@@ -303,6 +349,19 @@ let cursor = await cursorModule.loadCursor(cursorPath, cursorIdentity, config.fa
 const healthServer = healthModule.startHealthServer(config.healthPort, healthState);
 await updateHealth({ status: "ONLINE", lastError: null });
 
+async function recordFinalizedExplanation(request) {
+  if (!request.resultHash || request.modelHash !== evaluatorHash || !request.assignedOracleIds.includes(config.oracleId)) return;
+  const result = await evaluateOrNull("ReadOracleResult", `${request.id}:${config.oracleId}`);
+  if (result?.resultHash !== request.resultHash || !/^XGB_(AUTO|REVIEW):/.test(result.verificationCode)) return;
+  const decision = await findPinnedDecision(path.join(config.stateRoot, config.oracleId, "decisions"), [
+    decisionIdentity(config, runtime.identityFingerprint, request),
+    ...historicalDecisionAliases(config, runtime.identityFingerprint, request),
+  ], runtime.privateKey);
+  if (decision?.resultHash === result.resultHash) {
+    await writeExplanationReceipt(config.stateRoot, request, config.oracleId, decision, result.verificationCode);
+  }
+}
+
 async function consumeEvents() {
   const checkpoint = cursor.transactionId ? {
     getBlockNumber: () => BigInt(cursor.nextBlock),
@@ -316,20 +375,46 @@ async function consumeEvents() {
     checkpoint,
     startBlock: BigInt(cursor.nextBlock),
   });
+  const operations = new Map();
+  const queue = new OrderedEvents(3, async event => {
+    if (event.eventName === "OracleVerificationRequested") {
+      const { id } = decodeJson(event.payload);
+      let task = operations.get(id);
+      if (!task) {
+        inFlightRequests++;
+        task = processRequest(id).finally(() => {
+          inFlightRequests--;
+          operations.delete(id);
+        });
+        operations.set(id, task);
+      }
+      await task;
+    }
+    if (event.eventName === "OracleRequestFinalized") {
+      const request = decodeJson(event.payload);
+      await operations.get(request.id);
+      await recordFinalizedExplanation(request);
+    }
+  }, async event => {
+    if (stopping) return;
+    const nextCursor = { nextBlock: Number(event.blockNumber), transactionId: event.transactionId };
+    await cursorModule.persistCursor(cursorPath, cursorIdentity, nextCursor);
+    cursor = nextCursor;
+    await updateHealth({ lastProcessedBlock: String(event.blockNumber) });
+  }, () => activeEvents?.close());
   try {
     for await (const event of activeEvents) {
       if (stopping) break;
-      if (event.eventName === "OracleVerificationRequested") {
-        const payload = decodeJson(event.payload);
-        await processRequest(payload.id);
+      if (event.eventName === "OracleCommitmentSubmitted") {
+        const { requestId } = decodeJson(event.payload);
+        revealWaiters.get(requestId)?.();
       }
-      cursor = { nextBlock: Number(event.blockNumber), transactionId: event.transactionId };
-      await cursorModule.persistCursor(cursorPath, cursorIdentity, cursor);
-      await updateHealth({ lastProcessedBlock: String(event.blockNumber) });
+      if (!await queue.offer(event)) break;
     }
   } finally {
     activeEvents?.close();
     activeEvents = undefined;
+    await queue.finish();
   }
 }
 
@@ -339,7 +424,12 @@ async function main() {
     registrySource: registry.sourceId,
     registryRootHash: registry.rootHash,
     healthPort: config.healthPort,
+    nodeVersion: process.version,
   });
+  if (process.env.FABRIC_DEMO_READ_ONLY === "true") {
+    await evaluate("GetSchemaVersion");
+    return;
+  }
   while (!stopping) {
     try {
       await consumeEvents();
@@ -357,6 +447,7 @@ async function shutdown(signal) {
   stopping = true;
   shutdownPromise = (async () => {
     activeEvents?.close();
+    for (const wake of revealWaiters.values()) wake();
     runtime.close();
     await updateHealth({ status: "STOPPED", lastError: null }).catch(() => undefined);
     await new Promise((resolve) => healthServer.close(resolve));

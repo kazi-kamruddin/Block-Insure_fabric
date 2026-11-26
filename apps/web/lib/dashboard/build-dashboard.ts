@@ -1,4 +1,5 @@
 import type { FabricRole } from "@/lib/fabric/config";
+import { visibleDecisions } from "@/lib/fabric/vote-visibility";
 import type {
   BankMandate,
   BankAccountReference,
@@ -152,7 +153,7 @@ export function buildRoleDashboard(
         commandLabel: policy.status === "ACTIVE" ? "Prepare claim" : "Manage coverage",
         command: policy.status === "ACTIVE" ? {
           operation: "submitClaim", id: `claim-${Date.now()}`, policyId: policy.id, hospitalId: "hospital-demo",
-          hospitalInvoiceId: "", amountMinor: 250000, incidentDate: new Date().toISOString().slice(0, 10), descriptionHash: "a".repeat(64),
+          hospitalInvoiceId: "", amountMinor: 8500000, incidentDate: new Date(Date.now() + 6 * 3_600_000).toISOString().slice(0, 10), descriptionHash: "a".repeat(64),
         } : { operation: "requestBankMandate", policyId: policy.id },
         })),
       ],
@@ -196,7 +197,7 @@ export function buildRoleDashboard(
 
   if (role === "auditor") {
     const decidedReviewIds = new Set(decisions.filter((decision) => decision.auditorId === subjectId).map((decision) => decision.reviewId));
-    const ownDecisions = decisions.filter((decision) => decision.auditorId === subjectId);
+    const ownDecisions = visibleDecisions(decisions.filter((decision) => decision.auditorId === subjectId), reviews, { role, subjectId });
     const finalizedById = new Map(reviews.filter((review) => ["APPROVED", "REJECTED"].includes(review.status)).map((review) => [review.id, review.status]));
     const alignedDecisions = ownDecisions.filter((decision) =>
       (decision.outcome === "APPROVE" && finalizedById.get(decision.reviewId) === "APPROVED")
@@ -218,7 +219,7 @@ export function buildRoleDashboard(
       queue: queue.map((review) => ({
         id: review.id,
         title: review.claimId,
-        detail: `Round ${review.round} · ${review.approvals}/${review.approvalThreshold} approve · ${review.rejections}/${review.rejectionThreshold} reject`,
+        detail: `Round ${review.round} · Votes sealed until the round closes`,
         status: review.status,
         commandLabel: "Prepare decision",
         command: {
@@ -249,7 +250,7 @@ export function buildRoleDashboard(
       description: "Operate the connected Bank simulation: maintain balances, approve EFT mandates, and process deterministic premium debits.",
       metrics: [
         { label: "Bank action queue", value: queue.length, hint: "mandates, collections, and payouts" },
-        { label: "Customer balances", value: bankAccounts.filter((item) => item.accountType === "CUSTOMER").reduce((sum, item) => sum + item.balanceMinor, 0) / 100, hint: "BDT across verified demo accounts" },
+        { label: "Customer balances", value: bankAccounts.filter((item) => item.accountType === "CUSTOMER").reduce((sum, item) => sum + item.balanceMinor, 0) / 100, hint: "BDT across verified customer accounts" },
         { label: "Settled / bounced", value: bankTransfers.filter((item) => item.status === "SETTLED").length, hint: `${bankTransfers.filter((item) => item.status === "BOUNCED").length} bounced for insufficient funds` },
       ],
       queueTitle: "Mandates, collections, and payouts",

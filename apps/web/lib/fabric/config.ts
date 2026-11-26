@@ -126,7 +126,7 @@ export function resolveRoleProfile(role: FabricRole, config: FabricConfig) {
   };
 }
 
-const auditorIdentityNames = new Set(["auditor1", "auditor2", "auditor3", "auditor4"]);
+const auditorIdentityNames = new Set(["auditor1", "auditor2", "auditor3", "auditor4", "auditor5", "auditor6"]);
 const devLitePeerPorts = { insurerAdmin: 31051, policyholder: 31051, hospitalOfficer: 31151, auditor: 31251, bankOfficer: 31351 };
 
 function rolePeerPort(role: FabricRole, config: FabricConfig) {

@@ -97,27 +97,27 @@ function oracleConsensus(workerCount, request = baseRequest, inputClaim = claim)
 const configurations = [
   {
     id: "centralized",
-    label: "Centralized trusted verifier",
+    label: "Centralized trusted verifier (single evaluator)",
     operation() { return assess(); },
   },
   {
     id: "oracle-1-of-1",
-    label: "Single Oracle (1-of-1)",
+    label: "1-of-1 threshold (single evaluator)",
     operation() { return oracleConsensus(1); },
   },
   {
     id: "oracle-2-of-2",
-    label: "Unanimous Oracles (2-of-2)",
+    label: "2-of-2 threshold (single evaluator)",
     operation() { return oracleConsensus(2); },
   },
   {
     id: "oracle-2-of-3",
-    label: "Fault-tolerant Oracles (2-of-3)",
+    label: "2-of-3 threshold (single evaluator)",
     operation() { return oracleConsensus(3); },
   },
   {
     id: "oracle-2-of-3-private",
-    label: "2-of-3 with selective disclosure",
+    label: "2-of-3 with selective disclosure (single evaluator)",
     operation() {
       for (let index = 0; index < 3; index += 1) {
         const proof = verifySelectiveDisclosurePresentation({
@@ -265,7 +265,9 @@ const report = {
     orderStrategy: "balanced cyclic rotation",
     timer: "process.hrtime.bigint",
     confidenceInterval: "normal approximation over independent trial means (95%)",
-    scope: "Oracle decision, binding, threshold, and optional selective-disclosure computation; excludes Fabric network and storage latency",
+    assessmentMode: "single-evaluator",
+    registryAssessmentsPerOperation: 1,
+    scope: "Single-evaluator in-process registry assessment, binding, threshold, and optional selective-disclosure computation. Threshold profiles reuse one assessed result. Fabric network and storage costs are outside the timer",
   },
   inputSha256,
   summary,
@@ -275,12 +277,13 @@ const report = {
 
 await fs.mkdir(outputDirectory, { recursive: true });
 await fs.writeFile(path.join(outputDirectory, "latest.json"), `${JSON.stringify(report, null, 2)}\n`);
-const csvHeader = "configuration,repetitions,total_operations,mean_latency_us,median_latency_us,p95_latency_us,latency_ci_lower_us,latency_ci_upper_us,mean_throughput_ops_s,throughput_ci_lower,throughput_ci_upper,cpu_user_ms_per_1000_ops,mean_process_cpu_utilization_percent,latency_overhead_vs_centralized,throughput_relative_to_centralized_percent";
+const csvHeader = "configuration,repetitions,total_operations,mean_latency_us,median_latency_us,p95_latency_us,latency_ci_lower_us,latency_ci_upper_us,mean_throughput_ops_s,throughput_ci_lower,throughput_ci_upper,cpu_user_ms_per_1000_ops,mean_process_cpu_utilization_percent,latency_overhead_vs_centralized,throughput_relative_to_centralized_percent,assessment_mode";
 const csvRows = summary.map((item) => [
   item.configuration, item.repetitions, item.totalOperations, item.meanLatencyUs, item.medianLatencyUs,
   item.p95LatencyUs, item.trialMeanLatency95CiUs.lower, item.trialMeanLatency95CiUs.upper,
   item.meanThroughputOpsPerSecond, item.throughput95Ci.lower, item.throughput95Ci.upper,
   item.meanCpuUserMsPer1000Operations, item.meanProcessCpuUtilizationPercent, item.latencyOverheadVsCentralized, item.throughputRelativeToCentralizedPercent,
+  report.design.assessmentMode,
 ].join(","));
 await fs.writeFile(path.join(outputDirectory, "latest.csv"), `${[csvHeader, ...csvRows].join("\n")}\n`);
 const markdown = [

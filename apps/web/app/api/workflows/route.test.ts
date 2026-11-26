@@ -13,7 +13,17 @@ function request(extra: Record<string, string> = {}) {
 }
 beforeEach(() => {
   vi.resetAllMocks(); vi.stubEnv("FABRIC_CHANNEL_NAME", "insurance-recovery-test");
+  vi.stubEnv("FABRIC_LEDGER_INSTANCE_ID", "");
   vi.mocked(currentSession).mockResolvedValue({ accountId: "policyholder-1", subjectId: "policyholder1", role: "policyholder", issuedAt: 0, expiresAt: 9999999999 });
+});
+it("refuses recovery against a changed provisioning ID on the same channel", async () => {
+  const current = "a".repeat(64);
+  vi.stubEnv("FABRIC_LEDGER_INSTANCE_ID", current);
+  expect((await POST(request({ "x-workflow-ledger-instance": "b".repeat(64) }))).status).toBe(409);
+  expect((await POST(request())).status).toBe(409);
+  expect(runRecoverableOperation).not.toHaveBeenCalled();
+  vi.mocked(runRecoverableOperation).mockResolvedValue({ state: "COMMITTED" });
+  expect((await POST(request({ "x-workflow-ledger-instance": current }))).status).toBe(200);
 });
 it("rejects unauthenticated, cross-site and wrong-deployment recovery before executing a ledger command", async () => {
   vi.mocked(currentSession).mockResolvedValueOnce(null);

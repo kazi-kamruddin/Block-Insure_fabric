@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "check:xgboost": "node scripts/check-xgboost.mjs",
-    "check": "node --check src/index.mjs && node --check src/config.mjs && node --check src/environment.mjs && node --check src/gateway.mjs && node --check src/health.mjs && node --check src/protocol.mjs && node --check src/registry.mjs && node --check src/hybrid-adapter.mjs && node --check src/threshold-model.mjs && node --check src/cursor.mjs && node --check src/retry.mjs && node --check src/state-file.mjs && node --check scripts/build-hybrid-registries.mjs && node --check scripts/evaluate-consensus.mjs",
+    "check": "node --check src/index.mjs && node --check src/config.mjs && node --check src/environment.mjs && node --check src/gateway.mjs && node --check src/health.mjs && node --check src/protocol.mjs && node --check src/registry.mjs && node --check src/hybrid-adapter.mjs && node --check src/threshold-model.mjs && node --check src/cursor.mjs && node --check src/retry.mjs && node --check src/state-file.mjs && node --check src/ordered-events.mjs && node --check src/decision-store.mjs && node --check scripts/build-hybrid-registries.mjs && node --check scripts/evaluate-consensus.mjs && node --check scripts/export-receipts.mjs",
     "build:hybrid-registries": "node scripts/build-hybrid-registries.mjs",
     "build:hybrid-comparison": "node scripts/hybrid-comparison.mjs",
     "verify:hybrid-archive": "node scripts/hybrid-comparison.mjs --verify-archive",
@@ -14,6 +14,6 @@
     "start": "node src/index.mjs"
   },
   "engines": {
-    "node": ">=20.9.0"
+    "node": "24.x"
   }
 }

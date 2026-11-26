@@ -6,6 +6,7 @@ const sessionPayloadSchema = z.object({
   accountId: z.string().min(1),
   role: z.enum(fabricRoles),
   subjectId: z.string().min(1).optional(),
+  sessionId: z.string().uuid().optional(),
   issuedAt: z.number().int().nonnegative(),
   expiresAt: z.number().int().positive(),
 });
@@ -17,7 +18,7 @@ function signature(payload: string, secret: string) {
 }
 
 export function createSessionToken(
-  identity: Pick<Session, "accountId" | "role" | "subjectId">,
+  identity: Pick<Session, "accountId" | "role" | "subjectId" | "sessionId">,
   secret: string,
   ttlSeconds: number,
   now = Date.now(),

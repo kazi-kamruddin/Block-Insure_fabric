@@ -55,7 +55,7 @@ func (c *Contract) CreatePartnerAgreement(
 			return nil, fmt.Errorf("an active or suspended %s agreement already exists for %s", partnerType, partnerID)
 		}
 	}
-	now, err := timestamp(ctx)
+	now, err := ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -91,7 +91,7 @@ func (c *Contract) SetPartnerAgreementStatus(ctx contractapi.TransactionContextI
 		return nil, fmt.Errorf("agreement %s is already ended", id)
 	}
 	agreement.Status = status
-	agreement.UpdatedAt, err = timestamp(ctx)
+	agreement.UpdatedAt, err = ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -113,11 +113,11 @@ func (c *Contract) ListPartnerAgreements(ctx contractapi.TransactionContextInter
 }
 
 func (c *Contract) requireActivePartner(ctx contractapi.TransactionContextInterface, partnerType, partnerID string) (*PartnerAgreement, error) {
-	today, err := transactionDate(ctx)
+	// Agreements run on the Asia/Dhaka business calendar like every other date.
+	asOf, err := ledgerBusinessDate(ctx)
 	if err != nil {
 		return nil, err
 	}
-	asOf := today.Format("2006-01-02")
 	agreements, err := c.ListPartnerAgreements(ctx)
 	if err != nil {
 		return nil, err
@@ -187,7 +187,7 @@ func (c *Contract) ConfigurePolicyPackagePartners(ctx contractapi.TransactionCon
 	policyPackage.HospitalIDs = hospitalIDs
 	policyPackage.BankIDs = bankIDs
 	policyPackage.Version++
-	policyPackage.UpdatedAt, err = timestamp(ctx)
+	policyPackage.UpdatedAt, err = ledgerTimestamp(ctx)
 	if err != nil {
 		return nil, err
 	}
