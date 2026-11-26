@@ -102,7 +102,11 @@ func (c *Contract) CommitAuditorVote(ctx contractapi.TransactionContextInterface
 	if err != nil {
 		return nil, err
 	}
-	if !now.Before(deadline) {
+	// The first revealed vote closes sealing in ledger state, so the ±15 s
+	// timestamp tolerance cannot admit a ballot chosen after seeing a vote.
+	// CommitmentsCast++ below writes the same review key, so MVCC serializes
+	// a racing reveal.
+	if !now.Before(deadline) || review.VotesCast > 0 {
 		return nil, fmt.Errorf("panel commitment deadline has elapsed")
 	}
 	if _, err := currentMedicalHead(ctx, claim); err != nil {

@@ -27,11 +27,15 @@ claim automatically. Cases requiring review use a four-person panel with
 three approvals or two rejections. Bank settlement uses simulated BDT and
 checks the current version's approval certificate.
 
-The retained definition is chaincode 1.9.0 at lifecycle sequence 3,
-package `a5992983…5878`. A single shared ccaas process serves the peers.
-DEMO revision 1, E3 routing and the six-auditor roster are active. R2 adds
-sealed votes, Auditor-peer disclosure, three-share audit sampling and
-certificate v3. S-B is simulated regulator data. [Dated R2 evidence](docs/results/r2-journeys-2026-11-26.md)
+The retained definition is chaincode 1.9.0 at lifecycle sequence 4,
+package `7240d4c0…82b1` (binary `398ee940…e344`). A single shared ccaas
+process serves the peers. DEMO revision 1, E3 routing and the six-auditor
+roster are active. R2 adds sealed votes, Auditor-peer disclosure,
+three-share audit sampling and certificate v3. Sequence 4 adds one protocol
+guarantee: once any Oracle result or panel vote is revealed, no further
+sealed commitment is accepted, whatever the proposal timestamp. S-B is
+simulated regulator data. [Dated R2 evidence](docs/results/r2-journeys-2026-11-26.md) ·
+[Sequence 4 record](docs/results/session-c-2026-11-26.md)
 
 [Deployment provenance](docs/provenance.md) · [Dev-lite runbook](docs/dev-lite-medical.md) · [R2 design](docs/oracle-v2/R2-DESIGN.md) · [Defence checklist](docs/defence-checklist.md) · [Historical deployments](docs/archive/README.md)
 

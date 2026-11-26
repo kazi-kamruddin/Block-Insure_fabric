@@ -557,7 +557,8 @@ func (c *Contract) SubmitOracleCommitment(ctx contractapi.TransactionContextInte
 		return nil, fmt.Errorf("read transaction timestamp: %w", err)
 	}
 	deadline, _ := time.Parse(time.RFC3339, request.CommitDeadline)
-	if txTime.After(deadline) {
+	// As in v2, the first reveal ends the commit phase regardless of clock tolerance.
+	if txTime.After(deadline) || request.RevealCount > 0 {
 		return nil, fmt.Errorf("Oracle request %s commit phase has ended", requestID)
 	}
 	now, err := ledgerTimestamp(ctx)

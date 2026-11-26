@@ -59,7 +59,8 @@ function Start-OwnedContainer([string]$Service, $Record) {
 function Start-Ccaas($Runtime, $Record) {
     $imageId = & docker image inspect $Runtime.image --format '{{.Id}}'
     if ($LASTEXITCODE -or $imageId -notmatch '^sha256:[a-f0-9]{64}$') { throw 'The pinned ccaas image is absent from the local cache.' }
-    if (-not (Get-Containers)[$Runtime.service]) {
+    $create = {
+        param([string]$Mode)
         $savedId = $env:DEV_LITE_CCAAS_PACKAGE_ID
         $savedData = $env:DEV_LITE_DATA_DIR
         $savedProject = $env:DEV_LITE_COMPOSE_PROJECT
@@ -68,7 +69,7 @@ function Start-Ccaas($Runtime, $Record) {
             $env:DEV_LITE_DATA_DIR = 'dev-lite'
             $env:DEV_LITE_COMPOSE_PROJECT = $project
             & docker compose --project-name $project --file (Join-Path $root 'network/compose/compose-dev-lite.yaml') --profile ccaas `
-                create --no-build --no-recreate --pull never $Runtime.service | Out-Null
+                create --no-build $Mode --pull never $Runtime.service | Out-Null
             if ($LASTEXITCODE) { throw 'Could not create the pinned ccaas service from the cached image.' }
         } finally {
             $env:DEV_LITE_CCAAS_PACKAGE_ID = $savedId
@@ -76,11 +77,23 @@ function Start-Ccaas($Runtime, $Record) {
             $env:DEV_LITE_COMPOSE_PROJECT = $savedProject
         }
     }
+    if (-not (Get-Containers)[$Runtime.service]) { & $create '--no-recreate' }
     $existing = (Get-Containers)[$Runtime.service]
     if (-not $existing) { throw 'The ccaas service container is missing.' }
     $environment = @(& docker inspect --type container --format '{{range .Config.Env}}{{println .}}{{end}}' $existing.Id)
-    if ($LASTEXITCODE -or "CHAINCODE_ID=$($Runtime.packageId)" -notin $environment) {
-        throw 'The retained ccaas container is bound to a different package ID.'
+    if ($LASTEXITCODE) { throw 'Could not inspect the ccaas service container.' }
+    if ("CHAINCODE_ID=$($Runtime.packageId)" -notin $environment) {
+        # After a lifecycle upgrade the stopped chaincode server still carries the
+        # previous package ID. It is stateless (one read-only binary mount, no
+        # volumes), so recreate it only while stopped; never replace a running one.
+        $running = & docker inspect --type container --format '{{.State.Running}}' $existing.Id
+        if ($LASTEXITCODE -or $running -ne 'false') { throw 'The retained ccaas container is bound to a different package ID.' }
+        & $create '--force-recreate'
+        $existing = (Get-Containers)[$Runtime.service]
+        $environment = @(& docker inspect --type container --format '{{range .Config.Env}}{{println .}}{{end}}' $existing.Id)
+        if ($LASTEXITCODE -or "CHAINCODE_ID=$($Runtime.packageId)" -notin $environment) {
+            throw 'The recreated ccaas container is bound to a different package ID.'
+        }
     }
     $containerImage = & docker inspect --type container --format '{{.Image}}' $existing.Id
     if ($LASTEXITCODE -or $containerImage -ne $imageId) { throw 'The retained ccaas container uses a different image.' }

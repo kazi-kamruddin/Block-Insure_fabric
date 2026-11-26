@@ -7,7 +7,9 @@ readback. Use one network and three Oracle subjects.
 Start the production demo from the Fabric checkout with
 `powershell -ExecutionPolicy Bypass -File .\scripts\r2-demo.ps1 Start`.
 The web app opens at `http://127.0.0.1:3219/workspace`. Confirm sequence
-3, DEMO, and three Oracle workers in the launcher status.
+4, DEMO, and three Oracle workers in the launcher status. Sequence 4
+(26 November) adds the commit-before-reveal guard and keeps every record
+below. [Session C record](results/session-c-2026-11-26.md)
 
 [Scenario cookbook](scenario-cookbook.md) · [Dev-lite runbook](dev-lite-medical.md) · [Session A live record](results/r2-journeys-2026-11-26.md)
 

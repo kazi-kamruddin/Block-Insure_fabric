@@ -34,6 +34,8 @@ valid opening of an assigned commitment. Wall-clock timing, identities,
 private data, funds outside the policy and eligibility checks are outside
 this model.
 
+`SealBallot` requires `stage = "COMMIT"`, so the model never seals after a reveal. From sequence 4 the chaincode enforces the same order in state: `CommitAuditorVote` is refused once `VotesCast > 0`, whatever the proposal timestamp. See [R2 design: phase order](../../docs/oracle-v2/R2-DESIGN.md#phase-order-under-clock-tolerance-sequence-4).
+
 The liveness configuration weakly requires Oracle timeout or claimant
 escalation when continuously eligible. It also assumes the audit seed
 eventually becomes available to the resolver, the Insurer eventually

@@ -53,6 +53,10 @@ const PENDING_STATES = new Set([
   "UPHELD",
   "MEDIUM",
   "INCONCLUSIVE",
+  // Chaincode status for "the Oracles did not auto-approve". The agreed Oracle
+  // decision (panel review or integrity issue) routes the claim onwards, so it
+  // is not a terminal failure. The ledger value is kept for compatibility.
+  "ORACLE_FAILED",
 ]);
 
 const REJECTED_STATES = new Set([
@@ -67,7 +71,6 @@ const REJECTED_STATES = new Set([
   "TIMED_OUT",
   "FAILED",
   "PAYMENT_FAILED",
-  "ORACLE_FAILED",
   "ACCESS_FAILED",
   "PROCEDURAL_FAILURE",
   "UNHEALTHY",
@@ -168,6 +171,7 @@ export function StatusBadge({
     escalated_timeout: "Claim escalated after Oracle timeout",
     model_held: "Model on hold",
     medical_audit_pending: "Held for random audit sampling",
+    oracle_failed: "Oracle did not auto-approve",
   };
   const display = label ?? labels[statusSlug] ?? status.replaceAll("_", " ");
   return (

@@ -14,6 +14,7 @@ export function MedicalAuditPeriod({ organization, canCreate }: { organization: 
   const [period, setPeriod] = useState<Period>();
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
+  const [heldClaim, setHeldClaim] = useState("");
   const endpoint = "/api/medical/audit-period";
   const storageKey = `block-insure:audit-share:${organization}:${id.trim()}`;
   async function read() {
@@ -35,6 +36,13 @@ export function MedicalAuditPeriod({ organization, canCreate }: { organization: 
     if (!response.ok) throw new Error(body.message);
     setStatus("Action confirmed.");
     await read();
+  }
+  async function resolveHeld() {
+    const response = await fetch(endpoint, { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "resolve", id: heldClaim.trim() }) });
+    const body = await response.json();
+    if (!response.ok) throw new Error(body.message);
+    setStatus("Audit selection resolved. Open the claim to see whether it was sampled for the panel.");
   }
   async function commit() {
     let share = localStorage.getItem(storageKey);
@@ -69,6 +77,11 @@ export function MedicalAuditPeriod({ organization, canCreate }: { organization: 
       <label>Reveal grace in minutes<input type="number" name="grace" min={1} max={10080} required /></label>
       <button className="primary button" disabled={busy || !id.trim()}>Propose period</button>
     </form>}
+    {canCreate && <div className="medicalSubpanel">
+      <p>After the reveal deadline, resolve each held claim. A sampled or defaulted claim goes to panel preparation; the rest continue to settlement.</p>
+      <label>Held claim ID<input value={heldClaim} onChange={event => setHeldClaim(event.target.value)} /></label>
+      <button type="button" className="secondary button" disabled={busy || !heldClaim.trim()} onClick={() => run(resolveHeld)}>Resolve audit selection</button>
+    </div>}
     {period && <>
       <p>{period.status} · {period.rateBps / 100}% sample · Ends {period.endsAt}</p>
       <p>Reveal deadline {period.graceEndsAt} · Defaulted panel referrals {period.panelLoad ?? 0}</p>

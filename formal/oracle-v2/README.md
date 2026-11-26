@@ -23,6 +23,8 @@ fairness of both deadline transitions. This abstracts eventual clock progress
 and a permitted deadline finalization being submitted and committed. Worker
 participation itself is optional.
 
+The single `stage` variable is the model's phase boundary. The chaincode has no such field: each transaction reads the phase from its proposal timestamp, which may differ from the peer clock by up to 15 s. From sequence 4, a commitment is also refused once any reveal is recorded, so the first reveal acts as the stage switch and the implementation cannot admit a `Commit` after a `Reveal`. Before sequence 4 that ordering was not enforced, and a backdated commitment could follow a reveal. See [R2 design: phase order](../../docs/oracle-v2/R2-DESIGN.md#phase-order-under-clock-tolerance-sequence-4).
+
 The model abstracts successful authentication and evidence checks into the
 representative vectors. It omits issuer signature arithmetic, lineage graphs,
 revocation and Fabric ordering. The panel outcome and settlement are covered

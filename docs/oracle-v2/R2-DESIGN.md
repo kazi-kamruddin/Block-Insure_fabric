@@ -50,6 +50,19 @@ InsurerMSP proposes a named REAL or DEMO profile for `insurance-dev-lite-190`. A
 | Appeal-note disposal | Retention | 365 d | 365 d |
 | Peer ledger-clock tolerance | Clock | 15 s | 15 s |
 
-The unchanged 15 s proposal tolerance equals the DEMO Oracle commit window. The phase guards compare with the accepted proposal timestamp during endorsement. Treat DEMO timing as a rehearsal setting. The pre-freeze audit leaves a strict peer-observed phase boundary open for a sequence-4 design. [Dated R2 run](../results/r2-journeys-2026-11-26.md#pre-freeze-readback)
+### Phase order under clock tolerance (sequence 4)
+
+Every chaincode clock reads the transaction proposal timestamp through `ledgerNow`, which refuses a timestamp more than 15 s from the endorsing peer's wall clock. The tolerance is unchanged in both profiles because it absorbs ordinary skew between hosts, not workflow time.
+
+Up to sequence 3 each sealed-value transaction derived its phase only from that timestamp. A proposal could therefore be backdated by up to 15 s. The pre-freeze audit (26 November 2026) found that this let a subject that had withheld its sealed value submit one after another subject's value was already public:
+
+- **Oracle v2 and v1.** `SubmitOracleCommitmentV2` and `SubmitOracleCommitment` checked only `now ≤ CommitDeadline`, while reveals open once the deadline passes. A withheld worker could copy a revealed fact vector into a fresh commitment and create a false 2-of-3 when the two honest workers disagree. This held in REAL as well as DEMO; DEMO only made it more visible because 15 s is the whole DEMO commit window.
+- **Sealed panel ballots.** `CommitAuditorVote` had the same shape, so an auditor who had not sealed could seal after a vote was revealed. That defeats the anti-herding purpose of sealing. Practical exposure was lower, because auditor identities stay behind the Gateway, which sets proposal timestamps.
+
+Sequence 4 closes the phase in ledger state rather than in time. A commitment is refused once `RevealCount > 0`; a ballot is refused once `VotesCast > 0`. Each commit transaction already reads and writes the same request or review key that the first reveal writes, so Fabric's MVCC validation serialises a racing commit and reveal: in any block at most one of them is valid against the version both read. The first reveal is therefore the state switch that the TLA+ models represent with a single `stage` variable ([Oracle v2 model](../../formal/oracle-v2/README.md), [sealed panel model](../../formal/medical-certificate/README.md)). After this change the implementation follows the modelled order: no sealed value can enter after any value has been opened.
+
+One effect of the tolerance remains, and it concerns liveness only. A reveal whose timestamp is ahead of real time could open the reveal phase up to 15 s early once all commitments have arrived or the shifted deadline has passed. That can exclude a slow honest worker or auditor, who then counts as absent. The remaining two Oracle workers still decide by exact agreement, and an absent auditor abstains under the existing expiry rules. Integrity, meaning which values may count, is not affected.
+
+Evidence: [`late_commit_guard_test.go`](../../chaincode/insurance-contract/src/late_commit_guard_test.go) reproduces the backdated late commitment for v2, v1 and sealed ballots. All three tests failed against the sequence-3 source and pass against sequence 4. A fourth test shows that a tolerated commitment before any reveal still counts. [Session C record](../results/session-c-2026-11-26.md)
 
 Oracle requests store their commit and reveal deadlines with the profile. Reviews keep the profile through voting, standby replacement, and closure. The final model approval records `activationEligibleAt` for that governance round. Earlier records fall back to REAL, including the existing failure on claim 206. Certificates v3 bind the decisive review or Oracle request profile into the digest. The dossier checks each stamped review, the Oracle v2 deadlines, and the certificate profile, including against independent readback when required.

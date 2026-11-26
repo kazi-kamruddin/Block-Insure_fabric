@@ -179,7 +179,11 @@ func (c *Contract) SubmitOracleCommitmentV2(ctx contractapi.TransactionContextIn
 		return nil, err
 	}
 	deadline, err := time.Parse(time.RFC3339Nano, request.CommitDeadline)
-	if err != nil || now.After(deadline) {
+	// The first reveal closes the commit phase in ledger state. The ±15 s
+	// timestamp tolerance can then never admit a commitment chosen after
+	// another subject's fact vector became public. CommitmentCount++ below
+	// writes the same request key, so MVCC serializes a racing reveal.
+	if err != nil || now.After(deadline) || request.RevealCount > 0 {
 		return nil, fmt.Errorf("Oracle commit phase has ended")
 	}
 	key, err := ctx.GetStub().CreateCompositeKey("oracleCommitmentHash", []string{requestID, commitmentHash})

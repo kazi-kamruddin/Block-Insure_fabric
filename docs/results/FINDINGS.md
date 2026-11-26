@@ -1,4 +1,25 @@
-# Fabric 1.9.0 maintenance findings
+# Fabric 1.9.0 findings
+
+## Pre-freeze audit and Session C — 26 November 2026 (Asia/Dhaka)
+
+The pre-freeze audit (Codex, then an independent architect review) checked the whole repository against the live ledger before the thesis freeze. Its findings and their outcomes are listed here. IDs carry a `PF-` prefix so they do not collide with the 20 November IDs further down.
+
+| ID | Finding | Outcome |
+| --- | --- | --- |
+| PF-01 | Oracle v2 and v1 commitments were gated only by the proposal timestamp, which may lag the peer clock by up to 15 s. A withheld worker could therefore commit a copied fact vector after another worker's reveal, creating a false 2-of-3. Present in REAL and DEMO timing. | **Fixed in sequence 4.** A commitment is refused once `RevealCount > 0`. The reproducing tests fail on sequence-3 source and pass on sequence 4. [Record](session-c-2026-11-26.md) |
+| PF-02 | Sealed panel ballots had the same shape: an auditor could seal after another vote was revealed. Lower exposure, because auditor keys stay behind the Gateway. | **Fixed in sequence 4.** A ballot is refused once `VotesCast > 0`. |
+| PF-03 | The TLA+ models order phases with a single `stage` variable, which the sequence-3 code did not enforce. The model checks therefore did not yet bind the implementation. | **Resolved by PF-01/PF-02.** The first reveal is now the state switch, and both model READMEs document the refinement. |
+| PF-04 | `ORACLE_FAILED`, the ledger status for "not auto-approved", appeared as a red failure even when the Oracles agreed to refer the claim to the panel. | **Fixed in the UI.** The badge reads "Oracle did not auto-approve" in the pending tone. The ledger value is unchanged. |
+| PF-05 | The per-claim audit resolver had an API action but no workspace control. | **Fixed.** The Insurer's audit card has **Resolve audit selection**. |
+| PF-06 | The altered-byte disclosure refusal (U13) was proven only in Go. | **Closed live.** A one-bit change was refused on the sequence-4 Insurer peer, evaluate-only. |
+| PF-07 | The claimant escalation of a defaulted audit hold had no test. | **Go test added.** The live run is left to the owner. |
+| PF-08 | Ignore rules covered known `data/` subfolders but not new ones or root `backups/`. | **Fixed** with catch-all patterns; nothing under `data/` was tracked. |
+| PF-09 | Full-stack memory sits near the floors: 631–750 MB at health, 967 MB warmed against a 1,000 MB target. | **Accepted.** Close other applications before writes; the launcher and lifecycle runner enforce the floors. |
+| PF-10 | Four Next.js build warnings about dynamic filesystem tracing (OTP store, event root, worker health root). | **Accepted.** The build succeeds and no credential directory is bundled. Changing tracing roots across profiles was riskier than the warning. |
+| PF-11 | The publisher's direct and mirror ports are duplicated between the web client and the supervisor profile. | **Accepted.** Both copies match. |
+| PF-12 | The 20 November F01 (early votes visible in the unrestricted decision listing) | **Superseded for R2 reviews.** Sealed ballots record a decision only at reveal, after sealing has closed. Legacy unsealed reviews keep the original limitation. |
+
+## 20 November 2026 maintenance findings (historical)
 
 Recorded on 20 November 2026, Asia/Dhaka.
 

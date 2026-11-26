@@ -72,7 +72,7 @@ foreach ($file in 'enrollment-complete','app-secrets.json') {
     else { Report "data/dev-lite/$file" $(if ($file -eq 'app-secrets.json' -and -not $R2Demo) { 'WARN' } else { 'FAIL' }) 'Missing' }
 }
 $backups = @(Get-ChildItem -LiteralPath (Join-Path $state 'backups') -Directory -ErrorAction SilentlyContinue |
-    Where-Object { -not $R2Demo -or $_.Name -like '*-pre-r2*' } | Sort-Object Name)
+    Where-Object { -not $R2Demo -or $_.Name -like '*-pre-r2*' -or $_.Name -like '*-pre-seq*' } | Sort-Object Name)
 if ($backups.Count) { Report 'Volume backup' 'PASS' "Latest: $($backups[-1].Name)" } else { Report 'Volume backup' 'WARN' 'No backup under data/dev-lite/backups' }
 if ($R2Demo) {
     $runtime = & {

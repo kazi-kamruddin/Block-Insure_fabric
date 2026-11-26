@@ -119,3 +119,11 @@ MEMORY.md
 *.handoff.md
 /data/dev-lite/
 /data/dev-lite-couchdb/
+
+# Catch-all for runtime state, added at the 26 November 2026 freeze.
+# No file under data/ is tracked; ledgers, identities, OTP stores, evidence and
+# package artifacts must stay local. The per-namespace rules above stay as history.
+/data/
+/backups/
+*.backup.tar
+*.backup.tar.gz

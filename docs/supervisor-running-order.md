@@ -1,9 +1,54 @@
 # Supervisor running order (dev-lite 1.9.0)
 
+## Current order — R2 on sequence 4 (from 26 November 2026)
+
+Use this section for the meeting. The older order further down reflects the 24 November baseline: an INPATIENT claim approved automatically through the v1 registry path. On the current ledger, Oracle v2 handles DIAGNOSTIC claims with signed sources, so that order no longer applies as written.
+
+**Before the meeting.** Close heavy programs, especially browsers with many tabs, and keep at least 2 GB free on drive C. Docker Desktop must be running. From the Fabric checkout:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\r2-demo.ps1 Start
+```
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\r2-demo.ps1 Status
+```
+
+Wait for `Status : HEALTHY`, `ExpectedSequence : 4`, `TimingProfile : DEMO`, three workers, `AdapterListeners : 6/6` and `BusinessMemoryReady : True`. Writes are refused below 700 MB available, so if the flag is `False`, close something and check again. To enrol a new customer, stop and start with `-Onboarding`. That also starts the Insurer CA, which uses more memory. Open `http://127.0.0.1:3219/workspace`: the customer in a private window, staff in a normal window.
+
+**Twenty-five minute order.**
+
+| # | Segment | Who and where | What it shows |
+| --- | --- | --- | --- |
+| 1 | Network and identity | Show `Status`, then the Insurer **Overview** | Five organisations, one orderer, sequence 4 on every peer; the Gateway holds the Fabric keys, the browser never does |
+| 2 | Policy and premium | Customer **Policies** and **Payments** (an existing ACTIVE diagnostic policy, or a new customer) | Terms digest on the ledger; EFT mandate or OTP premium; cover follows paid periods |
+| 3 | Hospital facts | Chattogram Hospital **Patient billing → Save patient intake** (DIAGNOSTIC); Insurer **Customers → Resolve association** | The Hospital records facts only; only the Insurer links an episode to a customer |
+| 4 | Claim | Customer **Claims → Prepare claim and calculate reimbursement → Accept statement and submit claim**; optional receipt under **Documents** and **Confirm receipt details** | The payable amount comes from the issued terms; private facts go to the collection, not the public ledger |
+| 5 | Three Oracles | Insurer **Claims → Start claim processing → Submit verified transaction**, then refresh | The publisher signs S-A and S-C feeds; three workers commit then reveal; two exact matches decide. In DEMO the windows are 15 s then 30 s |
+| 6 | Automatic payout | Insurer **Prepare settlement**; Bank **Payouts → Execute payout** | The approval certificate binds claim version, amount and evidence; the Bank pays simulated BDT and the claim reads SETTLED |
+| 7 | Panel path | Show a referred claim (badge **Oracle did not auto-approve**, Oracle card **Panel review**), for example claim 205 or a receipt mismatch per cookbook recipe 2 | Four sealed ballots: three approvals approve, two rejections reject; no auditor sees a vote before sealing their own |
+| 8 | Appeal | Claim 207's record | Rejection, corrected receipt, new claim version, mixed panel, payout |
+| 9 | Fault tolerance | `r2-demo.ps1 StopWorker -Worker 3`, run a claim, then `RestartWorker -Worker 3` | Two of three Oracles still finalise; with fewer, the request times out and the claimant can escalate |
+| 10 | Integrity | Export a claim dossier and verify it against a separate peer readback | Evidence integrity and agreement, not clinical truth |
+
+The detailed clicks, eligible customers and timings for each segment are in the [scenario cookbook](scenario-cookbook.md); the evidence to point at is in the [defence walkthrough](defence-walkthrough.md).
+
+**If something stalls.** `ORACLE_FAILED` means the Oracles did not auto-approve. Read the Oracle card, then prepare the panel. A claim stuck in `ORACLE_PENDING` past the DEMO windows usually means a worker or adapter stopped; check `Status`. A refused write is usually a real business rule. Read the message instead of retrying.
+
+**After the meeting.**
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\r2-demo.ps1 Stop
+```
+
+This keeps every volume, identity and record.
+
+## 24 November 2026 baseline order (historical)
+
 This is the live end-to-end order for the dev-lite medical lab on
-`insurance-dev-lite-190` (chaincode 1.9.0, LevelDB). It shows one
+`insurance-dev-lite-190` (chaincode 1.9.0, LevelDB) as it stood before R1. It shows one
 new customer from sign-up to a Bank-confirmed claim payout. Every amount is
-synthetic BDT. Rehearse it once before the meeting.
+synthetic BDT.
 
 The ledger was rebuilt on 24 November 2026: the sequence-7 package
 (`d6da2d77…`) is committed at sequence 1 on a fresh ledger. It holds a small
@@ -28,7 +73,7 @@ Do not run the automated journeys (`test-dev-lite-*.ps1`,
 `stage-dev-lite-demo.ps1`) on this ledger before the meeting: they add their
 own test partners, packages and customers.
 
-## 1. Start the lab (about 5 minutes)
+### 1. Start the lab (about 5 minutes)
 
 Close other heavy programs first: the laptop has 8 GB of RAM. Start Docker
 Desktop and wait until it reports that it is running.
@@ -63,7 +108,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\dev-lite-app.ps1 -Onboarding
 Open `http://127.0.0.1:3219/workspace` once the window prints "Dev-lite
 application is available".
 
-## 2. Use two browser windows
+### 2. Use two browser windows
 
 A customer can request only five codes per email address per hour, with a
 60-second gap between codes. Do not sign the customer out and in again
@@ -71,7 +116,7 @@ between staff steps. Keep the customer in an InPrivate or Incognito window
 and the staff roles (Insurer, Hospital, Bank) in a normal window. Staff
 sign-in uses the demo identity cards and needs no code.
 
-## 3. Running order
+### 3. Running order
 
 Allow about 25 minutes. Use a new
 customer for each run. The same patient's stays on one day are screened as
@@ -105,7 +150,7 @@ The seed opened premium collection account `**** 7001` at BDT 0 and claims
 reserve account `**** 7002` at BDT 25,00,000. The preflight ledger check reports
 the current balances after recorded premiums and payouts.
 
-## 4. If something stalls
+### 4. If something stalls
 
 - **Too many code requests.** Wait for the time shown, or continue with the
   prepared customer that is already signed in in the other window. Never
@@ -127,7 +172,7 @@ the current balances after recorded premiums and payouts.
   authority, so it is usually a real business rule (wrong role, unpaid
   period, filing deadline).
 
-## Rehearsal record
+### Rehearsal record
 
 On 21 November 2026 (late night) the whole order ran in the browser on
 sequence 7 for a new synthetic customer, Nusrat Jahan (`BI-682PQAHA`). Steps:
@@ -141,7 +186,7 @@ was SETTLED, and the customer balance was BDT 87,750.00. Four customer codes
 were used. That ledger was replaced on 24 November 2026; its records are
 no longer on the network.
 
-## 5. Stop after the meeting
+### 5. Stop after the meeting
 
 Close the application window (Ctrl+C). Then stop the network without
 removing anything:

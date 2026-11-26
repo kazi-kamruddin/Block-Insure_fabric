@@ -1,5 +1,22 @@
 # Medical development workflow
 
+## Current position — R2 on sequence 4 (26 November 2026)
+
+The sections below are dated development records, from the earliest rehearsals (sequences 1–7 on the superseded ledger) to the 24 November seed, R1 and the pre-R2 backup. They stay as history. The current demonstration runs on the retained 24 November ledger at **sequence 4**, package `7240d4c0…82b1`, started and stopped with `scripts\r2-demo.ps1`, and is described in these documents:
+
+| Need | Document |
+| --- | --- |
+| Start, check and stop the stack | `.project-context/08_STARTUP_AND_RECOVERY_COMMANDS.md`, "Current quick start" |
+| Every recipe with clicks, eligible customers and timings | [Scenario cookbook](scenario-cookbook.md) |
+| The meeting order | [Supervisor running order](supervisor-running-order.md), "Current order" |
+| What changed in sequence 4 and its evidence | [Session C record](results/session-c-2026-11-26.md) |
+| Live R2 journeys, payouts and readbacks | [Session A record](results/r2-journeys-2026-11-26.md) |
+| Coverage of the 62 tracked items | [Coverage audit](final-coverage-audit.md) |
+
+Do not run `test-dev-lite-*.ps1`, `stage-dev-lite-demo.ps1`, `seed-dev-lite-demo.ps1`, `network.sh reset` or `CleanBootstrap` against the retained ledger. They create their own fixtures or reset state.
+
+## Development history
+
 Dev-lite uses `insurance-dev-lite-190` and `data/dev-lite`. The accepted
 deployment has a separate channel, package, identities and storage.
 
